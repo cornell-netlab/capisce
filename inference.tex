@@ -1,0 +1,230 @@
+\documentclass{article}
+
+\usepackage{amsmath, amsthm, array, stmaryrd}
+\usepackage{booktabs}
+\usepackage{todonotes}
+
+\title{Notes on Control Plane Inference}
+\author{Eric Campbell}
+
+
+\newcommand{\NumRows}{\mathsf{numrows}}
+\newcommand{\MatchRow}{\mathsf{keys}}
+\newcommand{\ActionRow}{\mathsf{action}}
+\newcommand{\ActionDataRow}{\mathsf{data}}
+
+\begin{document}
+
+\maketitle
+
+\section{Preliminaries}
+
+Let a data plane program $p \in \mathsf{DProg}$ be defined by the following grammar:
+
+\[\begin{array}{lcl}
+    p & ::= & \mathsf{skip}\\
+      & \mid & f := e \\
+      & \mid & \mathsf{assert}~b \\
+      & \mid & \mathsf{assume}~b \\
+      & \mid & p;p \\
+      & \mid & p [] p \\
+      & \mid & t.apply() \\
+  \end{array}
+\]
+
+Where $b$ is a boolean logic over bitvectors expressions $e$, and
+$t$ is a table as defined in Avenir.
+
+Let $\delta$ be Control plane edits defined by the grammar
+\[\begin{array}{lcl}
+    \delta & ::= & \mathsf{Add}_t(\vec m,a(\vec k)) \\
+           & \mid & \mathsf{Del}_t(\vec m) \\             
+  \end{array}\]
+
+Write $\delta.\mathit{keys}$ to be the list of keys $\vec m$. When
+$\delta$ is an \textsf{Add} operation, write $\delta.\mathit{action}$
+to indicate the action $a$, and write $\delta.\mathit{data}$ to
+indicate the argument list $\vec k$. For any list $\vec x$ write
+$\vec x[i]$ for element $x_i$.
+
+Define a control plane instance $\sigma$ to be a list of edits
+$\delta$, and is minimal if there are no deletions and no shadowed
+insertions. An insertion $\delta = \mathsf{Add}_t(\vec m, a(\vec k))$
+is \emph{shadowed} in an instance $\sigma$ if $\sigma[i] = \delta$ and
+every packet that matches $\delta$ matches a preceeding rule
+$\sigma[j]$, $0 \leq k < i$. An instance $\sigma$ is minimal for a
+program $p$ if for all $\sigma'$ such that
+$\llbracket p[\sigma] \rrbracket = \llbracket p[\sigma'] \rrbracket$,
+then $|\sigma| \leq |\sigma'|$.
+
+The operation $\sigma(t)$ selects all the operations on table
+$t$ in $\sigma$. To apply the edits $\sigma$ to a program $p$ as is
+done in Avenir, write $p[\sigma] \in \mathsf{DProg}$.
+
+
+Let $\varphi$ be a control plane constraint modelled by minimal lists
+of edits. For a table $t$ let $t[i]$ be a record
+$\{\MatchRow = \vec m; \ActionRow = \vec a; \ActionDataRow = \vec k\}$
+representing the $i$th row in that table.  We can describe $\varphi$
+by the boolean combinations of (in)equalities over the following
+variables.
+\begin{center}
+\begin{tabular}{lll}
+  \toprule
+  Variable & Semantics on minimal $\sigma$\\
+  \midrule
+  $t.\NumRows$ & Denotes the number of edits in table $t$\\
+  $t[i].\MatchRow(j)$ & In table $t$ the $j$th key in row $i$\\
+  $t[i].\ActionRow$ & In table $t$ the action selected in row $i$\\
+  $t[i].\ActionDataRow(j)$ & in table $t$ the $i$th action argument in row $i$\\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+Then the grammar we get is:
+\[
+  \begin{array}{lcl}
+    \varphi &::=& \bot \\
+            & \mid & \varphi \Rightarrow \varphi \\
+            & \mid & e < e  \\
+    e       & ::= & n \\
+            & \mid & [n]_w \\
+            & \mid & t \\
+            & \mid & e[i] \\
+            & \mid & e.\NumRows \\
+            & \mid & e.\MatchRow \\
+            & \mid & e.\ActionRow \\
+            & \mid & e.\ActionDataRow \\
+  \end{array} 
+\]
+
+We use $\psi$ to denote a formula that intermingles the control plane
+variables above with dataplane variables like \texttt{ipv4.src\_addr}.
+
+We write the modelling relation $\sigma \models \varphi$ to indicate
+that $\sigma$ satisfies $\varphi$ in the standard
+way with respect to the above semantics.
+
+\[
+  \begin{array}{rcl}
+    \sigma \models \bot &\iff & \mathit{never} \\
+    \sigma \models \varphi_1 \Rightarrow \varphi_2 & \iff & \sigma \not\models \varphi_1,~\text{or}~\sigma \models \varphi_2 \\
+    \sigma \models e_1 < e_2 &\iff& \llbracket e_1 \rrbracket \sigma < \llbracket e_2 \rrbracket \sigma \\\\
+    % \llbracket n \rrbracket \sigma & = & n \\
+    % \llbracket [n]_w \rrbracket \sigma & = & [n]_w \\
+    % \llbracket t \rrbracket \sigma & = & \sigma(t) \\
+    % \llbracket e[i] \rrbracket \sigma & = & \sigma(t)[i], \mathit{where},~\llbracket e \rrbracket \sigma = \sigma(t),  \\
+    % \llbracket e.\NumRows \rrbracket \sigma & = &  |\sigma(t)|, \mathit{where}~\llbracket e \rrbracket \sigma = \sigma(t)[i], \\    
+    % \vdots
+  \end{array}
+\]
+
+\section{The Problem}
+
+Given a program $p$, compute $\varphi$ such that for all
+instantiations $\sigma$, $\sigma \models \varphi$ if (and
+only if) one of the following (equivalent expressions) holds:
+\begin{enumerate}
+\item $\forall \mathit{pkt}. \llbracket p[\sigma]\rrbracket~\mathit{pkt} \neq \bot$
+\item $\mathit{wp}(p[\sigma], \top)$ is valid
+\end{enumerate}
+
+Our proposed solution is to instrument $p$ with ghost variables to
+(completely) describe the unknowns in the program. Write the
+instrumented program as $\mathcal{I}(p)$. An immediate strategy is to
+replace any table application $t.\mathit{apply}()$, where
+$t = (\mathsf{keys}= \vec k, \mathsf{actions} = \overrightarrow{a(\vec
+  d)})$ which statically has a maxmimum number of rows $n$ with a
+table of the following form:
+\[
+  \begin{array}{ll}
+    \multicolumn{2}{l}{\mathsf{assume} (t.\mathsf{numrows} = 0) []}\\
+    {[]}_{1 \leq r \leq n}
+    & \mathsf{assume}(t.\mathsf{numrows} \geq r)\\
+    & \mathsf{assume}(\bigwedge_l k_l = t[r].\MatchRow(l)); \\
+    & {[]}_j (\mathsf{assume}(j = t[r].\ActionRow); \\
+    & \quad\; \mathsf{assume}(\bigwedge_i d_i = t[r].\ActionDataRow(i)); \\
+    & \quad\; a_j(\vec d)) \\
+    ) 
+  \end{array}
+\]
+This is the approach taken by Avenir's strawman simple synthesis
+algorithm. P4v doesn't do such an enumeratively crazy instrumentation
+procedure---it uses only one table row $t[0]$ rather than $n$ table
+rows. More care is needed to figure out whether these are different or
+the same.
+
+Once we have this instrumentation, we can compute a verification
+condition (VC), to constrain the ``safe'' behavior of the instrumented
+program $\mathcal{I}(p)$. For the time being, we'll use the weakest
+precondition predicate transformer
+$\mathit{wp}(\mathcal{I}(p), \top)$, and notate the result as
+$\psi_p$. Notice that this formula $\psi_p$ may contain both
+dataplane variables, like $\texttt{ipv4.srcAddr}$ and control plane
+ghost variables, like $t[i].\MatchRow(l)$. Write
+$\psi_p[\vec{\texttt{d}},\vec{\mathsf{c}}]$ to denote that the free
+variables of $\psi_p$ are the union of the dataplane variables
+$\{\texttt{d}_1, \ldots,\texttt{d}_n\}$ and the control plane variables
+$\{\mathsf{c}_1, \ldots, \mathsf{c}_m\}$.
+
+Now we can reformulate the problem entirely logically. Given a program
+$p$ and its corresponding instrumented verification condition
+$\psi_p$, compute a controller constraint $\varphi$ such that the following equation is valid
+\[\forall \vec{\texttt{d}}.~\psi_p[\vec{\texttt{d}},\vec{\mathsf{c}}] \iff \varphi[\vec{\mathsf{c'}}] \]
+Now we only need to investigate a quantifier elimination algorithm for
+the variables $\vec{\texttt{d}}$. The standard algorithm (replace
+every $\texttt{d}_i$ of sort $\texttt{(\_~BitVec~n)}$ with every
+element in $\mathbf{2}^n$) for fixed-width bitvector theories is
+intractable: a standard ethernet frame is $1500$ bits, and the number
+of corresponding disjunctions is $2^{1500} = 10^{451.5\ldots}$, which
+is far greater than the $10^{82}$ atoms in the universe.
+
+However, I believe we can support a complete collection of rewrite
+rules to eliminate these variables based leveraging the known
+invariants about the program \& formula structures.
+
+\section{An Incremental Problem Statement}
+
+Writing an instrumentation function for these indexed variables seems
+difficult. Instead lets just concentrate on a single new insertion at
+a time into a table $t$. This way, we can simply just insert the
+instrumented edit
+\[?\delta_t = \mathsf{Add}(\langle t.\MatchRow(0),\ldots,
+  t.\MatchRow(n-1)\rangle, t.\ActionRow(t.\ActionDataRow(0), \ldots,
+  t.\ActionDataRow(m-1)))\] where $n$ is the number of keys in table
+$t$, and $m$ is the maximum number of action data parameters that any
+action in $t$ has. For this incremental solution we can omit the
+subscripts, because there's only one rule being added.
+
+\begin{quote}
+  \it Given a program $p$, a table $t$, and a minimal instantiation
+  $\sigma$ compute the weakest formula $\varphi$ such that
+  $\mathit{wp}(p[\sigma;?\delta_t],\top) \Rightarrow \varphi$.
+\end{quote}
+
+\subsection{One Possible Solution}
+
+We can write a formula $\psi = \mathit{wp}(p[\sigma;\varphi],\top)$, as
+\[\forall d_1,\ldots, d_n. \psi[c_1,\ldots,c_n,d_1,\ldots,d_m]\]
+where the variables $d_i$ are dataplane variables like
+\texttt{ipv4.src\_addr} and the variables $d_1, \ldots, d_m$ are
+controllable variables like $t.\MatchRow(j)$, and
+$\{d_1,\ldots, d_m, c_1,\ldots, c_n\}$ are all the free variables of $\varphi_{\mathit{vc}}$
+
+Then, compute a solution $\varphi$ by performing quantifier
+elimination on the $d_1,\ldots,d_n$.
+
+This is probably untenable to do in the brute-force way. Is there another way?
+
+\subsection{Failed Horn Encoding}
+
+
+Given the above formula $\psi$, solve following CHC for $H$
+
+\[H \leftarrow \forall \vec d.\psi[\vec d, \vec c]\]
+
+This will trivially give True.
+
+
+
+\end{document}
