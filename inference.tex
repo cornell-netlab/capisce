@@ -1,8 +1,9 @@
 \documentclass{article}
 
-\usepackage{amsmath, amsthm, array, stmaryrd}
+\usepackage{amsmath, amsthm, array, stmaryrd, latexsym}
 \usepackage{booktabs}
 \usepackage{todonotes}
+\usepackage{float}
 
 \title{Notes on Control Plane Inference}
 \author{Eric Campbell}
@@ -125,7 +126,7 @@ Given a program $p$, compute $\varphi$ such that for all
 instantiations $\sigma$, $\sigma \models \varphi$ if (and
 only if) one of the following (equivalent expressions) holds:
 \begin{enumerate}
-\item $\forall \mathit{pkt}. \llbracket p[\sigma]\rrbracket~\mathit{pkt} \neq \bot$
+\item $\forall \mathit{pkt}. \llbracket p[\sigma]\rrbracket~\mathit{pkt} \neq \mathsf{error}$
 \item $\mathit{wp}(p[\sigma], \top)$ is valid
 \end{enumerate}
 
@@ -170,7 +171,9 @@ $\{\mathsf{c}_1, \ldots, \mathsf{c}_m\}$.
 Now we can reformulate the problem entirely logically. Given a program
 $p$ and its corresponding instrumented verification condition
 $\psi_p$, compute a controller constraint $\varphi$ such that the following equation is valid
-\[\forall \vec{\texttt{d}}.~\psi_p[\vec{\texttt{d}},\vec{\mathsf{c}}] \iff \varphi[\vec{\mathsf{c'}}] \]
+%% \[(\forall \vec{\texttt{d}}.~\psi_p[\vec{\texttt{d}},\vec{\mathsf{c}}]) \iff \varphi[\vec{\mathsf{c'}}] \]
+\[\varphi[\vec{\mathsf{c}}] \Rightarrow \psi_p[\vec{\texttt{d}},\vec{\mathsf{c}}] \]
+
 Now we only need to investigate a quantifier elimination algorithm for
 the variables $\vec{\texttt{d}}$. The standard algorithm (replace
 every $\texttt{d}_i$ of sort $\texttt{(\_~BitVec~n)}$ with every
@@ -183,12 +186,374 @@ However, I believe we can support a complete collection of rewrite
 rules to eliminate these variables based leveraging the known
 invariants about the program \& formula structures.
 
-\section{An Incremental Problem Statement}
+\section{Examples}
 
-Writing an instrumentation function for these indexed variables seems
-difficult. Instead lets just concentrate on a single new insertion at
-a time into a table $t$. This way, we can simply just insert the
-instrumented edit
+There are a few questions we want to investigate with examples.
+\begin{enumerate}
+\item \label{question:rowiter}
+  Do we need to consider multiple rows at the same time? In other words, do
+  we need to instrument each table $t$ with a different row for \(t[0]\ldots
+  t[t.\mathsf{maxrows}]\) or is it sufficient to, like P4v, only consider a
+  single row at a time?
+\item \label{question:elimination}
+  Can we eliminate all references to dataplane state in the conditions we
+  generate?
+\end{enumerate}
+
+\subsection{A Multi-Table Example}
+We will construct a pipeline with 3 tables, \(t_i\) for \(i=0,1,2\),
+where each \(t_i\) matches on \(x_i\) and assigns a value to
+\(y_i\).
+\begin{verbatim}
+table ti {
+  keys : xi
+  actions : ai
+  default : ai(i)
+  max_rows : 2
+}
+action ai(y){
+  yi := y
+}
+\end{verbatim}
+
+The control block applies \(t_0\), and then conditionally applies
+\(t_1\) or \(t_2\). The assertion is that \(t_i\) is even for all \(i=0,1,2\).
+
+\begin{verbatim}
+y0 := 0;
+y1 := 0;
+y2 := 0;
+t0.apply();
+if (y0%3 = 0) {
+  t1.apply()
+} else {
+  t2.apply()
+}
+assert y0%2 = 0;
+assert y1%2 = 0;
+assert y2%2 = 0;
+\end{verbatim}
+
+Now, we can instrument this program using the ghost state defined above.
+\begin{verbatim}
+y0 := 0; y1 := 0; y2 := 0;
+assume t0[0].action <= 0;
+assume t0[1].action <= 0;
+assume t0.numrows <= 2;
+{ assume t0.numrows > 0 && t0[0].keys(x0) = x0;
+  assume t0[0].action = 0;
+  y0 := t0[0].data(y)
+} [] {
+ assume not (t0.numrows > 0 && t0[0].keys(x0) = x0);
+ assume t0.numrows > 1  && t0[1].keys(x0) = x0;
+ assume t0[1].action = 0;
+ y0 := t0[1].data(y)
+} [] {
+ assume not (t0.numrows > 0 && t0[0].keys(x0) = x0);
+ assume not (t0.numrows > 1 && t0[1].keys(x0) = x0);
+ y0 := 0
+};
+{assume y0%3 = 0;
+  assume t1[0].action <= 0;
+  assume t1[1].action <= 0;
+  assume t1.numrows <= 2;
+  { assume t1.numrows > 0 && t1[0].keys(x1) = x1;
+    assume t1[0].action = 0;
+    y1 := t1[0].data(y)
+  } [] {
+    assume not (t1.numrows > 0 && t1[0].keys(x1) = x1);
+    assume t1.numrows > 1  && t1[1].keys(x1) = x1;
+    assume t1[1].action = 0;
+    y1 := t1[1].data(y)
+  } [] {
+    assume not (t1.numrows > 0 && t1[0].keys(x1) = x1);
+    assume not (t1.numrows > 1 && t1[1].keys(x1) = x1);
+    y1 := 1
+  }
+} [] {
+  assume y0%3 != 0;
+  assume t2[0].action <= 0;
+  assume t2[1].action <= 0;
+  assume t2.numrows <= 2;
+  { assume t2.numrows > 0 && t2[0].keys(x2) = x2;
+    assume t2[0].action = 0;
+    y2 := t2[0].data(y)
+  } [] {
+    assume not (t2.numrows > 0 && t2[0].keys(x2) = x2);
+    assume t2.numrows > 1  && t2[1].keys(x2) = x2;
+    assume t2[1].action = 0;
+    y2 := t2[1].data(y)
+  } [] {
+    assume not (t2.numrows > 0 && t2[0].keys(x2) = x2);
+    assume not (t2.numrows > 1 && t2[1].keys(x2) = x2);
+    y2 := 2
+  }
+}
+assert y0 % 2 = y1 % 2 = y2 % 2 = 0
+\end{verbatim}
+
+And finally, we can compute the weakest precondition to produce a (universally
+closed) condition on variables.
+
+\[
+\begin{array}{l}
+  t_0.\NumRows > 0 \wedge t_0[0].\MatchRow(x_0) = x_0 \\
+  \Rightarrow
+  \begin{array}[t]{l}
+    t_0[0].\ActionDataRow(y) \% 3 = 0 \Rightarrow
+    \begin{array}[t]{l}
+      t_1.\NumRows > 0 \wedge t_1[0].\MatchRow(x_1) = x_1 \\
+      \qquad \Rightarrow t_1[0].\ActionDataRow(y) \% 2 = 0 \wedge t_0[0].\ActionDataRow(y)\% 2 = 0 \\
+      \wedge (\neg (t_1.\NumRows > 0 \wedge t_1[0].\MatchRow(x_1) = x_1) \\
+      \phantom{\wedge(}\wedge (t_1.\NumRows > 1 \wedge t_1[1].\MatchRow(x_1) = x_1) \\
+      \phantom{\wedge(}\Rightarrow t_1[1].\ActionDataRow(y) \% 2 = 0 \wedge t_0[1].\ActionDataRow(y)\% 2 = 0 )\\
+      \wedge (\neg (t_1.\NumRows > 0 \wedge t_1[0].\MatchRow(x_1) = x_1) \\
+      \phantom{\wedge (}\wedge \neg (t_1.\NumRows > 1 \wedge t_1[1].\MatchRow(x_1) = x_1)) \\
+    \end{array} \\
+    \wedge\,t_0[0].\ActionDataRow(y) \% 3 \neq 0 \Rightarrow
+    \begin{array}[t]{l}
+      t_2.\NumRows > 0 \wedge t_2[0].\MatchRow(x_2) = x_2 \\
+      \qquad \Rightarrow t_2[0].\ActionDataRow(y) \% 2 = 0 \wedge t_0[0].\ActionDataRow(y)\% 2 = 0 \\
+      \wedge (\neg (t_2.\NumRows > 0 \wedge t_2[0].\MatchRow(x_2) = x_2) \\
+      \phantom{\wedge(}\wedge (t_2.\NumRows > 1 \wedge t_2[1].\MatchRow(x_2) = x_2) \\
+      \phantom{\wedge(}\Rightarrow t_2[1].\ActionDataRow(y) \% 2 = 0 \wedge t_0[1].\ActionDataRow(y)\% 2 = 0 )\\
+      \wedge (\neg (t_2.\NumRows > 0 \wedge t_2[0].\MatchRow(x_2) = x_2) \\
+      \phantom{\wedge (}\wedge \neg (t_2.\NumRows ? 1 \wedge t_2[1].\MatchRow(x_2) = x_2) \\
+      \phantom{\wedge (} t_0[1].\ActionDataRow(y) \% 2 = 0)
+    \end{array}
+  \end{array} \\
+  t_0.\NumRows > 1 \wedge t_0[1].\MatchRow(x_0) = x_0 \\
+  \wedge \neg (t_0.\NumRows > 0 \wedge t_0[0].\MatchRow(x_0) = x_0 ) \\
+  \Rightarrow
+  \begin{array}[t]{l}
+    t_0[1].\ActionDataRow(y) \% 3 = 0 \Rightarrow
+    \begin{array}[t]{l}
+      t_1.\NumRows > 0 \wedge t_1[0].\MatchRow(x_1) = x_1 \\
+      \qquad \Rightarrow t_1[0].\ActionDataRow(y) \% 2 = 0 \wedge t_0[1].\ActionDataRow(y)\% 2 = 0 \\
+      \wedge (\neg (t_1.\NumRows > 0 \wedge t_1[0].\MatchRow(x_1) = x_1) \\
+      \phantom{\wedge(}\wedge (t_1.\NumRows > 1 \wedge t_1[1].\MatchRow(x_1) = x_1) \\
+      \phantom{\wedge(}\Rightarrow t_1[1].\ActionDataRow(y) \% 2 = 0 \wedge t_0[1].\ActionDataRow(y)\% 2 = 0 )\\
+      \wedge ((t_1.\NumRows > 0 \wedge t_1[0].\MatchRow(x_1) = x_1) \\
+      \phantom{\wedge (}\vee (t_1.\NumRows ? 1 \wedge t_1[1].\MatchRow(x_1) = x_1)) \\
+    \end{array} \\
+    \wedge\,t_0[1].\ActionDataRow(y) \% 3 \neq 0 \Rightarrow
+    \begin{array}[t]{l}
+      t_2.\NumRows > 0 \wedge t_2[0].\MatchRow(x_2) = x_2 \\
+      \qquad \Rightarrow t_2[0].\ActionDataRow(y) \% 2 = 0 \wedge t_0[1].\ActionDataRow(y)\% 2 = 0 \\
+      \wedge (\neg (t_2.\NumRows > 0 \wedge t_2[0].\MatchRow(x_2) = x_2) \\
+      \phantom{\wedge(}\wedge (t_2.\NumRows > 1 \wedge t_2[1].\MatchRow(x_2) = x_2) \\
+      \phantom{\wedge(}\Rightarrow t_2[1].\ActionDataRow(y) \% 2 = 0 \wedge t_0[1].\ActionDataRow(y)\% 2 = 0 )\\
+      \wedge (\neg (t_2.\NumRows > 0 \wedge t_2[0].\MatchRow(x_2) = x_2) \\
+      \phantom{\wedge (}\wedge \neg (t_2.\NumRows ? 1 \wedge t_2[1].\MatchRow(x_2) = x_2) \\
+      \phantom{\wedge (} t_0[1].\ActionDataRow(y) \% 2 = 0)
+    \end{array}
+  \end{array} \\
+  \neg (t_0.\NumRows > 0 \wedge t_0[0].\MatchRow(x_0) = x_0) \\
+  \wedge \neg (t_0.\NumRows > 1 \wedge t_0[1].\MatchRow(x_0) = x_0 ) \\
+  \Rightarrow
+  \begin{array}[t]{l}
+    t_1.\NumRows > 0 \wedge t_1[0].\MatchRow(x_1) = x_1 \\
+    \qquad \Rightarrow t_1[0].\ActionDataRow(y) \% 2 = 0 \\
+    \wedge (\neg (t_1.\NumRows > 0 \wedge t_1[0].\MatchRow(x_1) = x_1) \\
+    \phantom{\wedge(}\wedge (t_1.\NumRows > 1 \wedge t_1[1].\MatchRow(x_1) = x_1) \\
+    \phantom{\wedge(}\Rightarrow t_1[1].\ActionDataRow(y) \% 2 = 0 )\\
+    \wedge ((t_1.\NumRows > 0 \wedge t_1[0].\MatchRow(x_1) = x_1) \\
+    \phantom{\wedge (}\vee (t_1.\NumRows ? 1 \wedge t_1[1].\MatchRow(x_1) = x_1)) \\
+    \end{array}
+\end{array}
+\]
+
+\subsubsection{Question~\ref{question:rowiter}}
+
+For this example, its clear that we dont need the cases for both \(t_i[0]\) and
+\(t_i[1]\) for $i = 1,2,3$, so we can equivalently compute the following
+(universally closed) verification condition.
+
+\[
+\begin{array}{l}
+  t_0.\MatchRow(x_0) = x_0 \\
+  \Rightarrow
+  \begin{array}[t]{l}
+    t_0.\ActionDataRow(y) \% 3 = 0 \Rightarrow
+    \begin{array}[t]{l}
+      t_1.\MatchRow(x_1) = x_1 \\
+      \qquad \Rightarrow t_1.\ActionDataRow(y) \% 2 = 0 \wedge t_0.\ActionDataRow(y)\% 2 = 0 \\
+      \wedge \neg (t_1.\MatchRow(x_1) = x_1 \Rightarrow \bot) \\
+    \end{array} \\
+    \wedge\,t_0.\ActionDataRow(y) \% 3 \neq 0 \Rightarrow
+    \begin{array}[t]{l}
+      t_2.\MatchRow(x_2) = x_2 \\
+      \qquad \Rightarrow t_2.\ActionDataRow(y) \% 2 = 0 \wedge t_0.\ActionDataRow(y)\% 2 = 0 \\
+      \wedge (\neg (t_2.\MatchRow(x_2) = x_2) \\
+      \qquad \Rightarrow t_0.\ActionDataRow(y) \% 2 = 0)
+    \end{array}
+  \end{array} \\\\
+  \wedge \neg (t_0.\MatchRow(x_0) = x_0)
+  \Rightarrow
+  \begin{array}[t]{l}
+    t_1.\MatchRow(x_1) = x_1 \Rightarrow t_1.\ActionDataRow(y) \% 2 = 0 \\
+    \wedge \, \neg(t_1.\MatchRow(x_1) = x_1 \Rightarrow \bot)\\
+    \end{array}
+\end{array}
+\]
+which is similar to p4v's approach.
+
+\subsubsection{Question~\ref{question:elimination}}
+
+Looking at these examples, its not clear that we can eliminate the dataplane
+state, which occurs only in the form of match conditions. Specifically,
+dataplane state occurs only in the formula as expressions the form
+\(t_i.\MatchRow(x_i) = x_i \Rightarrow \varphi\), where \(\varphi\) is some
+further formula that may intermingle control and dataplane state.
+
+Inspecting the formula above, my intuition tells me that we should be able to
+come up with a rewrite rule that replaces these occurences with \(\top\),
+resulting in a formula with shape.
+
+\[
+\begin{array}{l}
+  \begin{array}[t]{l}
+    t_0.\ActionDataRow(y) \% 3 = 0 \Rightarrow
+    \begin{array}[t]{l}
+      t_1.\ActionDataRow(y) \% 2 = 0 \wedge t_0.\ActionDataRow(y)\% 2 = 0 \\
+    \end{array} \\
+    \wedge\,t_0.\ActionDataRow(y) \% 3 \neq 0 \Rightarrow
+    \begin{array}[t]{l}
+      t_2.\ActionDataRow(y) \% 2 = 0 \wedge t_0.\ActionDataRow(y)\% 2 = 0 \\
+    \end{array}
+  \end{array} \\
+  \,\,\,\wedge\, t_1.\ActionDataRow(y) \% 2 = 0 \\
+\end{array}
+\]
+
+which constraints only controllable variables.
+
+However, we have completely lost the fact that no packet may miss in table
+\(t_1\), which is encoded in the raw formula. More care is needed here.
+
+
+\subsection{Existential Example}
+
+For a while I've been concerned with the issue of control plane conditions of
+the form \[\forall \rho_1 \in t_1, \exists \rho_2 \in t_2,\] because I was
+afraid that this row existence wouldn't be captured in the predicate transformer
+semantics. This is related to Question~\ref{question:rowiter}---the multiplicity
+of rows is intended to enable this kind of fine-grained approach.
+
+It seems that we \emph{can} recover the existential information from the weakest
+preconditions constructed from instrumenting with only a single rule.
+
+Consider the following program that focuses on a single header instance \texttt{h}.
+\begin{figure}[H]
+  \begin{minipage}{0.32\textwidth}
+\begin{verbatim}
+control {
+  out := 0;
+  h.setInvalid();
+  t1.apply();
+  if(h.isValid()){
+    t2.apply();
+    assert out!=0;
+  }
+}
+\end{verbatim}
+  \end{minipage} \begin{minipage}{0.39\textwidth}
+\begin{verbatim}
+table t1 {
+  keys = x : exact;
+  acts : set_h
+  default_action : nop
+}
+table t2 {
+  keys = h.f:exact;
+  acts = {nop; set_out}
+  default_action = nop;:
+}
+\end{verbatim}
+  \end{minipage} \begin{minipage}{0.27\textwidth}
+\begin{verbatim}
+action set_h(f)  {
+  h.setValid();
+  h.f := x;
+}
+action set_out (o) {
+  out := o
+}
+action nop () {}
+\end{verbatim}
+\end{minipage}
+\end{figure}
+
+Notice that the control plane must satisfy the following condtion for the assertion to never fail:
+\[ \forall \rho_1 \in t_1.~\exists \rho_2 \in t_2.~\rho_2.\MatchRow(h.f) = \rho_1.\ActionDataRow(f) \wedge \rho_2.\ActionDataRow(o) \neq 0 \]
+
+If we follow the single-row-per-table instrumentation strategy, we compute the
+following condition:
+
+\[\begin{array}{l}
+t_1.\MatchRow(x) = x \Rightarrow \\
+\quad t_2.\MatchRow(h.f) = t_1.\ActionDataRow(f) \\
+\quad \wedge t_2.\ActionDataRow(o) \neq 0
+\end{array}\]
+
+which bears a striking resemblence to the condition above. We can typset them side-by-side to highlight the similarities.
+
+\[\begin{array}{lcl}
+t_1.\MatchRow(x) = x \Rightarrow && \forall \rho_1 \in t_1. \\
+\quad t_2.\MatchRow(h.f) = t_1.\ActionDataRow(f) & \leadsto & \quad \exists \rho_2 \in t_2.~\rho_2.\MatchRow(h.f) = \rho_1.\ActionDataRow(f) \\
+\qquad \wedge t_2.\ActionDataRow(o) \neq 0 && \qquad \wedge\rho_2.\ActionDataRow(o) \neq 0
+\end{array}
+\]
+
+This provides evidence for the p4v approach, in repsonse to Question~\ref{question:rowiter}.
+
+\subsection{Hypothesizing Transformations}
+
+In response to Question~\ref{question:eliminations}, we can hypothesize the
+following transformation rules in response to the above example, where
+\(t.\mathsf{o}\) represents an arbitrary access to table \(t\), \(\texttt{d}\)
+represents dataplane state,
+
+\[\begin{array}{l>{\leadsto}cr}
+t.\MatchRow(x) = x \rightarrow \phi && \forall \rho \in t. \phi \\
+t.\mathsf{o} = t'.\mathsf{o'} \wedge \phi && \exists \rho \in t'. \phi \\
+t.\mathsf{o} = n && \rho.\mathsf{o} = n \\
+\end{array}\]
+
+An example of each of these can be seen in the example above.
+
+However, these rules as stated are incorrect, they must aqcuire and maintain
+some context. For example, in the final rule, mapping tests liket $t.\mathsf(o)
+= 0$, we need to know which \(\rho\) row-variable corresponds to the \(t\).
+
+Not only that, but we also need to know how to bind the variables. For example,
+how would we translate a rule like
+\[t_1.\MatchRow = 6 \Rightarrow t_2.\MatchRow = 7\]
+
+The set of hypothesized rules suggests that this should become
+\[\forall \rho_1 \in t_1. \rho_1.\MatchRow = 6 \Rightarrow \exists \rho_2 \in t_2. \rho_2.\MatchRow = 7\]
+
+Some random thoughts
+\begin{enumerate}
+\item Context seems important
+\item Can we generalize this into only introducing one operator? It seems like
+  both of the quantifier introduction rules could be replaced by a local
+  \(\exists\)-quantifiaction,
+\item We need more examples and a more formal approach. Can we derive these rules?
+\end{enumerate}
+
+
+
+\subsection{Additional Examples}
+More examples are needed to investigate
+Questions~\ref{question:rowiter}\&\ref{question:elimination}.
+
+\clearpage
+\section{(OUTDATED) An Incremental Problem Statement}
+
+Writing an instrumentation function for these indexed variables seems difficult.
+Instead lets just concentrate on a single new insertion at a time into a table
+$t$. This way, we can simply just insert the instrumented edit
 \[?\delta_t = \mathsf{Add}(\langle t.\MatchRow(0),\ldots,
   t.\MatchRow(n-1)\rangle, t.\ActionRow(t.\ActionDataRow(0), \ldots,
   t.\ActionDataRow(m-1)))\] where $n$ is the number of keys in table
