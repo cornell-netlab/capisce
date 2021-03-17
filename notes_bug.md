@@ -18,14 +18,15 @@ control {
 What condition can we imagine for the control plane such that this never
 occurs?
 ```
-∃ ρ ∈ t. ρ.key[0] = 4
- ∧ ∀ ρ ∈ t. ρ.key[0] ≠ ρ.data[0]
+∀ t : row list.
+  ∃ ρ ∈ t. ρ.key[0] = 4 
+   ∧ ∀ ρ ∈ t. ρ.key[0] ≠ ρ.data[0]
 ```
 
 However, there is only one key and one action datum so we will omit the index
 moving forward, i.e. we can write the condition as
 ```
-∃ ρ ∈ t. ρ.key = 4
+(∃ ρ ∈ t. ρ.key = 4)
  ∧ ∀ ρ ∈ t. ρ.key ≠ ρ.data
 ```
 
@@ -75,6 +76,25 @@ So the condition we really mean is
 ∀ z. ∀ t ⊆ row. ∀ ρ ∈ t.
     (ρ.key = z ⇒ ρ.data ≠ z)
     ∧ (ρ.key ≠ z ⇒ z ≠ 4)
+==
+(∀ z. ∀ t ⊆ row. ∀ ρ ∈ t.
+  (ρ.key = z ⇒ ρ.data ≠ z))
+ ∧ 
+(∀ z. ∀ t ⊆ row. ∀ ρ ∈ t.
+ (z = 4 ⇒ ρ.key = z))
+==
+(∀ z. ∀ t ⊆ row. ∀ ρ ∈ t.
+  (ρ.key = z ⇒ ρ.data ≠ z))
+ ∧ 
+(∀ t ⊆ row. ∀ ρ ∈ t.
+ (ρ.key = 4))
+```
+
+```
+ ???
+ hit(t) ⇒ t.data ≠ z
+ ∧
+ miss(t) ⇒ z ≠ 4
 ```
 
 But this is not correct! Consider the following model `m`:
@@ -100,12 +120,12 @@ assert x ≠ z
 which triggers no assertion error.
 
 However this behavior _is not_ allowed by the computed condition
-``````
+```
 ((ρ.key = z ⇒ ρ.data ≠ z) ∧ (ρ.key ≠ z ⇒ z ≠ 4))[m]
 = (3 = 4 ⇒ 4 ≠ 4) ∧ (3 ≠ 4 ⇒ 4 ≠ 4)
 = ⊤ ∧ ⊥
 = ⊥
-``````
+```
 
 While it is allowed by the handwritten condition:
 ```
@@ -143,3 +163,107 @@ which would give us the condition
 ```
 
 Which returns us to the problem of quantifier elimination for `z`.
+
+
+## Formalizing Encoding
+
+```
+(Values)
+v :: = [n]_w list
+
+(Row)
+ρ ::= {keys : v list; action: Nat; data: v list}
+
+(Expr)
+e ::= v
+    | x
+    | ρ.key[i]
+    | ρ.data[i]
+    | e (op) e
+
+(Form)
+ϕ ::= ⊥ | ϕ → ϕ | e = e | ∀ x ∈ Q. e[x]
+
+(Cmd)
+c :: = 
+   | assume ϕ
+   | assert ϕ
+   | f := e
+   | c [] c
+   | c ; c
+   | t.apply()
+   
+(GCL)
+c :: = 
+   | assume ϕ
+   | assert ϕ
+   | f := e
+   | c [] c
+   | c ; c
+   
+(Action)
+a ::= {data : var list, cmd : c} 
+    (* |  λ x₁,…,xₙ. c *)
+    
+(Table)
+t ::= { 
+  name : Ident;
+  keys : x list;
+  actions : a list;
+  default : c
+}
+```
+
+Now we have one goal.
+
+We want to write down an encoding function `encode(c) : Cmd → Cmd ∖ {t.apply()}` such that the
+following theorem holds.
+
+Theorem. Encoding Soundness.
+   ∀ c ∈ Cmd. ∀ ϕ ∈ Form.
+   ∀ p ∈ Pkt. ∀ σ ∈ State.
+     σ,pkt ⊧ wp(c[~], ϕ)
+     ⇒
+    〚c[σ]〛pkt ⊧ ϕ
+.
+
+
+Theorem. Encoding Universality.
+   ∀ c ∈ Cmd. ∀ ϕ ∈ Form.
+   ∀ p ∈ Pkt. ∀ σ ∈ State.
+    〚c[σ]〛pkt ⊧ ϕ
+     ⇒
+     σ,pkt ⊧ wp(c[~], ϕ)
+.
+
+Proof. TODO. 
+
+To prove this, we need to write some helpers, `〚c〛σ pkt`, `⊧` and `encode`.
+
+Goal 1. define algo and c[~] such that:
+
+Theorem. 
+   ∀ c ∈ Cmd. ∀ ϕ ∈ Form.
+   ∀ σ ∈ State. ∀ ψ ∈ Form.
+    (∀ pkt ∈ Pkt. 〚c[σ]〛pkt ⊧ ϕ)
+    ∧ algo(wp(c[~], ϕ))) = ψ
+    ∧ ψ is defined
+    ⇒
+    σ ⊧ ψ
+.
+
+Goal 2. define wfcmd and wfform such that:
+
+Theorem. 
+   ∀ c ∈ Cmd. ∀ ϕ ∈ Form.
+   ∀ σ ∈ State. ∀ ψ ∈ Form.
+    (∀ pkt ∈ Pkt. 〚c[σ]〛pkt ⊧ ϕ)
+    ∧ wfcmd(c) ∧ wfform(ϕ)
+    ⇒
+    σ ⊧ ψ
+    ∧ algo(wp(c[~], ϕ))) = ψ
+    ∧ ψ is defined
+.
+
+
+
