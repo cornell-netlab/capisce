@@ -57,7 +57,7 @@
 \newcommand{\choiceop}{\rotatebox[origin=c]{90}{$\sqsubset\!\!\!\sqsupset$}}
 \newcommand{\choice}{\mathbin{\choiceop}}
 \DeclareMathOperator*{\bigchoice}{\scalerel*{\choiceop}{\sum}}
-\renewcommand{\choose}[2]{\mathsf{choose}~#1~\mathsf{from}~#2}
+\renewcommand{\choose}[2]{\mathop{\mathsf{choose}~#1~\mathsf{from}~#2~\mathsf{in}}}
 \newcommand{\SKIP}{\mathsf{skip}}
 
 % math
@@ -114,10 +114,10 @@
     c & ::=  & h.f := e & \textit{Assignment}\\
       & \mid & \assert b & \textit{Assertion}\\
       & \mid & \assume b & \textit{Assumption}\\
-      & \mid & \choose \rho t & \textit{Selection} \\
       & \mid & t.\apply() & \textit{Table Application}\\
       & \mid & c;c & \textit{Sequential Composition} \\
     & \mid & c \choice c & \textit{Nondeterministic Choice}\\
+    & \mid & \choose \rho t c & \textit{Selection} \\
     \multicolumn{3}{l}{
       \begin{array}{ll}
         x \in \Var & h \in \Hdr\\
@@ -198,7 +198,7 @@ We can represent other standard boolean operators by using standard encodings:
 \paragraph{Commands}
 Data plane programs $c \in \mathsf{Cmd}$ can be assignments ($h.f := e$),
 assumptions ($\assume b$), assertions ($\assert b$), table application
-($t.\apply()$), nondeterministic selection ($\choose \rho t$), sequential composition ($c_1;c_2$ for two commands $c_1$ and
+($t.\apply()$), lexically-scoped nondeterministic selection ($\choose \rho t c$), sequential composition ($c_1;c_2$ for two commands $c_1$ and
 $c_2$), and nondeterministic choice ($c_1 \choice c_2$ for two commands $c_1$
 and $c_2$).
 
@@ -244,9 +244,9 @@ following conditions hold:
 
 \paragraph{Row Models}
 We also need models $\mu \in \Model$ to indicate which symbolic rows corresponds
-to which concrete rows, i.e. $\Model$ is a map from symbolic rows to concrete
-rows; write $\mu(\rho) = r$ for a model $\mu$, a symbolic row $\rho$, and a
-concrete row $r$.
+to which concrete rows, i.e. $\Model = \SymbRow \rightharpoonup \Row$. We write
+$\mu\{\rho \mapsto r\}$ to extend $\mu$ by mapping $\rho$ to $r$, and write $\mu
+\setminus \rho$, to remove $\rho$ from the map.
 
 \paragraph{Expressions}
 The semantics of expressions is shown in Figure~\label{fig:sem-expr}. Note that
@@ -307,8 +307,8 @@ equality undefined if either argument is undefined.
 
 \paragraph{Command Evaluation}
 Commands are evaluated similar to Avenir in Figure~\ref{fig:com-sem}. The
-notable differences are the inclusion of assertions, the use of a binary
-nondeterminism operator, and a cleaner representation of table application.
+notable differences are the inclusion of assertions, the nondeterminism
+operators, and a cleaner representation of table application.
 
 \begin{figure}[htp]
   \[\begin{array}{l >{\triangleq}cl}
@@ -324,8 +324,9 @@ nondeterminism operator, and a cleaner representation of table application.
       \{(\mu,\pkt)\} & \pkt,\mu \models_\sigma b \\
       \error & \textit{otherwise}
     \end{cases} \\
-    \denote{\choose \rho t}^\sigma~\mu~\pkt &&
-    \bigcup_{r \in \sigma(t)}\{(\pkt,\mu\{\rho \mapsto r\})\}
+    \denote{\choose \rho t c}^\sigma~\mu~\pkt &&
+    \{(\mu'\setminus \rho,\pkt')
+    \mid (\mu',\pkt') \in \denote{c}^\sigma\,(\mu\{\rho\mapsto r\})\,\pkt, r \in \sigma(t)\}
     \\
     \denote{c_1;c_2}^\sigma~\mu~\pkt&&
     \bigcup_{(\mu',\pkt') \in \denote{c_1}^\sigma\,\mu\,\pkt}\denote{c_2}^\sigma~\mu'~\pkt' \\
@@ -335,7 +336,8 @@ nondeterminism operator, and a cleaner representation of table application.
     \begin{cases}
       \denote{c[\vec d/\vec x]}^\sigma~\mu~\pkt,
       & \text{where}~\lambda \vec x.~c = r.\action, \vec d = r.\data \\
-      & \text{where}~r = \argmin_i\{\pkt,\mu \models_\sigma \sigma(t.\id)[i].\matches = t.\keys \} \\
+      & \text{where}~r = \argmin_i\{\pkt,\mu \models_\sigma b_i\} \\
+      & \text{where}~b_i = \sigma(t.\id)[i].\matches = t.\keys \\
       \{(\mu,\pkt)\}, & \mathit{otherwise}
     \end{cases}
   \end{array}\]
@@ -364,7 +366,7 @@ is defined in Figure~\ref{fig:table-elim}
   (\assert b)[\sigma] && \assert b \\
   (c_1;c_2)[\sigma] && c_1[\sigma];c_2[\sigma] \\
   (c_1 \choice c_2)[\sigma] && c_1[\sigma] \choice c_2[\sigma] \\
-  (\choose \rho t)[\sigma] && \textrm{\textcolor{red}{unnecessary, but similar to t.apply}}\\
+  (\choose \rho t c)[\sigma] && \textrm{\textcolor{red}{unnecessary, but similar to t.apply}}\\
   (t.\apply())[\sigma] &&
   \begin{array}[t]{l}
     \{\\
@@ -413,18 +415,19 @@ inspect $\sigma$. We define $c[?]$ in Figure~\ref{fig:table-instrument}.
   (\assert b)[?] && \assert b\\
   (c_1;c_2)[?] && c_1[?];c_2[?]\\
   (c_1 \choice c_2)[?] && c_1[?] \choice c_2[?]\\
-  (\choose \rho t)[?] &&
+  (\choose \rho t c)[?] &&
   \textrm{\textcolor{red}{unnecessary}} \\
   (t.\apply())[?] &&
   \begin{array}[t]{l} \displaystyle
     \{ \\
-    \quad \choose \rho t; \\
-    \quad \assume \rho.\matches = t.\keys; \\
-    \quad \displaystyle \bigchoice_{i=0}^{|t.\action| -1}
+    \quad \choose \rho t \;\{ \\
+    \qquad \assume \rho.\matches = t.\keys; \\
+    \qquad \displaystyle \bigchoice_{i=0}^{|t.\action| -1}
     \left\{\begin{array}{l}
     \assume \rho.\action = i;\\
     t.\action[i](\rho.\data)
     \end{array}\right\}\\
+    \quad \} \\
     \} \choice \{ \\
     \quad \assume \forall \rho \in t. \rho.\matches \neq t.\keys; \\
     \quad \SKIP \\
@@ -505,36 +508,66 @@ inspect $\sigma$. We define $c[?]$ in Figure~\ref{fig:table-instrument}.
       \end{array}
       \]
 
-      Now let's consider the first branch, considering each command sequentially.
-      \[\begin{array}{>{\displaystyle}ll}
-      \denote{\choose \rho t; \assume \rho.\matches = t.\keys}^\sigma~\mu~\pkt \\
-      = \bigcup_{r \in \sigma(t)}\denote{\assume\rho.\matches = t.\keys}^\sigma~\mu\{\rho \mapsto r\}~\pkt
-      & \textrm{by definition of }\denote{-}\\
-      = \{(\mu\{\rho\mapsto r\},\pkt)
-      \mid r \in \sigma(t), \pkt,\mu\{\rho\mapsto r\} \models_\sigma \rho.\matches = t.\keys
-      \}
-      & \textrm{by definitions and set theory} \\
-      = \{(\mu\{\rho \mapsto r\}, \pkt)
-      \mid r \in \sigma(t), \pkt,\mu \models_\sigma r.\matches = t.\keys\}
-      & \textrm{by definitions \textcolor{red}{TODO Lemma}} \\
-      = \{(\mu\{\rho \mapsto r_i\}, \pkt)\}
-      & \textrm{by \textsc{Hit} and \textsc{NoShadow}} \\
+      Now let's consider the first branch, i.e.
+      \[
+      \denote{\choose \rho t \left\{
+        \begin{array}{>{\displaystyle}l}
+          \assume \rho.\matches = t.\keys;\\
+          \bigchoice_{i=0}^{|t.\action| -1}
+          \left\{\begin{array}{l}
+          \assume \rho.\action = i;\\
+          t.\actions[i](\rho.\data)
+          \end{array}\right\}
+        \end{array}\right\}
+      }^\sigma~\mu~\pkt\]
+
+      Compute the following inner result, by definitions and set theory
+      \[
+      \begin{array}{>{\displaystyle}ll}
+      \bigcup_{r \in \sigma(t)}\denote{\begin{array}{>{\displaystyle}l}
+          \assume \rho.\matches = t.\keys;\\
+          \bigchoice_{i=0}^{|t.\action| -1}
+          \left\{\begin{array}{l}
+          \assume \rho.\action = i;\\
+          t.\actions[i](\rho.\data)
+          \end{array}\right\}
+      \end{array}}^\sigma~\mu\{\rho \mapsto r\}~\pkt\\
+      = \bigcup_{
+        \substack{r \in \sigma(t) \\
+          (\mu',\pkt') \in \denote{\assume \rho.\matches = t.\keys}^\sigma\,(\mu\{\rho \mapsto r\})\,\pkt}}
+      \bigcup_{i=0}^{|t.\action| -1}\denote{
+       \begin{array}{l}
+          \assume \rho.\action = i;\\
+          t.\actions[i](\rho.\data)
+      \end{array}}^\sigma~\mu'~\pkt'
+
+      \\\\
+      (\textrm{by \textsc{Hit}, \textsc{NoShadow}, and the definition of }\denote{-}) \\
+      \\
+      = \bigcup_{i=0}^{|t.\action| -1}\denote{
+       \begin{array}{l}
+          \assume \rho.\action = i;\\
+          t.\actions[i](\rho.\data)
+      \end{array}}^\sigma~(\mu\{\rho \mapsto r_i\})~\pkt \\
+      = \bigcup_{j=0}^{|t.\action| -1}\denote{
+       \begin{array}{l}
+          \assume r_i.\action = j;\\
+          t.\actions[j](r_i.\data)
+      \end{array}}^\sigma~(\mu\{\rho \mapsto r_i\})~\pkt \\
+      \textrm{\textcolor{red}{TODO LEMMA}} \\
+      = \denote{t.\actions[r_i.\action](r_i.\data)}^\sigma~(\mu\{\rho \mapsto r_i\})~\pkt \\
+      = \denote{c[r_i.\data/\vec x]}^\sigma~(\mu\{\rho \mapsto r_i\})~\pkt
       \end{array}\]
 
-      Now by the sequential composition rule, we can determine the result of the
-      first branch by computing as follows:
-      \[\begin{array}{>{\displaystyle}ll}
-      \denote{\bigchoice_{i=0}^{|t.\action| -1}
-        \left\{\begin{array}{l}
-        \assume \rho.\action = i;\\
-        t.\actions[i](\rho.\data)
-        \end{array}\right\}
-      }^\sigma~(\mu\{\rho \mapsto r_i\})~\pkt \\
-      = \denote{\denote{c[r_i.\data/\vec x]}^\sigma~(\mu\{\rho \mapsto r\})~\pkt}\\
-      & \textrm{skipping lots of definition steps} \\
-      \end{array}
-      \]
-      \todo[inline]{Need Scoping Rules for $\rho$}
+      Since $\rho$ is fresh in $c$, and consequently in $c[r_i.\data/\vec x]$,
+      then by \textcolor{red}{Lemma},
+      \[\{(\mu'\setminus \rho,\pkt')
+      \mid (\mu', \pkt') \in \denote{c[r_i.\data/\vec x]}^\sigma~(\mu\{\rho \mapsto r_i\})~\pkt\}
+       = \denote{c[r_i.\data/\vec x]}^\sigma~\mu~\pkt
+       \]
+       \todo[inline]{Relies on the fact that $\rho \not \in \mu$, or that $\rho$ is globally fresh}
+
+       The result follows.
 
     \item[\textsc{Miss}]
       \todo[inline]{Should be easy}
