@@ -59,11 +59,9 @@
 \newcommand{\argmin}{\mathop{\textrm{argmin}}}
 
 
-% Old
-\newcommand{\NumRows}{\mathsf{numrows}}
-\newcommand{\MatchRow}{\mathsf{keys}}
-\newcommand{\ActionRow}{\mathsf{action}}
-\newcommand{\ActionDataRow}{\mathsf{data}}
+% Theorems
+\newtheorem{theorem}{Theorem}
+
 
 \begin{document}
 
@@ -324,566 +322,102 @@ nondeterminism operator, and a cleaner representation of table application.
 \end{figure}
 
 
-\subsection{Encoding}
-
-
-
-%% \section{OLD}
-
-%% Let $\delta$ be Control plane edits defined by the grammar
-%% \[\begin{array}{lcl}
-%%     \delta & ::= & \mathsf{Add}_t(\vec m,a(\vec k)) \\
-%%            & \mid & \mathsf{Del}_t(\vec m) \\
-%%   \end{array}\]
-
-%% Write $\delta.\mathit{keys}$ to be the list of keys $\vec m$. When
-%% $\delta$ is an \textsf{Add} operation, write $\delta.\mathit{action}$
-%% to indicate the action $a$, and write $\delta.\mathit{data}$ to
-%% indicate the argument list $\vec k$. For any list $\vec x$ write
-%% $\vec x[i]$ for element $x_i$.
-
-%% Define a control plane instance $\sigma$ to be a list of edits
-%% $\delta$, and is minimal if there are no deletions and no shadowed
-%% insertions. An insertion $\delta = \mathsf{Add}_t(\vec m, a(\vec k))$
-%% is \emph{shadowed} in an instance $\sigma$ if $\sigma[i] = \delta$ and
-%% every packet that matches $\delta$ matches a preceeding rule
-%% $\sigma[j]$, $0 \leq k < i$. An instance $\sigma$ is minimal for a
-%% program $p$ if for all $\sigma'$ such that
-%% $\llbracket p[\sigma] \rrbracket = \llbracket p[\sigma'] \rrbracket$,
-%% then $|\sigma| \leq |\sigma'|$.
-
-%% The operation $\sigma(t)$ selects all the operations on table
-%% $t$ in $\sigma$. To apply the edits $\sigma$ to a program $p$ as is
-%% done in Avenir, write $p[\sigma] \in \mathsf{DProg}$.
-
-
-%% Let $\varphi$ be a control plane constraint modelled by minimal lists
-%% of edits. For a table $t$ let $t[i]$ be a record
-%% $\{\MatchRow = \vec m; \ActionRow = \vec a; \ActionDataRow = \vec k\}$
-%% representing the $i$th row in that table.  We can describe $\varphi$
-%% by the boolean combinations of (in)equalities over the following
-%% variables.
-%% \begin{center}
-%% \begin{tabular}{lll}
-%%   \toprule
-%%   Variable & Semantics on minimal $\sigma$\\
-%%   \midrule
-%%   $t.\NumRows$ & Denotes the number of edits in table $t$\\
-%%   $t[i].\MatchRow(j)$ & In table $t$ the $j$th key in row $i$\\
-%%   $t[i].\ActionRow$ & In table $t$ the action selected in row $i$\\
-%%   $t[i].\ActionDataRow(j)$ & in table $t$ the $i$th action argument in row $i$\\
-%%   \bottomrule
-%% \end{tabular}
-%% \end{center}
-
-%% Then the grammar we get is:
-%% \[
-%%   \begin{array}{lcl}
-%%     \varphi &::=& \bot \\
-%%             & \mid & \varphi \Rightarrow \varphi \\
-%%             & \mid & e < e  \\
-%%     e       & ::= & n \\
-%%             & \mid & [n]_w \\
-%%             & \mid & t \\
-%%             & \mid & e[i] \\
-%%             & \mid & e.\NumRows \\
-%%             & \mid & e.\MatchRow \\
-%%             & \mid & e.\ActionRow \\
-%%             & \mid & e.\ActionDataRow \\
-%%   \end{array}
-%% \]
-
-%% We use $\psi$ to denote a formula that intermingles the control plane
-%% variables above with dataplane variables like \texttt{ipv4.src\_addr}.
-
-%% We write the modelling relation $\sigma \models \varphi$ to indicate
-%% that $\sigma$ satisfies $\varphi$ in the standard
-%% way with respect to the above semantics.
-
-%% \[
-%%   \begin{array}{rcl}
-%%     \sigma \models \bot &\iff & \mathit{never} \\
-%%     \sigma \models \varphi_1 \Rightarrow \varphi_2 & \iff & \sigma \not\models \varphi_1,~\text{or}~\sigma \models \varphi_2 \\
-%%     \sigma \models e_1 < e_2 &\iff& \llbracket e_1 \rrbracket \sigma < \llbracket e_2 \rrbracket \sigma \\\\
-%%     % \llbracket n \rrbracket \sigma & = & n \\
-%%     % \llbracket [n]_w \rrbracket \sigma & = & [n]_w \\
-%%     % \llbracket t \rrbracket \sigma & = & \sigma(t) \\
-%%     % \llbracket e[i] \rrbracket \sigma & = & \sigma(t)[i], \mathit{where},~\llbracket e \rrbracket \sigma = \sigma(t),  \\
-%%     % \llbracket e.\NumRows \rrbracket \sigma & = &  |\sigma(t)|, \mathit{where}~\llbracket e \rrbracket \sigma = \sigma(t)[i], \\
-%%     % \vdots
-%%   \end{array}
-%% \]
-
-%% \section{The Problem}
-
-%% Given a program $p$, compute $\varphi$ such that for all
-%% instantiations $\sigma$, $\sigma \models \varphi$ if (and
-%% only if) one of the following (equivalent expressions) holds:
-%% \begin{enumerate}
-%% \item $\forall \mathit{pkt}. \llbracket p[\sigma]\rrbracket~\mathit{pkt} \neq \mathsf{error}$
-%% \item $\mathit{wp}(p[\sigma], \top)$ is valid
-%% \end{enumerate}
-
-%% Our proposed solution is to instrument $p$ with ghost variables to
-%% (completely) describe the unknowns in the program. Write the
-%% instrumented program as $\mathcal{I}(p)$. An immediate strategy is to
-%% replace any table application $t.\mathit{apply}()$, where
-%% $t = (\mathsf{keys}= \vec k, \mathsf{actions} = \overrightarrow{a(\vec
-%%   d)})$ which statically has a maxmimum number of rows $n$ with a
-%% table of the following form:
-%% \[
-%%   \begin{array}{ll}
-%%     \multicolumn{2}{l}{\mathsf{assume} (t.\mathsf{numrows} = 0) []}\\
-%%     {[]}_{1 \leq r \leq n}
-%%     & \mathsf{assume}(t.\mathsf{numrows} \geq r)\\
-%%     & \mathsf{assume}(\bigwedge_l k_l = t[r].\MatchRow(l)); \\
-%%     & {[]}_j (\mathsf{assume}(j = t[r].\ActionRow); \\
-%%     & \quad\; \mathsf{assume}(\bigwedge_i d_i = t[r].\ActionDataRow(i)); \\
-%%     & \quad\; a_j(\vec d)) \\
-%%     )
-%%   \end{array}
-%% \]
-%% This is the approach taken by Avenir's strawman simple synthesis
-%% algorithm. P4v doesn't do such an enumeratively crazy instrumentation
-%% procedure---it uses only one table row $t[0]$ rather than $n$ table
-%% rows. More care is needed to figure out whether these are different or
-%% the same.
-
-%% Once we have this instrumentation, we can compute a verification
-%% condition (VC), to constrain the ``safe'' behavior of the instrumented
-%% program $\mathcal{I}(p)$. For the time being, we'll use the weakest
-%% precondition predicate transformer
-%% $\mathit{wp}(\mathcal{I}(p), \top)$, and notate the result as
-%% $\psi_p$. Notice that this formula $\psi_p$ may contain both
-%% dataplane variables, like $\texttt{ipv4.srcAddr}$ and control plane
-%% ghost variables, like $t[i].\MatchRow(l)$. Write
-%% $\psi_p[\vec{\texttt{d}},\vec{\mathsf{c}}]$ to denote that the free
-%% variables of $\psi_p$ are the union of the dataplane variables
-%% $\{\texttt{d}_1, \ldots,\texttt{d}_n\}$ and the control plane variables
-%% $\{\mathsf{c}_1, \ldots, \mathsf{c}_m\}$.
-
-%% Now we can reformulate the problem entirely logically. Given a program
-%% $p$ and its corresponding instrumented verification condition
-%% $\psi_p$, compute a controller constraint $\varphi$ such that the following equation is valid
-%% %% \[(\forall \vec{\texttt{d}}.~\psi_p[\vec{\texttt{d}},\vec{\mathsf{c}}]) \iff \varphi[\vec{\mathsf{c'}}] \]
-%% \[\varphi[\vec{\mathsf{c}}] \Rightarrow \psi_p[\vec{\texttt{d}},\vec{\mathsf{c}}] \]
-
-%% Now we only need to investigate a quantifier elimination algorithm for
-%% the variables $\vec{\texttt{d}}$. The standard algorithm (replace
-%% every $\texttt{d}_i$ of sort $\texttt{(\_~BitVec~n)}$ with every
-%% element in $\mathbf{2}^n$) for fixed-width bitvector theories is
-%% intractable: a standard ethernet frame is $1500$ bits, and the number
-%% of corresponding disjunctions is $2^{1500} = 10^{451.5\ldots}$, which
-%% is far greater than the $10^{82}$ atoms in the universe.
-
-%% However, I believe we can support a complete collection of rewrite
-%% rules to eliminate these variables based leveraging the known
-%% invariants about the program \& formula structures.
-
-%% \section{Examples}
-
-%% There are a few questions we want to investigate with examples.
-%% \begin{enumerate}
-%% \item \label{question:rowiter}
-%%   Do we need to consider multiple rows at the same time? In other words, do
-%%   we need to instrument each table $t$ with a different row for \(t[0]\ldots
-%%   t[t.\mathsf{maxrows}]\) or is it sufficient to, like P4v, only consider a
-%%   single row at a time?
-%% \item \label{question:elimination}
-%%   Can we eliminate all references to dataplane state in the conditions we
-%%   generate?
-%% \end{enumerate}
-
-%% \subsection{A Multi-Table Example}
-%% We will construct a pipeline with 3 tables, \(t_i\) for \(i=0,1,2\),
-%% where each \(t_i\) matches on \(x_i\) and assigns a value to
-%% \(y_i\).
-%% \begin{verbatim}
-%% table ti {
-%%   keys : xi
-%%   actions : ai
-%%   default : ai(i)
-%%   max_rows : 2
-%% }
-%% action ai(y){
-%%   yi := y
-%% }
-%% \end{verbatim}
-
-%% The control block applies \(t_0\), and then conditionally applies
-%% \(t_1\) or \(t_2\). The assertion is that \(t_i\) is even for all \(i=0,1,2\).
-
-%% \begin{verbatim}
-%% y0 := 0;
-%% y1 := 0;
-%% y2 := 0;
-%% t0.apply();
-%% if (y0%3 = 0) {
-%%   t1.apply()
-%% } else {
-%%   t2.apply()
-%% }
-%% assert y0%2 = 0;
-%% assert y1%2 = 0;
-%% assert y2%2 = 0;
-%% \end{verbatim}
-
-%% Now, we can instrument this program using the ghost state defined above.
-%% \begin{verbatim}
-%% y0 := 0; y1 := 0; y2 := 0;
-%% assume t0[0].action <= 0;
-%% assume t0[1].action <= 0;
-%% assume t0.numrows <= 2;
-%% { assume t0.numrows > 0 && t0[0].keys(x0) = x0;
-%%   assume t0[0].action = 0;
-%%   y0 := t0[0].data(y)
-%% } [] {
-%%  assume not (t0.numrows > 0 && t0[0].keys(x0) = x0);
-%%  assume t0.numrows > 1  && t0[1].keys(x0) = x0;
-%%  assume t0[1].action = 0;
-%%  y0 := t0[1].data(y)
-%% } [] {
-%%  assume not (t0.numrows > 0 && t0[0].keys(x0) = x0);
-%%  assume not (t0.numrows > 1 && t0[1].keys(x0) = x0);
-%%  y0 := 0
-%% };
-%% {assume y0%3 = 0;
-%%   assume t1[0].action <= 0;
-%%   assume t1[1].action <= 0;
-%%   assume t1.numrows <= 2;
-%%   { assume t1.numrows > 0 && t1[0].keys(x1) = x1;
-%%     assume t1[0].action = 0;
-%%     y1 := t1[0].data(y)
-%%   } [] {
-%%     assume not (t1.numrows > 0 && t1[0].keys(x1) = x1);
-%%     assume t1.numrows > 1  && t1[1].keys(x1) = x1;
-%%     assume t1[1].action = 0;
-%%     y1 := t1[1].data(y)
-%%   } [] {
-%%     assume not (t1.numrows > 0 && t1[0].keys(x1) = x1);
-%%     assume not (t1.numrows > 1 && t1[1].keys(x1) = x1);
-%%     y1 := 1
-%%   }
-%% } [] {
-%%   assume y0%3 != 0;
-%%   assume t2[0].action <= 0;
-%%   assume t2[1].action <= 0;
-%%   assume t2.numrows <= 2;
-%%   { assume t2.numrows > 0 && t2[0].keys(x2) = x2;
-%%     assume t2[0].action = 0;
-%%     y2 := t2[0].data(y)
-%%   } [] {
-%%     assume not (t2.numrows > 0 && t2[0].keys(x2) = x2);
-%%     assume t2.numrows > 1  && t2[1].keys(x2) = x2;
-%%     assume t2[1].action = 0;
-%%     y2 := t2[1].data(y)
-%%   } [] {
-%%     assume not (t2.numrows > 0 && t2[0].keys(x2) = x2);
-%%     assume not (t2.numrows > 1 && t2[1].keys(x2) = x2);
-%%     y2 := 2
-%%   }
-%% }
-%% assert y0 % 2 = y1 % 2 = y2 % 2 = 0
-%% \end{verbatim}
-
-%% And finally, we can compute the weakest precondition to produce a (universally
-%% closed) condition on variables.
-
-%% \[
-%% \begin{array}{l}
-%%   t_0.\NumRows > 0 \wedge t_0[0].\MatchRow(x_0) = x_0 \\
-%%   \Rightarrow
-%%   \begin{array}[t]{l}
-%%     t_0[0].\ActionDataRow(y) \% 3 = 0 \Rightarrow
-%%     \begin{array}[t]{l}
-%%       t_1.\NumRows > 0 \wedge t_1[0].\MatchRow(x_1) = x_1 \\
-%%       \qquad \Rightarrow t_1[0].\ActionDataRow(y) \% 2 = 0 \wedge t_0[0].\ActionDataRow(y)\% 2 = 0 \\
-%%       \wedge (\neg (t_1.\NumRows > 0 \wedge t_1[0].\MatchRow(x_1) = x_1) \\
-%%       \phantom{\wedge(}\wedge (t_1.\NumRows > 1 \wedge t_1[1].\MatchRow(x_1) = x_1) \\
-%%       \phantom{\wedge(}\Rightarrow t_1[1].\ActionDataRow(y) \% 2 = 0 \wedge t_0[1].\ActionDataRow(y)\% 2 = 0 )\\
-%%       \wedge (\neg (t_1.\NumRows > 0 \wedge t_1[0].\MatchRow(x_1) = x_1) \\
-%%       \phantom{\wedge (}\wedge \neg (t_1.\NumRows > 1 \wedge t_1[1].\MatchRow(x_1) = x_1)) \\
-%%     \end{array} \\
-%%     \wedge\,t_0[0].\ActionDataRow(y) \% 3 \neq 0 \Rightarrow
-%%     \begin{array}[t]{l}
-%%       t_2.\NumRows > 0 \wedge t_2[0].\MatchRow(x_2) = x_2 \\
-%%       \qquad \Rightarrow t_2[0].\ActionDataRow(y) \% 2 = 0 \wedge t_0[0].\ActionDataRow(y)\% 2 = 0 \\
-%%       \wedge (\neg (t_2.\NumRows > 0 \wedge t_2[0].\MatchRow(x_2) = x_2) \\
-%%       \phantom{\wedge(}\wedge (t_2.\NumRows > 1 \wedge t_2[1].\MatchRow(x_2) = x_2) \\
-%%       \phantom{\wedge(}\Rightarrow t_2[1].\ActionDataRow(y) \% 2 = 0 \wedge t_0[1].\ActionDataRow(y)\% 2 = 0 )\\
-%%       \wedge (\neg (t_2.\NumRows > 0 \wedge t_2[0].\MatchRow(x_2) = x_2) \\
-%%       \phantom{\wedge (}\wedge \neg (t_2.\NumRows ? 1 \wedge t_2[1].\MatchRow(x_2) = x_2) \\
-%%       \phantom{\wedge (} t_0[1].\ActionDataRow(y) \% 2 = 0)
-%%     \end{array}
-%%   \end{array} \\
-%%   t_0.\NumRows > 1 \wedge t_0[1].\MatchRow(x_0) = x_0 \\
-%%   \wedge \neg (t_0.\NumRows > 0 \wedge t_0[0].\MatchRow(x_0) = x_0 ) \\
-%%   \Rightarrow
-%%   \begin{array}[t]{l}
-%%     t_0[1].\ActionDataRow(y) \% 3 = 0 \Rightarrow
-%%     \begin{array}[t]{l}
-%%       t_1.\NumRows > 0 \wedge t_1[0].\MatchRow(x_1) = x_1 \\
-%%       \qquad \Rightarrow t_1[0].\ActionDataRow(y) \% 2 = 0 \wedge t_0[1].\ActionDataRow(y)\% 2 = 0 \\
-%%       \wedge (\neg (t_1.\NumRows > 0 \wedge t_1[0].\MatchRow(x_1) = x_1) \\
-%%       \phantom{\wedge(}\wedge (t_1.\NumRows > 1 \wedge t_1[1].\MatchRow(x_1) = x_1) \\
-%%       \phantom{\wedge(}\Rightarrow t_1[1].\ActionDataRow(y) \% 2 = 0 \wedge t_0[1].\ActionDataRow(y)\% 2 = 0 )\\
-%%       \wedge ((t_1.\NumRows > 0 \wedge t_1[0].\MatchRow(x_1) = x_1) \\
-%%       \phantom{\wedge (}\vee (t_1.\NumRows ? 1 \wedge t_1[1].\MatchRow(x_1) = x_1)) \\
-%%     \end{array} \\
-%%     \wedge\,t_0[1].\ActionDataRow(y) \% 3 \neq 0 \Rightarrow
-%%     \begin{array}[t]{l}
-%%       t_2.\NumRows > 0 \wedge t_2[0].\MatchRow(x_2) = x_2 \\
-%%       \qquad \Rightarrow t_2[0].\ActionDataRow(y) \% 2 = 0 \wedge t_0[1].\ActionDataRow(y)\% 2 = 0 \\
-%%       \wedge (\neg (t_2.\NumRows > 0 \wedge t_2[0].\MatchRow(x_2) = x_2) \\
-%%       \phantom{\wedge(}\wedge (t_2.\NumRows > 1 \wedge t_2[1].\MatchRow(x_2) = x_2) \\
-%%       \phantom{\wedge(}\Rightarrow t_2[1].\ActionDataRow(y) \% 2 = 0 \wedge t_0[1].\ActionDataRow(y)\% 2 = 0 )\\
-%%       \wedge (\neg (t_2.\NumRows > 0 \wedge t_2[0].\MatchRow(x_2) = x_2) \\
-%%       \phantom{\wedge (}\wedge \neg (t_2.\NumRows ? 1 \wedge t_2[1].\MatchRow(x_2) = x_2) \\
-%%       \phantom{\wedge (} t_0[1].\ActionDataRow(y) \% 2 = 0)
-%%     \end{array}
-%%   \end{array} \\
-%%   \neg (t_0.\NumRows > 0 \wedge t_0[0].\MatchRow(x_0) = x_0) \\
-%%   \wedge \neg (t_0.\NumRows > 1 \wedge t_0[1].\MatchRow(x_0) = x_0 ) \\
-%%   \Rightarrow
-%%   \begin{array}[t]{l}
-%%     t_1.\NumRows > 0 \wedge t_1[0].\MatchRow(x_1) = x_1 \\
-%%     \qquad \Rightarrow t_1[0].\ActionDataRow(y) \% 2 = 0 \\
-%%     \wedge (\neg (t_1.\NumRows > 0 \wedge t_1[0].\MatchRow(x_1) = x_1) \\
-%%     \phantom{\wedge(}\wedge (t_1.\NumRows > 1 \wedge t_1[1].\MatchRow(x_1) = x_1) \\
-%%     \phantom{\wedge(}\Rightarrow t_1[1].\ActionDataRow(y) \% 2 = 0 )\\
-%%     \wedge ((t_1.\NumRows > 0 \wedge t_1[0].\MatchRow(x_1) = x_1) \\
-%%     \phantom{\wedge (}\vee (t_1.\NumRows ? 1 \wedge t_1[1].\MatchRow(x_1) = x_1)) \\
-%%     \end{array}
-%% \end{array}
-%% \]
-
-%% \subsubsection{Question~\ref{question:rowiter}}
-
-%% For this example, its clear that we dont need the cases for both \(t_i[0]\) and
-%% \(t_i[1]\) for $i = 1,2,3$, so we can equivalently compute the following
-%% (universally closed) verification condition.
-
-%% \[
-%% \begin{array}{l}
-%%   t_0.\MatchRow(x_0) = x_0 \\
-%%   \Rightarrow
-%%   \begin{array}[t]{l}
-%%     t_0.\ActionDataRow(y) \% 3 = 0 \Rightarrow
-%%     \begin{array}[t]{l}
-%%       t_1.\MatchRow(x_1) = x_1 \\
-%%       \qquad \Rightarrow t_1.\ActionDataRow(y) \% 2 = 0 \wedge t_0.\ActionDataRow(y)\% 2 = 0 \\
-%%       \wedge \neg (t_1.\MatchRow(x_1) = x_1 \Rightarrow \bot) \\
-%%     \end{array} \\
-%%     \wedge\,t_0.\ActionDataRow(y) \% 3 \neq 0 \Rightarrow
-%%     \begin{array}[t]{l}
-%%       t_2.\MatchRow(x_2) = x_2 \\
-%%       \qquad \Rightarrow t_2.\ActionDataRow(y) \% 2 = 0 \wedge t_0.\ActionDataRow(y)\% 2 = 0 \\
-%%       \wedge (\neg (t_2.\MatchRow(x_2) = x_2) \\
-%%       \qquad \Rightarrow t_0.\ActionDataRow(y) \% 2 = 0)
-%%     \end{array}
-%%   \end{array} \\\\
-%%   \wedge \neg (t_0.\MatchRow(x_0) = x_0)
-%%   \Rightarrow
-%%   \begin{array}[t]{l}
-%%     t_1.\MatchRow(x_1) = x_1 \Rightarrow t_1.\ActionDataRow(y) \% 2 = 0 \\
-%%     \wedge \, \neg(t_1.\MatchRow(x_1) = x_1 \Rightarrow \bot)\\
-%%     \end{array}
-%% \end{array}
-%% \]
-%% which is similar to p4v's approach.
-
-%% \subsubsection{Question~\ref{question:elimination}}
-
-%% Looking at these examples, its not clear that we can eliminate the dataplane
-%% state, which occurs only in the form of match conditions. Specifically,
-%% dataplane state occurs only in the formula as expressions the form
-%% \(t_i.\MatchRow(x_i) = x_i \Rightarrow \varphi\), where \(\varphi\) is some
-%% further formula that may intermingle control and dataplane state.
-
-%% Inspecting the formula above, my intuition tells me that we should be able to
-%% come up with a rewrite rule that replaces these occurences with \(\top\),
-%% resulting in a formula with shape.
-
-%% \[
-%% \begin{array}{l}
-%%   \begin{array}[t]{l}
-%%     t_0.\ActionDataRow(y) \% 3 = 0 \Rightarrow
-%%     \begin{array}[t]{l}
-%%       t_1.\ActionDataRow(y) \% 2 = 0 \wedge t_0.\ActionDataRow(y)\% 2 = 0 \\
-%%     \end{array} \\
-%%     \wedge\,t_0.\ActionDataRow(y) \% 3 \neq 0 \Rightarrow
-%%     \begin{array}[t]{l}
-%%       t_2.\ActionDataRow(y) \% 2 = 0 \wedge t_0.\ActionDataRow(y)\% 2 = 0 \\
-%%     \end{array}
-%%   \end{array} \\
-%%   \,\,\,\wedge\, t_1.\ActionDataRow(y) \% 2 = 0 \\
-%% \end{array}
-%% \]
-
-%% which constraints only controllable variables.
-
-%% However, we have completely lost the fact that no packet may miss in table
-%% \(t_1\), which is encoded in the raw formula. More care is needed here.
-
-
-%% \subsection{Existential Example}
-
-%% For a while I've been concerned with the issue of control plane conditions of
-%% the form \[\forall \rho_1 \in t_1, \exists \rho_2 \in t_2,\] because I was
-%% afraid that this row existence wouldn't be captured in the predicate transformer
-%% semantics. This is related to Question~\ref{question:rowiter}---the multiplicity
-%% of rows is intended to enable this kind of fine-grained approach.
-
-%% It seems that we \emph{can} recover the existential information from the weakest
-%% preconditions constructed from instrumenting with only a single rule.
-
-%% Consider the following program that focuses on a single header instance \texttt{h}.
-%% \begin{figure}[H]
-%%   \begin{minipage}{0.32\textwidth}
-%% \begin{verbatim}
-%% control {
-%%   out := 0;
-%%   h.setInvalid();
-%%   t1.apply();
-%%   if(h.isValid()){
-%%     t2.apply();
-%%     assert out!=0;
-%%   }
-%% }
-%% \end{verbatim}
-%%   \end{minipage} \begin{minipage}{0.39\textwidth}
-%% \begin{verbatim}
-%% table t1 {
-%%   keys = x : exact;
-%%   acts : set_h
-%%   default_action : nop
-%% }
-%% table t2 {
-%%   keys = h.f:exact;
-%%   acts = {nop; set_out}
-%%   default_action = nop;:
-%% }
-%% \end{verbatim}
-%%   \end{minipage} \begin{minipage}{0.27\textwidth}
-%% \begin{verbatim}
-%% action set_h(f)  {
-%%   h.setValid();
-%%   h.f := x;
-%% }
-%% action set_out (o) {
-%%   out := o
-%% }
-%% action nop () {}
-%% \end{verbatim}
-%% \end{minipage}
-%% \end{figure}
-
-%% Notice that the control plane must satisfy the following condtion for the assertion to never fail:
-%% \[ \forall \rho_1 \in t_1.~\exists \rho_2 \in t_2.~\rho_2.\MatchRow(h.f) = \rho_1.\ActionDataRow(f) \wedge \rho_2.\ActionDataRow(o) \neq 0 \]
-
-%% If we follow the single-row-per-table instrumentation strategy, we compute the
-%% following condition:
-
-%% \[\begin{array}{l}
-%% t_1.\MatchRow(x) = x \Rightarrow \\
-%% \quad t_2.\MatchRow(h.f) = t_1.\ActionDataRow(f) \\
-%% \quad \wedge t_2.\ActionDataRow(o) \neq 0
-%% \end{array}\]
-
-%% which bears a striking resemblence to the condition above. We can typset them side-by-side to highlight the similarities.
-
-%% \[\begin{array}{lcl}
-%% t_1.\MatchRow(x) = x \Rightarrow && \forall \rho_1 \in t_1. \\
-%% \quad t_2.\MatchRow(h.f) = t_1.\ActionDataRow(f) & \leadsto & \quad \exists \rho_2 \in t_2.~\rho_2.\MatchRow(h.f) = \rho_1.\ActionDataRow(f) \\
-%% \qquad \wedge t_2.\ActionDataRow(o) \neq 0 && \qquad \wedge\rho_2.\ActionDataRow(o) \neq 0
-%% \end{array}
-%% \]
-
-%% This provides evidence for the p4v approach, in repsonse to Question~\ref{question:rowiter}.
-
-%% \subsection{Hypothesizing Transformations}
-
-%% In response to Question~\ref{question:eliminations}, we can hypothesize the
-%% following transformation rules in response to the above example, where
-%% \(t.\mathsf{o}\) represents an arbitrary access to table \(t\), \(\texttt{d}\)
-%% represents dataplane state,
-
-%% \[\begin{array}{l>{\leadsto}cr}
-%% t.\MatchRow(x) = x \rightarrow \phi && \forall \rho \in t. \phi \\
-%% t.\mathsf{o} = t'.\mathsf{o'} \wedge \phi && \exists \rho \in t'. \phi \\
-%% t.\mathsf{o} = n && \rho.\mathsf{o} = n \\
-%% \end{array}\]
-
-%% An example of each of these can be seen in the example above.
-
-%% However, these rules as stated are incorrect, they must aqcuire and maintain
-%% some context. For example, in the final rule, mapping tests liket $t.\mathsf(o)
-%% = 0$, we need to know which \(\rho\) row-variable corresponds to the \(t\).
-
-%% Not only that, but we also need to know how to bind the variables. For example,
-%% how would we translate a rule like
-%% \[t_1.\MatchRow = 6 \Rightarrow t_2.\MatchRow = 7\]
-
-%% The set of hypothesized rules suggests that this should become
-%% \[\forall \rho_1 \in t_1. \rho_1.\MatchRow = 6 \Rightarrow \exists \rho_2 \in t_2. \rho_2.\MatchRow = 7\]
-
-%% Some random thoughts
-%% \begin{enumerate}
-%% \item Context seems important
-%% \item Can we generalize this into only introducing one operator? It seems like
-%%   both of the quantifier introduction rules could be replaced by a local
-%%   \(\exists\)-quantifiaction,
-%% \item We need more examples and a more formal approach. Can we derive these rules?
-%% \end{enumerate}
-
-
-
-%% \subsection{Additional Examples}
-%% More examples are needed to investigate
-%% Questions~\ref{question:rowiter}\&\ref{question:elimination}.
-
-%% \clearpage
-%% \section{(OUTDATED) An Incremental Problem Statement}
-
-%% Writing an instrumentation function for these indexed variables seems difficult.
-%% Instead lets just concentrate on a single new insertion at a time into a table
-%% $t$. This way, we can simply just insert the instrumented edit
-%% \[?\delta_t = \mathsf{Add}(\langle t.\MatchRow(0),\ldots,
-%%   t.\MatchRow(n-1)\rangle, t.\ActionRow(t.\ActionDataRow(0), \ldots,
-%%   t.\ActionDataRow(m-1)))\] where $n$ is the number of keys in table
-%% $t$, and $m$ is the maximum number of action data parameters that any
-%% action in $t$ has. For this incremental solution we can omit the
-%% subscripts, because there's only one rule being added.
-
-%% \begin{quote}
-%%   \it Given a program $p$, a table $t$, and a minimal instantiation
-%%   $\sigma$ compute the weakest formula $\varphi$ such that
-%%   $\mathit{wp}(p[\sigma;?\delta_t],\top) \Rightarrow \varphi$.
-%% \end{quote}
-
-%% \subsection{One Possible Solution}
-
-%% We can write a formula $\psi = \mathit{wp}(p[\sigma;\varphi],\top)$, as
-%% \[\forall d_1,\ldots, d_n. \psi[c_1,\ldots,c_n,d_1,\ldots,d_m]\]
-%% where the variables $d_i$ are dataplane variables like
-%% \texttt{ipv4.src\_addr} and the variables $d_1, \ldots, d_m$ are
-%% controllable variables like $t.\MatchRow(j)$, and
-%% $\{d_1,\ldots, d_m, c_1,\ldots, c_n\}$ are all the free variables of $\varphi_{\mathit{vc}}$
-
-%% Then, compute a solution $\varphi$ by performing quantifier
-%% elimination on the $d_1,\ldots,d_n$.
-
-%% This is probably untenable to do in the brute-force way. Is there another way?
-
-%% \subsection{Failed Horn Encoding}
-
-
-%% Given the above formula $\psi$, solve following CHC for $H$
-
-%% \[H \leftarrow \forall \vec d.\psi[\vec d, \vec c]\]
-
-%% This will trivially give True.
-
-
+\section{Encoding}
+
+Now we will define a collection of source-to-source translations that deal with
+the controller interface.
+
+\section{Eliminating Tables}
+
+The first thing to do is to define a source-to-source translation that
+eliminates the tables. The observation here is that tables essentially represent
+if-else statements, so once we have a state $\sigma$ in hand we can rewrite the
+program to a command $c[\sigma] \in \Cmd$ that uses no tables. This translation
+is defined in Figure~\ref{fig:table-elim}
+
+\begin{figure}
+  \[\begin{array}{r>{\triangleq}cl}
+  (h.f := e)[\sigma] && h.f := e   \\
+  (\assume b)[\sigma] && \assume b \\
+  (\assert b)[\sigma] && \assert b \\
+  (c_1;c_2)[\sigma] && c_1[\sigma];c_2[\sigma] \\
+  (c_1 \choice c_2)[\sigma] && c_1[\sigma] \choice c_2[\sigma] \\
+  (t.\apply())[\sigma] &&
+  \begin{array}[t]{l}
+    \{\\
+    \quad \assume {r_1.\matches = t.\keys};\\
+    \quad t.\action[r_1.\action](r_1.\data)\\
+    \}~\choice\\
+    \multicolumn{1}{c}{\vdots}\\
+    \choice~\{\\
+    \quad \assume {r_n.\matches = t.\keys};\\
+    \quad t.\action[r_n.\action](r_n.\data)\\
+    \}\\
+    \textrm{where}~[r_1;\ldots;r_n] = \sigma(t.\id)
+  \end{array}
+  \end{array}
+  \]
+  \caption{Table Elimination}
+  \label{fig:table-elim}
+\end{figure}
+
+
+\begin{theorem}[Table Elimination]
+  For every $c \in \Cmd$, well-formed state $\sigma : \Value \to \Row^*$,
+  and packet $\pkt \in \Pkt$, then for any state $\tau : \Value \to \Row^*$,
+  \[\denote{c}^\sigma~\pkt = \denote{c[\sigma]}^\tau~\pkt\]
+\end{theorem}
+\begin{proof}
+\todo[inline]{By induction on the structure of $c$.}
+\end{proof}
+
+\section{Instrumenting Tables}
+
+The next step is to define a source to source translation that eliminates tables
+in the absence of concrete table state, which we will write $c[?] \in \Cmd$.
+This is the first step towards the goal of constraining control plane behavior.
+Want the instrumented program $c[?]$ to fail on exactly the same situations that
+$c[\sigma]$ does, however $c[?]$ is constrained to have no table applications.
+The only remaining mechanism is to use $\assume$ and $\assert$ statements to
+inspect $\sigma$. We define $c[?]$ in Figure~\ref{fig:table-instrument}.
+
+
+\begin{figure}[htp]
+  \[\begin{array}{r >{\triangleq}cl}
+  (h.f := e)[?] && h.f := e \\
+  (\assume b)[?] && \assume b \\
+  (\assert b)[?] && \assert b\\
+  (c_1;c_2)[?] && c_1[?];c_2[?]\\
+  (c_1 \choice c_2)[?] && c_1[?] \choice c_2[?]\\
+  (t.\apply())[?] &&
+  \begin{array}[t]{l}
+  \{ \\
+  \quad \assume \rho.\matches = t.\keys; \\
+  \quad \{\assume \rho.\action = 0; t.\action[0](\rho.\data)\}\\
+  \quad \choice \cdots \\
+  \quad \choice \{\assume \rho.action = |t.\action| - 1; t.\action[t.\action - 1](\rho.\data)\}\\
+  \quad \}\\
+  \} \choice \{ \\
+  \quad \assume \forall \rho \in t. \rho.\matches \neq t.\keys; \\
+  \quad \SKIP \\
+  \quad \}\\
+  \}
+  \end{array}
+  \end{array}
+  \]
+\end{figure}
+
+\todo[inline]{This is wrong because $\rho$ is unbound in the first branch}
+
+
+\begin{theorem}[Instrumentation Sufficiency]
+  For every $c \in \Cmd$, well-formed state $\sigma : \Value \to \Row^*$, and
+  packet $\pkt \in \Pkt$, $\denote{c}^\sigma~\pkt = \pkt'$ if and only if
+  $\pkt' \in \denote{c[?]}^\sigma~\pkt$
+\end{theorem}
+
+\begin{proof}
+\todo[inline]{By induction on the structure of $c$}
+\end{proof}
 
 \end{document}
