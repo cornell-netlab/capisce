@@ -69,6 +69,7 @@
 \newcommand{\WP}{\textit{wp}}
 \newcommand{\satisfy}[3]{({#1,#3}) \models_{#2}}
 \newcommand{\notsatisfy}[3]{({#1,#3})\not\models_{#2}}
+\newcommand{\pv}{\mathit{p4v}}
 
 
 % defined functions
@@ -398,7 +399,7 @@ is defined in Figure~\ref{fig:table-elim}
   (\assert b)[\sigma] && \assert b \\
   (c_1;c_2)[\sigma] && c_1[\sigma];c_2[\sigma] \\
   (c_1 \choice c_2)[\sigma] && c_1[\sigma] \choice c_2[\sigma] \\
-  (\choose \rho t c)[\sigma] && \textrm{\textcolor{red}{unnecessary, but similar to t.apply}}\\
+  (\choose \rho t c)[\sigma] && \textrm{\textcolor{red}{undefined}}\\
   (t.\apply())[\sigma] &&
   \begin{array}[t]{l}
     \{\\
@@ -429,6 +430,7 @@ is defined in Figure~\ref{fig:table-elim}
 \todo[inline]{By induction on the structure of $c$.}
 \end{proof}
 
+
 \section{Instrumenting Tables}
 
 The next step is to define a source to source translation that eliminates tables
@@ -450,7 +452,7 @@ inspect $\sigma$. We define $c[?]$ in Figure~\ref{fig:table-instrument}.
   (c_1;c_2)[?] && c_1[?];c_2[?]\\
   (c_1 \choice c_2)[?] && c_1[?] \choice c_2[?]\\
   (\choose \rho t c)[?] &&
-  \textrm{\textcolor{red}{unnecessary}} \\
+  \textrm{\textcolor{red}{undefined}} \\
   (t.\apply())[?] &&
   \begin{array}[t]{l} \displaystyle
     \{ \\
@@ -642,8 +644,6 @@ inspect $\sigma$. We define $c[?]$ in Figure~\ref{fig:table-instrument}.
   \end{enumerate}
 \end{proof}
 
-
-
 \section{The Research Problem}
 
 Now we can formally define the research problems that we want to solve. We have
@@ -734,5 +734,72 @@ To do so, we need to extend our templates along the following dimensions:
   constraining the packets) to either $c_1$ or $c_2$. This would require
   computing a $b_{\textit{pkt}}$.
 \end{enumerate}
+
+
+\section{P4v comparison}
+
+Ive said before that the P4v-style instrumentation is an overapproximation of
+the control plane behavior. It's a slightly inaccurate claim in that it
+correctly captures all possible control plane behaviors, but it doesn't have a
+handle on constrain control plane behavior.
+
+A simplified version of P4v's encoding is shown in Figure~\ref{fig:p4vlike}. It
+omits the key-reads commands and hit/miss predicates.
+
+\begin{figure}
+  \[\begin{array}{l >{\triangleq}cl}
+  \multicolumn{3}{l}{\pv : \Cmd \to \Cmd} \\
+  \multicolumn{3}{l}{\pv : \Prog \to \Instr} \\
+  \pv(h.f := e) && h.f := e \\
+  \pv(\assume b) && \assume b \\
+  \pv(\assert b) && \assert b \\
+  \pv(c_1;c_2) && \pv(c_1;c_2) \\
+  \pv(c_1 \choice c_2) && \pv(c_1) \choice \pv(c_2) \\
+  \pv(\choose \rho t c) && \textcolor{red}{\text{undefined}} \\
+  \pv(t.\apply()) && \\
+  \multicolumn{3}{>{\qquad}r}{
+    \displaystyle
+    \bigchoice_{i = 0}^{|t.\action|-1}t.\action[i]()
+  }
+  \end{array}\]
+  \caption{A \texttt{p4v}-like instrumentation. For simplicity of reasoning
+    about variables, assume that actions take no action data. }
+  \label{fig:p4vlike}
+\end{figure}
+
+The theorem below demonstrates the over-approximation. Compare with the Instrumentation Equivalence Theorem~\ref{thm:instr-equiv}.
+
+\begin{theorem}[\texttt{p4v} over-approximates]
+  \label{thm:p4v-over}
+  For every $c \in \Prog$, well-formed state $\sigma : \Value \to \Row^* $,
+  model $\mu \in \Model$, and packet $\pkt \in \Pkt$,
+  $\denote{c}^\sigma\,\mu\,\pkt \subseteq \denote{\pv(c)}^\sigma\,\mu\,\pkt$
+\end{theorem}
+
+\begin{proof}
+\todo[inline]{By induction on c}.
+\end{proof}
+
+We can witness non-equality by the following counter-example. Consider a program
+$t.\apply()$ where $t = \{\keys=[h.f];\actions=[\lambda().\SKIP, \lambda(). h.f :=
+  99]\}$. Consider an input packet with $\pkt(h.f) = 47$, and an empty input
+model and state that selects a single action.
+
+Then $\denote{t.\apply()}^\emptyset\,\emptyset\,\pkt = \{(\mu,\pkt)\}$.
+
+Whereas
+\[\begin{array}{l}
+\denote{\pv(t.\apply())}^\emptyset\,\emptyset\,\pkt \\
+= \denote{
+    \displaystyle
+    \bigchoice_{i = 0}^{|t.\action|-1} t.\action[i]()
+}^\emptyset\,\emptyset\,\pkt \\
+= \denote{\SKIP}^\emptyset\,\emptyset\,\pkt \cup \denote{h.f := 99}^\emptyset\,\emptyset\,\pkt\\
+= \{(\emptyset,\pkt),(\emptyset,\pkt\{h.f\mapsto 99\})\}
+\end{array}\]
+
+Finally, $\{(\emptyset,\pkt)\} \subset
+\{(\emptyset,\pkt),(\emptyset,\pkt\{h.f\mapsto 99\})\}$, exemplifies a strict
+subset behavior described by Theorem~\ref{thm:p4v-over}.
 
 \end{document}
