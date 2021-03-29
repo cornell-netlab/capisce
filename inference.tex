@@ -67,6 +67,9 @@
 % math
 \newcommand{\argmin}{\mathop{\textrm{argmin}}}
 \newcommand{\WP}{\textit{wp}}
+\newcommand{\satisfy}[3]{({#1,#3}) \models_{#2}}
+\newcommand{\notsatisfy}[3]{({#1,#3})\not\models_{#2}}
+
 
 % defined functions
 \newcommand{\tables}{\mathop{\mathsf{tables}}}
@@ -305,7 +308,7 @@ undefined.
 \end{figure}
 
 \paragraph{Boolean Satisfaction}
-The satisfaction relation $\pkt,\mu \models_\sigma b$ is defined in
+The satisfaction relation $\satisfy \sigma \pkt \mu b$ is defined in
 Figure~\ref{fig:bool-satis} in terms of the three kinds of variable contexts,
 packets, models, and states. We also use the strict semantics here, most
 importantly in the equality rule. Sometimes two expressions are considered equal
@@ -314,20 +317,21 @@ equality undefined if either argument is undefined.
 
 \begin{figure}
   \[\begin{array}{l>{\iff}cl}
-  \pkt,\mu \models_\sigma \FALSE && \textit{pigs fly} \\
-  \pkt,\mu \models_\sigma b_1 \Rightarrow b_2 &&
-  \pkt,\mu \not\models_\sigma b_1~\textit{or}~
-  \pkt,\mu \models_\sigma b_2\\
-  \pkt,\mu \models_\sigma e_1 = e_2 &&
+  \satisfy \sigma \pkt \mu \FALSE && \textit{pigs fly} \\
+  \satisfy \sigma \pkt \mu b_1 \Rightarrow b_2 &&
+  \notsatisfy \sigma \pkt \mu  b_1~\textit{or}~
+  \satisfy \sigma \pkt \mu b_2\\
+  \satisfy \sigma \pkt \mu e_1 = e_2 &&
   \edenote{e_1}~\pkt~\mu = \edenote{e_2}~\pkt~\mu, \qquad
   \text{(note strict semantics)} \\
-  \pkt,\mu \models_\sigma \forall \rho \in t. ~b &&
+  \satisfy \sigma \pkt \mu \forall \rho \in t. ~b &&
   \forall r \in \sigma(t.\id).
-  \pkt,\sigma,\mu[\rho \mapsto r] \models b
+  \satisfy \sigma \pkt {\mu\{\rho \mapsto r\}} b
   \end{array}
   \]
-  \caption{Satisfaction for $\BExpr$. Write $\pkt \models_\sigma b$ as syntactic
-    sugar when the model $\mu$ is empty.}
+  \todo[inline]{Clarify $\error$ states}
+  \todo[inline]{@Nate I know you wanted a standard satisfaction relation, but this was easier to think about in the context of the domain. The difference boils down to a naming convention}
+  \caption{Satisfaction for $\BExpr$.}
   \label{fig:bool-satis}
 \end{figure}
 
@@ -342,12 +346,12 @@ operators, and a cleaner representation of table application.
     \denote{h.f := e}^\sigma~\mu~\pkt && \{(\mu, \pkt\{h \mapsto \edenote{e}~\pkt~\mu\})\} \\
     \denote{\assume b}^\sigma~\mu~\pkt &&
     \begin{cases}
-      \{(\mu,\pkt)\} & \pkt,\mu \models_\sigma b \\
+      \{(\mu,\pkt)\} & \satisfy \sigma \pkt \mu b \\
       \{\} & \textit{otherwise} \\
     \end{cases}\\
     \denote{\assert b}^\sigma~\mu~\pkt &&
     \begin{cases}
-      \{(\mu,\pkt)\} & \pkt,\mu \models_\sigma b \\
+      \{(\mu,\pkt)\} & \satisfy \sigma \pkt \mu b \\
       \error & \textit{otherwise}
     \end{cases} \\
     \denote{\choose \rho t c}^\sigma~\mu~\pkt &&
@@ -362,7 +366,7 @@ operators, and a cleaner representation of table application.
     \begin{cases}
       \denote{c[\vec d/\vec x]}^\sigma~\mu~\pkt,
       & \text{where}~\lambda \vec x.~c = r.\action, \vec d = r.\data \\
-      & \text{where}~r = \argmin_i\{\pkt,\mu \models_\sigma b_i\} \\
+      & \text{where}~r = \argmin_i\{\satisfy \sigma \pkt \mu b_i\} \\
       & \text{where}~b_i = \sigma(t.\id)[i].\matches = t.\keys \\
       \{(\mu,\pkt)\}, & \mathit{otherwise}
     \end{cases}
@@ -533,8 +537,7 @@ inspect $\sigma$. We define $c[?]$ in Figure~\ref{fig:table-instrument}.
     Let $r_1,\ldots,r_n = \sigma(t)$.
     There are two cases, either the packet hits a row, or hits no row. Explore each case separately.
     \begin{enumerate}
-    \item[\textsc{Hit}] In this case, there is some $r_i$ such that $\pkt,\mu
-      \models_\sigma r_i.\matches = t.\keys$. By the well-formedness assumption,
+    \item[\textsc{Hit}] In this case, there is some $r_i$ such that $\satisfy \sigma \pkt \mu r_i.\matches = t.\keys$. By the well-formedness assumption,
       we know that this $r_i$ is unique, and that we can write
       $t.\actions[r_i.\action]$ as $\lambda \vec x. c$, and $|r_i.\data| = |\vec x|$.
 
@@ -552,7 +555,7 @@ inspect $\sigma$. We define $c[?]$ in Figure~\ref{fig:table-instrument}.
         = \denote{\assume \forall \rho \in t. \rho.\matches \neq t.\keys}^\sigma~\mu~\pkt
         & \textrm{\textcolor{red}{Redo with defaults}} \\
         = \begin{cases}
-          \{(\mu,\pkt)\}, & \pkt,\mu \models_\sigma \rho.\matches \neq t.\keys \\
+          \{(\mu,\pkt)\}, & \satisfy\sigma\pkt\mu \rho.\matches \neq t.\keys \\
           \{\}, &\textit{otherwise}
         \end{cases}
         & \textrm{By definition of }\denote{-}\\
@@ -627,11 +630,11 @@ inspect $\sigma$. We define $c[?]$ in Figure~\ref{fig:table-instrument}.
 
       The result follows.
 
-    \item[\textsc{Miss}] In this case, there is no $r_i$ such that $\pkt,\mu
-      \models_\sigma r_i.\matches = t.\keys$, which means that the LHS of the
-      toplevel choice operator should evaluate to $\{\}$ \todo{compute this},
-      and the RHS evaluates to $\{\mu,\pkt\}$\todo{compute this}, which is
-      precisely the result we get when executing
+    \item[\textsc{Miss}] In this case, there is no $r_i$ such that
+      $\satisfy\sigma\pkt\mu r_i.\matches = t.\keys$, which means that the LHS
+      of the toplevel choice operator should evaluate to $\{\}$ \todo{compute
+        this}, and the RHS evaluates to $\{\mu,\pkt\}$\todo{compute this}, which
+      is precisely the result we get when executing
       $\denote{t.apply()}^\sigma~\mu~\pkt$.
 
     \end{enumerate}
@@ -649,7 +652,7 @@ some ideal goals, that are probably not solvable in general.
 \begin{quote}
   \textbf{Conservative Problem.} Given a command $c \in \Cmd$, compute the weakest test
   $b$ such that if a state $\sigma : \Value \to \Row^*$ the following
-  judgement is defined and satisfied \[\emptyset, \emptyset \models_\sigma b,\] then \[\forall \pkt \in \Pkt.~
+  judgement is defined and satisfied \[\satisfy\sigma\emptyset\emptyset b,\] then \[\forall \pkt \in \Pkt.~
   \denote{c}^\sigma \pkt \neq \error \]
 \end{quote}
 
@@ -660,9 +663,9 @@ prefer to solve the following problem:
   \textbf{Flexible Problem.} Given a command $c \in \Cmd$, compute a test
   $b_{\mathit{cp}}$, and a test $b_{\mathit{pkt}}$ such that
   for every packet $\pkt \in \Pkt$ such that
-  \[\emptyset, \emptyset \models_\emptyset b_{\mathit{pkt}},\]
+  \[\satisfy \emptyset \pkt \emptyset b_{\mathit{pkt}},\]
   and for every state $\sigma : \Value \to \Row^*$ such that
-  \[\pkt, \emptyset \models_\sigma b_{\mathit{cp}},\]
+  \[\satisfy \sigma \pkt \emptyset b_{\mathit{cp}},\]
   then \[\denote{c}^\sigma ~\emptyset~\pkt \neq \error \]
 \end{quote}
 
@@ -714,7 +717,7 @@ of $\Value$.
 
 Now we may wonder: \emph{can we procedurally generate templates in a (nearly) complete way}?
 
-To do so, we need to consider the following dimensions:
+To do so, we need to extend our templates along the following dimensions:
 \begin{enumerate}[align=left]
 \item[\textbf{Keys}.] Should generalize by changing the LHS comparisons to $
   \bigwedge_i[\rho.\keys[i]~\square_{\{=,\neq\}}~?_{v_i}]?$
@@ -725,7 +728,7 @@ To do so, we need to consider the following dimensions:
   if we notice that $t_1$ has a dataflow path to the keys of $t_2$, we should
   generate a join condition template, otherwise we may be able to simply ``and'' the templates.
 
-\item[\textbf{Nondeterminism} ($c_1 \choice c_2$).]. To solve the \textbf{Conservative
+\item[\textbf{Nondeterminism} ($c_1 \choice c_2$).] To solve the \textbf{Conservative
   Problem} we simply and the templates together, but to solve the
   \textbf{Flexible Problem} we may be able to constrain the problem (by
   constraining the packets) to either $c_1$ or $c_2$. This would require
