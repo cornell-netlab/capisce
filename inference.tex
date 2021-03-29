@@ -32,6 +32,10 @@
 \newcommand{\BVExpr}{\mathsf{BVExpr}}
 \newcommand{\BExpr}{\mathsf{BExpr}}
 \newcommand{\Cmd}{\mathsf{Cmd}}
+\newcommand{\Action}{\mathsf{Action}}
+\newcommand{\Instr}{\mathsf{Instr}}
+\newcommand{\Prog}{\mathsf{Prog}}
+\newcommand{\GCL}{\mathsf{GCL}}
 \newcommand{\Pkt}{\mathsf{Pkt}}
 \newcommand{\Model}{\mathsf{Model}}
 \newcommand{\Hdr}{\mathsf{Hdr}}
@@ -62,6 +66,7 @@
 
 % math
 \newcommand{\argmin}{\mathop{\textrm{argmin}}}
+\newcommand{\WP}{\textit{wp}}
 
 % defined functions
 \newcommand{\tables}{\mathop{\mathsf{tables}}}
@@ -70,6 +75,8 @@
 % Theorems
 \newtheorem{theorem}{Theorem}
 \newtheorem{lemma}{Lemma}
+\newtheorem{conjecture}{Conjecture}
+
 
 
 \begin{document}
@@ -81,44 +88,44 @@
 \subsection{Syntax}
 
 \begin{figure}[htp]
-  \[\begin{array}{lcll}
+  \[\begin{array}{lclll}
     \multicolumn{3}{l}{\Value} \\
-    v & ::= & [n]_w  & \textit{Bitvector Literal}\\
+    v & ::= & [n]_w  & \textit{Bitvector Literal} & (a,g,p,\iota) \\
     \multicolumn{3}{l}{\SymbRow} \\
     \rho & ::= & \left\{
     \begin{array}{l}
       \matches = \List[x];\\
       \action = x;\\
       \data = \List[x]
-    \end{array}\right\} & \textit{Symbolic Row}\\
+    \end{array}\right\} & \textit{Symbolic Row} & (\iota)\\
     \multicolumn{3}{l}{\BVExpr} \\
-    e & ::= & v & \textit{Value}\\
-      & \mid & h.f & \textit{Header Access} \\
-      & \mid & \rho.\matches[i] & \textit{Symbolic Match} \\
-      & \mid & \rho.\action & \textit{Symbolic Action}\\
-      & \mid & \rho.\data[i] & \textit{Symbolic Action Data}\\
-      & \mid & x & \textit{Variable}\\
-      & \mid & e \binop e & \textit{Arbitrary Binary Operation}\\
-    & \mid & \unop e & \textit{Arbitrary Unary Operation}\\
+    e & ::= & v & \textit{Value} & (a,g,p,\iota)\\
+      & \mid & h.f & \textit{Header Access} & (a,g,p,\iota)\\
+      & \mid & \rho.\matches[i] & \textit{Symbolic Match} & (\iota)\\
+      & \mid & \rho.\action & \textit{Symbolic Action} & (\iota) \\
+      & \mid & \rho.\data[i] & \textit{Symbolic Action Data} & (\iota) \\
+      & \mid & x & \textit{Action Data Variable} & (a^*) \\
+      & \mid & e \binop e & \textit{Arbitrary Binary Operation} & (a,g,p,\iota) \\
+    & \mid & \unop e & \textit{Arbitrary Unary Operation} & (a,g,p,\iota) \\
     \multicolumn{3}{l}{\Table} \\
     t & ::= & \left\{\begin{array}{l}
     t.\id = v; \\
     t.\keys = \List[h.f]; \\
-    t.\actions = \List[\lambda \vec x. c]\\
-    \end{array}\right\} & \textit{Table}\\
+    t.\actions = \List[\lambda \vec x.\,a]\\
+    \end{array}\right\} & \textit{Table} & (p)\\
     \multicolumn{3}{l}{\BExpr} \\
-    b & ::= & \FALSE  & \textit{Falsity}\\
-      & \mid & b \Rightarrow b & \textit{Implication} \\
-      & \mid & e = e & \textit{Bitvector Equality}\\
-    & \mid & \forall \rho \in t.~b & \textit{Row Universality}\\
-    \multicolumn{3}{l}{\Cmd} \\
-    c & ::=  & h.f := e & \textit{Assignment}\\
-      & \mid & \assert b & \textit{Assertion}\\
-      & \mid & \assume b & \textit{Assumption}\\
-      & \mid & t.\apply() & \textit{Table Application}\\
-      & \mid & c;c & \textit{Sequential Composition} \\
-    & \mid & c \choice c & \textit{Nondeterministic Choice}\\
-    & \mid & \choose \rho t c & \textit{Selection} \\
+    b & ::= & \FALSE  & \textit{Absurdity}& (a,g,p,\iota)\\
+      & \mid & b \Rightarrow b & \textit{Implication} & (a,g,p,\iota)\\
+      & \mid & e = e & \textit{Bitvector Equality} & (a,g,p,\iota)\\
+    & \mid & \forall \rho \in t.~b & \textit{Row Universality} & (\iota)\\
+    \multicolumn{4}{l}{c \in \Cmd, a \in \Action, g \in \GCL, p \in \Prog, \iota \in \Instr } \\
+    c & ::=  & h.f := e & \textit{Assignment} & (g,p,\iota) \\
+      & \mid & \assert b & \textit{Assertion} & (g,p,\iota)\\
+      & \mid & \assume b & \textit{Assumption} & (g,p,\iota) \\
+      & \mid & t.\apply() & \textit{Table Application} & (p)\\
+      & \mid & c;c & \textit{Sequential Composition} & (a,g,p,\iota) \\
+    & \mid & c \choice c & \textit{Nondeterministic Choice} & (g,p,\iota)\\
+    & \mid & \choose \rho t c & \textit{Selection} & (\iota) \\
     \multicolumn{3}{l}{
       \begin{array}{ll}
         x \in \Var & h \in \Hdr\\
@@ -126,7 +133,10 @@
     \end{array}} & \textit{Sets }\\
   \end{array}
 \]
-\caption{Grammar of Dataplane Programs}
+\caption{Grammar of Commands $c \in \Cmd$. Legal action indicated by $a \in
+  \Action$, legal instrumented command variants indicated by $\iota \in \Instr$,
+  dataplane programs indicated by $p \in \Prog$, and table-free commands
+  indicated by $g \in \GCL$.}
 \label{fig:grammar}
 \end{figure}
 
@@ -199,17 +209,32 @@ We can represent other standard boolean operators by using standard encodings:
 \paragraph{Commands}
 Data plane programs $c \in \mathsf{Cmd}$ can be assignments ($h.f := e$),
 assumptions ($\assume b$), assertions ($\assert b$), table application
-($t.\apply()$), lexically-scoped nondeterministic selection ($\choose \rho t c$), sequential composition ($c_1;c_2$ for two commands $c_1$ and
-$c_2$), and nondeterministic choice ($c_1 \choice c_2$ for two commands $c_1$
-and $c_2$).
+($t.\apply()$), lexically-scoped nondeterministic selection ($\choose \rho t
+c$), sequential composition ($c_1;c_2$ for two commands $c_1$ and $c_2$), and
+nondeterministic choice ($c_1 \choice c_2$ for two commands $c_1$ and $c_2$).
 
 We define $\SKIP$ as the following syntactic sugar $\assume \TRUE$.
 
-For actions, we restrict the language to be generated by only non-symbolic
-assignment, sequence, and $\SKIP$.
+We express a collection of invariants on commands as subsets of the set $\Cmd$.
+It is convenient to describe these as subgrammars. First, action-commands $a \in
+\Action$ contain only non-symbolic assignment and sequence. If an action
+command has variables, indicated by the starred variant $a*$, it is called
+\emph{open}, if it has none it is called \emph{closed}.
+
+Second, $p \in \Prog \subset \Cmd$ represents the expected set of programs extracted from a
+P4 interface, most notably, it contains tables $t$ and no symbolic selection
+statements or symbolic expersions.
+
+Conversely $\iota \in \Instr \subset \Cmd$ represents a program instrumented
+with symbolic variables. A program $\iota$ cannot apply tables using
+$t.\apply()$, but instead uses a havoc statement $\choose \rho t c$, to
+introduce symbolic variables $\rho$ in $c$.
+
+Finally $g \in \GCL \subset \Prog \subset \Cmd$ represents the core algebraic
+flavor of GCL without havoc, symbolic tables, or table application.
 
 
-Define $\tables(c) \subset \Table$ to be the set of all tables hat occur in $c$.
+Define $\tables(c) \subset \Table$ to be the set of all tables that occur in $c$.
 
 \subsection{Semantics}
 
@@ -362,6 +387,8 @@ is defined in Figure~\ref{fig:table-elim}
 
 \begin{figure}
   \[\begin{array}{r>{\triangleq}cl}
+  \multicolumn{3}{l}{(\cdot)[\sigma] : \Cmd \to \Cmd} \\
+  \multicolumn{3}{l}{(\cdot)[\sigma] : \Prog \to \GCL} \\
   (h.f := e)[\sigma] && h.f := e   \\
   (\assume b)[\sigma] && \assume b \\
   (\assert b)[\sigma] && \assert b \\
@@ -411,6 +438,8 @@ inspect $\sigma$. We define $c[?]$ in Figure~\ref{fig:table-instrument}.
 
 \begin{figure}[htp]
   \[\begin{array}{r >{\triangleq}cl}
+  \multicolumn{3}{l}{(\cdot)[?] : \Cmd \to \Cmd} \\
+  \multicolumn{3}{l}{(\cdot)[?] : \Prog \to \Instr} \\
   (h.f := e)[?] && h.f := e \\
   (\assume b)[?] && \assume b \\
   (\assert b)[?] && \assert b\\
@@ -444,7 +473,7 @@ inspect $\sigma$. We define $c[?]$ in Figure~\ref{fig:table-instrument}.
 
 \begin{lemma}[Models Invariant over Actions]
   \label{lem:models-invariant-over-actions}
-  For an action command $c$, $\mu,\mu'
+  For a closed action command $c$, $\mu,\mu'
   \in \Model$, $\sigma \in \Value \to
   \Row^*$, $\pkt \in \Pkt$, there exists some $\pkt'$
   \[\denote{c}^\sigma\,\mu\,\pkt = \{\mu,\pkt'\}\]
@@ -453,7 +482,6 @@ inspect $\sigma$. We define $c[?]$ in Figure~\ref{fig:table-instrument}.
 \begin{proof}
   Proceed by induction over $c$.
   \begin{enumerate}[align=left]
-  \item[($c = \SKIP$)] Immediate.
   \item[$(c = h.f = e)$] Immediate.
   \item[$(c = c_1;c_2)$]
     By IH($c_1$) there exists some $\pkt''$ such that
@@ -464,7 +492,8 @@ inspect $\sigma$. We define $c[?]$ in Figure~\ref{fig:table-instrument}.
     \end{enumerate}
 \end{proof}
 
-\begin{theorem}[Instrumentation Expressivity]
+\begin{theorem}[Instrumentation Equivalence]
+  \label{thm:instr-equiv}
   For every $c \in \Cmd$, well-formed state $\sigma : \Value \to \Row^*$, model
   $\mu \in \Model$, and packet $\pkt \in \Pkt$, $\denote{c}^\sigma~\mu~\pkt =
   \denote{c[?]}^\sigma~\mu~\pkt$.
@@ -584,26 +613,123 @@ inspect $\sigma$. We define $c[?]$ in Figure~\ref{fig:table-instrument}.
       \end{array}\]
 
       By Lemma~\ref{lem:models-invariant-over-actions}, there's some $\pkt'$ such that
-      \[\{\mu\{\rho \mapsto r_i\}, \pkt'\} =
+      \[\{(\mu\{\rho \mapsto r_i\}, \pkt')\} =
       \denote{c[r_i.\data/\vec x]}^\sigma~(\mu\{\rho \mapsto r_i\})~\pkt
       \]
 
       which means that the result of the first branch is
-      \[\{\mu, \pkt'\} =
-      \denote{c[r_i.\data/\vec x]}^\sigma~(\mu\{\rho \mapsto r_i\})~\pkt
-      \]
+      \[\{(\mu, \pkt')\} \]
 
-      Since $\rho$ doesn't occur in $c$, then also
-      \[\{\mu, \pkt'\} = \denote{c[r_i.\data/\vec x]}^\sigma~\mu~\pkt \]
+      Since $\rho$ doesn't occur in $c$, then there's some $\mu'$ such that also
+      \[\{\mu', \pkt'\} = \denote{c[r_i.\data/\vec x]}^\sigma~\mu~\pkt \]
+
+      and $\mu = \mu'$ by Lemma~\ref{lem:models-invariant-over-actions}.
 
       The result follows.
 
-    \item[\textsc{Miss}]
-      \todo[inline]{Should be easy}
+    \item[\textsc{Miss}] In this case, there is no $r_i$ such that $\pkt,\mu
+      \models_\sigma r_i.\matches = t.\keys$, which means that the LHS of the
+      toplevel choice operator should evaluate to $\{\}$ \todo{compute this},
+      and the RHS evaluates to $\{\mu,\pkt\}$\todo{compute this}, which is
+      precisely the result we get when executing
+      $\denote{t.apply()}^\sigma~\mu~\pkt$.
 
     \end{enumerate}
 
   \end{enumerate}
 \end{proof}
+
+
+
+\section{The Research Problem}
+
+Now we can formally define the research problems that we want to solve. We have
+some ideal goals, that are probably not solvable in general.
+
+\begin{quote}
+  \textbf{Conservative Problem.} Given a command $c \in \Cmd$, compute the weakest test
+  $b$ such that if a state $\sigma : \Value \to \Row^*$ the following
+  judgement is defined and satisfied \[\emptyset, \emptyset \models_\sigma b,\] then \[\forall \pkt \in \Pkt.~
+  \denote{c}^\sigma \pkt \neq \error \]
+\end{quote}
+
+However, this $b$ may be $\FALSE$ for many realistic programs $c$, so we may
+prefer to solve the following problem:
+
+\begin{quote}
+  \textbf{Flexible Problem.} Given a command $c \in \Cmd$, compute a test
+  $b_{\mathit{cp}}$, and a test $b_{\mathit{pkt}}$ such that
+  for every packet $\pkt \in \Pkt$ such that
+  \[\emptyset, \emptyset \models_\emptyset b_{\mathit{pkt}},\]
+  and for every state $\sigma : \Value \to \Row^*$ such that
+  \[\pkt, \emptyset \models_\sigma b_{\mathit{cp}},\]
+  then \[\denote{c}^\sigma ~\emptyset~\pkt \neq \error \]
+\end{quote}
+
+
+\section{Reduction to QE}
+
+We can observe that the \textbf{Conservative Problem} is simply solvable. We
+sketch the argument here.
+
+\begin{conjecture}[Quantifer Elimination]
+  The \textbf{\textrm{Conservative Problem}} is reducable to Quantifer Elimination.
+\end{conjecture}
+
+\begin{proof}[Proof Sketch.]
+  Given a command $c \in \Cmd$. Compute the instrumented command $c[?]$. We know
+  it is equivalent to $c$ by Theorem~\ref{thm:instr-equiv}. Then $\forall
+  \overrightarrow{h.f}.\WP(c[?],\TRUE)[\overrightarrow{h.f}]$,\todo{how to write this?} is such a
+  formula $b$ by Dijkstra '75. To make $b$ a controller formula, then we simply
+  need to remove the dataplane variables via a QE procedure.
+\end{proof}
+
+This doesn't work in general. Standard QE procedures are exponential at best, and
+enumerating all eth/ipv4 src/dst addresses already takes an intractable amount
+of time.
+
+\section{Can Templates save us?}
+
+One option is to use a kind of constrained template-based synthesis, where we
+generate a catalogue of temaplates based on syntactic features of the target table.
+
+For example, given a single table like the following:
+
+\[t = \{\keys: [h.f]; \actions: [\lambda x.~~h.g:= x]\}\]
+
+and the simple program \[t.\apply()\]
+
+We may be able to generate a template that looks like
+
+\[\begin{array}{>{\displaystyle}c}
+  {[\exists \rho \in t.~ \rho.\keys[0]~\square_{\{=,\neq\}}~?_{v_1}\wedge \rho.\data[0]~\square_{\{=,\neq\}}~?_{v_2} ]?} \\
+  \wedge\\
+  {[\forall \rho \in t.~\rho.\keys[0]~\square_{\{=,\neq\}}~?_{v_3} \Rightarrow \rho.\data[0]~\square_{\{=,\neq\}}~?_{v_4}]?}
+\end{array}\]
+
+where $[b]?$ indicates a hole to either use template $b$ or replace it with
+$\TRUE$, $\square_S$ indicates a template for an operation, where $S$ is the set
+of allowed operations, and $?_{v_i}$ indicates a hole that should evaluate to an element
+of $\Value$.
+
+Now we may wonder: \emph{can we procedurally generate templates in a (nearly) complete way}?
+
+To do so, we need to consider the following dimensions:
+\begin{enumerate}[align=left]
+\item[\textbf{Keys}.] Should generalize by changing the LHS comparisons to $
+  \bigwedge_i[\rho.\keys[i]~\square_{\{=,\neq\}}~?_{v_i}]?$
+\item[\textbf{Action Data}.] Should generalize by changing the RHS comparisons to $\bigwedge_i[\rho.\data[i]~\square_{\{=,\neq\}}~?_{v_i}]?$
+\item[\textbf{Actions}.] We need to generalize the template across multiple actions. This should be as simple as adding $\rho.\action = i$ on the RHS of each implication above.
+\item[\textbf{Sequence}.] I'm not sure how to generalize sequentially composed tables.
+  Perhaps a larger catalogue of templates conditioned on structural information:
+  if we notice that $t_1$ has a dataflow path to the keys of $t_2$, we should
+  generate a join condition template, otherwise we may be able to simply ``and'' the templates.
+
+\item[\textbf{Nondeterminism} ($c_1 \choice c_2$).]. To solve the \textbf{Conservative
+  Problem} we simply and the templates together, but to solve the
+  \textbf{Flexible Problem} we may be able to constrain the problem (by
+  constraining the packets) to either $c_1$ or $c_2$. This would require
+  computing a $b_{\textit{pkt}}$.
+\end{enumerate}
 
 \end{document}
