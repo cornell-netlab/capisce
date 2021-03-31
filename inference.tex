@@ -128,7 +128,8 @@
       & \mid & \assume b & \textit{Assumption} & (g,p,\iota) \\
       & \mid & t.\apply() & \textit{Table Application} & (p)\\
       & \mid & c;c & \textit{Sequential Composition} & (a,g,p,\iota) \\
-    & \mid & c \choice c & \textit{Nondeterministic Choice} & (g,p,\iota)\\
+      & \mid & c \choice c & \textit{Nondeterministic Choice} & (g,p,\iota)\\
+      & \mid & \{c\} & \textit{Scope} & (g,p,\iota)\\
     \multicolumn{3}{l}{
       \begin{array}{ll}
         x \in \Var & h \in \Hdr\\
@@ -212,8 +213,7 @@ We can represent other standard boolean operators by using standard encodings:
 \paragraph{Commands}
 Data plane programs $c \in \mathsf{Cmd}$ can be assignments ($h.f := e$),
 assumptions ($\assume b$), assertions ($\assert b$), table application
-($t.\apply()$), lexically-scoped nondeterministic selection ($\choose \rho t
-c$), sequential composition ($c_1;c_2$ for two commands $c_1$ and $c_2$), and
+($t.\apply()$), sequential composition ($c_1;c_2$ for two commands $c_1$ and $c_2$), and
 nondeterministic choice ($c_1 \choice c_2$ for two commands $c_1$ and $c_2$).
 
 We define $\SKIP$ as the following syntactic sugar $\assume \TRUE$.
@@ -230,7 +230,7 @@ statements or symbolic expersions.
 
 Conversely $\iota \in \Instr \subset \Cmd$ represents a program instrumented
 with symbolic variables. A program $\iota$ cannot apply tables using
-$t.\apply()$, but instead uses a havoc statement $\choose \rho t c$, to
+$t.\apply()$, but instead uses havoc statements, to
 introduce symbolic variables $\rho$ in $c$.
 
 Finally $g \in \GCL \subset \Prog \subset \Cmd$ represents the core algebraic
@@ -285,22 +285,23 @@ undefined.
 
 \begin{figure}[H]
   \[\begin{array}{l>{\triangleq}cl}
-  \multicolumn{3}{l}{\edenote{e} : \Pkt \to \Model \rightharpoonup \Value }\\
-    \edenote{v}~\pkt~\mu &&
+  \multicolumn{3}{l}{\edenote{e} : \Model \to \Pkt \rightharpoonup \Value }\\
+    \edenote{v}~\mu~\pkt &&
     v \\
-    \edenote{h.f}~\pkt~\mu &&
+    \edenote{\havoc_w}~\mu~\pkt && \{[n]_w \mid n \in \mathbb N\}\\
+    \edenote{h.f}~\mu~\pkt &&
     pkt(h.f)\\
-    \edenote{\rho.\matches[i]}~\pkt~\mu &&
+    \edenote{\rho.\matches[i]}~\mu~\pkt &&
     \mu(\rho).\matches[i] \\
-    \edenote{\rho.\action}~\pkt~\mu &&
+    \edenote{\rho.\action}~\mu~\pkt &&
     \mu(\rho).\action \\
     \edenote{\rho.\data[i]} &&
     \mu(\rho).\data[i]\\
-    \edenote{e_1 \binop e_2}~\pkt~\mu&&
-    \edenote{e_1}~\pkt~\mu \binop
-    \edenote{e_2}~\pkt~\mu \\
-    \edenote{\unop e}~\pkt~\mu &&
-    \unop \left(\edenote{e}~\pkt~\mu\right)
+    \edenote{e_1 \binop e_2}~\mu~\pkt&&
+    \edenote{e_1}~\mu~\pkt \binop
+    \edenote{e_2}~\mu~\pkt \\
+    \edenote{\unop e}~\mu~\pkt &&
+    \unop \left(\edenote{e}~\mu~\pkt\right)
   \end{array}
   \]
   \caption{Semantics of Expressions}
@@ -345,28 +346,26 @@ operators, and a cleaner representation of table application.
 \begin{figure}[htp]
   \[\begin{array}{l >{\triangleq}cl}
   \multicolumn{3}{l}{\denote{c}^\sigma : \Model \to \Pkt \to \mathcal{P}(\Model \times \Pkt)_\error }\\
-    \denote{h.f := e}^\sigma~\mu~\pkt && \{(\mu, \pkt\{h \mapsto \edenote{e}~\pkt~\mu\})\} \\
-    \denote{\assume b}^\sigma~\mu~\pkt &&
+    \denote{h.f := e}^\sigma\,\mu\,\pkt && \{(\mu, \pkt\{h \mapsto v\} \mid v \in \edenote{e}\,\mu\,\pkt\})\} \\
+    \denote{\assume b}^\sigma\,\mu\,\pkt &&
     \begin{cases}
       \{(\mu,\pkt)\} & \satisfy \sigma \pkt \mu b \\
       \{\} & \textit{otherwise} \\
     \end{cases}\\
-    \denote{\assert b}^\sigma~\mu~\pkt &&
+    \denote{\assert b}^\sigma\,\mu\,\pkt &&
     \begin{cases}
       \{(\mu,\pkt)\} & \satisfy \sigma \pkt \mu b \\
       \error & \textit{otherwise}
     \end{cases} \\
-    \denote{\choose \rho t c}^\sigma~\mu~\pkt &&
-    \{(\mu'\setminus \rho,\pkt')
-    \mid (\mu',\pkt') \in \denote{c}^\sigma\,(\mu\{\rho\mapsto r\})\,\pkt, r \in \sigma(t)\}
-    \\
-    \denote{c_1;c_2}^\sigma~\mu~\pkt&&
-    \bigcup_{(\mu',\pkt') \in \denote{c_1}^\sigma\,\mu\,\pkt}\denote{c_2}^\sigma~\mu'~\pkt' \\
-    \denote{c_1 \choice c_2}^\sigma~\mu~\pkt &&
-    \denote{c_1}^\sigma~\mu~\pkt \cup \denote{c_2}^\sigma~\mu~\pkt \\
-    \denote{t.\apply()}^\sigma~\mu~\pkt &&
+    \denote{c_1;c_2}^\sigma\,\mu\,\pkt&&
+    \bigcup_{(\mu',\pkt') \in \denote{c_1}^\sigma\,\mu\,\pkt}\denote{c_2}^\sigma\,\mu'\,\pkt' \\
+    \denote{c_1 \choice c_2}^\sigma\,\mu\,\pkt &&
+    \denote{c_1}^\sigma\,\mu\,\pkt \cup \denote{c_2}^\sigma\,\mu\,\pkt \\
+    \denote{\{c\}}^\sigma\,\mu\,\pkt &&
+    \{(\mu,\pkt') \mid (\mu',\pkt') \in \denote{c}^\sigma\,\mu\,\pkt \}\\
+    \denote{t.\apply()}^\sigma\,\mu\,\pkt &&
     \begin{cases}
-      \denote{c[\vec d/\vec x]}^\sigma~\mu~\pkt,
+      \denote{c[\vec d/\vec x]}^\sigma\,\mu\,\pkt,
       & \text{where}~\lambda \vec x.~c = r.\action, \vec d = r.\data \\
       & \text{where}~r = \argmin_i\{\satisfy \sigma \pkt \mu b_i\} \\
       & \text{where}~b_i = \sigma(t.\id)[i].\matches = t.\keys \\
@@ -375,7 +374,6 @@ operators, and a cleaner representation of table application.
   \end{array}\]
   \caption{Semantics of Commands}
   \label{fig:com-sem}
-  \todo[inline]{$\Model$ then $\Pkt$ everywhere.}
 \end{figure}
 
 \section{Encoding}
@@ -383,7 +381,7 @@ operators, and a cleaner representation of table application.
 Now we will define a collection of source-to-source translations that deal with
 the controller interface.
 
-\section{Eliminating Tables}
+\subsection{Eliminating Tables}
 
 The first thing to do is to define a source-to-source translation that
 eliminates the tables. The observation here is that tables essentially represent
@@ -400,18 +398,18 @@ is defined in Figure~\ref{fig:table-elim}
   (\assert b)[\sigma] && \assert b \\
   (c_1;c_2)[\sigma] && c_1[\sigma];c_2[\sigma] \\
   (c_1 \choice c_2)[\sigma] && c_1[\sigma] \choice c_2[\sigma] \\
-  (\choose \rho t c)[\sigma] && \textrm{\textcolor{red}{undefined}}\\
+  (\{c\})[\sigma] && \{c[\sigma]\} \\
   (t.\apply())[\sigma] &&
   \begin{array}[t]{l}
-    \{\\
+    (\\
     \quad \assume {r_1.\matches = t.\keys};\\
     \quad t.\action[r_1.\action](r_1.\data)\\
-    \}~\choice\\
+    )~\choice\\
     \multicolumn{1}{c}{\vdots}\\
-    \choice~\{\\
+    \choice~(\\
     \quad \assume {r_n.\matches = t.\keys};\\
     \quad t.\action[r_n.\action](r_n.\data)\\
-    \}\\
+    )\\
     \textrm{where}~[r_1;\ldots;r_n] = \sigma(t.\id)
   \end{array}
   \end{array}
@@ -432,7 +430,7 @@ is defined in Figure~\ref{fig:table-elim}
 \end{proof}
 
 
-\section{Instrumenting Tables}
+\subsection{Instrumenting Tables}
 
 The next step is to define a source to source translation that eliminates tables
 in the absence of concrete table state, which we will write $c[?] \in \Cmd$.
@@ -442,39 +440,43 @@ $c[\sigma]$ does, however $c[?]$ is constrained to have no table applications.
 The only remaining mechanism is to use $\assume$ and $\assert$ statements to
 inspect $\sigma$. We define $c[?]$ in Figure~\ref{fig:table-instrument}.
 
+For simplicity, We're going to assume that all actions in a given table have the
+same number of action data fields, and each field is the same number of bits.
+This can be realized manually.
 
 \begin{figure}[htp]
   \[\begin{array}{r >{\triangleq}cl}
   \multicolumn{3}{l}{(\cdot)[?] : \Cmd \to \Cmd} \\
-  \multicolumn{3}{l}{(\cdot)[?] : \Prog \to \Instr} \\
   (h.f := e)[?] && h.f := e \\
   (\assume b)[?] && \assume b \\
   (\assert b)[?] && \assert b\\
   (c_1;c_2)[?] && c_1[?];c_2[?]\\
   (c_1 \choice c_2)[?] && c_1[?] \choice c_2[?]\\
+  (\{c\})[?] && \{c[?]\}\\
   (t.\apply())[?] &&
   \begin{array}[t]{l} \displaystyle
     \{ \\
-    \quad \rho.\matches := \havoc; \\
+    \quad \rho.\matches := \overrightarrow\havoc; \\
     \quad \rho.\action := \havoc;\\
-    \quad \rho.\data := \havoc; \\
-    \quad \assume |\rho.\matches| = |t.\keys|; \\
+    \quad \rho.\data := \overrightarrow\havoc; \\
     \quad \assume \rho.\action < |t.\actions|; \\
-    \quad \assume |\rho.\data| < |t.\action[\rho.\action].\params| \\
     \quad \assume \rho.\matches = t.\keys; \\
     \quad \displaystyle \bigchoice_{i=0}^{|t.\action| -1}
-    \left\{\begin{array}{l}
+    \left(\begin{array}{l}
     \assume \rho.\action = i;\\
     t.\action[i](\rho.\data)
-    \end{array}\right\}\\
-    \} \choice \{ \\
+    \end{array}\right)\\
+    \} \choice ( \\
     \quad \assume \forall \rho \in t. \rho.\matches \neq t.\keys; \\
     \quad \SKIP \\
-    \}
+    )
   \end{array}
   \end{array}
   \]
-  \caption{Symbolic Table instrumentation}
+  \caption{Symbolic Table instrumentation. Typing information is omitted for
+    brevity; each $\havoc$ must have a appropriate bit-width annotation. For
+    simplicity, we assume each action in a table has the same number (and types) of
+    parameters.}
   \label{fig:table-instrument}
 \end{figure}
 
@@ -490,174 +492,85 @@ inspect $\sigma$. We define $c[?]$ in Figure~\ref{fig:table-instrument}.
 \end{figure}
 
 
-\begin{lemma}[Models Invariant over Actions]
-  \label{lem:models-invariant-over-actions}
-  For a closed action command $c$, $\mu,\mu'
-  \in \Model$, $\sigma \in \Value \to
-  \Row^*$, $\pkt \in \Pkt$, there exists some $\pkt'$
-  \[\denote{c}^\sigma\,\mu\,\pkt = \{\mu,\pkt'\}\]
-  \end{lemma}
+%% \begin{lemma}[Models Invariant over Actions]
+%%   \label{lem:models-invariant-over-actions}
+%%   For a closed action command $c$, $\mu,\mu'
+%%   \in \Model$, $\sigma \in \Value \to
+%%   \Row^*$, $\pkt \in \Pkt$, there exists some $\pkt'$
+%%   \[\denote{c}^\sigma\,\mu\,\pkt = \{\mu,\pkt'\}\]
+%%   \end{lemma}
 
-\begin{proof}
-  Proceed by induction over $c$.
-  \begin{enumerate}[align=left]
-  \item[$(c = h.f = e)$] Immediate.
-  \item[$(c = c_1;c_2)$]
-    By IH($c_1$) there exists some $\pkt''$ such that
-    $\denote{c_1}^\sigma\,\mu\,\pkt = \{(\mu,\pkt'')\}$.
-    By IH($c_2$) there exists some $\pkt'$ such that
-    $\denote{c_2}^\sigma,\mu\,pkt'' = \{(\mu, \pkt')\}$.
-    The result follows by definition of $\denote{-}$.
-    \end{enumerate}
-\end{proof}
+%% \begin{proof}
+%%   Proceed by induction over $c$.
+%%   \begin{enumerate}[align=left]
+%%   \item[$(c = h.f = e)$] Immediate.
+%%   \item[$(c = c_1;c_2)$]
+%%     By IH($c_1$) there exists some $\pkt''$ such that
+%%     $\denote{c_1}^\sigma\,\mu\,\pkt = \{(\mu,\pkt'')\}$.
+%%     By IH($c_2$) there exists some $\pkt'$ such that
+%%     $\denote{c_2}^\sigma,\mu\,pkt'' = \{(\mu, \pkt')\}$.
+%%     The result follows by definition of $\denote{-}$.
+%%     \end{enumerate}
+%% \end{proof}
 
+\begin{samepage}
 \begin{theorem}[Instrumentation Equivalence]
   \label{thm:instr-equiv}
   For every $c \in \Cmd$, well-formed state $\sigma : \Value \to \Row^*$, model
-  $\mu \in \Model$, and packet $\pkt \in \Pkt$, $\denote{c}^\sigma~\mu~\pkt =
-  \denote{c[?]}^\sigma~\mu~\pkt$.
+  $\mu \in \Model$, and packet $\pkt \in \Pkt$, \[\denote{c}^\sigma~\mu~\pkt = \denote{c[?];\assume \state\sigma_c}^\sigma~\mu~\pkt.\]
 \end{theorem}
+\end{samepage}
 
 \begin{proof}
-  Proceed by induction on the structure of $c$, leaving $\sigma$, $\mu$, $\pkt$ general.
-  \begin{enumerate}[align=left]
-  \item[$(c = h.f := e)$]
-    Let $\sigma$,$\mu$,$\pkt$ be given.
-    By definition $h.f:=e[?] = h.f:=e$. The result follows.
-  \item[$(c = \assume b)$] Similar. $[?]$ is no-op.
-  \item[$(c = \assert b)$] Similar. $[?]$ is no-op.
-  \item[$(c = \choose \rho t)$] \textcolor{red}{Admitted}.
-  \item[$(c = c_1;c_2)$]
-    Let $\sigma,\mu,\pkt$ be given.
-    By definition $(c_1;c_2)[?] = c_1[?]; c_2[?]$.
-    Compute as follows:
-    \[\begin{array}{>{\displaystyle}ll}
-    \denote{(c_1;c_2)[?]}^\sigma~\mu~\pkt \\
-    = \denote{c_1[?];c_2[?]}^\sigma~\mu\pkt
-    & \text{by definition of } [?]  \\
-    = \bigcup_{(\mu',\pkt') \in \denote{c_1[?]}^\sigma\,\mu\,\pkt}\denote{c_2[?]}^\sigma~\mu'~\pkt'
-    & \text{by definition of }\denote{-} \\
-    = \bigcup_{(\mu',\pkt') \in \denote{c_1}^\sigma\,\mu\,\pkt}\denote{c_2[?]}^\sigma~\mu'~\pkt'
-    & \text{by } \mathit{IH}(c_1, \mu, \pkt) \\
-    = \bigcup_{(\mu',\pkt') \in \denote{c_1}^\sigma\,\mu\,\pkt}\denote{c_2}^\sigma~\mu'~\pkt'
-    & \text{by } \mathit{IH}(c_2, \mu', \pkt') \\
-    = \denote{c_1;c_2}^\sigma~\mu~\pkt
-    & \text{by definition of } \denote{-}
-    \end{array}
-    \]
-  \item[$(c = c_1 \choice c_2)$] Similar, by IHs.
+  \todo[inline]{Proceed by induction on the structure of $c$, leaving $\sigma$, $\mu$, $\pkt$ general}
 
-  \item[$(c = t.\apply())$]
-    Let $\sigma$,$\mu$,$\pkt$ be given.
-    Let $r_1,\ldots,r_n = \sigma(t)$.
-    There are two cases, either the packet hits a row, or hits no row. Explore each case separately.
-    \begin{enumerate}
-    \item[\textsc{Hit}] In this case, there is some $r_i$ such that $\satisfy \sigma \pkt \mu r_i.\matches = t.\keys$. By the well-formedness assumption,
-      we know that this $r_i$ is unique, and that we can write
-      $t.\actions[r_i.\action]$ as $\lambda \vec x. c$, and $|r_i.\data| = |\vec x|$.
+  %% \begin{enumerate}[align=left]
+  %% \item[$(c = h.f := e)$]
+  %%   Let $\sigma$,$\mu$,$\pkt$ be given.
+  %%   By definition $h.f:=e[?] = h.f:=e$. The result follows.
+  %% \item[$(c = \assume b)$] Similar. $[?]$ is no-op.
+  %% \item[$(c = \assert b)$] Similar. $[?]$ is no-op.
+  %% \item[$(c = c_1;c_2)$]
+  %%   Let $\sigma,\mu,\pkt$ be given.
+  %%   By definition $(c_1;c_2)[?] = c_1[?]; c_2[?]$.
+  %%   Compute as follows:
+  %%   \[\begin{array}{>{\displaystyle}ll}
+  %%   \denote{(c_1;c_2)[?]}^\sigma~\mu~\pkt \\
+  %%   = \denote{c_1[?];c_2[?]}^\sigma~\mu\pkt
+  %%   & \text{by definition of } [?]  \\
+  %%   = \bigcup_{(\mu',\pkt') \in \denote{c_1[?]}^\sigma\,\mu\,\pkt}\denote{c_2[?]}^\sigma~\mu'~\pkt'
+  %%   & \text{by definition of }\denote{-} \\
+  %%   = \bigcup_{(\mu',\pkt') \in \denote{c_1}^\sigma\,\mu\,\pkt}\denote{c_2[?]}^\sigma~\mu'~\pkt'
+  %%   & \text{by } \mathit{IH}(c_1, \mu, \pkt) \\
+  %%   = \bigcup_{(\mu',\pkt') \in \denote{c_1}^\sigma\,\mu\,\pkt}\denote{c_2}^\sigma~\mu'~\pkt'
+  %%   & \text{by } \mathit{IH}(c_2, \mu', \pkt') \\
+  %%   = \denote{c_1;c_2}^\sigma~\mu~\pkt
+  %%   & \text{by definition of } \denote{-}
+  %%   \end{array}
+  %%   \]
+  %% \item[$(c = c_1 \choice c_2)$] Similar, by IHs.
 
-      Compute as follows:
-      \[\begin{array}{>{\displaystyle}ll}
-      \denote{t.\apply()}^\sigma~\mu~\pkt \\
-      = \denote{c[r_i.data/\vec x]}^\sigma~\mu~\pkt & \text{by definition of} \models \text{, and the uniqueness of }r_i  \\
-      \end{array}
-      \]
+  %% \item[$(c = t.\apply())$]
+  %%   Let $\sigma$,$\mu$,$\pkt$ be given.
+  %%   Let $r_1,\ldots,r_n = \sigma(t)$.
+  %%   There are two cases, either the packet hits a row, or hits no row. Explore each case separately.
+  %%   \begin{enumerate}
+  %%   \item[\textsc{Hit}]
+  %%     \textitP{}
 
-      Now, we compute the denotation of $t.\apply()[?]$ to see that it is equivalent to the above.
-      The definition of $t.\apply()[?]$ gives us two alternatives. Consider the second, first:
-      \[\begin{array}{>{\displaystyle}ll}
-        \denote{\assume \forall \rho \in t. \rho.\matches \neq t.\keys;\SKIP}^\sigma~\mu~\pkt \\
-        = \denote{\assume \forall \rho \in t. \rho.\matches \neq t.\keys}^\sigma~\mu~\pkt
-        & \textrm{\textcolor{red}{Redo with defaults}} \\
-        = \begin{cases}
-          \{(\mu,\pkt)\}, & \satisfy\sigma\pkt\mu \rho.\matches \neq t.\keys \\
-          \{\}, &\textit{otherwise}
-        \end{cases}
-        & \textrm{By definition of }\denote{-}\\
-        =  \{\}
-        & \textrm{by \textsc{Hit} assumption}
-      \end{array}
-      \]
+  %%   \item[\textsc{Miss}] In this case, there is no $r_i$ such that
+  %%     $\satisfy\sigma\pkt\mu r_i.\matches = t.\keys$, which means that the LHS
+  %%     of the toplevel choice operator should evaluate to $\{\}$ \todo{compute
+  %%       this}, and the RHS evaluates to $\{\mu,\pkt\}$\todo{compute this}, which
+  %%     is precisely the result we get when executing
+  %%     $\denote{t.apply()}^\sigma~\mu~\pkt$.
 
-      Now let's consider the first branch, i.e.
-      \[
-      \denote{\choose \rho t \left\{
-        \begin{array}{>{\displaystyle}l}
-          \assume \rho.\matches = t.\keys;\\
-          \bigchoice_{i=0}^{|t.\action| -1}
-          \left\{\begin{array}{l}
-          \assume \rho.\action = i;\\
-          t.\actions[i](\rho.\data)
-          \end{array}\right\}
-        \end{array}\right\}
-      }^\sigma~\mu~\pkt\]
+  %%   \end{enumerate}
 
-      Compute the following inner result, by definitions and set theory
-      \[
-      \begin{array}{>{\displaystyle}ll}
-      \bigcup_{r \in \sigma(t)}\denote{\begin{array}{>{\displaystyle}l}
-          \assume \rho.\matches = t.\keys;\\
-          \bigchoice_{i=0}^{|t.\action| -1}
-          \left\{\begin{array}{l}
-          \assume \rho.\action = i;\\
-          t.\actions[i](\rho.\data)
-          \end{array}\right\}
-      \end{array}}^\sigma~\mu\{\rho \mapsto r\}~\pkt\\
-      = \bigcup_{
-        \substack{r \in \sigma(t) \\
-          (\mu',\pkt') \in \denote{\assume \rho.\matches = t.\keys}^\sigma\,(\mu\{\rho \mapsto r\})\,\pkt}}
-      \bigcup_{i=0}^{|t.\action| -1}\denote{
-       \begin{array}{l}
-          \assume \rho.\action = i;\\
-          t.\actions[i](\rho.\data)
-      \end{array}}^\sigma~\mu'~\pkt'
-
-      \\\\
-      (\textrm{by \textsc{Hit}, \textsc{NoShadow}, and the definition of }\denote{-}) \\
-      \\
-      = \bigcup_{i=0}^{|t.\action| -1}\denote{
-       \begin{array}{l}
-          \assume \rho.\action = i;\\
-          t.\actions[i](\rho.\data)
-      \end{array}}^\sigma~(\mu\{\rho \mapsto r_i\})~\pkt \\
-      = \bigcup_{j=0}^{|t.\action| -1}\denote{
-       \begin{array}{l}
-          \assume r_i.\action = j;\\
-          t.\actions[j](r_i.\data)
-      \end{array}}^\sigma~(\mu\{\rho \mapsto r_i\})~\pkt \\
-      \textrm{\textcolor{red}{TODO LEMMA}} \\
-      = \denote{t.\actions[r_i.\action](r_i.\data)}^\sigma~(\mu\{\rho \mapsto r_i\})~\pkt \\
-      = \denote{c[r_i.\data/\vec x]}^\sigma~(\mu\{\rho \mapsto r_i\})~\pkt \\
-      \end{array}\]
-
-      By Lemma~\ref{lem:models-invariant-over-actions}, there's some $\pkt'$ such that
-      \[\{(\mu\{\rho \mapsto r_i\}, \pkt')\} =
-      \denote{c[r_i.\data/\vec x]}^\sigma~(\mu\{\rho \mapsto r_i\})~\pkt
-      \]
-
-      which means that the result of the first branch is
-      \[\{(\mu, \pkt')\} \]
-
-      Since $\rho$ doesn't occur in $c$, then there's some $\mu'$ such that also
-      \[\{\mu', \pkt'\} = \denote{c[r_i.\data/\vec x]}^\sigma~\mu~\pkt \]
-
-      and $\mu = \mu'$ by Lemma~\ref{lem:models-invariant-over-actions}.
-
-      The result follows.
-
-    \item[\textsc{Miss}] In this case, there is no $r_i$ such that
-      $\satisfy\sigma\pkt\mu r_i.\matches = t.\keys$, which means that the LHS
-      of the toplevel choice operator should evaluate to $\{\}$ \todo{compute
-        this}, and the RHS evaluates to $\{\mu,\pkt\}$\todo{compute this}, which
-      is precisely the result we get when executing
-      $\denote{t.apply()}^\sigma~\mu~\pkt$.
-
-    \end{enumerate}
-
-  \end{enumerate}
+  %% \end{enumerate}
 \end{proof}
 
-\section{Ghost State}
+\subsection{Ghost State}
 
 
 Following p4v, we want construct a ghostly header $\gamma$ from a program $p$
@@ -802,7 +715,7 @@ And now what we want to prove is
 
 
 
-\section{Tables as nondeterministic choice}
+\subsection{Tables as nondeterministic choice}
 
 Ive said before that the nondeterministic choice is an overapproximation of
 the control plane behavior. It's a slightly inaccurate claim in that it
@@ -821,7 +734,7 @@ omits the key-reads commands and hit/miss predicates.
   \nondet(\assert b) && \assert b \\
   \nondet(c_1;c_2) && \nondet(c_1;c_2) \\
   \nondet(c_1 \choice c_2) && \nondet(c_1) \choice \nondet(c_2) \\
-  \nondet(\choose \rho t c) && \textcolor{red}{\text{undefined}} \\
+  %% \nondet(\choose \rho t c) && \textcolor{red}{\text{undefined}} \\
   \nondet(t.\apply()) && \\
   \multicolumn{3}{>{\qquad}r}{
     \displaystyle
