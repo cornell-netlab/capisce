@@ -52,6 +52,7 @@
 \newcommand{\actions}{\mathsf{actions}}
 \newcommand{\keys}{\mathsf{keys}}
 \newcommand{\data}{\mathsf{data}}
+\newcommand{\params}{\mathsf{params}}
 \newcommand{\id}{\mathsf{id}}
 
 % commands
@@ -61,7 +62,7 @@
 \newcommand{\choiceop}{\rotatebox[origin=c]{90}{$\sqsubset\!\!\!\sqsupset$}}
 \newcommand{\choice}{\mathbin{\choiceop}}
 \DeclareMathOperator*{\bigchoice}{\scalerel*{\choiceop}{\sum}}
-\renewcommand{\choose}[2]{\mathop{\mathsf{havoc}~#1~\mathsf{from}~#2~\mathsf{in}}}
+\newcommand{\havoc}{\texttt{<?>}}
 \newcommand{\SKIP}{\mathsf{skip}}
 
 % math
@@ -71,6 +72,7 @@
 \newcommand{\notsatisfy}[3]{({#1,#3})\not\models_{#2}}
 \newcommand{\nondet}{\mathsf{nondet}}
 \newcommand{\ghostly}{\mathsf{ghostly}}
+\newcommand{\state}[1]{\llparenthesis#1\rrparenthesis}
 
 % defined functions
 \newcommand{\tables}{\mathop{\mathsf{tables}}}
@@ -102,6 +104,7 @@
     \multicolumn{3}{l}{\BVExpr} \\
     e & ::= & v & \textit{Value} & (a,g,p,\iota)\\
       & \mid & h.f & \textit{Header Access} & (a,g,p,\iota)\\
+      & \mid & \havoc & \textit{Havoc} & (a,g,p,\iota) \\
       & \mid & \rho.\matches[i] & \textit{Symbolic Match} & (\iota)\\
       & \mid & \rho.\action & \textit{Symbolic Action} & (\iota) \\
       & \mid & \rho.\data[i] & \textit{Symbolic Action Data} & (\iota) \\
@@ -126,7 +129,6 @@
       & \mid & t.\apply() & \textit{Table Application} & (p)\\
       & \mid & c;c & \textit{Sequential Composition} & (a,g,p,\iota) \\
     & \mid & c \choice c & \textit{Nondeterministic Choice} & (g,p,\iota)\\
-    & \mid & \choose \rho t c & \textit{Selection} & (\iota) \\
     \multicolumn{3}{l}{
       \begin{array}{ll}
         x \in \Var & h \in \Hdr\\
@@ -450,28 +452,40 @@ inspect $\sigma$. We define $c[?]$ in Figure~\ref{fig:table-instrument}.
   (\assert b)[?] && \assert b\\
   (c_1;c_2)[?] && c_1[?];c_2[?]\\
   (c_1 \choice c_2)[?] && c_1[?] \choice c_2[?]\\
-  (\choose \rho t c)[?] &&
-  \textrm{\textcolor{red}{undefined}} \\
   (t.\apply())[?] &&
   \begin{array}[t]{l} \displaystyle
     \{ \\
-    \quad \choose \rho t \;\{ \\
-    \qquad \assume \rho.\matches = t.\keys; \\
-    \qquad \displaystyle \bigchoice_{i=0}^{|t.\action| -1}
+    \quad \rho.\matches := \havoc; \\
+    \quad \rho.\action := \havoc;\\
+    \quad \rho.\data := \havoc; \\
+    \quad \assume |\rho.\matches| = |t.\keys|; \\
+    \quad \assume \rho.\action < |t.\actions|; \\
+    \quad \assume |\rho.\data| < |t.\action[\rho.\action].\params| \\
+    \quad \assume \rho.\matches = t.\keys; \\
+    \quad \displaystyle \bigchoice_{i=0}^{|t.\action| -1}
     \left\{\begin{array}{l}
     \assume \rho.\action = i;\\
     t.\action[i](\rho.\data)
     \end{array}\right\}\\
-    \quad \} \\
     \} \choice \{ \\
     \quad \assume \forall \rho \in t. \rho.\matches \neq t.\keys; \\
     \quad \SKIP \\
-    \quad \}\\
     \}
   \end{array}
   \end{array}
   \]
   \caption{Symbolic Table instrumentation}
+  \label{fig:table-instrument}
+\end{figure}
+
+\begin{figure}[htp]
+  \[\begin{array}{r >{\triangleq}cl}
+  \multicolumn{3}{l}{\state\sigma_c : (\Value \to \Row^*) \to \BExpr} \\
+  \state\sigma_c = \bigwedge_{ t \in \tables(c) } \bigvee_{r_i \in \sigma(t.\id)}
+  \rho = r_i
+  \end{array}
+  \]
+  \caption{Symbolic State Encoding}
   \label{fig:table-instrument}
 \end{figure}
 
