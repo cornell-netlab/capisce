@@ -69,19 +69,16 @@
 \newcommand{\WP}{\textit{wp}}
 \newcommand{\satisfy}[3]{({#1,#3}) \models_{#2}}
 \newcommand{\notsatisfy}[3]{({#1,#3})\not\models_{#2}}
-\newcommand{\pv}{\mathit{p4v}}
-
+\newcommand{\nondet}{\mathsf{nondet}}
+\newcommand{\ghostly}{\mathsf{ghostly}}
 
 % defined functions
 \newcommand{\tables}{\mathop{\mathsf{tables}}}
-
 
 % Theorems
 \newtheorem{theorem}{Theorem}
 \newtheorem{lemma}{Lemma}
 \newtheorem{conjecture}{Conjecture}
-
-
 
 \begin{document}
 
@@ -646,6 +643,218 @@ inspect $\sigma$. We define $c[?]$ in Figure~\ref{fig:table-instrument}.
   \end{enumerate}
 \end{proof}
 
+\section{Ghost State}
+
+
+Following p4v, we want construct a ghostly header $\gamma$ from a program $p$
+and use it to instrument the program to capture all dataplane behaviors.
+
+\[
+\begin{array}{l>{\triangleq}cl}
+  \multicolumn{3}{l}{\ghostly :: \Cmd \to \Cmd} \\
+  \multicolumn{3}{l}{\ghostly :: \Prog \to \GCL} \\
+  \ghostly(h.f := e)
+  && h.f := e \\
+  \ghostly(\assert b)
+  && \assert b\\
+  \ghostly(\assume b)
+  && \assume b \\
+  \ghostly(c_1;c_2)
+  && \ghostly(c_1);\ghostly(c_2) \\
+  \ghostly(c_1\choice c_2)
+  && \ghostly(c_1) \choice \ghostly(c_1)\\
+  \ghostly(t.\apply())
+  &&\\
+  \multicolumn{3}{c}{
+    \begin{array}[t]{>{\displaystyle\qquad}l}
+       \gamma.t_{\mathit{reach}} := [1]_1; \\
+       \gamma.t_{\mathit{read}(0)} := t.\keys[0]; \\
+       \vdots \\
+       \gamma.t_{\mathit{read}(|t.\keys|-1)} := t.\keys[|t.\keys|-1]; \\[1em]
+       \left(\gamma.t_{\mathit{hit}} := [0]_1 \right)
+       \choice \left(\bigchoice_{j = 1}^{|t.\action|-1}{
+         \left(\begin{array}{l}
+           \gamma.t_{\mathit{hit}} := [1]_1 ;\\
+           \gamma.t_{\mathit{action}} := [1]_1;\\
+           t.\action[j](\overrightarrow{\gamma.t_{\mathit{data}}})
+         \end{array}\right)
+       }\right)
+     \end{array}}
+\end{array}
+\]
+
+And now what we want to prove is
+
+\begin{theorem}{Instrumentation sufficiency}
+  For every well-formed program $c \in \Cmd$, every state $\sigma : \Value \to
+  \Row^*$, there is some $b_\sigma \in \BExpr$ such that for every model $\mu
+  \in \Model$ and every $\pkt \in \Pkt$,
+  \[\denote{c}^\sigma\,\mu\,\pkt =_{\not\gamma} \denote{\ghostly(c);\assume b}^\sigma\,\mu\,\pkt\]
+\end{theorem}
+
+\begin{proof}
+  Proceed by induction on $c$:
+  \begin{enumerate}[align=left]
+  \item[$(h.f:=e)$] Let $b_\sigma = \TRUE$; immediate.
+  \item[$(\assume b)$] Let $b_\sigma = \TRUE$; immediate.
+  \item[$(\assert b)$] Let $b_\sigma = \TRUE$; immediate.
+  \item[$(c_1;c_2)$] By IHs. $b_\sigma = b_1 \wedge b_2$ because $b_1$ and $b_2$ refer to disjoint variables.
+  \item[$(c_1 \choice c_2)$] \textit{sim}.
+  \item[$(t.\apply())$]
+
+    Let $b_\sigma$ be defined as follows:
+    \[
+    b_\sigma = \bigvee_{r \in \sigma(t.\id)}
+    \begin{array}{>{\displaystyle}l}
+      \gamma
+    \end{array}
+    \]
+
+    We can compute as follows:
+    \[\begin{array}{>{\displaystyle}ll}
+    \denote{\ghostly(c)}^\sigma\,\mu\,\pkt\\
+    =\denote{
+        \begin{array}{>{\displaystyle}l}
+          \gamma.t_{\mathit{reach}} := [1]_1; \\
+          \gamma.t_{\mathit{read}(0)} := t.\keys[0]; \\
+          \vdots \\
+          \gamma.t_{\mathit{read}(|t.\keys|-1)} := t.\keys[|t.\keys|-1]; \\[1em]
+          \left(\gamma.t_{\mathit{hit}} := [0]_1 \right)
+          \choice \left(\bigchoice_{j = 1}^{|t.\action|-1}
+            \left(\begin{array}{l}
+              \gamma.t_{\mathit{hit}} := [1]_1 ;\\
+              \gamma.t_{\mathit{action}} := j;\\
+              t.\action[j](\overrightarrow{\gamma.t_{\mathit{data}}})
+            \end{array}\right)
+          \right)
+    \end{array}}^\sigma\,\mu\,\pkt \\[2em]
+    =\denote{
+        \begin{array}{>{\displaystyle}l}
+          \left(\gamma.t_{\mathit{hit}} := [0]_1 \right)
+          \choice \left(\bigchoice_{j = 1}^{|t.\action|-1}
+            \left(\begin{array}{l}
+              \gamma.t_{\mathit{hit}} := [1]_1 ;\\
+              \gamma.t_{\mathit{action}} := j;\\
+              t.\action[j](\overrightarrow{\gamma.t_{\mathit{data}}})
+            \end{array}\right)
+          \right)
+    \end{array}}^\sigma\!\mu\,\pkt' \\
+    \qquad\qquad \text{where}~\pkt' = \pkt\left\{\begin{array}{l}
+    \gamma.t_{\mathit{reach}} \mapsto [1]_1,\\
+    \overrightarrow{\gamma.t_{\textit{key}} \mapsto \edenote{t.\keys}\,\pkt\,\mu}
+    \end{array}\right\} \\
+    =\denote{
+      \left(\gamma.t_{\mathit{hit}} := [0]_1 \right)}^\sigma\!\mu\,\pkt'
+    \cup
+    \denote{\left(\bigchoice_{j = 1}^{|t.\action|-1}
+            \left(\begin{array}{l}
+              \gamma.t_{\mathit{hit}} := [1]_1 ;\\
+              \gamma.t_{\mathit{action}} := j;\\
+              t.\action[j](\overrightarrow{\gamma.t_{\mathit{data}}})
+            \end{array}\right)
+            \right)
+    }^\sigma\!\mu\,\pkt' \\
+    = \left\{(\mu,\pkt'\left\{\gamma.t_{\mathit{hit}} \mapsto [0]_1\right\})\right\}
+    \cup
+        \denote{\left(\bigchoice_{j = 1}^{|t.\action|-1}
+          \left(\begin{array}{l}
+            \gamma.t_{\mathit{hit}} := [1]_1 ;\\
+            \gamma.t_{\mathit{action}} := j;\\
+            t.\action[j](\overrightarrow{\gamma.t_{\mathit{data}}})
+          \end{array}\right)
+          \right)
+        }^\sigma\!\mu\,\pkt' \\
+  = \left\{(\mu,\pkt'\left\{\gamma.t_{\mathit{hit}} \mapsto [0]_1\right\})\right\}
+  \cup
+  \left(\bigcup_{j = 1}^{|t.\action|-1}
+  \denote{t.\action[j](\overrightarrow{\gamma.t_{\mathit{data}}})}^\sigma\,\mu\,\pkt'\left\{
+  \begin{array}{l}
+    \gamma.t_{\textit{hit}} \mapsto [1]_1,\\
+    \gamma.t_{\textit{action}} \mapsto j
+  \end{array}
+  \right\}
+  \right) \\
+
+
+
+
+    \end{array}
+\]
+
+  \end{enumerate}
+\end{proof}
+
+
+
+
+
+\section{Tables as nondeterministic choice}
+
+Ive said before that the nondeterministic choice is an overapproximation of
+the control plane behavior. It's a slightly inaccurate claim in that it
+correctly captures all possible control plane behaviors, but it doesn't have a
+handle on constrain control plane behavior.
+
+A simplified version of P4v's encoding is shown in Figure~\ref{fig:p4vlike}. It
+omits the key-reads commands and hit/miss predicates.
+
+\begin{figure}
+  \[\begin{array}{l >{\triangleq}cl}
+  \multicolumn{3}{l}{\nondet : \Cmd \to \Cmd} \\
+  \multicolumn{3}{l}{\nondet : \Prog \to \Instr} \\
+  \nondet(h.f := e) && h.f := e \\
+  \nondet(\assume b) && \assume b \\
+  \nondet(\assert b) && \assert b \\
+  \nondet(c_1;c_2) && \nondet(c_1;c_2) \\
+  \nondet(c_1 \choice c_2) && \nondet(c_1) \choice \nondet(c_2) \\
+  \nondet(\choose \rho t c) && \textcolor{red}{\text{undefined}} \\
+  \nondet(t.\apply()) && \\
+  \multicolumn{3}{>{\qquad}r}{
+    \displaystyle
+    \bigchoice_{i = 0}^{|t.\action|-1}t.\action[i]()
+  }
+  \end{array}\]
+  \caption{A \texttt{p4v}-like instrumentation. For simplicity of reasoning
+    about variables, assume that actions take no action data. }
+  \label{fig:p4vlike}
+\end{figure}
+
+The theorem below demonstrates the over-approximation. Compare with the Instrumentation Equivalence Theorem~\ref{thm:instr-equiv}.
+
+\begin{theorem}[\texttt{p4v} over-approximates]
+  \label{thm:p4v-over}
+  For every $c \in \Prog$, well-formed state $\sigma : \Value \to \Row^* $,
+  model $\mu \in \Model$, and packet $\pkt \in \Pkt$,
+  $\denote{c}^\sigma\,\mu\,\pkt \subseteq \denote{\nondet(c)}^\sigma\,\mu\,\pkt$
+\end{theorem}
+
+\begin{proof}
+\todo[inline]{By induction on c}.
+\end{proof}
+
+We can witness non-equality by the following counter-example. Consider a program
+$t.\apply()$ where $t = \{\keys=[h.f];\actions=[\lambda().\SKIP, \lambda(). h.f :=
+  99]\}$. Consider an input packet with $\pkt(h.f) = 47$, and an empty input
+model and state that selects a single action.
+
+Then $\denote{t.\apply()}^\emptyset\,\emptyset\,\pkt = \{(\mu,\pkt)\}$.
+
+Whereas
+\[\begin{array}{l}
+\denote{\nondet(t.\apply())}^\emptyset\,\emptyset\,\pkt \\
+= \denote{
+    \displaystyle
+    \bigchoice_{i = 0}^{|t.\action|-1} t.\action[i]()
+}^\emptyset\,\emptyset\,\pkt \\
+= \denote{\SKIP}^\emptyset\,\emptyset\,\pkt \cup \denote{h.f := 99}^\emptyset\,\emptyset\,\pkt\\
+= \{(\emptyset,\pkt),(\emptyset,\pkt\{h.f\mapsto 99\})\}
+\end{array}\]
+
+Finally, $\{(\emptyset,\pkt)\} \subset
+\{(\emptyset,\pkt),(\emptyset,\pkt\{h.f\mapsto 99\})\}$, exemplifies a strict
+subset behavior described by Theorem~\ref{thm:p4v-over}.
+
+
 \section{The Research Problem}
 
 Now we can formally define the research problems that we want to solve. We have
@@ -670,6 +879,7 @@ prefer to solve the following problem:
   \[\satisfy \sigma \pkt \emptyset b_{\mathit{cp}},\]
   then \[\denote{c}^\sigma ~\emptyset~\pkt \neq \error \]
 \end{quote}
+
 
 
 \section{Reduction to QE}
@@ -737,71 +947,5 @@ To do so, we need to extend our templates along the following dimensions:
   computing a $b_{\textit{pkt}}$.
 \end{enumerate}
 
-
-\section{P4v comparison}
-
-Ive said before that the P4v-style instrumentation is an overapproximation of
-the control plane behavior. It's a slightly inaccurate claim in that it
-correctly captures all possible control plane behaviors, but it doesn't have a
-handle on constrain control plane behavior.
-
-A simplified version of P4v's encoding is shown in Figure~\ref{fig:p4vlike}. It
-omits the key-reads commands and hit/miss predicates.
-
-\begin{figure}
-  \[\begin{array}{l >{\triangleq}cl}
-  \multicolumn{3}{l}{\pv : \Cmd \to \Cmd} \\
-  \multicolumn{3}{l}{\pv : \Prog \to \Instr} \\
-  \pv(h.f := e) && h.f := e \\
-  \pv(\assume b) && \assume b \\
-  \pv(\assert b) && \assert b \\
-  \pv(c_1;c_2) && \pv(c_1;c_2) \\
-  \pv(c_1 \choice c_2) && \pv(c_1) \choice \pv(c_2) \\
-  \pv(\choose \rho t c) && \textcolor{red}{\text{undefined}} \\
-  \pv(t.\apply()) && \\
-  \multicolumn{3}{>{\qquad}r}{
-    \displaystyle
-    \bigchoice_{i = 0}^{|t.\action|-1}t.\action[i]()
-  }
-  \end{array}\]
-  \caption{A \texttt{p4v}-like instrumentation. For simplicity of reasoning
-    about variables, assume that actions take no action data. }
-  \label{fig:p4vlike}
-\end{figure}
-
-The theorem below demonstrates the over-approximation. Compare with the Instrumentation Equivalence Theorem~\ref{thm:instr-equiv}.
-
-\begin{theorem}[\texttt{p4v} over-approximates]
-  \label{thm:p4v-over}
-  For every $c \in \Prog$, well-formed state $\sigma : \Value \to \Row^* $,
-  model $\mu \in \Model$, and packet $\pkt \in \Pkt$,
-  $\denote{c}^\sigma\,\mu\,\pkt \subseteq \denote{\pv(c)}^\sigma\,\mu\,\pkt$
-\end{theorem}
-
-\begin{proof}
-\todo[inline]{By induction on c}.
-\end{proof}
-
-We can witness non-equality by the following counter-example. Consider a program
-$t.\apply()$ where $t = \{\keys=[h.f];\actions=[\lambda().\SKIP, \lambda(). h.f :=
-  99]\}$. Consider an input packet with $\pkt(h.f) = 47$, and an empty input
-model and state that selects a single action.
-
-Then $\denote{t.\apply()}^\emptyset\,\emptyset\,\pkt = \{(\mu,\pkt)\}$.
-
-Whereas
-\[\begin{array}{l}
-\denote{\pv(t.\apply())}^\emptyset\,\emptyset\,\pkt \\
-= \denote{
-    \displaystyle
-    \bigchoice_{i = 0}^{|t.\action|-1} t.\action[i]()
-}^\emptyset\,\emptyset\,\pkt \\
-= \denote{\SKIP}^\emptyset\,\emptyset\,\pkt \cup \denote{h.f := 99}^\emptyset\,\emptyset\,\pkt\\
-= \{(\emptyset,\pkt),(\emptyset,\pkt\{h.f\mapsto 99\})\}
-\end{array}\]
-
-Finally, $\{(\emptyset,\pkt)\} \subset
-\{(\emptyset,\pkt),(\emptyset,\pkt\{h.f\mapsto 99\})\}$, exemplifies a strict
-subset behavior described by Theorem~\ref{thm:p4v-over}.
 
 \end{document}
