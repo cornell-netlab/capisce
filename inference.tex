@@ -782,6 +782,37 @@ Finally, $\{(\emptyset,\pkt)\} \subset
 subset behavior described by Theorem~\ref{thm:p4v-over}.
 
 
+\subsection{Computing Logical Forms}
+
+Now, we would like to be able to translate the result from
+Theorem~\ref{thm:instr-equiv} into a symbolic representation. To do this, we'll
+use the weakest precondition, defined in Figure~\ref{fig:wp}
+
+\begin{figure}[H]
+  \[
+  \begin{array}{r >{\triangleq}c l}
+    \WP(h.f := e, b)
+    && b[e/h.f] \\
+    \WP(\assert b_a, b)
+    && b_a \wedge b \\
+    \WP(\assume b_a, b)
+    && b_a \Rightarrow b \\
+    \WP(t.\apply,b) && \textrm{\textcolor{red}{undefined}} \\
+    \WP(c_1;c_2, b)
+    && \WP(c_1,\WP(c_2,b)) \\
+    \WP(c_1 \choice c_2, b)
+    && \WP(c_1,b) \wedge \WP(c_2,b)
+  \end{array}
+  \]
+  \caption{Dijkstra's weakest precondition function}
+  \label{fig:wp}
+\end{figure}
+
+
+
+
+
+
 \section{The Research Problem}
 
 Now we can formally define the research problems that we want to solve. We have
