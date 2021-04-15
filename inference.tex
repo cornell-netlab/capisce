@@ -79,8 +79,9 @@
 \newcommand{\nondet}{\mathsf{nondet}}
 \newcommand{\ghostly}{\mathsf{ghostly}}
 \newcommand{\state}[1]{\llparenthesis#1\rrparenthesis}
-\newcommand{\instr}{[\forall]}
+\newcommand{\instr}{[?]}
 \newcommand{\ginstr}{[\mathghost]}
+\newcommand{\qe}{\textsc{Qe}}
 
 % defined functions
 \newcommand{\tables}{\mathop{\mathsf{tables}}}
@@ -132,13 +133,13 @@
     & \mid & \forall \rho.~b & \textit{Row Universality} & (\iota)\\
     \multicolumn{4}{l}{c \in \Cmd, a \in \Action, g \in \GCL, p \in \Prog, \iota \in \Instr } \\
     c & ::=  & h.f := e & \textit{Assignment} & (g,p,\iota) \\
-      & \mid & \havoc \rho & \textit{Row Havoc} & (\iota) \\
+      %% & \mid & \havoc \rho & \textit{Row Havoc} & (\iota) \\
       & \mid & \assert b & \textit{Assertion} & (g,p,\iota)\\
       & \mid & \assume b & \textit{Assumption} & (g,p,\iota) \\
       & \mid & t.\apply() & \textit{Table Application} & (p)\\
       & \mid & c;c & \textit{Sequential Composition} & (a,g,p,\iota) \\
       & \mid & c \choice c & \textit{Nondeterministic Choice} & (g,p,\iota)\\
-      & \mid & \{c\} & \textit{Scope} & (g,p,\iota)\\
+      %% & \mid & \{c\} & \textit{Scope} & (g,p,\iota)\\
     \multicolumn{3}{l}{
       \begin{array}{ll}
         x \in \Var & h \in \Hdr\\
@@ -233,19 +234,6 @@ It is convenient to describe these as subgrammars. First, action-commands $a \in
 command has variables, indicated by the starred variant $a*$, it is called
 \emph{open}, if it has none it is called \emph{closed}.
 
-Second, $p \in \Prog \subset \Cmd$ represents the expected set of programs extracted from a
-P4 interface, most notably, it contains tables $t$ and no symbolic selection
-statements or symbolic expersions.
-
-Conversely $\iota \in \Instr \subset \Cmd$ represents a program instrumented
-with symbolic variables. A program $\iota$ cannot apply tables using
-$t.\apply()$, but instead uses havoc statements, to
-introduce symbolic variables $\rho$ in $c$.
-
-Finally $g \in \GCL \subset \Prog \subset \Cmd$ represents the core algebraic
-flavor of GCL without havoc, symbolic tables, or table application.
-
-
 Define $\tables(c) \subset \Table$ to be the set of all tables that occur in $c$.
 
 \subsection{Semantics}
@@ -275,6 +263,7 @@ table $t$ iff the following conditions hold:
 A state map $\sigma : \Value \to \Row^*$ is well-formed for a command $c$ iff the
 following conditions hold:
 \begin{enumerate}
+\item[\textsc{Total}] For every $t \in \tables(c)$ $\pkt \in \pkt$ there exists a row $r \in \sigma(t.\id)$ such that $r.matches = \pkt(t.keys)$.
 \item[\textsc{WellFormedRows}] For every $t\in \tables(c)$, every row in $\sigma(t.\id)$ is well-formed.
 \item[\textsc{NoShadow}] For every $t \in \tables(c)$, with $r_1,\ldots,r_n =
   \sigma(t.\id)$, for every $1 \leq i \leq n$, there does not exist $1 \leq j <
@@ -363,14 +352,14 @@ operators, and a cleaner representation of table application.
       \{(\mu,\pkt)\} & \satisfy \sigma \pkt \mu b \\
       \error & \textit{otherwise}
     \end{cases} \\
-    \denote{\havoc \rho}^\sigma\,\mu\,\pkt &&
-    \{(\mu\{\rho \mapsto r\}, \pkt) \mid r \in \Row\} \\
+    %% \denote{\havoc \rho}^\sigma\,\mu\,\pkt &&
+    %% \{(\mu\{\rho \mapsto r\}, \pkt) \mid r \in \Row\} \\
     \denote{c_1;c_2}^\sigma\,\mu\,\pkt&&
     \bigcup_{(\mu',\pkt') \in \denote{c_1}^\sigma\,\mu\,\pkt}\denote{c_2}^\sigma\,\mu'\,\pkt' \\
     \denote{c_1 \choice c_2}^\sigma\,\mu\,\pkt &&
     \denote{c_1}^\sigma\,\mu\,\pkt \cup \denote{c_2}^\sigma\,\mu\,\pkt \\
-    \denote{\{c\}}^\sigma\,\mu\,\pkt &&
-    \{(\mu,\pkt') \mid (\mu',\pkt') \in \denote{c}^\sigma\,\mu\,\pkt \}\\
+    %% \denote{\{c\}}^\sigma\,\mu\,\pkt &&
+    %% \{(\mu,\pkt') \mid (\mu',\pkt') \in \denote{c}^\sigma\,\mu\,\pkt \}\\
     \denote{t.\apply()}^\sigma\,\mu\,\pkt &&
     \begin{cases}
       \denote{c[\vec d/\vec x]}^\sigma\,\mu\,\pkt,
@@ -400,13 +389,12 @@ is defined in Figure~\ref{fig:table-elim}
 \begin{figure}
   \[\begin{array}{r>{\triangleq}cl}
   \multicolumn{3}{l}{(\cdot)[\sigma] : \Cmd \to \Cmd} \\
-  \multicolumn{3}{l}{(\cdot)[\sigma] : \Prog \to \GCL} \\
   (h.f := e)[\sigma] && h.f := e   \\
   (\assume b)[\sigma] && \assume b \\
   (\assert b)[\sigma] && \assert b \\
   (c_1;c_2)[\sigma] && c_1[\sigma];c_2[\sigma] \\
   (c_1 \choice c_2)[\sigma] && c_1[\sigma] \choice c_2[\sigma] \\
-  (\{c\})[\sigma] && \{c[\sigma]\} \\
+  %% (\{c\})[\sigma] && \{c[\sigma]\} \\
   (t.\apply())[\sigma] &&
   \begin{array}[t]{l}
     (\\
@@ -444,10 +432,10 @@ is defined in Figure~\ref{fig:table-elim}
 \subsection{Instrumenting Tables}
 
 The next step is to define a source to source translation that eliminates tables
-in the absence of concrete table state, which we will write $c[?] \in \Cmd$.
+in the absence of concrete table state, which we will write $c\instr \in \Cmd$.
 This is the first step towards the goal of constraining control plane behavior.
-Want the instrumented program $c[?]$ to fail on exactly the same situations that
-$c[\sigma]$ does, however $c[?]$ is constrained to have no table applications.
+Want the instrumented program $c\instr$ to fail in exactly the same situations that
+$c\instr$ does, however $c\instr$ is constrained to have no table applications.
 The only remaining mechanism is to use $\assume$ and $\assert$ statements to
 inspect $\sigma$. We define $c[?]$ in Figure~\ref{fig:table-instrument}.
 
@@ -463,72 +451,58 @@ $\reads$ which is really a list of $|t.\keys|$ variables that stores the
 values of the packet when evaluating $t.\keys$.
 
 \begin{figure}[htp]
-  \begin{minipage}[t]{0.5\textwidth}
-  \[\begin{array}{r >{\triangleq}cl}
+  %% \begin{minipage}[t]{0.5\textwidth}
+  %% \[\begin{array}{r >{\triangleq}cl}
+  %% \multicolumn{3}{l}{(\cdot)\instr : \Cmd \to \Cmd} \\
+  %% (h.f := e)\instr && h.f := e \\
+  %% (\assume b)\instr && b \\
+  %% (\assert b)\instr && \assert b\\
+  %% (c_1;c_2)\instr && c_1\instr;c_2\instr\\
+  %% (c_1 \choice c_2)\instr && c_1\instr \choice c_2\instr\\
+  %% (\{c\})\instr && \{c\instr\}\\
+  %% (t.\apply())\instr && \\
+  %% \multicolumn{3}{r}{
+  %%   \qquad
+  %%   \begin{array}[t]{l} \displaystyle
+  %%     \{ \\
+  %%     \quad \havoc \rho;\\
+  %%     \quad \assume \rho \in t; \\
+  %%     \quad \assume \rho.\matches = t.\keys; \\
+  %%     \quad \displaystyle \bigchoice_{i=0}^{|t.\action| -1}
+  %%     \left(\begin{array}{l}
+  %%       \assume \rho.\action = i;\\
+  %%       t.\action[i](\rho.\data)
+  %%     \end{array}\right)\\
+  %%     \} \choice ( \\
+  %%     \quad \assume \forall \rho. \rho \in t \Rightarrow \rho.\matches \neq t.\keys;\\
+  %%     \quad \SKIP \\
+  %%     )
+  %%   \end{array}}
+  %% \end{array}
+  %% \]
+  %% \end{minipage}\begin{minipage}[t]{0.45\textwidth}
+\[\begin{array}{r >{\triangleq}cl}
   \multicolumn{3}{l}{(\cdot)\instr : \Cmd \to \Cmd} \\
   (h.f := e)\instr && h.f := e \\
-  (\assume b)\instr && b \\
+  (\assume b)\instr && \assume b \\
   (\assert b)\instr && \assert b\\
   (c_1;c_2)\instr && c_1\instr;c_2\instr\\
   (c_1 \choice c_2)\instr && c_1\instr \choice c_2\instr\\
-  (\{c\})\instr && \{c\instr\}\\
-  (t.\apply())\instr && \\
-  \multicolumn{3}{r}{
-    \qquad
-    \begin{array}[t]{l} \displaystyle
-      \{ \\
-      \quad \havoc \rho;\\
-      \quad \assume \rho \in t; \\
-      \quad \assume \rho.\matches = t.\keys; \\
-      \quad \displaystyle \bigchoice_{i=0}^{|t.\action| -1}
-      \left(\begin{array}{l}
-        \assume \rho.\action = i;\\
-        t.\action[i](\rho.\data)
-      \end{array}\right)\\
-      \} \choice ( \\
-      \quad \assume \forall \rho. \rho \in t \Rightarrow \rho.\matches \neq t.\keys;\\
-      \quad \SKIP \\
-      )
-    \end{array}}
-  \end{array}
-  \]
-  \end{minipage}\begin{minipage}[t]{0.45\textwidth}
-\[\begin{array}{r >{\triangleq}cl}
-  \multicolumn{3}{l}{(\cdot)\ginstr : \Cmd \to \Cmd} \\
-  (h.f := e)\ginstr && h.f := e \\
-  (\assume b)\ginstr && \assume b \\
-  (\assert b)\ginstr && \assert b\\
-  (c_1;c_2)\ginstr && c_1\ginstr;c_2\ginstr\\
-  (c_1 \choice c_2)\ginstr && c_1\ginstr \choice c_2\ginstr\\
-  (\{c\})\ginstr && \{c\ginstr\}\\
-  (t.\apply())\ginstr &&\\
+  (t.\apply())\instr &&\\
   \multicolumn{3}{l}{
     \qquad
     \begin{array}[t]{l} \displaystyle
-    \gamma_t.\reach := [1]_1; \\
-    \gamma_t.\reads := t.\keys; \\
-    (\\
-    \quad \assume \rho.\matches = t.\keys; \\
-    \quad \gamma_t.\hit := [1]_1; \\
-    \quad \displaystyle \bigchoice_{i=0}^{|t.\action| -1}
+    \assume \rho_t.\matches = t.\keys; \\
+    \displaystyle \bigchoice_{i=0}^{|t.\action| -1}
     \left(\begin{array}{l}
-    \assume \rho.\action = i;\\
-    t.\action[i](\rho.\data)
+    \assume \rho_t.\action = i;\\
+    t.\action[i](\rho_t.\data)
     \end{array}\right)\\
-    ) \choice ( \\
-    \quad \assume \rho.\matches \neq t.\keys; \\
-    \quad \gamma_t.\hit := [0]_1;\\
-    \quad \SKIP \\
-    )
   \end{array}}
   \end{array}
   \]
-  \end{minipage}
-  \caption{Symbolic Table instrumentation alternatives. For simplicity, we
-    assume each action in a table has the same number (and types) of parameters.
-    We want to eliminate the universal quantifier in the miss case shown in
-    pn the left. The current attempt, on the right, uses a ghost header
-    $\gamma_t$ for every table $t$. }
+  \caption{Symbolic Table instrumentation. For simplicity, we
+    assume each action in a table has the same number (and types) of parameters}
   \label{fig:table-instrument}
 \end{figure}
 
@@ -537,13 +511,7 @@ values of the packet when evaluating $t.\keys$.
   \multicolumn{3}{l}{\state\sigma_c : (\Value \to \Row^*) \to \BExpr} \\
   \state\sigma_c &\triangleq
   & \displaystyle\bigwedge_{ t \in \tables(c) }
-  \begin{array}{l}
-  \left(\bigvee_{r_i \in \sigma(t.\id)}
-  \rho = r_i\right) \wedge \\
-  \left(\bigwedge_{r_i \in \sigma(t.\id)}
-  \gamma_t.\mathit{reads} \neq r_i.\keys\right)
-  \Rightarrow \gamma_t.\mathit{hit} = [0]_1
-  \end{array}
+  \bigvee_{r_i \in \sigma(t.\id)} \rho = r_i
   \end{array}
   \]
   \caption{Symbolic State Encoding}
@@ -551,34 +519,20 @@ values of the packet when evaluating $t.\keys$.
 \end{figure}
 
 \begin{samepage}
-\begin{theorem}[Ghostly Instrumentation Equivalence]
-  \label{thm:ghost-instr-equiv}
+\begin{theorem}[Instrumentation Equivalence]
+  \label{thm:instr-equiv}
   For every $c \in \Cmd$, well-formed state $\sigma : \Value \to \Row^*$, model
-  $\mu \in \Model$, and packet $\pkt \in \Pkt$, \[\denote{c}^\sigma~\mu~\pkt = \denote{c\ginstr;\assume \state\sigma_c}^\sigma~\mu~\pkt.\]
+  $\mu \in \Model$, and packet $\pkt \in \Pkt$, \[\denote{c}^\sigma~\mu~\pkt = \denote{\assume \state\sigma_c; c\instr}^\sigma~\mu~\pkt.\]
 \end{theorem}
-\end{samepage}
-
-\begin{samepage}
-\begin{theorem}[Quantified Instrumentation Equivalence]
-  \label{thm:forall-instr-equiv}
-  For every $c \in \Cmd$, well-formed state $\sigma : \Value \to \Row^*$, model
-  $\mu \in \Model$, and packet $\pkt \in \Pkt$, \[\denote{c}^\sigma~\mu~\pkt = \denote{c\instr}^\sigma~\mu~\pkt.\]
-\end{theorem}
-\end{samepage}
-
 \begin{proof}
-  \todo[inline]{Proceed by induction on the structure of $c$, leaving $\sigma$, $\mu$, $\pkt$ general}
-
-
+\todo[inline]{do the proof}
 \end{proof}
+\end{samepage}
 
-
-
-
-\subsection{Computing Logical Forms}
+\subsection{Predicate Semantics}
 
 Now, we would like to be able to translate the result from
-Theorems~\ref{thm:ghost-instr-equiv} and~\ref{thm:forall-instr-equiv} into a
+Theorem~\ref{thm:instr-equiv} into a
 symbolic representation. To do this, we'll use the weakest precondition, defined
 in Figure~\ref{fig:wp}
 
@@ -587,8 +541,8 @@ in Figure~\ref{fig:wp}
   \begin{array}{r >{\triangleq}c l}
     \WP(h.f := e, b)
     && b[e/h.f] \\
-    \WP(\havoc \rho, b)
-    && \forall \rho.\,b \\
+    %% \WP(\havoc \rho, b)
+    %% && \forall \rho.\,b \\
     \WP(\assert b_a, b)
     && b_a \wedge b \\
     \WP(\assume b_a, b)
@@ -604,466 +558,12 @@ in Figure~\ref{fig:wp}
   \label{fig:wp}
 \end{figure}
 
-\subsection{A Strange Example}
+Now, we need to relate states $\sigma$ and the computed $\WP(c\instr,\TRUE)$.
+Note that since there are no havocs introduced in $c\instr$, all symbolic rows
+$\rho$, and header values $h.f$ are unbound.
 
-Now we'll present a counterexample showing that even though the
-$\forall$-free instrumentation $c\ginstr$ described in
-Figure~\ref{fig:table-instrument} is sufficient to prove
-Theorem~\ref{thm:ghost-instr-equiv}, it doesn't produce correct preconditions.
-
-\begin{samepage}
-Consider the following example table:
-\[t = \{\id = 47; \keys = [h.z]; \action = [\lambda x.\,h.x := x] \}\]
-
-and the following command
-\[c = h.x := 4; t.\apply(); \assert h.x \neq h.z\]
-\end{samepage}
-
-\subsubsection{Instrumentation}
-
-Now we must instrument this program. The resulting programs for both $c\ginstr$ and $c\instr$ are shown in Figure~\ref{fig:ex-instr}
-
-\begin{figure}[H]
-  \begin{minipage}[t]{0.5\textwidth}
-    \[
-    \begin{array}{l}
-      \multicolumn 1 c {\boxed{c\instr}} \\
-      h.x := 4; \\
-      \{\\
-      \quad \havoc \rho; \\
-      \quad \assume \rho \in t; \\
-      \quad \assume \rho.\matches[0] = h.z; \\
-      \quad \assume \action = 0; \\
-      \quad h.x := \rho.\data[0]; \\
-      \}\choice ( \\
-      \quad \assume \forall \rho.~\rho \in t \Rightarrow \rho.\matches[0] \neq h.z;\\
-      \quad \SKIP
-      )\\
-      \assert h.x \neq h.z
-    \end{array}
-    \]
-  \end{minipage} \begin{minipage}[t]{0.48\textwidth}
-    \[\begin{array}{l}
-    \multicolumn 1 c {\boxed{c\ginstr}} \\
-    h.x := 4;\\
-    \gamma_t.\reach := [1]_1;\\
-    \gamma_t.\reads[0] := [h.z]\\
-    (\\
-    \quad \assume \rho.\matches[0] = h.z; \\
-    \quad \gamma_t.\hit := [1]_1; \\
-    \quad \assume \rho.\action = 0;\\
-    \quad h.x := \rho.\data[0];\\
-    ) \choice (\\
-    \quad \assume \rho.\matches \neq t.\keys; \\
-    \quad \gamma.\hit := [0]_1; \\
-    \quad \SKIP \\
-    );\\
-    \assert h.x \neq h.z \\
-    \end{array}
-    \]
-  \end{minipage}
-  \caption{The left program is the forall instrumentation of program $c$, the
-    right one uses a ghost header. }
-  \label{fig:ex-instr}
-\end{figure}
-
-
-\subsubsection{Predicate Transformer}
-Now, we compute the predicate semantics for $c\ginstr$, which we will conclude is:
-
-\[\WP(c[?],\TRUE) =\rho.\action = 0 \Rightarrow
-\begin{array}{l}
-  \rho.\matches[0] = h.z \Rightarrow \rho.\data[0] \neq h.z\;\wedge \\
-  \rho.\matches[0] \neq h.z \Rightarrow 4 \neq h.z
-  \end{array}
-\]
-
-The derivation is in Section~\ref{sec:example-ghost-wp-derivation}. The problem is
-that the following state $\sigma$ triggers no assertion violations in the execution, but does violate the specification:
-
-\[\sigma = \left\{ 47 \mapsto \begin{array}{l}
-  [\{\keys = [4]; \action = 0;\data = [3]\}\\
-  \phantom[  \{\keys = [3]; \action = 0; \data = [4]\}
-  ]
-\end{array}
-\right\} \]
-
-First, let's see that $\sigma$ does not trigger an assertion violation. Consider
-the program $c[\sigma]$ below, and let $\pkt \in \Pkt$ be arbitary:
-
-\[
-\begin{array}{l}
-  h.x := 4; (\\
-  \quad (\assume h.z = 4; h.x := 3)\;\choice \\
-  \quad (\assume h.z = 3; h.x := 4)\;\choice \\
-  \quad (\assume h.z \neq 4; \assume h.z \neq 3; \SKIP) \\
-  ); \\
-  \assert h.x \neq h.z
-\end{array}
-\]
-
-There are three cases.
-\begin{enumerate}
-  \item If $\pkt(h.z) = 4$, then when it reaches the assert statement, $\pkt(h.x) =
-    3$, so $h.x \neq h.z$ is true.
-  \item If $\pkt(h.z) = 3$, then when it reaches the assert statement $\pkt(h.x) = 4$, so $h.x \neq h.z$ is true.
-  \item If $\pkt(h.z) \neq 3$ and $\pkt(h.z) \neq 4$, then by the time the
-    packet reaches the assert statement $\pkt(h.x) = 4$, and $h.x \neq h.z$ is
-    true because $\pkt(h.x) = 4 \neq \pkt(h.z)$.
-\end{enumerate}
-
-So we know that $\sigma$ should be allowed by the condition $\WP(c[?],\TRUE)$ for all packets. However the following $\mu$ and $pkt$ demonstrate the falsity of the condition:
-\[\mu = \{\rho \mapsto \sigma(t.\id)[1]\}
-\quad
-\pkt = \{h \mapsto \{z \mapsto 4, x\mapsto 0\}\} \]
-
-\[\begin{array}{l}
-\satisfy\sigma\pkt\mu \left(\rho.\action = 0 \Rightarrow
-\begin{array}{l}
-  \rho.\matches[0] = h.z \Rightarrow \rho.\data[0] \neq h.z\;\wedge \\
-  \rho.\matches[0] \neq h.z \Rightarrow 4 \neq h.z
-\end{array}\right)\\
-\iff\\
-\satisfy\sigma\pkt\mu  0 = 0 \Rightarrow
-\begin{array}{l}
-  (3 = 4 \Rightarrow 3 \neq 4) \wedge
-  (3 \neq 4 \Rightarrow 4 \neq 4)
-\end{array} \\
-\iff \\
-\satisfy\sigma\pkt\mu \TRUE \Rightarrow
-\begin{array}{l}
-  (\FALSE \Rightarrow \TRUE)\wedge (\FALSE \Rightarrow \FALSE)
-\end{array} \\
-\iff\\
-\satisfy\sigma\pkt\mu \FALSE \\
-\iff \\
-\textit{pigs fly}
-\end{array}
-\]
-
-\noindent which demonstrates that $\sigma$ is disallowed by $\WP(c\ginstr,\TRUE)$.
-
-This problem does not arise using the instrumentation $c\instr$. In this case,
-the  weakest precondition is (see Section~\ref{sec:example-forall-wp-derivation} for a derivation)
-\[
-\WP(c\instr,\TRUE) =
-\begin{array}{rl}
-&(\forall \rho.\; \rho \in t \wedge \rho.\matches[0] = h.z \wedge \rho.\action = 0
-\Rightarrow h.z \neq \rho.\data[0])\\
-\wedge
-& (\forall \rho.\;\rho \in t \Rightarrow\rho.\matches[0] \neq h.z) \Rightarrow 4 \neq h.z
-\end{array}
-\]
-\noindent which is satisfied by this example:
-
-\[
-\begin{array}{l}
-  \satisfy\sigma\pkt\mu
-  \begin{array}{rl}
-    &(\forall \rho.\; \rho \in t \wedge \rho.\matches[0] = h.z \wedge \rho.\action = 0
-    \Rightarrow h.z \neq \rho.\data[0])\\
-
-    &\wedge (\forall \rho.\;\rho \in t \Rightarrow\rho.\matches[0] \neq h.z) \Rightarrow 4  \neq h.z
-  \end{array} \\
-  \iff \\
-  \begin{array}{rl}
-    &\satisfy\sigma\pkt\mu \forall \rho.\; \rho \in t \wedge \rho.\matches[0] = h.z \wedge \rho.\action = 0
-    \Rightarrow h.z \neq \rho.\data[0]\\
-    \mathit{and}
-    &\satisfy\sigma\pkt\mu (\forall \rho.\;\rho \in t \Rightarrow\rho.\matches[0] \neq h.z) \Rightarrow 4  \neq h.z
-  \end{array} \\
-  \iff\\
-  \begin{array}{rl}
-    &\satisfy\sigma\pkt{\mu\{\rho \mapsto \sigma(47)[0]\}} \rho.\matches[0] = h.z \wedge \rho.\action = 0
-    \Rightarrow h.z \neq \rho.\data[0]\\
-    \mathit{and}
-  &\satisfy\sigma\pkt{\mu\{\rho \mapsto \sigma(47)[1]\}} \rho.\matches[0] = h.z \wedge   \rho.\action = 0
-    \Rightarrow h.z \neq \rho.\data[0]\\
-    \mathit{and}
-    &\satisfy\sigma\pkt\mu (\forall \rho.\;\rho \in t \Rightarrow\rho.\matches[0] \neq h.z) \Rightarrow 4  \neq h.z
-  \end{array} \\
-  \iff \\
-  \begin{array}{rl}
-    &\satisfy\sigma\pkt{\mu\{\rho \mapsto \sigma(47)[0]\}} 4 = 4 \wedge 0 = 0
-    \Rightarrow 4 \neq 3\\
-    \mathit{and}
-  &\satisfy\sigma\pkt{\mu\{\rho \mapsto \sigma(47)[1]\}} 3 = 4 \wedge \rho.\action = 0
-    \Rightarrow 4 \neq 4\\
-    \mathit{and}
-    &\satisfy\sigma\pkt\mu (\forall \rho.\;\rho \in t \Rightarrow\rho.\matches[0] \neq h.z) \Rightarrow 4  \neq h.z
-  \end{array} \\
-  \iff \\
-  \begin{array}{rl}
-    &\satisfy\sigma\pkt{\mu\{\rho \mapsto \sigma(47)[0]\}}\TRUE \\
-    \mathit{and}
-  &\satisfy\sigma\pkt{\mu\{\rho \mapsto \sigma(47)[1]\}} \TRUE
-    \Rightarrow 4 \neq 4\\
-    \mathit{and}
-    &\satisfy\sigma\pkt\mu (\forall \rho.\;\rho \in t \Rightarrow\rho.\matches[0] \neq h.z) \Rightarrow 4  \neq h.z
-  \end{array} \\
-  \iff \\
-  \begin{array}{rl}
-    &\satisfy\sigma\pkt{\mu\{\rho \mapsto \sigma(47)[0]\}}\TRUE \\
-    \mathit{and}
-  &\satisfy\sigma\pkt{\mu\{\rho \mapsto \sigma(47)[1]\}} \TRUE \\
-    \mathit{and}
-    &\satisfy\sigma\pkt\mu (\forall \rho.\;\rho \in t \Rightarrow\rho.\matches[0] \neq h.z) \Rightarrow 4  \neq h.z
-  \end{array} \\
-  \iff \\
-  \begin{array}{rl}
-    &\notsatisfy\sigma\pkt\mu \forall \rho.\;\rho \in t \Rightarrow\rho.\matches[0] \neq h.z \\
-    \mathit{or}
-    & \satisfy\sigma\pkt\mu ( 4  \neq h.z)
-  \end{array}\\
-  \iff\\
-  \begin{array}{rl}
-    &\notsatisfy\sigma\pkt{\mu\{\rho\mapsto\sigma(47)[0]\}} \rho.\matches[0] \neq h.z \\
-    \mathit{or}
-    &\notsatisfy\sigma\pkt{\mu\{\rho\mapsto\sigma(47)[1]\}} \rho.\matches[0] \neq h.z \\
-    \mathit{or}
-    & \satisfy\sigma\pkt\mu ( 4  \neq h.z)
-  \end{array}\\
-  \iff \\
-  \begin{array}{rll}
-    &\satisfy\sigma\pkt{\mu\{\rho\mapsto\sigma(47)[0]\}} 3 = 4  & \times \\
-    \mathit{or}
-    &\satisfy\sigma\pkt{\mu\{\rho\mapsto\sigma(47)[1]\}} 4 = 4 & \checkmark\\
-    \mathit{or}
-    & \satisfy\sigma\pkt\mu (4 \neq 4) & \times
-  \end{array}\\
-  \end{array}
-\]
-
-\subsubsection{Analysis}
-
-The problem with the ghostly instrumentation, $c\ginstr$, is that it allows for
-packets to execute the default action of a table $t$ whenever \emph{any} row in
-$\sigma(t.\id)$ is missed.
-
-So why we can prove Theorem~\ref{thm:ghost-instr-equiv}? We
-leverage the condition $\state\sigma_c$, which has two parts. The first, shown
-below, constrains the symbolic rows $\rho$ for a specific table $t$ to only
-refer to the rows that are in $\sigma(t.\id)$. In the universally-quantified
-version $c\instr$, this condition is realized symbolically using the constraints
-$\rho \in t$.
-\[ \bigwedge_{t \in \tables(c)} \bigvee_{r_i \in \sigma(t.\id)} \rho_t = r_i\]
-Concretely, for our example this is
-\[ \rho = \{\keys = [4]; \action = 0;\data = [3]\}\vee \rho = \{\keys = [3]; \action = 0; \data = [4]\} \]
-
-The second part of $\state\sigma_c$ ensures that the default action is only
-executed when the packet misses in the table. Shown below, this subformula plays
-the role of the $\forall \rho$ assumption at the start of the default action in
-$c\instr$.
-\[\bigwedge_{t \in \tables(c)} \left(\bigwedge_{r_i \in \sigma(t.\id)} \gamma_t.\reads = r_i.\matches\right) \Rightarrow \gamma_t.\hit = [0]_1 \]
-
-In our example this is
-\[(\gamma_t.\reads[0] \neq 3 \wedge \gamma_t.\reads[0] \neq 4) \Rightarrow \gamma_t.\hit = [0]_1 \]
-
-So we can prove Theorem~\ref{thm:ghost-instr-equiv}, because the state encoding
-$\state\sigma_c$ finitely enumerates the rows of $\sigma$. However, this
-information is not maintained in the weakest precondition calculation
-$\WP(c\ginstr,\TRUE)$.
-
-Of course it's not, because we've omitted $\state\sigma_c$ from the weakest
-precondition calculation! Of course $\WP(c\ginstr,\TRUE)$ isn't going to compute
-the precise constraints we want because the precision comes from $\state\sigma_c$.
-
-One solution is tod to generalize $\state\sigma_c$ to a symbolic representation,
-but this just gets us back to where we started. The naive generalization of the
-$\state\sigma_c$, which we'll write $\state?_c$ is the following:
-
-\[\state?_c \triangleq \bigwedge_{t \in \tables(c)} \rho \in t \wedge
-((\forall \rho. \rho \in t \Rightarrow \gamma_t.\reads = \rho.\keys ) \Rightarrow \gamma_t.\hit = [0]_1),\]
-\noindent which is the exact same structure provided by $c\instr$, except implemented using ghost state rather than at the table application point.
-
-\textbf{What's the move here?} It seems like instrumenting using $c\instr$ gives
-us the VCs we want, and $c\ginstr$ doesn't (yet). This fact is obscured by
-Theorem~\ref{thm:ghost-instr-equiv}. I think we want a theorem that describes
-the semantic completeness of whatever program we are going to pass into $\WP$,
-as Theorem~\ref{thm:forall-instr-equiv} does. The end goal is to compute a sufficiently general formula that can describe all legal control-plane behaviors, perhaps something like Theorem~\ref{thm:instr-expressiveness}:
-
-\begin{theorem}[Instrumentation Expressiveness]
-  \label{thm:instr-expressiveness}
-  Given an instrumentation strategy $(\cdot)[?] : \Cmd \to \Cmd$.
-  For every $c \in \Cmd$, and $\sigma : \Value \to \Row^*$
-  \[(\forall \pkt \in \Pkt. \forall \mu \in \Model.~\satisfy\sigma\pkt\mu \WP(c[?], \TRUE)) \iff (\forall \pkt \in \Pkt.\forall \mu \in \Model.~\denote{c}^\sigma\,\mu\,\pkt \neq \error)\]
-\end{theorem}
-
-Now, Theorem~\ref{thm:instr-expressiveness} is a corollary of
-Theorem~\ref{thm:forall-instr-equiv} and Dijsktra '75, with $[?] = \instr$.
-However, its not an immediate corollary of Theorem~\ref{thm:ghost-instr-equiv},
-because (I contend) it shows the equivalence of the program
-$c\ginstr;\assume\state\sigma_c$ and $c$ not the equivalence of $c\ginstr$ and
-$c$.
-
-I see three ways forward. The first is to proceed with $c\instr$. The second is
-to come up with an improvement on $c\ginstr$ that properly encodes misses (e.g.
-by returning to a previous approach that indexed each row $\rho_0, \rho_1,
-\ldots$). The third is to come up with a proper symbolic generalization of state
-$\state\sigma_c$.
-
-
-\subsubsection{WP derivation for Forall Instrumentation}
-\label{sec:example-forall-wp-derivation}
-
-\[
-\begin{array}{l}
-  \WP\left(
-  \begin{array}{l}
-    h.x := 4; \\
-    \{\\
-    \quad \havoc \rho; \\
-    \quad \assume \rho \in t; \\
-    \quad \assume \rho.\matches[0] = h.z; \\
-    \quad \assume \action = 0; \\
-    \quad h.x := \rho.\data[0]; \\
-    \}\choice ( \\
-    \quad \assume \forall \rho.~\rho \in t \Rightarrow \rho.\matches[0] \neq h.z;\\
-    \quad \SKIP
-    )\\
-    \assert h.x \neq h.z
-  \end{array},
-  \TRUE\right) \\
-  =\WP\left(
-  \begin{array}{l}
-    h.x := 4; \\
-    \{\\
-    \quad \havoc \rho; \\
-    \quad \assume \rho \in t; \\
-    \quad \assume \rho.\matches[0] = h.z; \\
-    \quad \assume \action = 0; \\
-    \quad h.x := \rho.\data[0]; \\
-    \}\choice ( \\
-    \quad \assume \forall \rho.~\rho \in t \Rightarrow \rho.\matches[0] \neq h.z;\\
-    \quad \SKIP
-    )
-  \end{array},
-  h.x \neq h.z\right) \\
-  =\WP\left(h.x := 4,
-  \WP\left(\begin{array}{l}
-    \{\\
-    \quad \havoc \rho; \\
-    \quad \assume \rho \in t; \\
-    \quad \assume \rho.\matches[0] = h.z; \\
-    \quad \assume \action = 0; \\
-    \quad h.x := \rho.\data[0]; \\
-    \}\choice ( \\
-    \quad \assume \forall \rho.~\rho \in t \Rightarrow \rho.\matches[0] \neq h.z;\\
-    \quad \SKIP
-    )
-  \end{array},
-  h.x \neq h.z\right)\right) \\
-  =\WP\left(h.x := 4,
-  \begin{array}{rl}
-    &\WP\left(\begin{array}{l}
-    \havoc \rho; \\
-    \assume \rho \in t; \\
-    \assume \rho.\matches[0] = h.z; \\
-    \assume \action = 0; \\
-    h.x := \rho.\data[0]
-    \end{array}, h.x \neq h.z \right) \\
-    \wedge &
-    \WP\left(\begin{array}{l}
-    \assume \forall \rho.~\rho \in t \Rightarrow \rho.\matches[0] \neq h.z;\\
-    \SKIP
-    \end{array},
-    h.x \neq h.z\right)
-  \end{array} \right) \\
-  =\WP\left(h.x := 4,
-  \begin{array}{rl}
-    &(\forall \rho. \rho \in t \wedge \rho.\matches[0] = h.z \wedge \rho.\action = 0 \Rightarrow \rho.\data[0] \neq h.z) \\
-    \wedge &
-     \left((\forall \rho.~\rho \in t \Rightarrow \rho.\matches[0] \neq h.z)
-     \Rightarrow h.x \neq h.z\right)
-  \end{array} \right) \\
-  =\begin{array}[t]{rl}
-    &(\forall \rho. \rho \in t \wedge \rho.\matches[0] = h.z \wedge \rho.\action = 0 \Rightarrow \rho.\data[0] \neq h.z) \\
-    \wedge &
-     \left((\forall \rho.~\rho \in t \Rightarrow \rho.\matches[0] \neq h.z)
-     \Rightarrow 4 \neq h.z\right)
-  \end{array} \\
-  \end{array}
-\]
-
-
-\subsubsection{WP derivation for Ghostly Instrumentation}
-\label{sec:example-ghost-wp-derivation}
-
-\[\begin{array}{l}
-  \WP\left(\begin{array}{l}
-    h.x := 4;\\
-    \gamma_t.\reach := [1]_1;\\
-    \gamma_t.\reads[0] := [h.z]\\
-    (\\
-    \quad \assume \rho.\matches[0] = h.z; \\
-    \quad \gamma_t.\hit := [1]_1; \\
-    \quad \assume \rho.\action = 0;\\
-    \quad h.x := \rho.\data[0];\\
-    ) \choice (\\
-    \quad \assume \rho.\matches \neq t.\keys; \\
-    \quad \gamma.\hit := [0]_1; \\
-    \quad \SKIP \\
-    );\\
-    \assert h.x \neq h.z \\
-  \end{array}, \TRUE\right) \\
-  =\WP\left(\begin{array}{l}
-    h.x := 4;\\
-    \gamma_t.\reach := [1]_1;\\
-    \gamma_t.\reads[0] := [h.z]\\
-    (\\
-    \quad \assume \rho.\matches[0] = h.z; \\
-    \quad \gamma_t.\hit := [1]_1; \\
-    \quad \assume \rho.\action = 0;\\
-    \quad h.x := \rho.\data[0];\\
-    ) \choice (\\
-    \quad \assume \rho.\matches \neq t.\keys; \\
-    \quad \gamma.\hit := [0]_1; \\
-    \quad \SKIP \\
-    );\\
-  \end{array},  h.x \neq h.z\right) \\
-  =\WP\left(\begin{array}{l}
-    h.x := 4;\\
-    \gamma_t.\reach := [1]_1;\\
-    \gamma_t.\reads[0] := [h.z]\\
-  \end{array},
-  \WP\left(
-  \begin{array}{rl}
-    &\WP\left(
-    \begin{array}{l}
-    \assume \rho.\matches[0] = h.z; \\
-    \gamma_t.\hit := [1]_1; \\
-    \assume \rho.\action = 0;\\
-    h.x := \rho.\data[0]\\
-    \end{array}, h.x \neq h.z\right)\\
-    \wedge &
-    \WP\left(\begin{array}{rl}
-    \assume \rho.\matches \neq t.\keys; \\
-    \gamma.\hit := [0]_1; \\
-    \SKIP \\
-    \end{array}, h.x\neq h.z \right)
-  \end{array}\right)
-  \right) \\
-  = \WP\left(\begin{array}{l}
-    h.x := 4;\\
-    \gamma_t.\reach := [1]_1;\\
-    \gamma_t.\reads[0] := [h.z]\\
-  \end{array},
-  \left(
-  \begin{array}{rl}
-    &\left(\rho.\matches[0] = h.z \wedge \rho.\action = 0;
-    \rho.\data[0] \neq h.z\right)\\
-    \wedge &
-    \left(\rho.\matches \neq t.\keys \Rightarrow h.x\neq h.z \right)
-  \end{array}\right)
-  \right) \\
-  =
-  \begin{array}{rl}
-    &\left(\rho.\matches[0] = h.z \wedge \rho.\action = 0;
-    \rho.\data[0] \neq h.z\right)\\
-    \wedge &
-    \left(\rho.\matches \neq t.\keys \Rightarrow 4\neq h.z \right)
-  \end{array}
-\end{array}\]
+This means that we must check the validity of \[\state\sigma_c \Rightarrow
+\WP(c\instr,\TRUE)\]
 
 
 
@@ -1075,9 +575,9 @@ some ideal goals, that are probably not solvable in general.
 
 \begin{quote}
   \textbf{Conservative Problem.} Given a command $c \in \Cmd$, compute the weakest test
-  $b$ such that if a state $\sigma : \Value \to \Row^*$ the following
-  judgement is defined and satisfied \[\satisfy\sigma\emptyset\emptyset b,\] then \[\forall \pkt \in \Pkt.~
-  \denote{c}^\sigma \pkt \neq \error \]
+  $b$ such that if, for a state $\sigma : \Value \to \Row^*$, the following
+  judgement is valid \[\state\sigma_c \Rightarrow b,\] then \[\forall \pkt \in \Pkt.~
+  \denote{c}^\sigma \emptyset\,\pkt \neq \error \]
 \end{quote}
 
 However, this $b$ may be $\FALSE$ for many realistic programs $c$, so we may
@@ -1085,36 +585,47 @@ prefer to solve the following problem:
 
 \begin{quote}
   \textbf{Flexible Problem.} Given a command $c \in \Cmd$, compute a test
-  $b_{\mathit{cp}}$, and a test $b_{\mathit{pkt}}$ such that
-  for every packet $\pkt \in \Pkt$ such that
-  \[\satisfy \emptyset \pkt \emptyset b_{\mathit{pkt}},\]
-  and for every state $\sigma : \Value \to \Row^*$ such that
-  \[\satisfy \sigma \pkt \emptyset b_{\mathit{cp}},\]
-  then \[\denote{c}^\sigma ~\emptyset~\pkt \neq \error \]
+  $b_{\mathit{cp}}$, and a test $b_{\mathit{pkt}}$ such that for every packet
+  $\pkt \in \Pkt$ and state $\sigma : \Value \to \Row^*$, if the following
+  formula is valid
+  \[b_{\mathit{pkt}} \wedge \state\sigma_c \Rightarrow b_{\mathit{cp}},\]
+  then \[\denote{c}^\sigma\emptyset\,\pkt \neq \error \]
 \end{quote}
-
-
 
 \section{Reduction to QE}
 
-We can observe that the \textbf{Conservative Problem} is simply solvable. We
-sketch the argument here.
+We can observe that the \textbf{Conservative Problem} is simply solvable by
+reduction to Quantifier Elimination. In fact Quantifier elimination is one of
+the key driving forces of the Dillig/Dillig/Millstein abduction work (\textsc{Hola},
+\textsc{Explain}). We sketch the argument here.
 
 \begin{conjecture}[Quantifer Elimination]
   The \textbf{\textrm{Conservative Problem}} is reducable to Quantifer Elimination.
 \end{conjecture}
 
 \begin{proof}[Proof Sketch.]
-  Given a command $c \in \Cmd$. Compute the instrumented command $c[?]$. We know
-  it is equivalent to $c$ by Theorem~\ref{thm:instr-equiv}. Then $\forall
-  \overrightarrow{h.f}.\WP(c[?],\TRUE)[\overrightarrow{h.f}]$,\todo{how to write this?} is such a
-  formula $b$ by Dijkstra '75. To make $b$ a controller formula, then we simply
-  need to remove the dataplane variables via a QE procedure.
+  Given a command $c \in \Cmd$. Compute the instrumented command $c\instr$. Let
+  $\overrightarrow{h.f}$ describe all the header fields occurring in $c\instr$. Write
+  $b[\overrightarrow{h.f}] = \WP(c\instr,\TRUE)$. Observe that $(\forall
+  \overrightarrow{h.f}.\;b[\overrightarrow{h.f}]) \Rightarrow
+  b[\overrightarrow{h.f}]$ is valid. Then the desired control plane formula is $\qe(\forall \overrightarrow{h.f}.\;b[\overrightarrow{h.f}])$.
 \end{proof}
 
-This doesn't work in general. Standard QE procedures are exponential at best, and
-enumerating all eth/ipv4 src/dst addresses already takes an intractable amount
-of time.
+This \emph{probably} doesn't work in general. Standard QE procedures are
+exponential at best, and enumerating all eth/ipv4 src/dst addresses already
+takes an intractable amount of time.
+
+The Dilligs' line of work uses Presburger arithmetic QE to implement the
+quantifier elimination scheme. We could directly adopt this, however networking
+programs make heavy use of bitwise operators like XOR, so we need to take a
+different strategy.
+StackOverflow\footnote{https://stackoverflow.com/questions/21293278/mathematical-arithmetic-representation-of-xor}
+says that you can implement $a \mathbin{\texttt{XOR}} b$ as $a + b - ab(1 + a +
+b - ab)$, but that still takes us out of PA, and casting between the naturals
+and fixed-width bitvectors seems dangerous.
+
+
+
 
 \section{Can Templates save us?}
 
@@ -1127,18 +638,22 @@ For example, given a single table like the following:
 
 and the simple program \[t.\apply()\]
 
-We may be able to generate a template that looks like
+We may be able to generate a boolean template constructed from the following
+comparisons
 
-\[\begin{array}{>{\displaystyle}c}
-  {[\exists \rho \in t.~ \rho.\keys[0]~\square_{\{=,\neq\}}~?_{v_1}\wedge \rho.\data[0]~\square_{\{=,\neq\}}~?_{v_2} ]?} \\
-  \wedge\\
-  {[\forall \rho \in t.~\rho.\keys[0]~\square_{\{=,\neq\}}~?_{v_3} \Rightarrow \rho.\data[0]~\square_{\{=,\neq\}}~?_{v_4}]?}
+\[
+\begin{array}{l}
+  \rho.\keys[i]~\square_{\{=,\neq\}}~?_{v_3} \Rightarrow \rho.\data[i]~\square_{\{=,\neq\}}~?_{v_4} \\
+
+  \rho.\keys[i]~\square_{\{=,\neq\}}\rho.\data[i]
 \end{array}\]
 
 where $[b]?$ indicates a hole to either use template $b$ or replace it with
 $\TRUE$, $\square_S$ indicates a template for an operation, where $S$ is the set
 of allowed operations, and $?_{v_i}$ indicates a hole that should evaluate to an element
 of $\Value$.
+
+
 
 Now we may wonder: \emph{can we procedurally generate templates in a (nearly) complete way}?
 
@@ -1160,211 +675,6 @@ To do so, we need to extend our templates along the following dimensions:
   computing a $b_{\textit{pkt}}$.
 \end{enumerate}
 
-
-
-\subsection{Ghost State}
-
-
-Following p4v, we want construct a ghostly header $\gamma$ from a program $p$
-and use it to instrument the program to capture all dataplane behaviors.
-
-\[
-\begin{array}{l>{\triangleq}cl}
-  \multicolumn{3}{l}{\ghostly :: \Cmd \to \Cmd} \\
-  \multicolumn{3}{l}{\ghostly :: \Prog \to \GCL} \\
-  \ghostly(h.f := e)
-  && h.f := e \\
-  \ghostly(\assert b)
-  && \assert b\\
-  \ghostly(\assume b)
-  && \assume b \\
-  \ghostly(c_1;c_2)
-  && \ghostly(c_1);\ghostly(c_2) \\
-  \ghostly(c_1\choice c_2)
-  && \ghostly(c_1) \choice \ghostly(c_1)\\
-  \ghostly(t.\apply())
-  &&\\
-  \multicolumn{3}{c}{
-    \begin{array}[t]{>{\displaystyle\qquad}l}
-       \gamma.t_{\mathit{reach}} := [1]_1; \\
-       \gamma.t_{\mathit{read}(0)} := t.\keys[0]; \\
-       \vdots \\
-       \gamma.t_{\mathit{read}(|t.\keys|-1)} := t.\keys[|t.\keys|-1]; \\[1em]
-       \left(\gamma.t_{\mathit{hit}} := [0]_1 \right)
-       \choice \left(\bigchoice_{j = 1}^{|t.\action|-1}{
-         \left(\begin{array}{l}
-           \gamma.t_{\mathit{hit}} := [1]_1 ;\\
-           \gamma.t_{\mathit{action}} := [1]_1;\\
-           t.\action[j](\overrightarrow{\gamma.t_{\mathit{data}}})
-         \end{array}\right)
-       }\right)
-     \end{array}}
-\end{array}
-\]
-
-And now what we want to prove is
-
-\begin{theorem}{Instrumentation sufficiency}
-  For every well-formed program $c \in \Cmd$, every state $\sigma : \Value \to
-  \Row^*$, there is some $b_\sigma \in \BExpr$ such that for every model $\mu
-  \in \Model$ and every $\pkt \in \Pkt$,
-  \[\denote{c}^\sigma\,\mu\,\pkt =_{\not\gamma} \denote{\ghostly(c);\assume b}^\sigma\,\mu\,\pkt\]
-\end{theorem}
-
-\begin{proof}
-  Proceed by induction on $c$:
-  \begin{enumerate}[align=left]
-  \item[$(h.f:=e)$] Let $b_\sigma = \TRUE$; immediate.
-  \item[$(\assume b)$] Let $b_\sigma = \TRUE$; immediate.
-  \item[$(\assert b)$] Let $b_\sigma = \TRUE$; immediate.
-  \item[$(c_1;c_2)$] By IHs. $b_\sigma = b_1 \wedge b_2$ because $b_1$ and $b_2$ refer to disjoint variables.
-  \item[$(c_1 \choice c_2)$] \textit{sim}.
-  \item[$(t.\apply())$]
-
-    Let $b_\sigma$ be defined as follows:
-    \[
-    b_\sigma = \bigvee_{r \in \sigma(t.\id)}
-    \begin{array}{>{\displaystyle}l}
-      \gamma
-    \end{array}
-    \]
-
-    We can compute as follows:
-    \[\begin{array}{>{\displaystyle}ll}
-    \denote{\ghostly(c)}^\sigma\,\mu\,\pkt\\
-    =\denote{
-        \begin{array}{>{\displaystyle}l}
-          \gamma.t_{\mathit{reach}} := [1]_1; \\
-          \gamma.t_{\mathit{read}(0)} := t.\keys[0]; \\
-          \vdots \\
-          \gamma.t_{\mathit{read}(|t.\keys|-1)} := t.\keys[|t.\keys|-1]; \\[1em]
-          \left(\gamma.t_{\mathit{hit}} := [0]_1 \right)
-          \choice \left(\bigchoice_{j = 1}^{|t.\action|-1}
-            \left(\begin{array}{l}
-              \gamma.t_{\mathit{hit}} := [1]_1 ;\\
-              \gamma.t_{\mathit{action}} := j;\\
-              t.\action[j](\overrightarrow{\gamma.t_{\mathit{data}}})
-            \end{array}\right)
-          \right)
-    \end{array}}^\sigma\,\mu\,\pkt \\[2em]
-    =\denote{
-        \begin{array}{>{\displaystyle}l}
-          \left(\gamma.t_{\mathit{hit}} := [0]_1 \right)
-          \choice \left(\bigchoice_{j = 1}^{|t.\action|-1}
-            \left(\begin{array}{l}
-              \gamma.t_{\mathit{hit}} := [1]_1 ;\\
-              \gamma.t_{\mathit{action}} := j;\\
-              t.\action[j](\overrightarrow{\gamma.t_{\mathit{data}}})
-            \end{array}\right)
-          \right)
-    \end{array}}^\sigma\!\mu\,\pkt' \\
-    \qquad\qquad \text{where}~\pkt' = \pkt\left\{\begin{array}{l}
-    \gamma.t_{\mathit{reach}} \mapsto [1]_1,\\
-    \overrightarrow{\gamma.t_{\textit{key}} \mapsto \edenote{t.\keys}\,\pkt\,\mu}
-    \end{array}\right\} \\
-    =\denote{
-      \left(\gamma.t_{\mathit{hit}} := [0]_1 \right)}^\sigma\!\mu\,\pkt'
-    \cup
-    \denote{\left(\bigchoice_{j = 1}^{|t.\action|-1}
-            \left(\begin{array}{l}
-              \gamma.t_{\mathit{hit}} := [1]_1 ;\\
-              \gamma.t_{\mathit{action}} := j;\\
-              t.\action[j](\overrightarrow{\gamma.t_{\mathit{data}}})
-            \end{array}\right)
-            \right)
-    }^\sigma\!\mu\,\pkt' \\
-    = \left\{(\mu,\pkt'\left\{\gamma.t_{\mathit{hit}} \mapsto [0]_1\right\})\right\}
-    \cup
-        \denote{\left(\bigchoice_{j = 1}^{|t.\action|-1}
-          \left(\begin{array}{l}
-            \gamma.t_{\mathit{hit}} := [1]_1 ;\\
-            \gamma.t_{\mathit{action}} := j;\\
-            t.\action[j](\overrightarrow{\gamma.t_{\mathit{data}}})
-          \end{array}\right)
-          \right)
-        }^\sigma\!\mu\,\pkt' \\
-  = \left\{(\mu,\pkt'\left\{\gamma.t_{\mathit{hit}} \mapsto [0]_1\right\})\right\}
-  \cup
-  \left(\bigcup_{j = 1}^{|t.\action|-1}
-  \denote{t.\action[j](\overrightarrow{\gamma.t_{\mathit{data}}})}^\sigma\,\mu\,\pkt'\left\{
-  \begin{array}{l}
-    \gamma.t_{\textit{hit}} \mapsto [1]_1,\\
-    \gamma.t_{\textit{action}} \mapsto j
-  \end{array}
-  \right\}
-  \right) \\
-    \end{array}
-\]
-
-  \end{enumerate}
-\end{proof}
-
-
-\subsection{Tables as nondeterministic choice}
-
-Ive said before that the nondeterministic choice is an overapproximation of
-the control plane behavior. It's a slightly inaccurate claim in that it
-correctly captures all possible control plane behaviors, but it doesn't have a
-handle on constrain control plane behavior.
-
-A simplified version of P4v's encoding is shown in Figure~\ref{fig:p4vlike}. It
-omits the key-reads commands and hit/miss predicates.
-
-\begin{figure}
-  \[\begin{array}{l >{\triangleq}cl}
-  \multicolumn{3}{l}{\nondet : \Cmd \to \Cmd} \\
-  \multicolumn{3}{l}{\nondet : \Prog \to \Instr} \\
-  \nondet(h.f := e) && h.f := e \\
-  \nondet(\assume b) && \assume b \\
-  \nondet(\assert b) && \assert b \\
-  \nondet(c_1;c_2) && \nondet(c_1;c_2) \\
-  \nondet(c_1 \choice c_2) && \nondet(c_1) \choice \nondet(c_2) \\
-  %% \nondet(\choose \rho t c) && \textcolor{red}{\text{undefined}} \\
-  \nondet(t.\apply()) && \\
-  \multicolumn{3}{>{\qquad}r}{
-    \displaystyle
-    \bigchoice_{i = 0}^{|t.\action|-1}t.\action[i]()
-  }
-  \end{array}\]
-  \caption{A \texttt{p4v}-like instrumentation. For simplicity of reasoning
-    about variables, assume that actions take no action data. }
-  \label{fig:p4vlike}
-\end{figure}
-
-The theorem below demonstrates the over-approximation. Compare with the Instrumentation Equivalence Theorem~\ref{thm:instr-equiv}.
-
-\begin{theorem}[\texttt{p4v} over-approximates]
-  \label{thm:p4v-over}
-  For every $c \in \Prog$, well-formed state $\sigma : \Value \to \Row^* $,
-  model $\mu \in \Model$, and packet $\pkt \in \Pkt$,
-  $\denote{c}^\sigma\,\mu\,\pkt \subseteq \denote{\nondet(c)}^\sigma\,\mu\,\pkt$
-\end{theorem}
-
-\begin{proof}
-\todo[inline]{By induction on c}.
-\end{proof}
-
-We can witness non-equality by the following counter-example. Consider a program
-$t.\apply()$ where $t = \{\keys=[h.f];\actions=[\lambda().\SKIP, \lambda(). h.f :=
-  99]\}$. Consider an input packet with $\pkt(h.f) = 47$, and an empty input
-model and state that selects a single action.
-
-Then $\denote{t.\apply()}^\emptyset\,\emptyset\,\pkt = \{(\mu,\pkt)\}$.
-
-Whereas
-\[\begin{array}{l}
-\denote{\nondet(t.\apply())}^\emptyset\,\emptyset\,\pkt \\
-= \denote{
-    \displaystyle
-    \bigchoice_{i = 0}^{|t.\action|-1} t.\action[i]()
-}^\emptyset\,\emptyset\,\pkt \\
-= \denote{\SKIP}^\emptyset\,\emptyset\,\pkt \cup \denote{h.f := 99}^\emptyset\,\emptyset\,\pkt\\
-= \{(\emptyset,\pkt),(\emptyset,\pkt\{h.f\mapsto 99\})\}
-\end{array}\]
-
-Finally, $\{(\emptyset,\pkt)\} \subset
-\{(\emptyset,\pkt),(\emptyset,\pkt\{h.f\mapsto 99\})\}$, exemplifies a strict
-subset behavior described by Theorem~\ref{thm:p4v-over}.
 
 
 \end{document}
