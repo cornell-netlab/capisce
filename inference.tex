@@ -1,7 +1,6 @@
 \documentclass{article}
 
 \usepackage[margin=1in]{geometry}
-\usepackage{halloweenmath}
 \usepackage{amsmath, amssymb, amsthm, array, stmaryrd}
 \usepackage{wasysym}
 \usepackage{booktabs}
@@ -10,6 +9,8 @@
 \usepackage{scalerel}
 %% \usepackage[notext,not1,nomath]{stix}
 \usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{soul}
 
 \title{Notes on Control Plane Inference}
 \author{Eric Campbell}
@@ -47,6 +48,7 @@
 \newcommand{\List}{\mathsf{List}}
 \newcommand{\Var}{\mathsf{Var}}
 \newcommand{\SymbRow}{\mathsf{SymbRow}}
+\newcommand{\State}{\mathsf{State}}
 
 % record fields
 \newcommand{\matches}{\mathsf{matches}}
@@ -90,6 +92,7 @@
 \newtheorem{theorem}{Theorem}
 \newtheorem{lemma}{Lemma}
 \newtheorem{conjecture}{Conjecture}
+\newtheorem{definition}{Definition}
 
 \begin{document}
 
@@ -102,43 +105,43 @@
 \begin{figure}[htp]
   \[\begin{array}{lclll}
     \multicolumn{3}{l}{\Value} \\
-    v & ::= & [n]_w  & \textit{Bitvector Literal} & (a,g,p,\iota) \\
+    v & ::= & [n]_w  & \textit{Bitvector Literal} \\
     \multicolumn{3}{l}{\SymbRow} \\
     \rho & ::= & \left\{
     \begin{array}{l}
       \matches = \List[x];\\
       \action = x;\\
       \data = \List[x]
-    \end{array}\right\} & \textit{Symbolic Row} & (\iota)\\
+    \end{array}\right\} & \textit{Symbolic Row} \\
     \multicolumn{3}{l}{\BVExpr} \\
-    e & ::= & v & \textit{Value} & (a,g,p,\iota)\\
-      & \mid & h.f & \textit{Header Access} & (a,g,p,\iota)\\
-      & \mid & \rho.\matches[i] & \textit{Symbolic Match} & (\iota)\\
-      & \mid & \rho.\action & \textit{Symbolic Action} & (\iota) \\
-      & \mid & \rho.\data[i] & \textit{Symbolic Action Data} & (\iota) \\
-      & \mid & x & \textit{Action Data Variable} & (a^*) \\
-      & \mid & e \binop e & \textit{Arbitrary Binary Operation} & (a,g,p,\iota) \\
-    & \mid & \unop e & \textit{Arbitrary Unary Operation} & (a,g,p,\iota) \\
+    e & ::= & v & \textit{Value} \\
+      & \mid & h.f & \textit{Header Access}\\
+      & \mid & \rho.\matches[i] & \textit{Symbolic Match}\\
+      & \mid & \rho.\action & \textit{Symbolic Action}\\
+      & \mid & \rho.\data[i] & \textit{Symbolic Action Data}\\
+      & \mid & x & \textit{Action Data Variable}\\
+      & \mid & e \binop e & \textit{Arbitrary Binary Operation}\\
+    & \mid & \unop e & \textit{Arbitrary Unary Operation} \\
     \multicolumn{3}{l}{\Table} \\
     t & ::= & \left\{\begin{array}{l}
     t.\id = v; \\
     t.\keys = \List[h.f]; \\
     t.\actions = \List[\lambda \vec x.\,a]\\
-    \end{array}\right\} & \textit{Table} & (p)\\
+    \end{array}\right\} & \textit{Table}\\
     \multicolumn{3}{l}{\BExpr} \\
-    b & ::= & \FALSE  & \textit{Absurdity}& (a,g,p,\iota)\\
-      & \mid & b \Rightarrow b & \textit{Implication} & (a,g,p,\iota)\\
-    & \mid & e = e & \textit{Bitvector Equality} & (a,g,p,\iota)\\
-    & \mid & \rho \in t & \textit{Table membership} & (\iota)\\
-    & \mid & \forall \rho.~b & \textit{Row Universality} & (\iota)\\
+    b & ::= & \FALSE  & \textit{Absurdity}\\
+      & \mid & b \Rightarrow b & \textit{Implication}\\
+    & \mid & e = e & \textit{Bitvector Equality}\\
+    & \mid & \rho \in t & \textit{Table membership}\\
+    %% & \mid & \forall \rho.~b & \textit{Row Universality}\\
     \multicolumn{4}{l}{c \in \Cmd, a \in \Action, g \in \GCL, p \in \Prog, \iota \in \Instr } \\
-    c & ::=  & h.f := e & \textit{Assignment} & (g,p,\iota) \\
+    c & ::=  & h.f := e & \textit{Assignment}\\
       %% & \mid & \havoc \rho & \textit{Row Havoc} & (\iota) \\
-      & \mid & \assert b & \textit{Assertion} & (g,p,\iota)\\
-      & \mid & \assume b & \textit{Assumption} & (g,p,\iota) \\
-      & \mid & t.\apply() & \textit{Table Application} & (p)\\
-      & \mid & c;c & \textit{Sequential Composition} & (a,g,p,\iota) \\
-      & \mid & c \choice c & \textit{Nondeterministic Choice} & (g,p,\iota)\\
+      & \mid & \assert b & \textit{Assertion}\\
+      & \mid & \assume b & \textit{Assumption} \\
+      & \mid & t.\apply() & \textit{Table Application} \\
+      & \mid & c;c & \textit{Sequential Composition} \\
+      & \mid & c \choice c & \textit{Nondeterministic Choice} \\
       %% & \mid & \{c\} & \textit{Scope} & (g,p,\iota)\\
     \multicolumn{3}{l}{
       \begin{array}{ll}
@@ -147,10 +150,7 @@
     \end{array}} & \textit{Sets }\\
   \end{array}
 \]
-\caption{Grammar of Commands $c \in \Cmd$. Legal action indicated by $a \in
-  \Action$, legal instrumented command variants indicated by $\iota \in \Instr$,
-  dataplane programs indicated by $p \in \Prog$, and table-free commands
-  indicated by $g \in \GCL$.}
+\caption{Grammar of Commands $c \in \Cmd$.}
 \label{fig:grammar}
 \end{figure}
 
@@ -313,26 +313,6 @@ importantly in the equality rule. Sometimes two expressions are considered equal
 if they are both undefined; we do not take this approach, considering the
 equality undefined if either argument is undefined.
 
-\begin{figure}
-  \[\begin{array}{l>{\iff}cl}
-  \satisfy \sigma \pkt \mu \FALSE && \textit{pigs fly} \\
-  \satisfy \sigma \pkt \mu b_1 \Rightarrow b_2 &&
-  \notsatisfy \sigma \pkt \mu  b_1~\textit{or}~
-  \satisfy \sigma \pkt \mu b_2\\
-  \satisfy \sigma \pkt \mu e_1 = e_2 &&
-  \edenote{e_1}~\pkt~\mu = \edenote{e_2}~\pkt~\mu, \qquad
-  \text{(note strict semantics)} \\
-  \satisfy\sigma\pkt\mu \rho \in t. && \mu(\rho) \in \sigma(t.\id) \\
-  \satisfy \sigma \pkt \mu \forall \rho. ~b &&
-  \forall r.
-  \satisfy \sigma \pkt {\mu\{\rho \mapsto r\}} b
-  \end{array}
-  \]
-  \todo[inline]{Clarify $\error$ states}
-  \caption{Satisfaction for $\BExpr$.}
-  \label{fig:bool-satis}
-\end{figure}
-
 \paragraph{Command Evaluation}
 Commands are evaluated similar to Avenir in Figure~\ref{fig:com-sem}. The
 notable differences are the inclusion of assertions, the nondeterminism
@@ -340,7 +320,7 @@ operators, and a cleaner representation of table application.
 
 \begin{figure}[htp]
   \[\begin{array}{l >{\triangleq}cl}
-  \multicolumn{3}{l}{\denote{c}^\sigma : \Model \to \Pkt \to \mathcal{P}(\Model \times \Pkt)_\error }\\
+  \multicolumn{3}{l}{\denote{c}^\sigma : \Pkt \to \mathcal{P}(\Pkt)_\error }\\
     \denote{h.f := e}^\sigma\,\mu\,\pkt && \{(\mu, \pkt\{h \mapsto v\} \mid v \in \edenote{e}\,\mu\,\pkt\})\} \\
     \denote{\assume b}^\sigma\,\mu\,\pkt &&
     \begin{cases}
@@ -562,8 +542,10 @@ Now, we need to relate states $\sigma$ and the computed $\WP(c\instr,\TRUE)$.
 Note that since there are no havocs introduced in $c\instr$, all symbolic rows
 $\rho$, and header values $h.f$ are unbound.
 
-This means that we must check the validity of \[\state\sigma_c \Rightarrow
-\WP(c\instr,\TRUE)\]
+\begin{conjecture}
+  For every $c \in \Cmd$, and $\sigma \in \State$, the following formula is valid
+  \[\state\sigma_c \Rightarrow  \WP(c\instr,\TRUE) \iff \WP(c[\sigma], \TRUE)\]
+\end{conjecture}
 
 
 
@@ -571,32 +553,38 @@ This means that we must check the validity of \[\state\sigma_c \Rightarrow
 \section{The Research Problem}
 
 Now we can formally define the research problems that we want to solve. We have
-some ideal goals, that are probably not solvable in general.
+an ideal, that is probably not solvable in general. First we begin by defining a control plane formula.
+
+\begin{definition}[Control Plane Formulae ]
+  A control plane formula $\varphi$ is a boolean expression in $\BExpr$ that
+  contains no header accesses $h.f$.
+\end{definition}
 
 \begin{quote}
-  \textbf{Conservative Problem.} Given a command $c \in \Cmd$, compute the weakest test
-  $b$ such that if, for a state $\sigma : \Value \to \Row^*$, the following
-  judgement is valid \[\state\sigma_c \Rightarrow b,\] then \[\forall \pkt \in \Pkt.~
-  \denote{c}^\sigma \emptyset\,\pkt \neq \error \]
+  \textbf{Conservative Problem.} Given a command $c \in \Cmd$, compute (the
+  weakest) control plane formula $\varphi$ such that if, for a state $\sigma :
+  \Value \to \Row^*$, the following judgement is valid \[\state\sigma_c
+  \Rightarrow \varphi,\] then \[\forall \pkt \in \Pkt.~ \denote{c}^\sigma
+  \emptyset\,\pkt \neq \error \]
 \end{quote}
 
-However, this $b$ may be $\FALSE$ for many realistic programs $c$, so we may
+However, this $\phi$ may be $\FALSE$ for many realistic programs $c$, so we may
 prefer to solve the following problem:
 
 \begin{quote}
-  \textbf{Flexible Problem.} Given a command $c \in \Cmd$, compute a test
-  $b_{\mathit{cp}}$, and a test $b_{\mathit{pkt}}$ such that for every packet
-  $\pkt \in \Pkt$ and state $\sigma : \Value \to \Row^*$, if the following
-  formula is valid
-  \[b_{\mathit{pkt}} \wedge \state\sigma_c \Rightarrow b_{\mathit{cp}},\]
+  \textbf{Flexible Problem.} Given a command $c \in \Cmd$, compute (the weakest)
+  control plane formula $\varphi$, and a test $b$ such that for every
+  packet $\pkt \in \Pkt$ and state $\sigma : \Value \to \Row^*$, if the
+  following formula is valid
+  \[b \wedge \state\sigma_c \Rightarrow \varphi,\]
   then \[\denote{c}^\sigma\emptyset\,\pkt \neq \error \]
 \end{quote}
 
-\section{Reduction to QE}
+\section{Quantifier Elimination?}
 
 We can observe that the \textbf{Conservative Problem} is simply solvable by
-reduction to Quantifier Elimination. In fact Quantifier elimination is one of
-the key driving forces of the Dillig/Dillig/Millstein abduction work (\textsc{Hola},
+reduction to Quantifier Elimination. In fact. Quantifier elimination is one of
+the key driving forces of the Dilligs' abduction work (\textsc{Hola},
 \textsc{Explain}). We sketch the argument here.
 
 \begin{conjecture}[Quantifer Elimination]
@@ -611,26 +599,88 @@ the key driving forces of the Dillig/Dillig/Millstein abduction work (\textsc{Ho
   b[\overrightarrow{h.f}]$ is valid. Then the desired control plane formula is $\qe(\forall \overrightarrow{h.f}.\;b[\overrightarrow{h.f}])$.
 \end{proof}
 
-This \emph{probably} doesn't work in general. Standard QE procedures are
+\paragraph{Discussion} This \emph{probably} doesn't work in general. Standard QE procedures are
 exponential at best, and enumerating all eth/ipv4 src/dst addresses already
-takes an intractable amount of time.
+takes an intractable amount of time. It's also not clear (to me) that this
+solution is weakest.
 
 The Dilligs' line of work uses Presburger arithmetic QE to implement the
 quantifier elimination scheme. We could directly adopt this, however networking
 programs make heavy use of bitwise operators like XOR, so we need to take a
 different strategy.
-StackOverflow\footnote{https://stackoverflow.com/questions/21293278/mathematical-arithmetic-representation-of-xor}
-says that you can implement $a \mathbin{\texttt{XOR}} b$ as $a + b - ab(1 + a +
-b - ab)$, but that still takes us out of PA, and casting between the naturals
-and fixed-width bitvectors seems dangerous.
+
+\section{Data-Driven Precondition Inference?}
 
 
+It seems that a solution to our problem can also be found in work by
+Padhi/Sharma/Millstein entitled \textit{Data-Driven Precondition Inference with
+  Learned Features}\todo{This won't make a ton of sense unless you've
+  read this paper}. Their algorithm uses a subroutine,
+$\textsc{VPreGen}(c,Q,G)$, which takes code $c$, a boolean predicate $Q$,
+and a set of passing test inputs $G$ and produces a predicate $P$ such that
+$P(t) = \TRUE$ for all $t \in G$, and $\{P\}\,C\,\{Q\}$.
+
+This gets us most of the way there. Naively, let's consider the space of inputs
+to be $\State \times \Pkt$. Then let $b_P$ be a boolean expression such that
+$b_p = \textsc{VPreGen}(c\instr,\TRUE,\emptyset)$. Then we know $b_P \Rightarrow
+\WP(c\instr,\TRUE)$. However, $b_p$ is not \emph{a priori} a control-plane
+formula.
+
+There's a trivial fix: modify the feature learning algorithm to only generate
+features that are control-plane formulae. The procedure $\textsc{FeatureLearn}$
+generates features from a space of operations described by the procedure
+$\textsc{GetOperations}()$. If we simply restrict \textsc{GetOperations} so that
+it only returns features that are control-plane formulae, then the generated
+expression $b_p$ is guaranteed to be a control plane formula. It may also be
+prudent to restrict the input space $G$ to be a subset of $\State$, rather than
+of $\State \times \Pkt$, but it doesn't seem strictly necessary.
 
 
-\section{Can Templates save us?}
+\paragraph{Discussion} This doesn't quite achieve our goal, because the
+synthesized solution is not necessarily the weakest. Further, its not clear to
+what extent this procedure relies on a non-empty set of examples $G$. Nor is it
+immediately clear where we would get such inputs. Currently each iteration of
+the \textsc{VPreGen} algorithm augments the set of examples with a failing
+example -- if it turns out that good inputs are necessary, it could be augmented
+with a similar solver call to generate a positive example (e.g.
+$\textsc{Sat}(\WP(c\instr,\TRUE))$).
+
+\paragraph{Relation to \texttt{bf4}} The \texttt{bf4} algorithm is similar to
+\textsc{VPreGen}, using formulae rather than examples. Rather than learn features, \texttt{bf4} uses a static set of
+control-plane features (which they call ``atoms''). Then, rather than learn a
+candidate boolean expression by abstracting these atoms and using a set of
+concrete positive and negative examples, \texttt{bf4} uses Z3's unsat-core to
+refine its candidate solution. Finally, \texttt{bf4} is interested in
+bug-finding rather than verification so it computes necessary conditions rather
+than sufficient conditions. The following table summarizes the differences
+
+\begin{center}
+\begin{tabular}{lll}
+  \toprule
+  & $\textsc{VPreGen}(c,Q,G)$ & \texttt{bf4's} $\textsc{INFER}(G,B,\mathcal P)$ \\
+  \midrule \\
+  Solution ($\varphi$)
+  & $\{\varphi\} C \{Q\}$, and $\forall t \in G.\,\varphi(t)$
+  & $G \models \phi$, minimizing(?) $|\{\eta\mid B
+  \wedge \varphi\}|$ \\[1.5em]
+  Features
+  & dynamically learns features
+  & features (aka \emph{atoms}) are heuristically defined ($\mathcal P$) \\[1.5em]
+  Candidates &
+  \begin{tabular}{>{\!\!\!}l}
+    abstracts features; \\
+    learns boolean expression; \\
+    concretizes features
+  \end{tabular}
+  & iteratively negates Z3's unsat-core\\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\section{Can we use templates?}
 
 One option is to use a kind of constrained template-based synthesis, where we
-generate a catalogue of temaplates based on syntactic features of the target table.
+generate a catalogue of templates based on syntactic features of the target table.
 
 For example, given a single table like the following:
 
@@ -659,22 +709,21 @@ Now we may wonder: \emph{can we procedurally generate templates in a (nearly) co
 
 To do so, we need to extend our templates along the following dimensions:
 \begin{enumerate}[align=left]
-\item[\textbf{Keys}.] Should generalize by changing the LHS comparisons to $
+\item[\textit{Keys}.] Should generalize by changing the LHS comparisons to $
   \bigwedge_i[\rho.\keys[i]~\square_{\{=,\neq\}}~?_{v_i}]?$
-\item[\textbf{Action Data}.] Should generalize by changing the RHS comparisons to $\bigwedge_i[\rho.\data[i]~\square_{\{=,\neq\}}~?_{v_i}]?$
+\item[\textit{Action Data}.] Should generalize by changing the RHS comparisons to $\bigwedge_i[\rho.\data[i]~\square_{\{=,\neq\}}~?_{v_i}]?$
 \item[\textbf{Actions}.] We need to generalize the template across multiple actions. This should be as simple as adding $\rho.\action = i$ on the RHS of each implication above.
-\item[\textbf{Sequence}.] I'm not sure how to generalize sequentially composed tables.
+\item[\textit{Sequence}.] I'm not sure how to generalize sequentially composed tables.
   Perhaps a larger catalogue of templates conditioned on structural information:
   if we notice that $t_1$ has a dataflow path to the keys of $t_2$, we should
   generate a join condition template, otherwise we may be able to simply ``and'' the templates.
 
-\item[\textbf{Nondeterminism} ($c_1 \choice c_2$).] To solve the \textbf{Conservative
+\item[\textit{Nondeterminism} ($c_1 \choice c_2$).] To solve the \textbf{Conservative
   Problem} we simply and the templates together, but to solve the
   \textbf{Flexible Problem} we may be able to constrain the problem (by
   constraining the packets) to either $c_1$ or $c_2$. This would require
   computing a $b_{\textit{pkt}}$.
 \end{enumerate}
 
-
-
 \end{document}
+m
