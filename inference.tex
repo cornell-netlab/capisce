@@ -84,6 +84,7 @@
 \newcommand{\instr}{[?]}
 \newcommand{\ginstr}{[\mathghost]}
 \newcommand{\qe}{\textsc{Qe}}
+\newcommand{\dom}{\textrm{dom}}
 
 % defined functions
 \newcommand{\tables}{\mathop{\mathsf{tables}}}
@@ -115,11 +116,7 @@
     \end{array}\right\} & \textit{Symbolic Row} \\
     \multicolumn{3}{l}{\BVExpr} \\
     e & ::= & v & \textit{Value} \\
-      & \mid & h.f & \textit{Header Access}\\
-      & \mid & \rho.\matches[i] & \textit{Symbolic Match}\\
-      & \mid & \rho.\action & \textit{Symbolic Action}\\
-      & \mid & \rho.\data[i] & \textit{Symbolic Action Data}\\
-      & \mid & x & \textit{Action Data Variable}\\
+      & \mid & x & \textit{Variable}\\
       & \mid & e \binop e & \textit{Arbitrary Binary Operation}\\
     & \mid & \unop e & \textit{Arbitrary Unary Operation} \\
     \multicolumn{3}{l}{\Table} \\
@@ -132,7 +129,7 @@
     b & ::= & \FALSE  & \textit{Absurdity}\\
       & \mid & b \Rightarrow b & \textit{Implication}\\
     & \mid & e = e & \textit{Bitvector Equality}\\
-    & \mid & \rho \in t & \textit{Table membership}\\
+    %% & \mid & \rho \in t & \textit{Table membership}\\
     %% & \mid & \forall \rho.~b & \textit{Row Universality}\\
     \multicolumn{4}{l}{c \in \Cmd, a \in \Action, g \in \GCL, p \in \Prog, \iota \in \Instr } \\
     c & ::=  & h.f := e & \textit{Assignment}\\
@@ -158,10 +155,10 @@ The following sections describe aspects of the grammar shown in Figure~\ref{fig:
 
 \paragraph{Packets}
 Our dataplane programs will reason about structured representations of packets,
-that is, they will be transformations on sets of packet headers. In programs,
-packet headers $h \in \Hdr$ are essentially structs with fields $f \in
-\Field$. Write $h.f$ for a header $h$ and a field $f$ is the value $v$ of $f$
-in header $h$.
+that is, they will be transformations on sets of packet headers. In P4 programs,
+packet headers $h \in \Hdr$ are essentially structs with fields $f \in \Field$.
+Write $h.f$ for a header $h$ and a field $f$ is the value $v$ of $f$ in header
+$h$. Our simple command language just treats ``h.f'' as a variable.
 
 \paragraph{Tables}
 A table $t \in \Table$ is a record with a few fields described below:
@@ -173,13 +170,12 @@ A table $t \in \Table$ is a record with a few fields described below:
     expression $\lambda \vec x. c$ where the variables $x$ are in scope for the
     commands $c$, which $c$ are straight-line code only (see below).
 \end{enumerate}
-For now we assume that the default action is the no-operation command (see
-$\SKIP$ below). We use $|l|$ to indicate the number of elements in a list or vector $l$
-such as $t.\keys$ or $t.\actions$.
-
+For now we assume that the default action is always specified by the controller.
+That is, programs never `miss' in tables. See the paragraph on state below. We use $|l|$ to indicate the number of
+elements in a list or vector $l$ such as $t.\keys$ or $t.\actions$.
 
 \paragraph{Symbolic Table Rows}
-A symbolic table row $\rho \in \SymbRow$ represents a symbolic row. Like tables,
+A symbolic table row $\rho \in \SymbRow$ represents a symbolic row. These rows are represented in our programs as simple variables $x$. Like tables,
 rows are also records with the following fields \todo{Well formedness constraint?}
 \begin{enumerate}[align=left]
   \item[($\rho.\matches$)] A list variable of length representing the possible match keys.
@@ -213,7 +209,7 @@ a programmer.
 
 We can represent other standard boolean operators by using standard encodings:
 \[\begin{array}{l}
-  \TRUE \triangleq \TRUE \Rightarrow \TRUE \\
+  \TRUE \triangleq \FALSE \Rightarrow \FALSE \\
   \neg b \triangleq b \Rightarrow \FALSE \\
   b_1 \vee b_2 \triangleq \neg b_1 \Rightarrow b_2 \\
   b_1 \wedge b_2 \triangleq \neg(\neg b_1 \vee \neg b_2) \\
@@ -226,13 +222,7 @@ assumptions ($\assume b$), assertions ($\assert b$), table application
 ($t.\apply()$), sequential composition ($c_1;c_2$ for two commands $c_1$ and $c_2$), and
 nondeterministic choice ($c_1 \choice c_2$ for two commands $c_1$ and $c_2$).
 
-We define $\SKIP$ as the following syntactic sugar $\assume \TRUE$.
-
-We express a collection of invariants on commands as subsets of the set $\Cmd$.
-It is convenient to describe these as subgrammars. First, action-commands $a \in
-\Action$ contain only non-symbolic assignment and sequence. If an action
-command has variables, indicated by the starred variant $a*$, it is called
-\emph{open}, if it has none it is called \emph{closed}.
+We define $\SKIP$ as syntactic sugar for $\assume \TRUE$.
 
 Define $\tables(c) \subset \Table$ to be the set of all tables that occur in $c$.
 
@@ -242,9 +232,9 @@ First we describe the semantic objects packet and state before giving semantics
 to bitvector expressions, boolean expressions, and commands.
 
 \paragraph{Packets}
-A packet $\pkt$ is a map from header fields to values. Use the syntax $\pkt[h.f
-  \mapsto v]$ to represent the packet that is equivalent to $\pkt$ on all header
-fields except $h.f$, which maps to $v$.
+A packet $\pkt$ is a map from header fields to values. Use the syntax $\pkt[x
+  \mapsto v]$ to represent the packet that is equivalent to $\pkt$ on all variables
+fields except $x$, which maps to $v$.
 
 \paragraph{State}
 On-switch state is represented by a mapping from tables identifiers $t.\id$ to
@@ -262,18 +252,27 @@ table $t$ iff the following conditions hold:
 
 A state map $\sigma : \Value \to \Row^*$ is well-formed for a command $c$ iff the
 following conditions hold:
-\begin{enumerate}
-\item[\textsc{Total}] For every $t \in \tables(c)$ $\pkt \in \pkt$ there exists a row $r \in \sigma(t.\id)$ such that $r.matches = \pkt(t.keys)$.
-\item[\textsc{WellFormedRows}] For every $t\in \tables(c)$, every row in $\sigma(t.\id)$ is well-formed.
-\item[\textsc{NoShadow}] For every $t \in \tables(c)$, with $r_1,\ldots,r_n =
+\begin{enumerate}[align=left]
+\item[(\textsc{Total})] For every $t \in \tables(c)$ $\pkt \in \pkt$ there exists a row $r \in \sigma(t.\id)$ such that $r.matches = \pkt(t.keys)$.
+\item[(\textsc{WellFormedRows})] For every $t\in \tables(c)$, every row in $\sigma(t.\id)$ is well-formed.
+\item[(\textsc{NoShadow})] For every $t \in \tables(c)$, with $r_1,\ldots,r_n =
   \sigma(t.\id)$, for every $1 \leq i \leq n$, there does not exist $1 \leq j <
   i$ such that $r_i.\matches = r_j.\matches$.
 \end{enumerate}
-\paragraph{Row Models}
-We also need models $\mu \in \Model$ to indicate which symbolic rows corresponds
-to which concrete rows, i.e. $\Model = \SymbRow \rightharpoonup \Row$. We write
-$\mu\{\rho \mapsto r\}$ to extend $\mu$ by mapping $\rho$ to $r$, and write $\mu
-\setminus \rho$, to remove $\rho$ from the map.
+
+Importantly, we assume that all state is \emph{total}, that is, no packet locally misses
+in the table. This is formally defined in Definition~\ref{def:total-state}.
+
+\begin{definition}[Total State]
+  \label{def:total-state}
+  A state $\sigma$ is total if for every $t \in \dom(\sigma)$, the following
+  formula is valid:
+  \[\bigwedge_{r \in \sigma(t.\id)} t.\keys = r.\matches \]
+\end{definition}
+
+Henceforth we assume that all states are total.
+
+
 
 \paragraph{Expressions}
 The semantics of expressions is shown in Figure~\label{fig:sem-expr}. Note that
@@ -283,22 +282,22 @@ undefined.
 
 \begin{figure}[H]
   \[\begin{array}{l>{\triangleq}cl}
-  \multicolumn{3}{l}{\edenote{e} : \Model \to \Pkt \rightharpoonup \Value }\\
-    \edenote{v}~\mu~\pkt &&
+  \multicolumn{3}{l}{\edenote{e} : \Pkt \to \Value }\\
+    \edenote{v}\pkt &&
     v \\
-    \edenote{h.f}~\mu~\pkt &&
+    \edenote{h.f}\pkt &&
     pkt(h.f)\\
-    \edenote{\rho.\matches[i]}~\mu~\pkt &&
-    \mu(\rho).\matches[i] \\
-    \edenote{\rho.\action}~\mu~\pkt &&
-    \mu(\rho).\action \\
-    \edenote{\rho.\data[i]} &&
-    \mu(\rho).\data[i]\\
-    \edenote{e_1 \binop e_2}~\mu~\pkt&&
-    \edenote{e_1}~\mu~\pkt \binop
-    \edenote{e_2}~\mu~\pkt \\
-    \edenote{\unop e}~\mu~\pkt &&
-    \unop \left(\edenote{e}~\mu~\pkt\right)
+    %% \edenote{\rho.\matches[i]}\pkt &&
+    %% \mu(\rho).\matches[i] \\
+    %% \edenote{\rho.\action}\pkt &&
+    %% \mu(\rho).\action \\
+    %% \edenote{\rho.\data[i]} &&
+    %% \mu(\rho).\data[i]\\
+    \edenote{e_1 \binop e_2}\pkt&&
+    \edenote{e_1}\pkt \binop
+    \edenote{e_2}\pkt \\
+    \edenote{\unop e}\pkt &&
+    \unop \left(\edenote{e}\pkt\right)
   \end{array}
   \]
   \caption{Semantics of Expressions}
@@ -306,12 +305,25 @@ undefined.
 \end{figure}
 
 \paragraph{Boolean Satisfaction}
-The satisfaction relation $\satisfy \sigma \pkt \mu b$ is defined in
-Figure~\ref{fig:bool-satis} in terms of the three kinds of variable contexts,
-packets, models, and states. We also use the strict semantics here, most
-importantly in the equality rule. Sometimes two expressions are considered equal
-if they are both undefined; we do not take this approach, considering the
-equality undefined if either argument is undefined.
+The satisfaction relation $\pkt \models b$ is defined in
+Figure~\ref{fig:bool-satis}. It is completely standard.
+
+\begin{figure}
+  \[
+  \begin{array}{l >{\iff}c l}
+    \pkt \models \FALSE
+    && \mathit{never}\\
+    \pkt \models b_1 \Rightarrow b_2
+    && \pkt \not\models b_1~\mathit{or}~\pkt \models b_2\\
+    \pkt \models e_1 = e_2
+    && \edenote{e_1}\pkt = \edenote{e_2}\pkt\\
+
+  \end{array}
+  \]
+  \caption{The satisfaction relation}
+  \label{fig:bool-satis}
+\end{figure}
+
 
 \paragraph{Command Evaluation}
 Commands are evaluated similar to Avenir in Figure~\ref{fig:com-sem}. The
@@ -319,34 +331,34 @@ notable differences are the inclusion of assertions, the nondeterminism
 operators, and a cleaner representation of table application.
 
 \begin{figure}[htp]
-  \[\begin{array}{l >{\triangleq}cl}
+  \[\begin{array}{r >{\triangleq}cl}
   \multicolumn{3}{l}{\denote{c}^\sigma : \Pkt \to \mathcal{P}(\Pkt)_\error }\\
-    \denote{h.f := e}^\sigma\,\mu\,\pkt && \{(\mu, \pkt\{h \mapsto v\} \mid v \in \edenote{e}\,\mu\,\pkt\})\} \\
-    \denote{\assume b}^\sigma\,\mu\,\pkt &&
+    \denote{h.f := e}^\sigma\pkt && \{\pkt\{h \mapsto \edenote{e}\pkt\}\} \\
+    \denote{\assume b}^\sigma\pkt &&
     \begin{cases}
-      \{(\mu,\pkt)\} & \satisfy \sigma \pkt \mu b \\
+      \{\pkt\} & \pkt \models b \\
       \{\} & \textit{otherwise} \\
     \end{cases}\\
-    \denote{\assert b}^\sigma\,\mu\,\pkt &&
+    \denote{\assert b}^\sigma\pkt &&
     \begin{cases}
-      \{(\mu,\pkt)\} & \satisfy \sigma \pkt \mu b \\
+      \{\pkt\} & \pkt \models b \\
       \error & \textit{otherwise}
     \end{cases} \\
     %% \denote{\havoc \rho}^\sigma\,\mu\,\pkt &&
     %% \{(\mu\{\rho \mapsto r\}, \pkt) \mid r \in \Row\} \\
-    \denote{c_1;c_2}^\sigma\,\mu\,\pkt&&
-    \bigcup_{(\mu',\pkt') \in \denote{c_1}^\sigma\,\mu\,\pkt}\denote{c_2}^\sigma\,\mu'\,\pkt' \\
-    \denote{c_1 \choice c_2}^\sigma\,\mu\,\pkt &&
-    \denote{c_1}^\sigma\,\mu\,\pkt \cup \denote{c_2}^\sigma\,\mu\,\pkt \\
+    \denote{c_1;c_2}^\sigma\pkt&&
+    \bigcup_{\pkt' \in \denote{c_1}^\sigma\pkt}\denote{c_2}^\sigma\pkt' \\
+    \denote{c_1 \choice c_2}^\sigma\pkt &&
+    \denote{c_1}^\sigma\pkt \cup \denote{c_2}^\sigma\pkt \\
     %% \denote{\{c\}}^\sigma\,\mu\,\pkt &&
     %% \{(\mu,\pkt') \mid (\mu',\pkt') \in \denote{c}^\sigma\,\mu\,\pkt \}\\
-    \denote{t.\apply()}^\sigma\,\mu\,\pkt &&
+    \denote{t.\apply()}^\sigma\,\pkt &&
     \begin{cases}
-      \denote{c[\vec d/\vec x]}^\sigma\,\mu\,\pkt,
+      \denote{c[\vec d/\vec x]}^\sigma\pkt,
       & \text{where}~\lambda \vec x.~c = r.\action, \vec d = r.\data \\
-      & \text{where}~r = \argmin_i\{\satisfy \sigma \pkt \mu b_i\} \\
+      & \text{where}~r = \argmin_i\{\pkt \models b_i\} \\
       & \text{where}~b_i = \sigma(t.\id)[i].\matches = t.\keys \\
-      \{(\mu,\pkt)\}, & \mathit{otherwise}
+      \{\pkt\}, & \mathit{otherwise}
     \end{cases}
   \end{array}\]
   \caption{Semantics of Commands}
@@ -399,10 +411,9 @@ is defined in Figure~\ref{fig:table-elim}
 
 
 \begin{theorem}[Table Substitution]
-  For every $c \in \Cmd$, well-formed state $\sigma : \Value \to \Row^*$, model
-  $\mu \in \Model$, and packet $\pkt \in \Pkt$, then for any state $\tau :
-  \Value \to \Row^*$,
-  \[\denote{c}^\sigma~\mu~\pkt = \denote{c[\sigma]}^\tau~\mu~\pkt\]
+  For every $c \in \Cmd$, well-formed state $\sigma : \Value \to \Row^*$, and
+  packet $\pkt \in \Pkt$, then for any state $\tau : \Value \to \Row^*$,
+  \[\denote{c}^\sigma\pkt = \denote{c[\sigma]}^\tau\pkt\]
 \end{theorem}
 \begin{proof}
 \todo[inline]{By induction on the structure of $c$.}
@@ -501,8 +512,9 @@ values of the packet when evaluating $t.\keys$.
 \begin{samepage}
 \begin{theorem}[Instrumentation Equivalence]
   \label{thm:instr-equiv}
-  For every $c \in \Cmd$, well-formed state $\sigma : \Value \to \Row^*$, model
-  $\mu \in \Model$, and packet $\pkt \in \Pkt$, \[\denote{c}^\sigma~\mu~\pkt = \denote{\assume \state\sigma_c; c\instr}^\sigma~\mu~\pkt.\]
+  For every $c \in \Cmd$, well-formed state $\sigma : \Value \to \Row^*$, and
+  packet $\pkt \in \Pkt$, \[\denote{c}^\sigma\pkt = \denote{\assume
+    \state\sigma_c; c\instr}^\sigma\pkt.\]
 \end{theorem}
 \begin{proof}
 \todo[inline]{do the proof}
@@ -543,8 +555,11 @@ Note that since there are no havocs introduced in $c\instr$, all symbolic rows
 $\rho$, and header values $h.f$ are unbound.
 
 \begin{conjecture}
-  For every $c \in \Cmd$, and $\sigma \in \State$, the following formula is valid
-  \[\state\sigma_c \Rightarrow  \WP(c\instr,\TRUE) \iff \WP(c[\sigma], \TRUE)\]
+  For every $c \in \Cmd$, and $\sigma \in \State$, the following are equivalent:
+  \begin{itemize}
+  \item \(\state\sigma_c \Rightarrow  \WP(c\instr,\TRUE)\)
+  \item \(\WP(c[\sigma], \TRUE)\)
+  \end{itemize}
 \end{conjecture}
 
 
@@ -561,34 +576,33 @@ an ideal, that is probably not solvable in general. First we begin by defining a
 \end{definition}
 
 \begin{quote}
-  \textbf{Conservative Problem.} Given a command $c \in \Cmd$, compute (the
+  \textbf{Inference Problem.} Given a command $c \in \Cmd$, compute (the
   weakest) control plane formula $\varphi$ such that if, for a state $\sigma :
-  \Value \to \Row^*$, the following judgement is valid \[\state\sigma_c
-  \Rightarrow \varphi,\] then \[\forall \pkt \in \Pkt.~ \denote{c}^\sigma
-  \emptyset\,\pkt \neq \error \]
+  \Value \to \Row^*$, the following formula is valid \[\state\sigma_c
+  \Rightarrow \varphi,\] then \[\forall \pkt \in \Pkt.~ \denote{c}^\sigma\pkt \neq \error \]
 \end{quote}
 
-However, this $\phi$ may be $\FALSE$ for many realistic programs $c$, so we may
+However, this $\varphi$ may be $\FALSE$ for many realistic programs $c$, so we may
 prefer to solve the following problem:
 
 \begin{quote}
-  \textbf{Flexible Problem.} Given a command $c \in \Cmd$, compute (the weakest)
+  \textbf{Repair Problem.} Given a command $c \in \Cmd$, compute (the weakest)
   control plane formula $\varphi$, and a test $b$ such that for every
   packet $\pkt \in \Pkt$ and state $\sigma : \Value \to \Row^*$, if the
   following formula is valid
-  \[b \wedge \state\sigma_c \Rightarrow \varphi,\]
-  then \[\denote{c}^\sigma\emptyset\,\pkt \neq \error \]
+  \[\state\sigma_c \Rightarrow \varphi,\]
+  then \[\denote{\assume b; c}^\sigma\pkt \neq \error \]
 \end{quote}
 
 \section{Quantifier Elimination?}
 
-We can observe that the \textbf{Conservative Problem} is simply solvable by
+We can observe that \textbf{Inference} is simply solvable by
 reduction to Quantifier Elimination. In fact. Quantifier elimination is one of
 the key driving forces of the Dilligs' abduction work (\textsc{Hola},
 \textsc{Explain}). We sketch the argument here.
 
 \begin{conjecture}[Quantifer Elimination]
-  The \textbf{\textrm{Conservative Problem}} is reducable to Quantifer Elimination.
+  The \textbf{\textrm{Inference Problem}} is reducable to Quantifer Elimination.
 \end{conjecture}
 
 \begin{proof}[Proof Sketch.]
@@ -718,12 +732,11 @@ To do so, we need to extend our templates along the following dimensions:
   if we notice that $t_1$ has a dataflow path to the keys of $t_2$, we should
   generate a join condition template, otherwise we may be able to simply ``and'' the templates.
 
-\item[\textit{Nondeterminism} ($c_1 \choice c_2$).] To solve the \textbf{Conservative
-  Problem} we simply and the templates together, but to solve the
-  \textbf{Flexible Problem} we may be able to constrain the problem (by
+\item[\textit{Nondeterminism} ($c_1 \choice c_2$).] To solve the
+  \textbf{Inference Problem} we simply `and' the templates together, but to solve
+  the \textbf{Repair Problem} we may be able to constrain the problem (by
   constraining the packets) to either $c_1$ or $c_2$. This would require
   computing a $b_{\textit{pkt}}$.
 \end{enumerate}
 
 \end{document}
-m
