@@ -304,6 +304,7 @@ h.y := ρ₂.data.x
 This amounts to ``dead code''. There is no packet that will traverse both ρ₁ and
 ρ₂.
 
+
 3. (ρ₂.action = 0 ∧ ρ₂.key.y ≠ ρ₁.data.y ∧ ρ₁.action = 1)
 
 This is symmetric to case 2.
