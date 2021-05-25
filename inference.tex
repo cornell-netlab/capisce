@@ -247,12 +247,43 @@ We can represent other standard boolean operators by using standard encodings:
 \end{array}\]
 
 \paragraph{Commands}
-Data plane programs $c \in \mathsf{Cmd}$ can be assignments ($h.f := e$),
+Data plane programs $c \in \mathsf{Cmd}$ can be assignments ($h.f := e$), havoc statements ($\havoc x$),
 assumptions ($\assume b$), assertions ($\assert b$), table application
 ($t.\apply()$), sequential composition ($c_1;c_2$ for two commands $c_1$ and $c_2$), and
 nondeterministic choice ($c_1 \choice c_2$ for two commands $c_1$ and $c_2$).
 
-We define $\SKIP$ as syntactic sugar for $\assume \TRUE$.
+We define $\SKIP$ as syntactic sugar for $\assume \TRUE$. We also lift havoc to
+sets of variables $\havoc \{x_1,\ldots,x_n\} = \SKIP; \havoc{x_1}; \cdots; \havoc{x_n}$.
+
+It is sensible to use sets here (rather than lists), because havocs commute:
+
+\begin{lemma}[Havocs Commute]
+  For any two variables $\{x_1,x_2\} \subseteq \Var$,
+  \[\forall \sigma.\forall \pkt. \denote{\havoc{x_1};\havoc{x_2}}^\sigma\pkt = \denote{\havoc{x_2};\havoc{x_2}}^\sigma\pkt \]
+\end{lemma}
+
+\begin{proof}
+  Let $x_1, x_2,\sigma,\pkt$ be given.
+  Compute as follows:
+  \[
+  \begin{array}{ll}
+    \denote{\havoc{x_1};\havoc{x_2}}^\sigma\pkt\\
+    = {\denote{\havoc{x_2}}^\sigma}^\dagger\left(\denote{\havoc{x_1}}\right)^\sigma\pkt
+    & \\
+    = {\denote{\havoc{x_2}}^\sigma}^\dagger\{\pkt\{x_1 \mapsto v_1\} \mid v_1 \in \Value\}
+    & \\
+    = \{\pkt\{x_1 \mapsto v_1\}\{x_2 \mapsto v_2\} \mid v_1,v_2 \in \Value\}
+    & \\
+    = \{\pkt\{x_2 \mapsto v_2\}\{x_1 \mapsto v_1\} \mid v_1,v_2 \in \Value\}
+    & \\
+    = {\denote{\havoc{x_1}}^\sigma}^\dagger\{\pkt\{x_2 \mapsto v_2\} \mid v_2 \in \Value\}
+    & \\
+    = {\denote{\havoc{x_1}}^\sigma}^\dagger\left(\denote{\havoc{x_2}}^\sigma\pkt\right)\}
+    & \\
+    = \denote{\havoc{x_2};\havoc{x_2}}^\sigma\pkt
+  \end{array}
+  \]
+\end{proof}
 
 Define $\tables(c) \subset \Table$ to be the set of all tables that occur in $c$.
 
@@ -678,10 +709,12 @@ values of the packet when evaluating $t.\keys$.
       \assume \gamma_t.\keys = t.\keys; \\
     \displaystyle \bigchoice_{i=0}^{|t.\action| -1}
     \left(\begin{array}{l}
+      \assume \gamma_t.\miss = 0;\\
       \assume \rho_t.\action = i;\\
       \assume \gamma_t.\hitAction = \rho_t.\id;\\
       t.\action[i](\rho_t.\data)
     \end{array}\right)\\
+    \choice (\assume \gamma_t.\miss = 1; \SKIP)  \\
   \end{array}}
   \end{array}
   \]
@@ -698,8 +731,9 @@ values of the packet when evaluating $t.\keys$.
   \left(
   \begin{array}{>{\displaystyle}l}
   \gamma_t.\miss = 1 \Leftrightarrow \gamma_t.\hitAction > |\sigma(t.\id)| \\
-  \wedge \bigvee_{r_i \in \sigma(t.\id)} \left(\rho = r_i
-  \wedge \left(\gamma_t.\hitAction \geq i \Leftrightarrow \bigwedge_{j=0}^{i-1} t.\matchrow(r_j)[\gamma_t.\keys/t.\keys]\right)\right)\\
+  \wedge \bigvee_{r_i \in \sigma(t.\id)} \rho = r_i  \\
+  \wedge \bigwedge_{r_i \in \sigma(t.\id)} \gamma_t.\hitAction = i \Leftrightarrow \rho_t = r_i \\
+  \wedge \bigwedge_{r_i \in \sigma(t.\id)} \left(\gamma_t.\hitAction \geq i \Leftrightarrow \bigwedge_{j=0}^{i-1} \neg t.\matchrow(r_j)[\gamma_t.\keys/t.\keys]\right)\\
   \end{array}\right)
   \end{array}
   \]
@@ -751,46 +785,42 @@ values of the packet when evaluating $t.\keys$.
 \begin{theorem}[Instrumentation Equivalence]
   \label{thm:instr-equiv}
   Given a set of variables $V \subseteq \Var$ that contains no ghost variables
-  or symbolic variables. For every $c \in \Cmd$ such that $\fvs(c) \subseteq V$, well-formed state
-  $\sigma : \Value \to \Row^*$, and packet $\pkt \in \Pkt$,
-  %% \[\denote{c}^\sigma\pkt =_{\fvs(c)} \denote{\assume\state\sigma_c;c\instr}\,\pkt.\]
+  or symbolic variables. For every $c \in \Cmd$ such that $\fvs(c) \subseteq V$,
+  well-formed state $\sigma : \Value \to \Row^*$, and packet $\pkt \in \Pkt$,
+  where $R = \{\rho_t \mid t \in \tables(c)\}$, and $G = \{\gamma_t \mid t \in
+  \tables(c)\}$,
 
-  \[\denote{c}^\sigma\,\pkt =_V \denote{\havoc \vec{\rho_t}; \havoc \vec{\gamma_t}; \assume{\state\sigma}_t; c\instr}\,\pkt  \]
+  \[\denote{c}^\sigma\,\pkt =_V \denote{\havoc {R \cup G}; \assume{\state\sigma}_t; c\instr}\,\pkt  \]
 \end{theorem}
 \end{samepage}
 
 \begin{proof}
   Proceed by induction on $c$.
   \begin{enumerate}[align=left]
-  \item[$(c = x:=e)$] Immediate.
-  \item[$(c = \havoc x)$] Immediate.
-  \item[$(c = \assume b)$] Immediate.
-  \item[$(c = \assert b)$] Immediate.
-  \item[$(c = c_1;c_2)$] Let $\vec{\rho_t}$ be the symbolic rows for tables $t
-    \in \tables(c_1;c_2)$. We can write $\vec\rho_t$ as $\vec{\rho_t} = \vec{\rho_{t_1}} \vec{\rho_{t_2}}$
-    where $\vec{\rho_{t_i}}$ is the set of symbolic rows in $c_i$. Let
-    $\vec{\gamma_t}$ be the ghost variables rows for tables $t \in
-    \tables(c_1;c_2)$. We can write $\vec{\gamma_t}$ as $\vec{\gamma_t} = \vec{\gamma_{t_1}} \vec{\gamma_{t_2}}$
-    where $\vec{\gamma_{t_i}}$ is the set of ghost variables in $c_i$. Compute as
-    follows:
+  \item[$(c = x:=e)$] Immediate, since $R = \emptyset = G$, $\assume{\state\sigma}_{x:=e} = \TRUE$, and $(x:=e)\instr = (x:=e)$.
+  \item[$(c = \havoc x)$] \textit{sim}.
+  \item[$(c = \assume b)$] \textit{sim}.
+  \item[$(c = \assert b)$] \textit{sim}.
+  \item[$(c = c_1;c_2)$] Let $R_i = \{\rho_t \mid t \in \tables(c_i)\}$ for $i =
+    1,2$. Notice that $R = R_1 \cup R_2$. Similarly, let $G_i = \{\gamma_t \mid
+    t \in \tables(c_i)\}$ for $i = 1,2$. Notice that $G = G_1 \cup G_2$. Compute
+    as follows:
     \[\begin{array}{ll}
-    \denote{\havoc{\vec{\rho_t}}; \havoc{\vec\gamma_t}; \assume{\state\sigma_{c_1;c_2}};(c_1;c_2)\instr}\,\pkt
+    \denote{\havoc {R \cup G}; \assume{\state\sigma_{c_1;c_2}};(c_1;c_2)\instr}\,\pkt
     & \\
-    = \denote{\havoc{\vec{\rho_t}}; \havoc{\vec\gamma_t}; \assume{\state\sigma_{c_1;c_2}}; c_1\instr;c_2\instr}\,\pkt
+    = \denote{\havoc{R\cup G}; \assume{\state\sigma_{c_1;c_2}}; c_1\instr;c_2\instr}\,\pkt
     & \text{definition of }(\cdot)\instr \\
-    = \denote{\havoc{\vec{\rho_t}}; \havoc{\vec\gamma_t}; \assume{\state\sigma_{c_1}};\assume{\state\sigma_{c_2}};c_1\instr;c_2\instr}\,\pkt
+    = \denote{\havoc{R\cup G}; \assume{\state\sigma_{c_1}};\assume{\state\sigma_{c_2}};c_1\instr;c_2\instr}\,\pkt
     & \text{LEMMAs INVOLVING SIGMA-DISTRIB \& ASSUME-DISTRIB} \\
-    = \denote{\havoc{\vec{\rho_{t_1}}}\havoc{\vec{\rho_{t_2}}}; \havoc{\vec\gamma_{t_1}}; \havoc{\vec\gamma_{t_2}}; \assume{\state\sigma_{c_1}};\assume{\state\sigma_{c_2}};c_1\instr;c_2\instr}\,\pkt
+    = \denote{\havoc{R_1};\havoc{G_1}; \havoc{R_2};\havoc{G_2}; \assume{\state\sigma_{c_1}};\assume{\state\sigma_{c_2}};c_1\instr;c_2\instr}\,\pkt
     & \text{by definition} \\
-    = \denote{\havoc{\vec{\rho_{t_1}}};\havoc{\vec{\rho_{t_2}}}; \havoc{\vec\gamma_{t_1}}; \havoc{\vec\gamma_{t_2}}; \assume{\state\sigma_{c_1}};c_1\instr;\assume{\state\sigma_{c_2}};c_2\instr}\,\pkt
+    = \denote{\havoc{R_1};\havoc{G_1}; \havoc{R_2}; \havoc{G_2}; \assume{\state\sigma_{c_1}};c_1\instr;\assume{\state\sigma_{c_2}};c_2\instr}\,\pkt
     & \text{BY FREE-VARIABLE-ASSUMPTION COMMUTATIVITY LEMMA} \\
-    = \denote{\havoc{\vec{\rho_{t_1}}}; \havoc{\vec\gamma_{t_1}};\havoc{\vec{\rho_{t_2}}}; \havoc{\vec\gamma_{t_2}}; \assume{\state\sigma_{c_1}};c_1\instr;\assume{\state\sigma_{c_2}};c_2\instr}\,\pkt
-    & \text{By Commutativity of }\havoc\\
-    = \denote{(\havoc{\vec{\rho_{t_1}}}; \havoc{\vec\gamma_{t_1}}; \assume{\state\sigma_{c_1}};c_1\instr);
-      (\havoc{\vec{\rho_{t_2}}}; \havoc{\vec\gamma_{t_2}};\assume{\state\sigma_{c_2}};c_2\instr)}\,\pkt
+    = \denote{(\havoc{R_1}; \havoc{G_1}; \assume{\state\sigma_{c_1}};c_1\instr);
+      (\havoc{R_2}; \havoc{G_2};\assume{\state\sigma_{c_2}};c_2\instr)}\,\pkt
     & \text{BY FREE-VARIABLE HAVOC COMMUTE LEMMA}\\
-    = \denote{\havoc{\vec{\rho_{t_2}}}; \havoc{\vec\gamma_{t_2}};\assume{\state\sigma_{c_2}};c_2\instr}^\dagger
-    \left(\denote{\havoc{\vec{\rho_{t_1}}}; \havoc{\vec\gamma_{t_1}}; \assume{\state\sigma_{c_1}};c_1\instr}\,\pkt\right)
+    = \denote{\havoc{R_2}; \havoc{G_2};\assume{\state\sigma_{c_2}};c_2\instr}^\dagger
+    \left(\denote{\havoc{R_1}; \havoc{G_1}; \assume{\state\sigma_{c_1}};c_1\instr}\,\pkt\right)
     & \text{BY DEFINITION} \\
     =_V {\denote{c_2}^\sigma}^\dagger \left(\denote{\havoc{\vec{\rho_{t_1}}}; \havoc{\vec\gamma_{t_1}}; \assume{\state\sigma_{c_1}};c_1\instr}\,\pkt\right)
     & \text{by IH}(c_2) \text{ since } \fvs(c_2) \subseteq \fvs(c_1;c_2) \subseteq V \\
@@ -802,33 +832,30 @@ values of the packet when evaluating $t.\keys$.
 
     THE RESULT FOLLOWS BY EQUALITY IMPLIES PROJECTED EQUALITY LEMMA
 
-  \item[$(c = c_1\choice c_2)$] Let $\vec{\rho_t}$ be the symbolic rows for tables $t
-    \in \tables(c_1;c_2)$. We can write $\vec\rho_t$ as $\vec{\rho_t} = \vec{\rho_{t_1}} \vec{\rho_{t_2}}$
-    where $\vec{\rho_{t_i}}$ is the set of symbolic rows in $c_i$. Let
-    $\vec{\gamma_t}$ be the ghost variables rows for tables $t \in
-    \tables(c_1;c_2)$. We can write $\vec{\gamma_t}$ as $\vec{\gamma_t} = \vec{\gamma_{t_1}} \vec{\gamma_{t_2}}$
-    where $\vec{\gamma_{t_i}}$ is the set of ghost variables in $c_i$. Compute as
-    follows:
+  \item[$(c = c_1\choice c_2)$] Let $R_i = \{\rho_t \mid t \in \tables(c_i)\}$ for $i =
+    1,2$. Notice that $R = R_1 \cup R_2$. Similarly, let $G_i = \{\gamma_t \mid
+    t \in \tables(c_i)\}$ for $i = 1,2$. Notice that $G = G_1 \cup G_2$. Compute
+    as follows:
     \[\begin{array}{ll}
-    \denote{\havoc{\vec{\rho_t}};\havoc{\vec{\gamma_t}};\assume{\state\sigma_{c_1\choice c_2}}; (c_1 \choice c_2)\instr}\,\pkt\\
+    \denote{\havoc{R \cup G};\assume{\state\sigma_{c_1\choice c_2}}; (c_1 \choice c_2)\instr}\,\pkt\\
     & \\
-    = \denote{\havoc{\vec{\rho_t}};\havoc{\vec{\gamma_t}};\assume{\state\sigma_{c_1\choice c_2}}; (c_1\instr \choice c_2\instr)}\,\pkt\\
+    = \denote{\havoc{R \cup G};\assume{\state\sigma_{c_1\choice c_2}}; (c_1\instr \choice c_2\instr)}\,\pkt\\
     & \text{by definition of }(\cdot)\instr\\
-    = \denote{\havoc{\vec{\rho_t}};\havoc{\vec{\gamma_t}};\assume{\state\sigma_{c_1} \wedge \state\sigma_{c_2}}; (c_1\instr \choice c_2\instr)}\,\pkt
+    = \denote{\havoc{R \cup G};\assume{\state\sigma_{c_1} \wedge \state\sigma_{c_2}}; (c_1\instr \choice c_2\instr)}\,\pkt
     & \text{BY LEMMA RELATING [] and STATE}\\
-    = \denote{\havoc{\vec{\rho_t}};\havoc{\vec{\gamma_t}};\assume{\state\sigma_{c_1}}; \assume{\state\sigma_{c_2}}; (c_1\instr  \choice   c_2\instr)}\,\pkt
+    = \denote{\havoc{R \cup G};\assume{\state\sigma_{c_1}}; \assume{\state\sigma_{c_2}}; (c_1\instr  \choice   c_2\instr)}\,\pkt
     & \text{BY WEDGE-ASSUME LEMMA}\\
-    = \denote{\havoc{\vec{\rho_t}};\havoc{\vec{\gamma_t}};\assume{\state\sigma_{c_1}}; \assume{\state\sigma_{c_2}}; c_1\instr
-      \choice \havoc{\vec{\rho_t}};\havoc{\vec{\gamma_t}};\assume{\state\sigma_{c_1}}; \assume{\state\sigma_{c_2}}; c_2\instr}\,\pkt
+    = \denote{\havoc{R \cup G};\assume{\state\sigma_{c_1}}; \assume{\state\sigma_{c_2}}; c_1\instr
+      \choice \havoc{R \cup G};\assume{\state\sigma_{c_1}}; \assume{\state\sigma_{c_2}}; c_2\instr}\,\pkt
     & \text{BY PRODUCTS(;) AND SUMS([]) LEMMA} \\
-    = \denote{\havoc{\vec{\rho_t}};\havoc{\vec{\gamma_t}}; \assume{\state\sigma_{c_1}}; c_1\instr
-      \choice \havoc{\vec{\rho_t}};\havoc{\vec{\gamma_t}}; \assume{\state\sigma_{c_2}}; c_2\instr}\,\pkt
+    = \denote{\havoc{R \cup G}; \assume{\state\sigma_{c_1}}; c_1\instr
+      \choice \havoc{R \cup G}; \assume{\state\sigma_{c_2}}; c_2\instr}\,\pkt
     & \text{BY UNUSED-VARIABLES -> TRIVIAL ASSUMPTIONS LEMMA} \\
-    = \denote{\havoc{\vec{\rho_{t_1}}};\havoc{\vec{\gamma_t}}; \assume{\state\sigma_{c_1}}; c_1\instr
-      \choice \havoc{\vec{\rho_{t_2}}};\havoc{\vec{\gamma_t}}; \assume{\state\sigma_{c_2}}; c_2\instr}\,\pkt
+    =_V \denote{\havoc{R_1 \cup G_1}; \assume{\state\sigma_{c_1}}; c_1\instr
+      \choice \havoc{R_2 \cup G_2}; \assume{\state\sigma_{c_2}}; c_2\instr}\,\pkt
     & \text{BY UNUSEDVARIABLE HAVOC ELIMINATION LEMMA } \\
-    = \denote{\havoc{\vec{\rho_{t_1}}};\havoc{\vec{\gamma_t}}; \assume{\state\sigma_{c_1}}; c_1\instr}\,\pkt
-    \cup \denote{\havoc{\vec{\rho_{t_2}}};\havoc{\vec{\gamma_t}}; \assume{\state\sigma_{c_2}}; c_2\instr}\,\pkt
+    = \denote{\havoc{R_1 \cup G_1}; \assume{\state\sigma_{c_1}}; c_1\instr}\,\pkt
+    \cup \denote{\havoc{R_2 \cup G_2}; \assume{\state\sigma_{c_2}}; c_2\instr}\,\pkt
     & \text{by definition of }\denote{\cdot} \\
     =_V \denote{c_1}^\sigma\pkt \cup \denote{\havoc{\vec{\rho_{t_2}}};\havoc{\vec{\gamma_t}}; \assume{\state\sigma_{c_2}}; c_2\instr}\,\pkt
     & \text{By IH}(c_1) \text{ since } \fvs(c_1) \subseteq \fvs(c_1 \choice c_2) \subseteq V \\
@@ -842,190 +869,127 @@ values of the packet when evaluating $t.\keys$.
     THE RESULT FOLLOWS BY EQUALITY IMPLIES PROJECTED EQUALITY LEMMA
 
   \item[$(c = t.\apply())$] Let $\pkt$ and $\sigma$ be arbitrary. Let
-    $[r_1,\ldots, r_n] = \sigma(t)$. There are two cases, corresponding to hit
-    and miss.
-    \begin{enumerate}
-    \item[\textit{Case 1}.] Assume that there is some $1 \leq i \leq n$ such
-      that $\pkt \models t.\matchrow(r_i)$. In fact, assume that $i$ is the
-      smallest such $i$. Then, by definition, $\denote{t.\apply()}^\sigma\,\pkt
-      = \denote{t.\action[r_i.\action](r_i.\data)}^\sigma\,\pkt$. Show that the
-      RHS is $V$-equal to this set. Let $P = \{\pkt\{\rho_t.* \mapsto
+    $[r_1,\ldots, r_n] = \sigma(t)$.
+
+    Let $P = \{\pkt\{\rho_t.* \mapsto
       v\}\{\gamma_t.* \mapsto v' \mid v,v' \in \Value\} \}$ \todo{clean this up}.
       Compute as follows:
 
       \[\begin{array}{lcl}
-      \denote{\havoc \rho_t; \havoc \gamma_t; \assume {\state\sigma_{t.\apply()}}; t.\apply\instr}\,\pkt
+      \denote{\havoc R \cup G; \assume {\state\sigma_{t.\apply()}}; t.\apply\instr}\,\pkt
       & \\
       = \denote{\assume {\state\sigma_{t.\apply()}}; t.\apply()\instr}^\dagger P
       & \text{by definition of }\denote{\cdot}^\sigma \\
       = \denote{t.\apply()\instr}^\dagger \{\pkt \mid \pkt \in P, \pkt \models \state\sigma_{t.\apply()} \}
       & \text{by definition of }\denote{\cdot}^\sigma \\
-      =\denote{t.\apply()\instr}^\dagger
-      \left\{\pkt\,\,
-      \begin{array}{|l}
-        \pkt(\gamma_t.\miss) = 1 \Leftrightarrow \pkt(\gamma_t.\hitAction) > |\sigma(t)| \\
-        \pkt \models \displaystyle\bigvee_{r_i \in \sigma(t)}
-        \begin{array}{l}
-          \rho = r_i\\
-          \wedge (\gamma_t.\hitAction \geq i\\
-          \phantom\wedge \Rightarrow\bigwedge_{j=0}^{i-1}\neg t.\matchrow(r_j)[\gamma_t.\keys / t.\keys]))
-        \end{array}
-      \end{array}
-      \right\}
-      & \text{by definition of } \models \text{ and }\state\sigma_{t.\apply()} \\
       = \denote{  \begin{array}{l} \displaystyle
-          \assume t.\matchrow(\rho_t); \\
           \assume \gamma_t.\keys = t.\keys; \\
           \displaystyle \bigchoice_{a=0}^{|t.\action| -1}
           \left(\begin{array}{l}
+            \assume t.\matchrow(\rho_t); \\
+            \assume \gamma_t.\miss = 0;\\
             \assume \rho_t.\action = a;\\
             \assume \gamma_t.\hitAction = \rho_t.\id;\\
             t.\action[a](\rho_t.\data)
-          \end{array}\right)
+          \end{array}\right) \\
+          \choice (\assume \gamma_t.\miss = 1;\SKIP) \\
       \end{array}}
-      \left\{\pkt \in P\,\,
-      \begin{array}{|l}
-        \pkt(\gamma_t.\miss) = 1 \Leftrightarrow \pkt(\gamma_t.\hitAction) > |\sigma(t)|, \\
-        \pkt \models \displaystyle\bigvee_{r_i \in \sigma(t)}
-        \begin{array}{l}
-          \rho = r_i\\
-          \wedge (\gamma_t.\hitAction \geq i\\
-          \phantom\wedge \Rightarrow\bigwedge_{j=0}^{i-1}\neg t.\matchrow(r_j)[\gamma_t.\keys / t.\keys]))
-        \end{array}
-      \end{array}
-      \right\}
-      & \text{by definition of } (\cdot)\instr \\
-      = \denote{  \begin{array}{l} \displaystyle
-          \displaystyle \bigchoice_{a=0}^{|t.\action| -1}
-          \left(\begin{array}{l}
-            \assume \rho_t.\action = a;\\
-            \assume \gamma_t.\hitAction = \rho_t.\id;\\
-            t.\action[a](\rho_t.\data)
-          \end{array}\right)
-      \end{array}}
-      \left\{\pkt \in P\,\,
-      \begin{array}{|l}
-        \pkt(\gamma_t.\miss) = 1 \Leftrightarrow \pkt(\gamma_t.\hitAction) > |\sigma(t)|, \\
-        \pkt \models \displaystyle\bigvee_{r_i \in \sigma(t)}
-        \begin{array}{l}
-          \rho = r_i\\
-          \wedge (\gamma_t.\hitAction \geq i\\
-          \phantom\wedge \Rightarrow\bigwedge_{j=0}^{i-1}\neg t.\matchrow(r_j)[\gamma_t.\keys / t.\keys]))
-        \end{array} \\
-        \pkt \models t.\matchrow(\rho_t), \\
-        \pkt(\gamma_t.\keys) = \pkt(t.\keys) \\
-      \end{array}
-      \right\}
-      & \text{by definition of } \denote{\cdot} \& \models \\
-      = \displaystyle \bigcup_{a=0}^{|t.\action| -1}
+      \{\pkt \mid \pkt \in P, \pkt \models \state\sigma_{t.\apply()} \}
+      & \text{by definition of }(\cdot)\instr \\
+      = \displaystyle\bigcup_{a=0}^{|t.\action| - 1}
       \denote{t.\action[a](\rho_t.\data)}
-      \left\{\pkt \in P\,\,
-      \begin{array}{|l}
-        \pkt(\gamma_t.\miss) = 1 \Leftrightarrow \pkt(\gamma_t.\hitAction) > |\sigma(t)|, \\
-        \pkt \models \displaystyle\bigvee_{r_i \in \sigma(t)}
-        \begin{array}{l}
-          \rho = r_i\\
-          \wedge (\gamma_t.\hitAction \geq i\\
-          \phantom\wedge \Rightarrow\bigwedge_{j=0}^{i-1}\neg t.\matchrow(r_j)[\gamma_t.\keys / t.\keys]))
-        \end{array} \\
-        \pkt \models t.\matchrow(\rho_t), \\
-        \pkt(\gamma_t.\keys) = \pkt(t.\keys), \\
-        \pkt(\rho_t.\action) = a,\\
-        \pkt(\gamma_t.\hitAction) = \pkt(\rho_t.\id),\\
-      \end{array}
-      \right\}
-      & \text{by definition of } \denote{\cdot} \& \models \\
-
-      = \displaystyle \bigcup_{a=0}^{|t.\action| -1}
-      \denote{t.\action[a](\rho_t.\data)}
-      \left\{\pkt \in P\,\,
-      \begin{array}{|l}
-        \pkt(\gamma_t.\miss) = 1 \Leftrightarrow \pkt(\gamma_t.\hitAction) > |\sigma(t)|, \\
-        \pkt \models \displaystyle\bigvee_{r_i \in \sigma(t)}
-        \begin{array}{l}
-          \rho = r_i\\
-          \wedge (\gamma_t.\hitAction \geq i\Rightarrow\bigwedge_{j=0}^{i-1}\neg t.\matchrow(r_j)))
-        \end{array} \\
-        \pkt \models t.\matchrow(\rho_t), \\
-        \pkt(\gamma_t.\keys) = \pkt(t.\keys), \\
-        \pkt(\rho_t.\action) = a,\\
-        \pkt(\gamma_t.\hitAction) = \pkt(\rho_t.\id),\\
-      \end{array}
-      \right\}
-      & \text{since } \pkt(\gamma_t.\keys) = \pkt(t.\keys), \\
-      =\displaystyle \bigcup_{a=0}^{|t.\action| -1}
-      \denote{t.\action[a](\rho_t.\data)}
-      \left\{\pkt \in P\,\,
-      \begin{array}{|l}
-        \pkt(\gamma_t.\miss) = 1 \Leftrightarrow \pkt(\gamma_t.\hitAction) > |\sigma(t)|, \\
-        \pkt \models \displaystyle\bigvee_{r_i \in \sigma(t)}
-        \begin{array}{l}
-          \rho = r_i\\
-          \wedge t.\matchrow(r_i) \\
-          \wedge r_i.\action = a \\
-          \wedge \gamma_t.\hitAction = i \\
-          \wedge (\gamma_t.\hitAction \geq i\Rightarrow\bigwedge_{j=0}^{i-1}\neg t.\matchrow(r_j)))
-        \end{array} \\
-        \pkt(\gamma_t.\keys) = \pkt(t.\keys), \\
-      \end{array}
-      \right\}
-      & \text{by taut} \\
-      =\displaystyle \bigcup_{a=0}^{|t.\action| -1}
-      \denote{t.\action[a](\rho_t.\data)}
-      \left\{\pkt \in P\,\,
-      \begin{array}{|l}
-        \pkt(\gamma_t.\miss) = 1 \Leftrightarrow \pkt(\gamma_t.\hitAction) > |\sigma(t)|, \\
-        \pkt \models \displaystyle\bigvee_{r_i \in \sigma(t)}
-        \begin{array}{l}
-          \rho = r_i\\
-          \wedge t.\matchrow(r_i) \\
-          \wedge r_i.\action = a \\
-          \wedge \gamma_t.\hitAction = i \\
-          \wedge \bigwedge_{j=0}^{i-1}\neg t.\matchrow(r_j))
-        \end{array} \\
-        \pkt(\gamma_t.\keys) = \pkt(t.\keys), \\
-      \end{array}
-      \right\}
-      & \text{by modus ponens} \\
-      =\displaystyle \bigcup_{a=0}^{|t.\action| -1}
-      \denote{t.\action[a](\rho_t.\data)}
-      \left\{\pkt \in P\,\,
-      \begin{array}{|l}
-        \pkt(\gamma_t.\miss) = 1 \Leftrightarrow \pkt(\gamma_t.\hitAction) > |\sigma(t)|, \\
-        \pkt(\rho) = r_i, \\
-        \pkt \models t.\matchrow(r_i), \\
-        r_i.\action = a, \\
-        \gamma_t.\hitAction = i, \\
-        \pkt \models \bigwedge_{j=0}^{i-1}\neg t.\matchrow(r_j)), \\
-        \pkt(\gamma_t.\keys) = \pkt(t.\keys), \\
-      \end{array}
-      \right\}
-      & \text{by assumption about } i, \text{ and definition of } \models
-      \end{array}\]
-      \[\begin{array}{ll}
-      =\denote{t.\action[r_i.\action](r_i.\data)}
-      \left\{\pkt \in P\,\,
-      \begin{array}{|l}
-        \pkt(\gamma_t.\miss) = 1 \Leftrightarrow \pkt(\gamma_t.\hitAction) > |\sigma(t)|, \\
-        \pkt(\rho) = r_i, \\
-        \pkt \models t.\matchrow(r_i), \\
-        r_i.\action = a, \\
-        \gamma_t.\hitAction = i, \\
-        \pkt \models \bigwedge_{j=0}^{i-1}\neg t.\matchrow(r_j)), \\
-        \pkt(\gamma_t.\keys) = \pkt(t.\keys), \\
-      \end{array}
-      \right\}
-      & \text{by definition of} \denote{\cdot}\\
-      =_V \denote{t.\action[r_i.\action](r_i.\data)} \pkt
-      & \text{SINCE ACTIONS ARE INSTRUMENTATION FREE AND } V \text{CONTAINS NO INSTRUMENATION VARIABLES} \\
-      =_V \denote{t.\action[r_i.\action](r_i.\data)}^\sigma\pkt
-      & \text{by IH}(t.\action[r_i.\action](r_i.\data)) \\
+      \left\{\pkt \in P\,\, \begin{array}{|ll}
+        \pkt \models \state\sigma_{t.\apply()}, & \pkt \models t.\matchrow(\rho_t)\\
+        \pkt \models \gamma_t.\keys = t.\keys, & \pkt \models \rho_t.\action = a \\
+        \multicolumn{2}{|l}{\pkt \models \gamma_t.\hitAction = \rho_t.\id}
+      \end{array}\right\}
+      & \text{by definition of }\denote{\cdot}\\
+      \qquad \cup\,\,\{\pkt \in P \mid \pkt \models \state\sigma_{t.\apply()} \wedge \gamma_t.\keys = t.\keys \wedge \gamma_t.\miss = 1 \}
       \end{array}\]
 
-    \item[\text{Case 2}.] \todo[inline]{Add defaults.}
+       There are two cases, corresponding to hit and miss. Let $M$ be the `miss
+       set' i.e.
+       \[M \triangleq \{\pkt \in P \mid \pkt \models \state\sigma_{t.\apply()} \wedge \gamma_t.\keys = t.\keys \wedge \gamma_t.\miss = 1 \},\]
 
+       and let $H_a$ be the input `hit-set' for action $a$, i.e.
+      \[ H_a \triangleq \left\{\pkt \in P\,\, \begin{array}{|ll}
+        \pkt \models \state\sigma_{t.\apply()}, & \pkt \models t.\matchrow(\rho_t)\\
+        \pkt \models \gamma_t.\keys = t.\keys, & \pkt \models \rho_t.\action = a \\
+        \multicolumn{2}{|l}{\pkt \models \gamma_t.\hitAction = \rho_t.\id}
+      \end{array}\right\}\]
+
+    \begin{enumerate}
+    \item[\textit{Case 1}.] Assume that there is some $1 \leq i \leq n$ such
+      that $\pkt \models t.\matchrow(r_i)$. In fact, assume that $i$ is the
+      smallest such $i$. Then, by definition, $\denote{t.\apply()}^\sigma\,\pkt
+      = \denote{t.\action[r_i.\action](r_i.\data)}^\sigma\,\pkt$. Show that
+      $M \cup \bigcup_{a=0}^{|t.\action|-1}\denote{t.\action[a](\rho_t.\data)} H_a$ is $V$-equal to this set.
+
+      Show that $M = \emptyset$, by showing that the refinement is contradictory.
+
+      Assume $\state\sigma_{t.\apply()}$, $\gamma_t.\keys = t.\keys$ and
+      $\gamma_t.\miss = 1$. First expand the definition of
+      $\state\sigma_{t.\apply()}$, which gives us $\gamma_t.\miss = 1
+      \Leftrightarrow \gamma_t.\hitAction > n$, $\bigvee_{i}^n \rho = r_i$,
+      $\bigwedge_{i=1}^n \gamma_t.\hitAction = i \Leftrightarrow \rho_t = r_i$,
+      and
+
+      \[\bigwedge_{i=1}^n \left(\gamma_t.\hitAction \geq i \Leftrightarrow \bigwedge_{j=0}^{i-1}\neg t.\matchrow(r_j)[\gamma_t.\keys/t.\keys]\right)\]
+
+      Since we know $\gamma_t.\keys = t.\keys$, we can equivalently write
+      \[\bigwedge_{i=1}^n \left(\gamma_t.\hitAction \geq i \Leftrightarrow \bigwedge_{j=0}^{i-1}\neg t.\matchrow(r_j)\right)\]
+
+      Since $\gamma_t.\miss = 1$ we know that $\gamma_t.\hitAction > n$, which
+      means that for all $1 \leq j \leq n$, $\neg t.\matchrow(r_j)$, which
+      contradicts the assumption that $t.\matchrow(r_j)$. Thus the refinement is
+      contradictory and $M = \emptyset$. \hfill \checkmark
+
+      Now, show that $\forall \pkt \in H_a. \rho_t = r_i$, by showing that the
+      refinement implies that $\rho_t = r_i \wedge \bigwedge_{j \neq i}\rho_t \neq r_j$. We assume the following facts:
+      \[ \state\sigma_{t.\apply()} \wedge \gamma_t = t.\keys \wedge \gamma.\hitAction = \rho_t.\id \wedge t.\matchrow(\rho_t) \wedge
+      \rho_t.\action = a\]
+
+      By unfolding the definition of $\state\sigma_{t.\apply()}$, we also know that
+      $\gamma.\miss = 1 \Leftrightarrow \gamma_t.\hitAction > n$, $\bigvee_{i=1}^n \rho = r_i$, $\bigwedge_{i=1}^n \gamma_t.\hitAction = i \Rightarrow \rho_t = r_i$, and
+      \[\bigwedge_{i=1}^n \left( \gamma_t.\hitAction \geq i \Leftrightarrow \bigwedge_{j=0}^{i-1}\neg t.\matchrow(r_j)[\gamma_t.\keys/t.\keys] \right)\]
+
+      As before, since $\gamma_t.\keys = t.\keys$ we can write this as
+      \[\bigwedge_{i=1}^n \left( \gamma_t.\hitAction \geq i \Leftrightarrow \bigwedge_{j=0}^{i-1}\neg t.\matchrow(r_j)\right)\]
+
+      By assumption, we know that $t.\matchrow(r_i)$, and for $1 \leq j < i$,
+      $\neg t.\matchrow(r_j)$. Combining this with the above fact gives
+      $\gamma_t.\hitAction = i$. Then since $\bigwedge_{i=1}^n
+      \gamma_t.\hitAction = i \Leftrightarrow \rho_t = r_i$,
+      conclude $\rho_t = r_i \wedge \bigwedge_{i\neq j} \rho_t\neq r_i$. \hfill \checkmark
+
+      Now, we can write
+      \[\bigcup_{a=0}^{|t.\action| - 1}\denote{t.\action[a](\rho_t.\data)}^\dagger H_a
+       = \denote{t.\action[r_i.\action](r_i.\data)}^\dagger H_a
+       \]
+
+       Which is $V$-equivalent to $\denote{t.\action[r_i.\action](r_i.\data)}\,\pkt$. \todo{PROVE THIS LEMMA}
+       The result follows by the IH on $t.\action[r_i.\action](r_i.\data)$.
+
+     \item[\text{Case 2}.]Assume that there is no $1 \leq i \leq n$ such that
+       $\pkt \models t.\matchrow(r_i)$. Then, by definition,
+       $\denote{t.\apply()}^\sigma\,\pkt = \{\pkt\}$. Show that
+       $M \cup\bigcup_{a=0}^{|t.\action|-1}\denote{t.\action[a](\rho_t.\data)} H_a$ is $V$-equal to this $\{\pkt\}$.
+
+        Let $\pkt' \in P$ such that $\pkt' \models \state\sigma_{t.\apply}$,
+        $\pkt' \models \gamma_t.\keys$, and $\gamma_t.\miss =1$. Expanding the
+        definition of $\state\sigma_{t.\apply()}$ further we get that $\pkt'
+        \models \gamma_t.\miss = 1 \Leftrightarrow \gamma_t.\hitAction > n$, forall $0
+        \leq i \leq n$, $\pkt' \models \gamma_t.\hitAction = i \Leftrightarrow
+        \rho_t = r_i$, and $\pkt' \models \gamma_t.\hitAction \geq i \Leftrightarrow
+        \bigwedge_{j=1}^{i-1} \neg.\matchrow(r_j)$ (since $\pkt' \models
+        \gamma_t.\keys = t.\keys$).
+
+        Our assumption gives us that $\bigwedge_{j=1}^n \neg t.\matchrow(r_j)$,
+        which means that $\gamma_t.\hitAction > n$, and that $\gamma_t.\miss =
+        1$. Conclude that $H_a = \emptyset$ and $M \neq \emptyset$. Since $P =_V
+        \{\pkt\}$, and $M$ is a nonempty refinement of $P$\todo{PROVE THIS
+          LEMMA?}, conclude that $M =_V \{\pkt\}$. The result follows.
     \end{enumerate}
-
 
   \end{enumerate}
 \end{proof}
@@ -1033,9 +997,8 @@ values of the packet when evaluating $t.\keys$.
 \subsection{Generation of Verification Conditions}
 
 Now, we would like to be able to translate the result from
-Theorem~\ref{thm:instr-equiv} into a
-symbolic representation. To do this, we'll use the weakest precondition, defined
-in Figure~\ref{fig:wp}
+Theorem~\ref{thm:instr-equiv} into a symbolic representation. To do this, we'll
+use the weakest precondition, defined in Figure~\ref{fig:wp}
 
 \begin{figure}[H]
   \[
@@ -1064,9 +1027,10 @@ Note that since there are no havocs introduced in $c\instr$, all symbolic rows
 $\rho$, and header values $h.f$ are unbound.
 
 \begin{theorem}[VC Correctness]
+  \label{thm:vc-correct}
   Given a set of variables $V$, for every $c \in \Cmd$ such that $\fvs(c) = V$,
   and $\sigma \in \State$, the following formula is valid:
-  \[ \WP(c[\sigma], \TRUE) \iff (\forall \vec{\rho_t}. \forall \vec{\gamma_t}. \state\sigma_c \Rightarrow  \WP(c\instr,\TRUE)\]
+  \[ \forall V. \WP(c[\sigma], \TRUE) \iff \forall V. (\forall \vec{\rho_t}. \forall \vec{\gamma_t}. \state\sigma_c \Rightarrow  \WP(c\instr,\TRUE)\]
 \end{theorem}
 
 \begin{proof}
@@ -1078,13 +1042,13 @@ $\rho$, and header values $h.f$ are unbound.
 
   \[\forall \pkt.\denote{c[\sigma]}\,\pkt =_{\fvs(c)}  \denote{\havoc \vec{\rho_t}; \havoc{\vec{\gamma_t}}; \assume{\state\sigma_c}; c\instr}\,\pkt\]
 
-  By Dijkstra '75, we can see
+  By Dijkstra, we can see
 
-  \[\WP(c[\sigma], \TRUE) \iff  \WP(\havoc \vec{\rho_t}; \havoc{\vec{\gamma_t}}; \assume{\state\sigma_c}; c\instr, \TRUE))\]
+  \[\forall V. \WP(c[\sigma], \TRUE) \iff \forall V. \WP(\havoc \vec{\rho_t}; \havoc{\vec{\gamma_t}}; \assume{\state\sigma_c}; c\instr, \TRUE))\]
 
   By definition of $\WP$, this is equivalent to
 
-  \[\WP(c[\sigma],\TRUE) \iff \left(\forall \vec{\rho_t}.\forall \vec{\gamma_t}.\state\sigma_c \Rightarrow \WP(c\instr, \TRUE)\right)\]
+  \[ \forall V. \WP(c[\sigma],\TRUE) \iff \forall V. \left(\forall \vec{\rho_t}.\forall \vec{\gamma_t}.\state\sigma_c \Rightarrow \WP(c\instr, \TRUE)\right)\]
 
 \end{proof}
 
@@ -1121,32 +1085,36 @@ prefer to solve the following problem:
 
 \section{Abduction}
 
-We can observe that \textbf{Inference} is simply solvable by
-reduction to Quantifier Elimination. In fact. Quantifier elimination is one of
-the key driving forces of the Dilligs' abduction work (\textsc{Hola},
-\textsc{Explain}). We sketch the argument here.
+We can observe that \textbf{Inference} is simply solvable by reduction to
+Quantifier Elimination (QE). In fact, QE is one of the key driving forces of the
+Dilligs' abduction work (\textsc{Hola}, \textsc{Explain}). We sketch the
+argument here.
 
-\begin{conjecture}[Quantifer Elimination]
-  The \textbf{\textrm{Inference Problem}} is reducable to Quantifer Elimination.
-\end{conjecture}
+In the following we assume a terminating function $\qe : \Var \times \BExpr \to
+\BExpr$ such that for $V \in \Var$ and $b \in \BExpr$, $\bfvs(\qe(V,b)) \cap V =
+\emptyset$ and $\qe(V,b) \Leftrightarrow \forall V. b$.
 
-\begin{proof}[Proof Sketch.]
-  Given a command $c \in \Cmd$. Compute the instrumented command $c\instr$. Let
-  $\overrightarrow{h.f}$ describe all the header fields occurring in $c\instr$. Write
-  $b[\overrightarrow{h.f}] = \WP(c\instr,\TRUE)$. Observe that $(\forall
-  \overrightarrow{h.f}.\;b[\overrightarrow{h.f}]) \Rightarrow
-  b[\overrightarrow{h.f}]$ is valid. Then the desired control plane formula is $\qe(\forall \overrightarrow{h.f}.\;b[\overrightarrow{h.f}])$.
+\begin{theorem}[Quantifer Elimination]
+  For every instrumentation-free command $c \in \Cmd$, the formula $\qe(\fvs(c), \WP(c\instr, \TRUE))$ is a solution to the \textbf{Inference Problem}.
+\end{theorem}
+
+\begin{proof}
+  Let $c \in \Cmd$ be instrumentation-free. Let $R$ be the set of symbolic row
+  variables in $c\instr$, and let $G$ be the set of ghost variables in $c\instr$,
+  Let $\varphi = \qe(\fvs(c),\WP(c\instr, \TRUE))$. Since $\bfvs(\varphi) \cap
+  \fvs(c) = \emptyset$, it is trivial to show \todo{do it} that $\varphi$ is a
+  control plane formula.
+
+  Now, let $\sigma$ be such that $\state\sigma_c \Rightarrow \varphi$ is valid,
+  i.e. $\forall R. \forall G. \state\sigma_c \Rightarrow \varphi$ is valid. By
+  assumption about $\qe$, this is equivalent to $\forall R.\forall G.
+  \state\sigma_c \Rightarrow \WP(c\instr, \TRUE)$. By
+  Theorem~\ref{thm:vc-correct}, $\WP(c[\sigma],\TRUE)$ is valid. By Dijkstra,
+  $\forall \pkt \in \Pkt. \denote{c[\sigma]} \neq \error$. Conclude $\forall
+  \pkt \in \Pkt. \denote{c}^\sigma \neq \error$, by Theorem~\ref{thm:subst}.
+
 \end{proof}
 
-\paragraph{Discussion} This \emph{probably} doesn't work in general. Standard QE procedures are
-exponential at best, and enumerating all eth/ipv4 src/dst addresses already
-takes an intractable amount of time. It's also not clear (to me) that this
-solution is weakest.
-
-The Dilligs' line of work uses Presburger arithmetic QE to implement the
-quantifier elimination scheme. We could directly adopt this, however networking
-programs make heavy use of bitwise operators like XOR, so we need to take a
-different strategy.
 
 \section{Data-Driven Precondition Inference?}
 
