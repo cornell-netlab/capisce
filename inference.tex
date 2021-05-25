@@ -751,8 +751,15 @@ values of the packet when evaluating $t.\keys$.
   $\pkt|_S = \pkt'|_s$. A set of packets $P$ is a subset of $P'$ up to $S$,
   written $P \subseteq_S P'$ iff for every packet $\pkt \in P$, there exists
   $\pkt' \in P'$ such that $\pkt =_S \pkt'$. Two sets of packets $P$ and $P'$
-  are equivalent up to $S$, written $P =_S P'$ iff $P \subseteq_S P'$ and $P \subseteq_S P'$.
+  are $S$-equivalent, written $P =_S P'$ iff $P \subseteq_S P'$ and $P \subseteq_S P'$.
 \end{definition}
+
+\begin{lemma}[Projection]
+  For $c \in \Cmd$, $\fvs(c) \subseteq V \subseteq \Var$ and $P \subseteq \Pkt$ such that $\forall
+  \pkt_1,\pkt_2 \in P, \pkt_1 =_V \pkt_2$, $\denote{c} P =_V \denote{c} P|_V$.
+
+\end{lemma}
+
 
 \begin{definition}[Variables]
   The free variables of a command $c$, written $\fvs(c) \subseteq \Var$, is the
