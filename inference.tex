@@ -66,13 +66,13 @@
 \newcommand{\miss}{\mathsf{miss}}
 
 % commands
-\newcommand{\assert}{\mathop{\mathsf{assert}}}
-\newcommand{\assume}{\mathop{\mathsf{assume}}}
+\newcommand{\assert}{\mathop{\mathsf{ast}}}
+\newcommand{\assume}{\mathop{\mathsf{asm}}}
 \newcommand{\apply}{\mathsf{apply}}
 \newcommand{\choiceop}{\rotatebox[origin=c]{90}{$\sqsubset\!\!\!\sqsupset$}}
 \newcommand{\choice}{\mathbin{\choiceop}}
 \DeclareMathOperator*{\bigchoice}{\scalerel*{\choiceop}{\sum}}
-\newcommand{\havoc}[1]{\mathop{\mathsf{havoc}}#1}
+\newcommand{\havoc}[1]{\mathop{\mathsf{hvc}}#1}
 \newcommand{\SKIP}{\mathsf{skip}}
 
 % matchkinds
@@ -324,16 +324,16 @@ following conditions hold:
 Importantly, we assume that all state is \emph{total}, that is, no packet locally misses
 in the table. This is formally defined in Definition~\ref{def:total-state}.
 
-\begin{definition}[Total State]
-  \label{def:total-state}
-  A state $\sigma$ is total if for every $t \in \dom(\sigma)$, the following
-  formula is valid:
-  \[\bigvee_{r \in \sigma(t.\id)} t.\keys = r.\matches \]
-\end{definition}
+%% \begin{definition}[Total State]
+%%   \label{def:total-state}
+%%   A state $\sigma$ is total if for every $t \in \dom(\sigma)$, the following
+%%   formula is valid:
+%%   \[\bigvee_{r \in \sigma(t.\id)} t.\keys = r.\matches \]
+%% \end{definition}
 
-Henceforth we assume that all states are total.
+%% Henceforth we assume that all states are total.
 
-\todo[inline]{Can be Removed(?)}
+%% \todo[inline]{Can be Removed(?)}
 
 
 \paragraph{Expressions}
@@ -457,6 +457,312 @@ e} \\
   \label{fig:com-sem}
 \end{figure}
 
+\subsection{Definitions}
+
+\begin{definition}[Variables]
+  The free variables of a command $c$, written $\fvs(c) \subseteq \Var$, is the
+  set of variables that occur at any point in $c$ (i.e. as the lhs of an
+  assignment, in a boolean expression, a bitvector expression, as a key in a
+  table.) The only bound variables are the action data in tables. Formally:
+  \[\begin{array}{l >{\triangleq}cl}
+  \efvs :: \BVExpr \to \mathcal{P}(\Var) \\
+  \efvs(v) && \{\} \\
+  \efvs(x) && \{x\}\\
+  \efvs(e_1 \binop e_2) && \efvs(e_1) \cup \efvs(e_2)\\
+  \efvs(\unop e) && \efvs(unop) \\[1em]
+  \bfvs :: \BExpr \to \mathcal{P}(\Var) \\
+  \bfvs(\FALSE) && \{\}\\
+  \bfvs(b_1 \Rightarrow b_2) && \bfvs(b_1) \cup \bfvs(b_2)\\
+  \bfvs(e_1 = e_2) && \efvs(e_1) = \efvs(e_2) \\[1em]
+  \fvs :: \Cmd \to \mathcal{P}(\Var) \\
+  \fvs(x := e) && \{x\} \cup \fvs(e)\\
+  \fvs(\havoc x) && \{x\}\\
+  \fvs(\assume b) && \fvs(b)\\
+  \fvs(\assert b) && \fvs(b) \\
+  \fvs(c_1;c_2) && \fvs(c_1) \cup \fvs(c_1) \\
+  \fvs(c_1 \choice c_2) && \fvs(c_1) \cup \fvs(c_2) \\
+  \fvs(t.\apply()) &&
+  t.\keys \cup \bigcup_{\lambda \vec x. c \in t.\actions} (\fvs(c) \setminus \{x_1,\ldots, x_n\})
+  \end{array}\]
+\end{definition}
+
+
+
+\begin{definition}[Projections]
+  For a set of variables $S \subseteq \Var$, and a packet $\pkt$, write
+  $\pkt|_S$ to be projection of $\pkt$ onto $S$. \todo{I guess this means
+    packets are partial functions?} Formally,
+  \[\pkt|_S \triangleq \{x \mapsto \pkt(x) \mid x \in S\}.\]
+  Two packets $\pkt$, $\pkt'$ are equivalent up to $S \subseteq \Var$, written
+  $\pkt =_S \pkt'$, iff $\pkt|_S = \pkt'|_s$. A set of packets $P$ is a subset
+  of $P'$ up to $S$, written $P \subseteq_S P'$ iff for every packet $\pkt \in
+  P$, there exists $\pkt' \in P'$ such that $\pkt =_S \pkt'$. Two sets of
+  packets $P$ and $P'$ are $S$-equivalent, written $P =_S P'$ iff $P \subseteq_S
+  P'$ and $P \subseteq_S P'$. A set $P \subseteq \Pkt$ is a $V$-equivalence
+  class if $\forall \pkt_1, \pkt_2 \in P$, $\pkt_1 =_V \pkt_2$.
+\end{definition}
+
+
+\begin{lemma}[Projection Union-Distributivity]
+  \label{lem:proj-union-set}
+  For all $P,Q \subseteq \Pkt$, $V \subseteq \Var$,
+  $(P\cup Q)|_V = P|_V \cup Q|_V$
+\end{lemma}
+
+\begin{proof}
+  Let $P,Q \subseteq \Pkt$ and $V \subseteq \Var$ be given. Compute:
+
+  \[\begin{array}{ll}
+  (P\cup Q)|_V\\
+  = \{\pkt|_V \mid \pkt \in P\cup Q\}\\
+  = \{\pkt|_V \mid \pkt \in P\}\cup \{\pkt|_V \mid \pkt \in Q\}\\
+  = P|_V \cup Q|_V
+  \end{array}\]
+\end{proof}
+
+\begin{lemma}[Projection Idempotence]
+  \label{lem:proj-idem}
+  For all $\pkt \in \Pkt$, $V \subseteq \Var$,
+  $(\pkt|_V)|_V = \pkt|_V$
+\end{lemma}
+
+\begin{proof}
+  Let $\pkt \in \Pkt$ and $V \subseteq \Var$ be given.
+  \[\begin{array}{ll}
+    (\pkt|_V)|_V \\
+    = \{x \mapsto (\pkt|_V)(x) \mid x \in V\} & \text{by definition}\\
+    = \{x \mapsto (\{y \mapsto \pkt(y) \mid y \in V\})(x) \mid x \in V\} & \text{by definition}\\
+    = \{x \mapsto \pkt(x) \mid x \in V\} & \beta\text{-reduction}\\
+    = \pkt|_V & \text{by definition}
+  \end{array}\]
+\end{proof}
+
+
+\begin{lemma}[Projection Idempotence for Sets]
+  \label{lem:proj-idem-set}
+  For all $P \subseteq \Pkt$, $V \subseteq \Var$,
+  $(P|_V)|_V = P|_V$
+\end{lemma}
+
+\begin{proof}
+  Let $P \subseteq \Pkt$ and $V \subseteq \Var$ be given. Compute:
+  \[\begin{array}{ll}
+  (P|_V)|_V \\
+  = \{\pkt|_V \mid \pkt \in P|_V\}
+  & \text{by definition of } (\cdot)|_V : \mathcal{P}(\Pkt) \to \mathcal{P}(\Pkt) \\
+  = \{\pkt|_V \mid \pkt \in \{\pkt'|_V \mid \pkt'\in P\}\}
+  & \text{by definition of } (\cdot)|_V : \mathcal{P}(\Pkt) \to \mathcal{P}(\Pkt) \\
+  = \{(\pkt|_V)|_V \mid \pkt \in P \}
+  & \text{by set theory} \\
+  = \{\pkt|_V \mid \pkt \in P\} & \text{by Lemma~\ref{lem:proj-idem}} \\
+  = P|_V & \text{by definition of } (\cdot)|_V : \mathcal{P}(\Pkt) \to \mathcal{P}(\Pkt)
+  \end{array}\]
+\end{proof}
+
+
+\begin{lemma}[Subset Implies Projected Subset]
+  \label{lem:subset-proj}
+  For $P,Q \subseteq \Pkt$, and $ V \subseteq \Var$,
+  If $P \subseteq Q$ then $P \subseteq_V Q$.
+\end{lemma}
+
+\begin{proof}
+Let $P,Q \subseteq \Pkt$ and $V \subseteq \Var$ be given. Assume $P \subseteq Q$,
+to show that $P \subseteq_V Q$.
+
+Let $\pkt \in P$. Since $P \subseteq Q$, $\pkt \in Q$. Notice that $\pkt =_V
+\pkt$, so $P \subseteq_V Q$.
+\end{proof}
+
+\begin{lemma}[Equality Implies Projected Equality]
+  \label{lem:equal-proj}
+  For $P,Q \subseteq \Pkt$, and $ V \subseteq \Var$,
+  If $P = Q$ then $P =_V Q$.
+\end{lemma}
+
+\begin{proof}
+  By Lemma~\ref{lem:subset-proj}
+\end{proof}
+
+\begin{lemma}[Expression Projection]
+  \label{lem:proj-expr}
+  For every set of variables $V \subseteq \Var$, packet $\pkt \in \Pkt$ and
+  expression $e \in \BVExpr$, such that $\efvs(e) \subseteq V$, $\edenote{e}\pkt =
+  \edenote{e}(\pkt|_V)$.
+\end{lemma}
+
+\begin{proof}
+  Let $V \subseteq \Var$ be given.
+  Proceed by induction on $e$, leaving $\pkt$ arbitrary.
+  \begin{enumerate}[align=left]
+  \item[($e = v$)] Let $\pkt$ be given. $\edenote{v}\pkt = v = \edenote{v}{\pkt|_V}$
+  \item[($e = x$)] Let $\pkt$ be given. Note that $\efvs(x) = \{x\} \subseteq V$. Compute:
+    \[\begin{array}{ll}
+    \edenote{x}(\pkt|_V) \\
+    = (\pkt|_V)(x)
+    & \text{by definition of }\edenote\cdot\\
+    = \{y \mapsto \pkt(y) \mid y \in V\}(x)
+    & \text{by definition of }(\cdot)|_V : \Pkt \to \Pkt\\
+    = \pkt(x) & \text{since } x \in V
+    \end{array}
+    \]
+  \item[($e = e_1 \binop e_2$)] Let $\pkt$ be given. Compute:
+    \[\begin{array}{ll}
+    \edenote{e_1 \binop e_2}\pkt \\
+    = \edenote{e_1}\pkt \binop \edenote{e_2}\pkt & \text{definition of }\edenote\cdot \\
+    = \edenote{e_1}(\pkt|_V) \binop \edenote{e_2}(\pkt|_V) & \text{by IHS since }\efvs(e_i) \subseteq \efvs(e_1 \binop e_2) \subseteq V, i = 1,2 \\
+    = \edenote{e_1 \binop e_2}(\pkt|_V) & \text{definition of }\edenote\cdot
+    \end{array}\]
+  \item[($e = \unop e$)] Let $\pkt$ be given. Compute:
+    \[\begin{array}{ll}
+    \edenote{\unop e}\pkt \\
+    = \unop \edenote{e}\pkt & \text{definition of }\edenote\cdot \\
+    = \unop \edenote{e}(\pkt|_V) & \text{by IH, since } \efvs(e) = \efvs(\unop e) \subseteq V \\
+    = \edenote{\unop e}(\pkt|_V) & \text{definition of }\edenote\cdot
+    \end{array}\]
+  \end{enumerate}
+\end{proof}
+
+\begin{lemma}[Satisfaction Projection]
+  \label{lem:proj-satis}
+  For every set of variables $V \subseteq \Var$, packet $\pkt \in \Pkt$ and
+  boolean expression $b \in \BExpr$, such that $\bfvs(b) \subseteq V$,
+  $\pkt \models b$ iff $\pkt|_V \models b$.
+\end{lemma}
+
+\begin{proof}
+  Let $V \subseteq \Var$ be given.
+  Proceed by induction on $b$, leaving $\pkt$ arbitrary.
+  \begin{enumerate}[align=left]
+  \item[($b = \FALSE$)] Immediate.
+  \item[($b = b_1 \Rightarrow b_2$)]
+    Let $\pkt$ be given. Compute:
+    \[\begin{array}{ll}
+    \pkt \models b_1 \Rightarrow b_2 \\
+    \iff \pkt \not\models b_1 \text{or} \pkt\models b_2 & \text{by definition of } \models   \\
+    \iff \pkt|_V \not\models b_1 \text{or} \pkt|_V \models b_2  & \text{by IHs, since} \bfvs(b_i) \subseteq \bfvs(b_1 \Rightarrow b_2) \subseteq V, i = 1,2  \\
+    \iff \pkt|_V \models b_1 \Rightarrow b_2
+    & \text{by definition of } \models
+    \end{array}\]
+
+  \item[($b = e_1 = e_2$)] Let $\pkt$ be given. Compute:
+    \[\begin{array}{ll}
+    \pkt \models e_1 = e_2 \\
+    \iff \edenote{e_1}\pkt = \edenote{e_2}\pkt
+    & \text{by definition of }\models \\
+    \iff \edenote{e_1}(\pkt|_V) = \edenote{e_2}(\pkt|_V)
+    & \text{by Lemma~\ref{lem:proj-expr}, since } \efvs(e_i) \subseteq \bfvs(e_1 = e_2) \subseteq V, i = 1,2 \\
+    \iff \pkt|_V \models e_1 = e_2
+    & \text{by definition of }\models
+    \end{array}\]
+
+  \end{enumerate}
+
+\end{proof}
+
+
+\begin{lemma}[Projection-Denotation Commutativity]
+  \label{lem:proj-den-comm}
+  For a closed action $c \in \Cmd$, $\fvs(c) \subseteq V \subseteq \Var$ and
+  $\pkt \in \Pkt$, $\denote{c} \pkt =_V \denote{c} \pkt|_V$.
+\end{lemma}
+
+\begin{proof}
+  Proceed by induction on $c$, leaving $\pkt$ general.
+  \begin{enumerate}[align=left]
+  \item[$(c = x:=e)$] Let $\pkt$ be given. Compute:
+    \[\begin{array}{ll}
+    (\denote{x:=e} (\pkt|_V))|_V\\
+    = ((\pkt|_V)\{x:=\edenote{e}(\pkt|_V)\})|_V
+    & \text{definition} \\
+    = ((\pkt|_V)\{x := \edenote{e}\pkt\})|_V
+    & \text{By Lemma~\ref{lem:proj-expr} since } \fvs(e) \subseteq \fvs(x := e) \subseteq V \\
+    = (\pkt\{x := \edenote{e}\pkt\}|_V)|_V
+    & \text{since } x \in \fvs(x:=e) \subseteq V \\
+    = ((\denote{x:=e}\pkt)|_V)|_V
+    & \text{by definition of }\denote{\cdot}\\
+    = (\denote{x:=e}\pkt)|_V
+    & \text{by Lemma~\ref{lem:proj-idem}}
+    \end{array}\]
+    The result follows by definition of $=_V$.
+
+  \item[$(c = \havoc x)$] Contradictory; $\havoc x$ is not an action.
+  \item[$(c = \assume b)$]
+    Let $\pkt$ be given. Compute:
+    \[\begin{array}{ll}
+    (\denote{\assume b} \pkt)|_V \\
+    = (\{\pkt \mid \pkt \models b\})|_V
+    & \text{definition of}\denote\cdot\\
+    = ((\{\pkt \mid \pkt \models b\})|_V)|_V
+    & \text{By Lemma~\ref{lem:proj-idem-set}} \\
+    = (\{\pkt|_V \mid \pkt \models b\})|_V
+    & \text{definition of }(\cdot)|_V : \mathcal P (\Pkt) \to \mathcal P (\Pkt) \\
+    = (\{\pkt|_V \mid \pkt|_V \models b\})|_V
+    & \text{By Lemma~\ref{lem:proj-satis} since } \fvs(b) \subseteq \fvs(\assume b) \subseteq V \\
+    = (\denote{\assume b}(\pkt|_V))|_V
+    & \text{by definition of}\denote\cdot
+    \end{array}
+    \]
+    The result follows by definition of $=_V$.
+
+  \item[$(c = \assert b)$] \textit{sim.}
+  \item[$(c = c_1;c_2)$] Let $\pkt$ be given. Compute:
+    \[\begin{array}{>{\displaystyle}ll}
+    (\denote{c_1;c_2}\pkt)|_V \\
+    = (\denote{c_2}^\dagger(\denote{c_1}\pkt))|_V
+    & \text{definition of }\denote\cdot \\
+    = \left(\bigcup_{\pkt' \in \denote{c_1} \pkt} \denote{c_2}\pkt'\right)|_V
+    & \text{definition of }(\cdot)^\dagger \\
+    = \bigcup_{\pkt' \in \denote{c_1} \pkt} (\denote{c_2}\pkt')|_V
+    & \text{by Lemma~\ref{lem:proj-union-set}} \\
+    = \bigcup_{\pkt' \in \denote{c_1}\pkt} (\denote{c_2}(\pkt'|_V))|_V
+    & \text{IH}(c_2)  \\
+    =\bigcup_{\pkt' \in (\denote{c_1}\pkt)|_V} (\denote{c_2} \pkt')|_V
+    & \text{by set theory} \\
+    = \bigcup_{\pkt' \in (\denote{c_1}(\pkt|_V))|_V} (\denote{c_2} \pkt')|_V
+    & \text{by IH}(c_1) \\
+    = \bigcup_{\pkt' \in \denote{c_1}(\pkt|_V)} (\denote{c_2} (\pkt'|_V))|_V
+    & \text{by set theory} \\
+    = \bigcup_{\pkt' \in \denote{c_1}(\pkt|_V)} ((\denote{c_2} \pkt')|_V)|_V
+    & \text{by IH}(c_2) \\
+    = \bigcup_{\pkt' \in \denote{c_1}(\pkt|_V)} (\denote{c_2} \pkt')|_V
+    & \text{by Lemma~\ref{lem:proj-idem-set}} \\
+    = \left(\bigcup_{\pkt' \in \denote{c_1}(\pkt|_V)} \denote{c_2}\pkt'\right)|_V
+    & \text{by Lemma~\ref{lem:proj-union-set}} \\
+    = \denote{c_2}^\dagger(\denote{c_1}(\pkt|_V))|_V
+    & \text{By definition of }(\cdot)^\dagger\\
+    = (\denote{c_1;c_2}(\pkt|_V))|_V
+    & \text{By definition of }\denote\cdot
+    \end{array}\]
+    The result follows by definition of $=_V$.
+
+  \item[$(c = c_1 \choice c_2)$] Let $\pkt$ be given.
+    \[\begin{array}{ll}
+    (\denote{c_1\choice c_2}\pkt)|_V \\
+    = (\denote{c_1}\pkt \cup \denote{c_2}\pkt)|_V
+    & \text{By definition of }\denote\cdot \\
+    = (\denote{c_1}\pkt)|_V \cup (\denote{c_2}\pkt)|_V
+    & \text{By Lemma~\ref{lem:proj-union-set}} \\
+    = (\denote{c_1}(\pkt|_V))|_V \cup (\denote{c_2}(\pkt|_V))|_V
+    & \text{By IHs} \\
+    = ((\denote{c_1}(\pkt|_V) \cup \denote{c_2}(\pkt|_V))|_V)|_V
+    & \text{By Lemma~\ref{lem:proj-union-set}} \\
+    = (\denote{c_1}(\pkt|_V) \cup \denote{c_2}(\pkt|_V))|_V
+    & \text{By Lemma~\ref{lem:proj-idem-set}}\\
+    = (\denote{c_1 \choice c_2}(\pkt|_V))|_V
+    & \text{By definition of }\denote\cdot \\
+    \end{array}\]
+
+    The result follows by definition of $=_V$.
+
+  \item[$(c = t.\apply())$] Contradictory; $t.\apply()$ is not an action.
+  \end{enumerate}
+
+\end{proof}
+
+
+
+
 \subsection{Lemmas}
 
 \begin{lemma}[Assume-Currying]
@@ -495,22 +801,277 @@ e} \\
   \]
 \end{proof}
 
+
+\begin{lemma}[Pseudo-Parametricity]
+  \label{lem:parametricity}
+  For $c \in \Cmd$, $\sigma : \State$, $y \in \Var$, $\pkt \in \Pkt$, if $y
+  \not\in \fvs(c)$, then $\forall \pkt' \in \denote{c}^\sigma \pkt$, $\pkt'(y) =
+  \pkt(y)$.
+\end{lemma}
+
+\begin{proof}
+  Let $\sigma : \State $, $y \in \Var$, and $\pkt \in \Pkt$ be given.
+  Proceed by induction on $c$.
+  \begin{enumerate}[align=left]
+  \item[($c = x := e$)] Assume $y \not \in \fvs(x:=e)$, that is, $y \neq x$.
+    Compute $\denote{x:=e}^\sigma \pkt = \{\pkt\{ x \mapsto \edenote e
+    \pkt\}\}$. Observe that $\pkt\{ x \mapsto \edenote e \pkt\}(y) = \pkt(y)$
+    since $y \neq x$. The result follows.
+
+  \item[($c = \havoc x$)] Assume $y \not \in \fvs(\havoc x)$, that is $y \neq
+    x$. Compute $\denote{\havoc x}^\sigma\pkt = \{\pkt\{x \mapsto v\} | v \in
+    \Value\}$. let $v \in \Value$ be arbitrary. Observe that since $x \neq y$,
+    $\pkt\{x \mapsto v\}(y) = \pkt(y)$. The result follows.
+
+  \item[($c = \assume b$)] Assume $y \not \in \fvs(\assume b)$, that is $y
+    \not\in \bfvs(b)$. Compute $\denote{\assume b}^\sigma \pkt = \{\pkt \mid
+    \pkt \models b\}$. If $\pkt \not\models b$ the result holds vacuously.
+    Otherwise the result follows from $\pkt(y) = \pkt(y)$.
+
+  \item[$(c = \assert b)$] \textit{sim}.
+
+  \item[$(c = c_1;c_2)$] Assume $y \not \in \fvs(c_1;c_2)$. Consequently $y
+    \not\in \fvs(c_1)$, and $y \not \in \fvs(c_2)$. By IH$(c_1)$, $\forall
+    \pkt_1 \in \denote{c_1}^\sigma(\pkt)$, $\pkt_1(y) = pkt(y)$. Pick an
+    arbitrary $\pkt_1 \in \denote{c_1}^\sigma(\pkt)$. By IH$(c_2)$, $\forall
+    \pkt_2 \in \denote{c_1}^\sigma(\pkt_1)$, $\pkt_2(y) = \pkt_1(y)$. By
+    transitivity, we have $\pkt_2(y) = \pkt(y)$. Conclude that $\forall \pkt_2
+    \in {\denote{c_2}^\sigma}^\dagger (\denote{c_1}^\sigma \pkt)$, $\pkt_2(y) =
+    \pkt_1(y)$.
+
+  \item[$(c = c_1 \choice c_2)$] Assume $y \not \in \fvs(c_1 \choice c_2)$.
+    Consequently, $y \not \in \fvs(c_1)$ and $y \not \in \fvs(c_2)$.
+    By IH$(c_i)$, $\forall \pkt' \in \denote(c_i)^\sigma\pkt$, for $i = 1,2$.
+    By definition of $\denote{\cdot}$, the result follows.
+
+  \item[$(t.\apply())$] Assume $y \not\in \fvs(t.\apply())$.
+    There are two cases. Either $\pkt$ hits in the table or it misses.
+    \begin{enumerate}[align=left]
+    \item[\textit{Case 1}.] Assume that there is a row $r$ such that $\pkt
+      \models t.\matchrow(r)$. Then $\denote{t.\apply()}^\sigma \pkt =
+      \denote{t.\action[r.\action](r.\data)} \pkt$. The result follows by the
+      IH.
+
+    \item[\textit{Case 2}.] Conversely, there is no such row, in which case
+      $\denote{t.\apply()}^\sigma\pkt = \{\pkt\}$, in which case the result is
+      trivial.
+    \end{enumerate}
+  \end{enumerate}
+\end{proof}
+
+\begin{lemma}[Unused-Variable Expression Noninterference]
+  \label{lem:exp-param-noninter}
+  For $e \in \BVExpr$, $\pkt \in \Pkt$,
+  $\{v_1,v_2\} \subseteq \Value$, $y \in \Var \setminus \efvs(e) $,
+  $\edenote{e}\pkt\{y \mapsto v_1\} = \edenote{e}pkt\{y \mapsto v_2\}$.
+\end{lemma}
+\begin{proof}
+  Let $\pkt$, $v_1$, $v_2$, and $y$ be given as above. Proceed by induction on
+  $e$.
+  \begin{enumerate}[align=left]
+    \item[$(e = v)$] Compute: $\edenote{v}\pkt\{y
+      \mapsto v_1\} = v = \edenote{v}pkt\{y \mapsto v_2\}$.
+    \item[$(e = x)$] Since $y \not\in \efvs(x)$, conclude $y \neq x$. Compute:
+      $\edenote{x}\pkt\{y \mapsto v_i\} = \pkt\{y \mapsto v_i\}(x) = \pkt(x) $
+      for $i = 1,2$. The result follows.
+
+    \item[$(e = e_1 \binop e_2)$]
+      Note that $\efvs(e_i) \subseteq \efvs(e_1 \binop e_2)$ for $i = 1,2$. Compute
+      \[\begin{array}{ll}
+      \edenote{e_1 \binop e_2}\pkt\{y \mapsto v_1\} \\
+      = \edenote{e_1}\pkt{y \mapsto v_1} \binop \edenote{e_2}\pkt\{y \mapsto v_1\} \\
+      = \edenote{e_1}\pkt{y \mapsto v_2} \binop \edenote{e_2}\pkt\{y \mapsto v_2\} & \text{By IH}(e_i), i = 1,2\\
+      = \denote{e_1 \binop e_2}\pkt\{y \mapsto v_2\}
+      \end{array}
+      \]
+
+    \item[$(e = \unop e)$]
+      Note that $\efvs(e) \subseteq \efvs(\unop e)$. Compute:
+      \[\begin{array}{ll}
+      \edenote{\unop e}\pkt\{y \mapsto v_1\} \\
+      = \unop \edenote{e}\pkt\{y \mapsto v_1\} \\
+      = \unop \denote{e}\pkt\{y \mapsto v_2\} & \textit{by IH}(e)\\
+      = \denote{\unop e}\pkt\{y \mapsto v_2\}
+      \end{array}\]
+  \end{enumerate}
+\end{proof}
+
+
+\begin{lemma}[Unused-Variable Boolean Noninterference]
+  \label{lem:bool-noninter}
+  For $b \in \BExpr$, $\pkt \in \Pkt$,
+  $\{v_1,v_2\} \subseteq \Value$, $y \in \Var \setminus \bfvs(b) $,
+  $\pkt\{y \mapsto v_1\} \models b \iff pkt\{y \mapsto v_2\} \models b$.
+\end{lemma}
+
+\begin{proof}
+  Let $\pkt$, $v_1$, $v_2$, and $y$ be given as above.
+  Proceed by induction on $b$:
+  \begin{enumerate}[align=left]
+  \item[($b = \FALSE$)] Trivial.
+  \item[($b = b_1 \Rightarrow b_2$)] Since $y \not \in\bfvs(b_1 \Rightarrow b_2) =
+    \bfvs(b_1) \cup \bfvs(b_2)$, $y \not \in \bfvs(b_i)$, for $i = 1,2$. Compute
+    as follows:
+    \[\begin{array}{ll}
+    \pkt\{y \mapsto v_1\} \models b_1 \Rightarrow b_2 \\
+    \iff \pkt\{y \mapsto v_1\} \not\models b_1 \text{ or } \pkt\{y \mapsto v_1\} \models b_2 \\
+    \iff \pkt\{y \mapsto v_2\} \not\models b_1 \text{ or } \pkt\{y \mapsto v_2\} \models b_2
+    & \text{by IHs since } y \not \in \bfvs(b_i), i = 1,2 \\
+    \iff \pkt\{y \mapsto v_2\} \models b_1 \Rightarrow b_2
+    \end{array}\]
+
+  \item[$(b = e_1 = e_2)$] Since $y \not \in\bfvs(e_1 = e_2) = \efvs(e_1) \cup
+    \efvs(e_2)$, $y \not \in \bfvs(e_i)$ for $i =1,2$. Compute as follows:
+    \[\begin{array}{ll}
+    \pkt\{y \mapsto v_1\} \models e_1 = e_2
+    \iff \edenote{e_1}\pkt\{y \mapsto v_1\} = \edenote{e_2}\pkt\{y \mapsto v_1\} \\
+    \iff\edenote{e_1}\pkt\{y \mapsto v_2\} = \edenote{e_2}\pkt\{y \mapsto v_2\} & \text{by Lemma~\ref{lem:exp-param-noninter}} \\
+    \iff \pkt\{y\mapsto v_2\} \models e_1 = e_2
+    \end{array}
+    \]
+  \end{enumerate}
+\end{proof}
+
+\begin{lemma}[Unused Variable Noninterference]
+  \label{lem:param-noninter}
+  For $c \in \Cmd$, $\sigma : \State$, $\pkt \in \Pkt$,
+  $\{v_1,v_2\} \subseteq \Value$, $y \in \Var \setminus \fvs(c)$,
+  $\denote{c}^\sigma \pkt\{y \mapsto v\} =_{\Var \setminus \{y\}}\denote{c}^\sigma\pkt\{y \mapsto v\}$.
+\end{lemma}
+
+\begin{proof}
+  Let $\sigma$, $v_1$, $v_2$, and $y$ be given.
+  Proceed by induction on $c$, leaving $\pkt$ and $x$ general.
+  \begin{enumerate}[align=left]
+  \item[$(c = z := e)$]
+    Let $\pkt$ be given. Since $y \not\in \fvs(z := e)$ we know that $y \neq z$.
+    Compute:
+    \[\begin{array}{ll}
+    \pkt' \in \denote{z:=e}^\sigma (\pkt\{y \mapsto v\}) \\
+    \iff \pkt' \in \{\pkt\{y \mapsto v\}\{z \mapsto \edenote{e}(\pkt\{y\mapsto v\})\}\}\\
+    \iff \pkt' = \pkt\{y \mapsto v\}\{z \mapsto \edenote{e}(\pkt\{y\mapsto v\})\}
+    \end{array}
+    \]
+    Similarly, compute:
+    \[\begin{array}{ll}
+    \pkt'' \in \denote{z:=e}^\sigma (\pkt\{y \mapsto v'\})\\
+    \iff \pkt'' \in \{\pkt\{y \mapsto v'\}\{z \mapsto \edenote{e}(\pkt\{y\mapsto v'\})\}\}\\
+    \iff \pkt'' = \pkt\{y \mapsto v'\}\{z \mapsto \edenote{e}(\pkt\{y\mapsto v'\})\}
+    \end{array}
+    \]
+
+    We need to show that
+    \[\forall x \in \Var \setminus \{y\}.
+    \pkt\{y \mapsto v'\}\{z \mapsto \edenote{e}(\pkt\{y\mapsto v'\})(x)
+    = \pkt\{y \mapsto v\}\{z \mapsto \edenote{e}(\pkt\{y\mapsto v\})\}(x)
+    \]
+
+    Equivalently we can show
+    \[\forall x \in \Var \setminus \{y\}.
+    \pkt\{z \mapsto \edenote{e}(\pkt\{y\mapsto v'\})(x)
+    = \pkt\{z \mapsto \edenote{e}(\pkt\{y\mapsto v\})\}(x)
+    \]
+
+    Let $x \neq y$ be given. The result is immediate if $x \neq z$. Otherwise we
+    must show that $\edenote{e}(\pkt\{y \mapsto v\}) = \edenote{e}(\pkt\{y
+    \mapsto v'\})$. Since $y \not \in \efvs(e)$, this follows by
+    Lemma~\ref{lem:exp-param-noninter}.
+
+
+  \item[$(c = \havoc z)$] Let $\pkt$ by given. Since $y \not \in \fvs(\havoc z)$, we know $y \neq z$.
+    Compute:
+    \[\begin{array}{ll}
+    \denote{\havoc z}^\sigma\pkt\{y \mapsto v_1\} \\
+    = \{\pkt\{y \mapsto v_1\}\{z \mapsto v_z\} \mid v_z \in \Value\}\\
+    =_{\Var \setminus \{y\}} \{\pkt\{y \mapsto v_2\}\{z \mapsto v_z\} \mid v_z \in \Value\} \\
+    = \denote{\havoc z}^\sigma\pkt\{y \mapsto v_2\}
+    \end{array}
+    \]
+
+    The result follows by Lemma~\ref{lem:equal-proj}.
+
+  \item[$(c = \assume b)$]
+    Let $\pkt$ by given. Since $\bfvs(b) \subseteq \fvs(\assume b)$, $y \not\in \bfvs(b)$.
+    Compute \[
+    \begin{array}{ll}
+      \denote{\assume b}^\sigma \pkt\{y \mapsto v_1\} \\
+      = \{\pkt \mid \pkt\{y \mapsto v_1\} \models b\}\\
+      =_{\Var \setminus \{y\}} \{\pkt \mid \pkt\{y \mapsto v_2\} \models b\} & \text{by Lemma~\ref{lem:bool-noninter}, since }y \not\in \bfvs(b) \\
+      = \denote{\assume b}^\sigma \pkt\{y \mapsto v_2\}
+    \end{array}
+    \]
+
+    The result follows by Lemma~\ref{lem:equal-proj}.
+
+    \item[$(c = \assert b)$] \textit{sim}.
+    \item[$(c = c_1;c_2)$] Observe that $\fvs(c_i) \subseteq \fvs(c_1;c_2)$ for
+      $i = 1,2$, which enables both IHS. Observe that:
+      \[\begin{array}{ll}
+      \denote{c_1;c_2}^\sigma\pkt\{y \mapsto v_1\}
+      = {\denote{c_2}^\sigma}^\dagger\left(\denote{c_1}^\sigma\pkt\{y\mapsto v_1\}\right) \\
+      \end{array}
+      \]
+      If $c_1$ denotes $\error$, the result is immediate, so assume otherwise.
+
+      Let $\{i,j\} \subseteq \{1,2\}$. Let $\pkt_i \in
+      \denote{c_1}^\sigma\pkt\{y \mapsto v_i\}$ be arbitary. By
+      Lemma~\ref{lem:parametricity}, we know that $\pkt_i(y) = v_i$. Further
+      IH$(c_1)$ tells us that there is some $\pkt_j \in
+      \denote{c_1}^\sigma\pkt\{y\mapsto v_j\}$ such that $\pkt_1 =_{\Var
+        \setminus \{y\}} \pkt_j$. Again, IH$(c_1)$ tells us that $\pkt_j(y) =
+      v$. Consequently, we can write $\pkt_i$ and $\pkt_j$ in terms of a another
+      packet $\pkt'$, i.e $\pkt_k = \pkt'\{y \mapsto v_k\}$ for $k = i,j$. Then
+      by IH$(c_2)$, $\denote{c_2}^\sigma\pkt'\{y \mapsto v_i\} =_{\Var \setminus \{y\}}
+      \denote{c_2}^\sigma \pkt'\{y \mapsto v_j\}$. Conclude that
+      $\denote{c_1}^\sigma\pkt\{y \mapsto v_i\} \subseteq_{\Var \setminus \{y\} }
+      \denote{c_1}^\sigma\pkt\{y \mapsto v_j\}$.
+
+      We just proved that the projected subset is bidrectional, i.e. that
+      $\denote{c_1}^\sigma\pkt\{y \mapsto v_1\} =_{\Var \setminus\{y\}}
+      \denote{c_1}^\sigma\pkt\{y \mapsto v_2\}$
+
+    \item[$(c = c_1 \choice c_2)$] Observe that $\fvs(c_i) \subseteq \fvs(c_1 \choice c_2)$ for
+      $i = 1,2$, which enables both IHs. Compute as follows
+      \[\begin{array}{ll}
+      \denote{c_1 \choice c_2}^\sigma\pkt\{y \mapsto v_1\} \\
+      = \denote{c_1}^\sigma\pkt\{y \mapsto v_1\} \cup \denote{c_2}^\sigma\pkt\{y \mapsto v_1\} \\
+      =_{\Var \setminus \{y\}} \denote{c_1}^\sigma\pkt\{y \mapsto v_2\} \cup \denote{c_2}^\sigma\pkt\{y \mapsto v_2\}
+      & \text{by IHs} \\
+      = \denote{c_1 \choice c_2}
+      \end{array}
+      \]
+
+      The result follows by Lemma~\ref{lem:equal-proj}.
+
+    \item[$(c = t.\apply())$]
+      There are two cases, corresponding to hitting and missing.
+      \begin{enumerate}[align=left]
+      \item[\textit{Case 1}.] Assume there is some $r \in \sigma(t)$ such that
+        $\pkt\{y \mapsto v_1\} \models t.\matchrow(r)$, and that $r$ is the
+        minimally-indexed such row. Then by Lemma~\ref{lem:bool-noninter},
+        $\pkt\{y \mapsto v_2\} \models t.\matchrow(r)$, and is the minimally indexed such row. Then, since
+        $\fvs(t.\action[r.\action](r.\data)) \subseteq \fvs(t.\apply())$, the
+        result follows by IH$(t.\action[r.\action](r.\data))$.
+
+        \item[\textit{Case 2}.] Assume there is no $r \in \sigma(t)$ such that
+          $\pkt\{y \mapsto v_1\} \models t.\matchrow(r)$. Then by
+          Lemma~\ref{lem:bool-noninter}, there is now $r \in \sigma(t)$ such
+          that $\pkt\{y \mapsto v_2\} \models t.\matchrow(r)$. Then by definitions:
+          \[\denote{t.\apply()}^\sigma \pkt\{y \mapsto v_1\} = \{\pkt\{y \mapsto v_1\}\} = \{\pkt\{y \mapsto v_2\}\} = \denote{t.\apply()}^\sigma \pkt\{y \mapsto v_2\}\]
+          The result follows by Lemma~\ref{lem:equal-proj}.
+      \end{enumerate}
+
+  \end{enumerate}
+\end{proof}
+
 \begin{lemma}[Disjoint Commutativity]
   \label{lem:disj-comm}
-  For $c_1,c_2 \in \Cmd$, and $\sigma : \Value \to \Row^*$ if $\fvs(c_1) \cap
+  For $c_1,c_2 \in \Cmd$, and $\sigma \in \State$ if $\fvs(c_1) \cap
   \fvs(c_2) = \emptyset$, $ \forall \pkt \in \Pkt. \denote{c_1;c_2}^\sigma\pkt =
   \denote{c_2;c_1}^\sigma \pkt$.
 \end{lemma}
 \begin{proof}
-  %% Let $c_1,c_2$, $\sigma$, and $\pkt$ be given as above. Assume $\fvs(c_1) \cap
-  %% \fvs(c_2) = \emptyset$. Compute:
-  %% \[
-  %% \begin{array}{ll}
-  %%   \denote{c_1;c_2}^\sigma \pkt =
-
-  %% \end{array}
-  %% \]
-  \todo[inline]{prove}
+  \todo[inline]{todo}
 \end{proof}
 
 
@@ -843,305 +1404,6 @@ values of the packet when evaluating $t.\keys$.
 
 
 
-\begin{definition}[Projections]
-  For a set of variables $S \subseteq \Var$, and a packet $\pkt$, write
-  $\pkt|_S$ to be projection of $\pkt$ onto $S$. \todo{I guess this means
-    packets are partial functions?} Formally,
-  \[\pkt|_S \triangleq \{x \mapsto \pkt(x) \mid x \in S\}.\]
-  Two packets $\pkt$, $\pkt'$ are equivalent up to $S \subseteq \Var$, written
-  $\pkt =_S \pkt'$, iff $\pkt|_S = \pkt'|_s$. A set of packets $P$ is a subset
-  of $P'$ up to $S$, written $P \subseteq_S P'$ iff for every packet $\pkt \in
-  P$, there exists $\pkt' \in P'$ such that $\pkt =_S \pkt'$. Two sets of
-  packets $P$ and $P'$ are $S$-equivalent, written $P =_S P'$ iff $P \subseteq_S
-  P'$ and $P \subseteq_S P'$. A set $P \subseteq \Pkt$ is a $V$-equivalence
-  class if $\forall \pkt_1, \pkt_2 \in P$, $\pkt_1 =_V \pkt_2$.
-\end{definition}
-
-
-\begin{lemma}[Projection Union-Distributivity]
-  \label{lem:proj-union-set}
-  For all $P,Q \subseteq \Pkt$, $V \subseteq \Var$,
-  $(P\cup Q)|_V = P|_V \cup Q|_V$
-\end{lemma}
-
-\begin{proof}
-  Let $P,Q \subseteq \Pkt$ and $V \subseteq \Var$ be given. Compute:
-
-  \[\begin{array}{ll}
-  (P\cup Q)|_V\\
-  = \{\pkt|_V \mid \pkt \in P\cup Q\}\\
-  = \{\pkt|_V \mid \pkt \in P\}\cup \{\pkt|_V \mid \pkt \in Q\}\\
-  = P|_V \cup Q|_V
-  \end{array}\]
-\end{proof}
-
-\begin{lemma}[Projection Idempotence]
-  \label{lem:proj-idem}
-  For all $\pkt \in \Pkt$, $V \subseteq \Var$,
-  $(\pkt|_V)|_V = \pkt|_V$
-\end{lemma}
-
-\begin{proof}
-  Let $\pkt \in \Pkt$ and $V \subseteq \Var$ be given.
-  \[\begin{array}{ll}
-    (\pkt|_V)|_V \\
-    = \{x \mapsto (\pkt|_V)(x) \mid x \in V\} & \text{by definition}\\
-    = \{x \mapsto (\{y \mapsto \pkt(y) \mid y \in V\})(x) \mid x \in V\} & \text{by definition}\\
-    = \{x \mapsto \pkt(x) \mid x \in V\} & \beta\text{-reduction}\\
-    = \pkt|_V & \text{by definition}
-  \end{array}\]
-\end{proof}
-
-
-\begin{lemma}[Projection Idempotence for Sets]
-  \label{lem:proj-idem-set}
-  For all $P \subseteq \Pkt$, $V \subseteq \Var$,
-  $(P|_V)|_V = P|_V$
-\end{lemma}
-
-\begin{proof}
-  Let $P \subseteq \Pkt$ and $V \subseteq \Var$ be given. Compute:
-  \[\begin{array}{ll}
-  (P|_V)|_V \\
-  = \{\pkt|_V \mid \pkt \in P|_V\}
-  & \text{by definition of } (\cdot)|_V : \mathcal{P}(\Pkt) \to \mathcal{P}(\Pkt) \\
-  = \{\pkt|_V \mid \pkt \in \{\pkt'|_V \mid \pkt'\in P\}\}
-  & \text{by definition of } (\cdot)|_V : \mathcal{P}(\Pkt) \to \mathcal{P}(\Pkt) \\
-  = \{(\pkt|_V)|_V \mid \pkt \in P \}
-  & \text{by set theory} \\
-  = \{\pkt|_V \mid \pkt \in P\} & \text{by Lemma~\ref{lem:proj-idem}} \\
-  = P|_V & \text{by definition of } (\cdot)|_V : \mathcal{P}(\Pkt) \to \mathcal{P}(\Pkt)
-  \end{array}\]
-\end{proof}
-
-
-\begin{lemma}{Subset Implies Projected Subset}
-  \label{lem:subset-proj}
-  For $P,Q \subseteq \Pkt$, and $ V \subseteq \Var$,
-  If $P \subseteq Q$ then $P \subseteq_V Q$.
-\end{lemma}
-
-\begin{proof}
-Let $P,Q \subseteq \Pkt$ and $V \subseteq \Var$ be given. Assume $P \subseteq Q$,
-to show that $P \subseteq_V Q$.
-
-Let $\pkt \in P$. Since $P \subseteq Q$, $\pkt \in Q$. Notice that $\pkt =_V
-\pkt$, so $P \subseteq_V Q$.
-\end{proof}
-
-\begin{lemma}{Equality Implies Projected Equality}
-  \label{lem:equal-proj}
-  For $P,Q \subseteq \Pkt$, and $ V \subseteq \Var$,
-  If $P = Q$ then $P =_V Q$.
-\end{lemma}
-
-\begin{proof}
-  By Lemma~\ref{lem:subset-proj}
-\end{proof}
-
-\begin{lemma}[Expression Projection]
-  \label{lem:proj-expr}
-  For every set of variables $V \subseteq \Var$, packet $\pkt \in \Pkt$ and
-  expression $e \in \BVExpr$, such that $\efvs(e) \subseteq V$, $\edenote{e}\pkt =
-  \edenote{e}(\pkt|_V)$.
-\end{lemma}
-
-\begin{proof}
-  Let $V \subseteq \Var$ be given.
-  Proceed by induction on $e$, leaving $\pkt$ arbitrary.
-  \begin{enumerate}[align=left]
-  \item[($e = v$)] Let $\pkt$ be given. $\edenote{v}\pkt = v = \edenote{v}{\pkt|_V}$
-  \item[($e = x$)] Let $\pkt$ be given. Note that $\efvs(x) = \{x\} \subseteq V$. Compute:
-    \[\begin{array}{ll}
-    \edenote{x}(\pkt|_V) \\
-    = (\pkt|_V)(x)
-    & \text{by definition of }\edenote\cdot\\
-    = \{y \mapsto \pkt(y) \mid y \in V\}(x)
-    & \text{by definition of }(\cdot)|_V : \Pkt \to \Pkt\\
-    = \pkt(x) & \text{since } x \in V
-    \end{array}
-    \]
-  \item[($e = e_1 \binop e_2$)] Let $\pkt$ be given. Compute:
-    \[\begin{array}{ll}
-    \edenote{e_1 \binop e_2}\pkt \\
-    = \edenote{e_1}\pkt \binop \edenote{e_2}\pkt & \text{definition of }\edenote\cdot \\
-    = \edenote{e_1}(\pkt|_V) \binop \edenote{e_2}(\pkt|_V) & \text{by IHS since }\efvs(e_i) \subseteq \efvs(e_1 \binop e_2) \subseteq V, i = 1,2 \\
-    = \edenote{e_1 \binop e_2}(\pkt|_V) & \text{definition of }\edenote\cdot
-    \end{array}\]
-  \item[($e = \unop e$)] Let $\pkt$ be given. Compute:
-    \[\begin{array}{ll}
-    \edenote{\unop e}\pkt \\
-    = \unop \edenote{e}\pkt & \text{definition of }\edenote\cdot \\
-    = \unop \edenote{e}(\pkt|_V) & \text{by IH, since } \efvs(e) = \efvs(\unop e) \subseteq V \\
-    = \edenote{\unop e}(\pkt|_V) & \text{definition of }\edenote\cdot
-    \end{array}\]
-  \end{enumerate}
-\end{proof}
-
-\begin{lemma}[Satisfaction Projection]
-  \label{lem:proj-satis}
-  For every set of variables $V \subseteq \Var$, packet $\pkt \in \Pkt$ and
-  boolean expression $b \in \BExpr$, such that $\bfvs(b) \subseteq V$,
-  $\pkt \models b$ iff $\pkt|_V \models b$.
-\end{lemma}
-
-\begin{proof}
-  Let $V \subseteq \Var$ be given.
-  Proceed by induction on $b$, leaving $\pkt$ arbitrary.
-  \begin{enumerate}[align=left]
-  \item[($b = \FALSE$)] Immediate.
-  \item[($b = b_1 \Rightarrow b_2$)]
-    Let $\pkt$ be given. Compute:
-    \[\begin{array}{ll}
-    \pkt \models b_1 \Rightarrow b_2 \\
-    \iff \pkt \not\models b_1 \text{or} \pkt\models b_2 & \text{by definition of } \models   \\
-    \iff \pkt|_V \not\models b_1 \text{or} \pkt|_V \models b_2  & \text{by IHs, since} \bfvs(b_i) \subseteq \bfvs(b_1 \Rightarrow b_2) \subseteq V, i = 1,2  \\
-    \iff \pkt|_V \models b_1 \Rightarrow b_2
-    & \text{by definition of } \models
-    \end{array}\]
-
-  \item[($b = e_1 = e_2$)] Let $\pkt$ be given. Compute:
-    \[\begin{array}{ll}
-    \pkt \models e_1 = e_2 \\
-    \iff \edenote{e_1}\pkt = \edenote{e_2}\pkt
-    & \text{by definition of }\models \\
-    \iff \edenote{e_1}(\pkt|_V) = \edenote{e_2}(\pkt|_V)
-    & \text{by Lemma~\ref{lem:proj-expr}, since } \efvs(e_i) \subseteq \bfvs(e_1 = e_2) \subseteq V, i = 1,2 \\
-    \iff \pkt|_V \models e_1 = e_2
-    & \text{by definition of }\models
-    \end{array}\]
-
-  \end{enumerate}
-
-\end{proof}
-
-
-\begin{lemma}[Projection-Denotation Commutativity]
-  \label{lem:proj-den-comm}
-  For a closed action $c \in \Cmd$, $\fvs(c) \subseteq V \subseteq \Var$ and
-  $\pkt \in \Pkt$, $\denote{c} \pkt =_V \denote{c} \pkt|_V$.
-\end{lemma}
-
-\begin{proof}
-  Proceed by induction on $c$, leaving $\pkt$ general.
-  \begin{enumerate}[align=left]
-  \item[$(c = x:=e)$] Let $\pkt$ be given. Compute:
-    \[\begin{array}{ll}
-    (\denote{x:=e} (\pkt|_V))|_V\\
-    = ((\pkt|_V)\{x:=\edenote{e}(\pkt|_V)\})|_V
-    & \text{definition} \\
-    = ((\pkt|_V)\{x := \edenote{e}\pkt\})|_V
-    & \text{By Lemma~\ref{lem:proj-expr} since } \fvs(e) \subseteq \fvs(x := e) \subseteq V \\
-    = (\pkt\{x := \edenote{e}\pkt\}|_V)|_V
-    & \text{since } x \in \fvs(x:=e) \subseteq V \\
-    = ((\denote{x:=e}\pkt)|_V)|_V
-    & \text{by definition of }\denote{\cdot}\\
-    = (\denote{x:=e}\pkt)|_V
-    & \text{by Lemma~\ref{lem:proj-idem}}
-    \end{array}\]
-    The result follows by definition of $=_V$.
-
-  \item[$(c = \havoc x)$] Contradictory; $\havoc x$ is not an action.
-  \item[$(c = \assume b)$]
-    Let $\pkt$ be given. Compute:
-    \[\begin{array}{ll}
-    (\denote{\assume b} \pkt)|_V \\
-    = (\{\pkt \mid \pkt \models b\})|_V
-    & \text{definition of}\denote\cdot\\
-    = ((\{\pkt \mid \pkt \models b\})|_V)|_V
-    & \text{By Lemma~\ref{lem:proj-idem-set}} \\
-    = (\{\pkt|_V \mid \pkt \models b\})|_V
-    & \text{definition of }(\cdot)|_V : \mathcal P (\Pkt) \to \mathcal P (\Pkt) \\
-    = (\{\pkt|_V \mid \pkt|_V \models b\})|_V
-    & \text{By Lemma~\ref{lem:proj-satis} since } \fvs(b) \subseteq \fvs(\assume b) \subseteq V \\
-    = (\denote{\assume b}(\pkt|_V))|_V
-    & \text{by definition of}\denote\cdot
-    \end{array}
-    \]
-    The result follows by definition of $=_V$.
-
-  \item[$(c = \assert b)$] \textit{sim.}
-  \item[$(c = c_1;c_2)$] Let $\pkt$ be given. Compute:
-    \[\begin{array}{>{\displaystyle}ll}
-    (\denote{c_1;c_2}\pkt)|_V \\
-    = (\denote{c_2}^\dagger(\denote{c_1}\pkt))|_V
-    & \text{definition of }\denote\cdot \\
-    = \left(\bigcup_{\pkt' \in \denote{c_1} \pkt} \denote{c_2}\pkt'\right)|_V
-    & \text{definition of }(\cdot)^\dagger \\
-    = \bigcup_{\pkt' \in \denote{c_1} \pkt} (\denote{c_2}\pkt')|_V
-    & \text{by Lemma~\ref{lem:proj-union-set}} \\
-    = \bigcup_{\pkt' \in \denote{c_1}\pkt} (\denote{c_2}(\pkt'|_V))|_V
-    & \text{IH}(c_2)  \\
-    =\bigcup_{\pkt' \in (\denote{c_1}\pkt)|_V} (\denote{c_2} \pkt')|_V
-    & \text{by set theory} \\
-    = \bigcup_{\pkt' \in (\denote{c_1}(\pkt|_V))|_V} (\denote{c_2} \pkt')|_V
-    & \text{by IH}(c_1) \\
-    = \bigcup_{\pkt' \in \denote{c_1}(\pkt|_V)} (\denote{c_2} (\pkt'|_V))|_V
-    & \text{by set theory} \\
-    = \bigcup_{\pkt' \in \denote{c_1}(\pkt|_V)} ((\denote{c_2} \pkt')|_V)|_V
-    & \text{by IH}(c_2) \\
-    = \bigcup_{\pkt' \in \denote{c_1}(\pkt|_V)} (\denote{c_2} \pkt')|_V
-    & \text{by Lemma~\ref{lem:proj-idem-set}} \\
-    = \left(\bigcup_{\pkt' \in \denote{c_1}(\pkt|_V)} \denote{c_2}\pkt'\right)|_V
-    & \text{by Lemma~\ref{lem:proj-union-set}} \\
-    = \denote{c_2}^\dagger(\denote{c_1}(\pkt|_V))|_V
-    & \text{By definition of }(\cdot)^\dagger\\
-    = (\denote{c_1;c_2}(\pkt|_V))|_V
-    & \text{By definition of }\denote\cdot
-    \end{array}\]
-    The result follows by definition of $=_V$.
-
-  \item[$(c = c_1 \choice c_2)$] Let $\pkt$ be given.
-    \[\begin{array}{ll}
-    (\denote{c_1\choice c_2}\pkt)|_V \\
-    = (\denote{c_1}\pkt \cup \denote{c_2}\pkt)|_V
-    & \text{By definition of }\denote\cdot \\
-    = (\denote{c_1}\pkt)|_V \cup (\denote{c_2}\pkt)|_V
-    & \text{By Lemma~\ref{lem:proj-union-set}} \\
-    = (\denote{c_1}(\pkt|_V))|_V \cup (\denote{c_2}(\pkt|_V))|_V
-    & \text{By IHs} \\
-    = ((\denote{c_1}(\pkt|_V) \cup \denote{c_2}(\pkt|_V))|_V)|_V
-    & \text{By Lemma~\ref{lem:proj-union-set}} \\
-    = (\denote{c_1}(\pkt|_V) \cup \denote{c_2}(\pkt|_V))|_V
-    & \text{By Lemma~\ref{lem:proj-idem-set}}\\
-    = (\denote{c_1 \choice c_2}(\pkt|_V))|_V
-    & \text{By definition of }\denote\cdot \\
-    \end{array}\]
-
-    The result follows by definition of $=_V$.
-
-  \item[$(c = t.\apply())$] Contradictory; $t.\apply()$ is not an action.
-  \end{enumerate}
-
-\end{proof}
-
-
-\begin{definition}[Variables]
-  The free variables of a command $c$, written $\fvs(c) \subseteq \Var$, is the
-  set of variables that occur at any point in $c$ (i.e. as the lhs of an
-  assignment, in a boolean expression, a bitvector expression, as a key in a
-  table.) The only bound variables are the action data in tables. Formally:
-  \[\begin{array}{l >{\triangleq}cl}
-  \efvs :: \BVExpr \to \mathcal{P}(\Var) \\
-  \efvs(v) && \{\} \\
-  \efvs(x) && \{x\}\\
-  \efvs(e_1 \binop e_2) && \efvs(e_1) \cup \efvs(e_2)\\
-  \efvs(\unop e) && \efvs(unop) \\[1em]
-  \bfvs :: \BExpr \to \mathcal{P}(\Var) \\
-  \bfvs(\FALSE) && \{\}\\
-  \bfvs(b_1 \Rightarrow b_2) && \bfvs(b_1) \cup \bfvs(b_2)\\
-  \bfvs(e_1 = e_2) && \efvs(e_1) = \efvs(e_2) \\[1em]
-  \fvs :: \Cmd \to \mathcal{P}(\Var) \\
-  \fvs(x := e) && \{x\} \cup \fvs(e)\\
-  \fvs(\havoc x) && \{x\}\\
-  \fvs(\assume b) && \fvs(b)\\
-  \fvs(\assert b) && \fvs(b) \\
-  \fvs(c_1;c_2) && \fvs(c_1) \cup \fvs(c_1) \\
-  \fvs(c_1 \choice c_2) && \fvs(c_1) \cup \fvs(c_2) \\
-  \fvs(t.\apply()) &&
-  t.\keys \cup \bigcup_{\lambda \vec x. c \in t.\actions} (\fvs(c) \setminus \{x_1,\ldots, x_n\})
-  \end{array}\]
-\end{definition}
 
 \begin{samepage}
 \begin{theorem}[Instrumentation Equivalence]
@@ -1459,6 +1721,14 @@ In the following we assume a terminating function $\qe : \Var \times \BExpr \to
 \BExpr$ such that for $V \in \Var$ and $b \in \BExpr$, $\bfvs(\qe(V,b)) \cap V =
 \emptyset$ and $\qe(V,b) \Leftrightarrow \forall V. b$.
 
+%% \begin{lemma}[Universal Quantifier Weakness]
+%%   For $b \in \BExpr$ and $V \subseteq \bfvs(b)$, $\forall V. b$ is the weakest
+%%   formula on variables $\bfvs(b) \setminus V$ that implies $b$.
+%% \end{lemma}
+%% \begin{proof}
+%%   Elementary.
+%% \end{proof}
+
 \begin{theorem}[Quantifer Elimination]
   For every instrumentation-free command $c \in \Cmd$, the formula $\qe(\fvs(c), \WP(c\instr, \TRUE))$ is a solution to the \textbf{Inference Problem}.
 \end{theorem}
@@ -1478,9 +1748,14 @@ In the following we assume a terminating function $\qe : \Var \times \BExpr \to
   $\forall \pkt \in \Pkt. \denote{c[\sigma]} \neq \error$. Conclude $\forall
   \pkt \in \Pkt. \denote{c}^\sigma \neq \error$, by Theorem~\ref{thm:subst}.
 
+  \todo[inline]{weakest?}
 \end{proof}
 
 
+
+
+
+\clearpage
 \section{Data-Driven Precondition Inference?}
 
 
