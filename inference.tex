@@ -859,6 +859,18 @@ Let $\pkt \in P$. Since $P \subseteq Q$, $\pkt \in Q$. Notice that $\pkt =_V
   \end{enumerate}
 \end{proof}
 
+\begin{lemma}[Set Pseudo-Parametricity]
+  \label{lem:parametricity-set}
+  For $c \in \Cmd$, $\sigma : \State$, $y \in \Var$, $\pkt \in \Pkt$, if $Y
+  \subseteq \Var \setminus \fvs(c)$, then $\forall \pkt' \in \denote{c}^\sigma
+  \pkt$, $\pkt'(y) = \pkt(y)$.
+\end{lemma}
+
+\begin{proof}
+By Lemma~\ref{lem:parametricity}.
+\end{proof}
+
+
 \begin{lemma}[Unused-Variable Expression Noninterference]
   \label{lem:exp-param-noninter}
   For $e \in \BVExpr$, $\pkt \in \Pkt$,
@@ -923,7 +935,7 @@ Let $\pkt \in P$. Since $P \subseteq Q$, $\pkt \in Q$. Notice that $\pkt =_V
   \item[$(b = e_1 = e_2)$] Since $y \not \in\bfvs(e_1 = e_2) = \efvs(e_1) \cup
     \efvs(e_2)$, $y \not \in \bfvs(e_i)$ for $i =1,2$. Compute as follows:
     \[\begin{array}{ll}
-    \pkt\{y \mapsto v_1\} \models e_1 = e_2
+    \pkt\{y \mapsto v_1\} \models e_1 = e_2 \\
     \iff \edenote{e_1}\pkt\{y \mapsto v_1\} = \edenote{e_2}\pkt\{y \mapsto v_1\} \\
     \iff\edenote{e_1}\pkt\{y \mapsto v_2\} = \edenote{e_2}\pkt\{y \mapsto v_2\} & \text{by Lemma~\ref{lem:exp-param-noninter}} \\
     \iff \pkt\{y\mapsto v_2\} \models e_1 = e_2
@@ -1064,6 +1076,19 @@ Let $\pkt \in P$. Since $P \subseteq Q$, $\pkt \in Q$. Notice that $\pkt =_V
   \end{enumerate}
 \end{proof}
 
+
+\begin{lemma}[Unused Variable Set Noninterference]
+  \label{lem:param-noninter-set}
+  For $c \in \Cmd$, $\sigma : \State$, $\pkt \in \Pkt$,
+  $\{v_1,v_2\} \subseteq \Value$, $Y \subseteq \Var \setminus \fvs(c)$,
+  $\denote{c}^\sigma \pkt\{y \mapsto v\} =_{\Var \setminus Y}\denote{c}^\sigma\pkt\{y \mapsto v\}$.
+\end{lemma}
+
+\begin{proof}
+  By Lemma~\ref{lem:param-noninter}.
+\end{proof}
+
+
 \begin{lemma}[Disjoint Commutativity]
   \label{lem:disj-comm}
   For $c_1,c_2 \in \Cmd$, and $\sigma \in \State$ if $\fvs(c_1) \cap
@@ -1071,7 +1096,31 @@ Let $\pkt \in P$. Since $P \subseteq Q$, $\pkt \in Q$. Notice that $\pkt =_V
   \denote{c_2;c_1}^\sigma \pkt$.
 \end{lemma}
 \begin{proof}
-  \todo[inline]{todo}
+  Let $c_1, c_2$, $\sigma$, and $\pkt$ be given as above.
+  Let $\{i,j\} = \{1,2\}$. Observe:
+  \[\begin{array}{ll}
+  \denote{c_i;c_j}^\sigma \pkt
+  = {\denote{c_j}\sigma}^\dagger\left(\denote{c_i}^\sigma \pkt\right)
+  \end{array}\]
+
+  Let $V = \Var \setminus \fvs(c_1;c_2)$. Let $P_1 = \denote{c_1}^\sigma \pkt$,
+  and $P_2 = \denote{c_2}^\sigma \pkt$. By Lemma~\ref{lem:parametricity-set}, the following hold
+  \[P_1 =_{\fvs(c_2) \cup V} \{\pkt\}\] \[P_2 =_{\fvs(c_1) \cup V} \{\pkt\}\]
+  So, Let $P_{12} = {\denote{c_2}^\sigma}^\dagger P_1$, and $P_{21} =
+  {\denote{c_1}^\sigma}^\dagger P_2$. Again, by
+  Lemma~\ref{lem:parametricity-set}, the following equivalences hold
+  \[P_{12} =_{\fvs(c_1) \cup V} P_1\] \[P_{21} =_{\fvs(c_2) \cup V} P_2\]
+  Now by Lemma~\ref{lem:proj-set-subset}, we know $P_{12} =_V \{\pkt\} = P_{21}$.
+
+  Now by Lemma~\ref{lem:param-noninter-set} we know
+  \[P_{21} =_{\fvs(c_1)} P_1\] \[P_{12} = \fvs(c_2) P_2\]
+
+  Then Lemma~\ref{lem:proj-set-subset} gives
+  \[P_{12} =_{\fvs(c_1)} {P_1}\] \[P_{21} =_{\fvs(c_2)} {P_2}\]
+
+  Finally Lemma~\ref{lem:union} proves our goal:
+  \[P_{12} =_{\fvs(c_1) \cup \fvs(c_2) \cup V} P_{21}\]
+
 \end{proof}
 
 
