@@ -364,7 +364,7 @@ Because of the well-formedness assumption about commands, overload $\sigma(t)
 \triangleq \sigma(t.\id)$.
 
 \paragraph{Expressions}
-The semantics of expressions is shown in Figure~\label{fig:sem-expr}. Note that
+The semantics of expressions is shown in Figure~\ref{fig:sem-expr}. Note that
 here we implicitly use the strict semantics for definedness, that is, operators
 only succeed when all of their arguments are defined, otherwise it returns
 undefined.
@@ -516,75 +516,20 @@ e} \\
 
 
 \begin{definition}[Projections]
-  For a set of variables $S \subseteq \Var$, and a packet $\pkt$, write
-  $\pkt|_S$ to be projection of $\pkt$ onto $S$. \todo{I guess this means
-    packets are partial functions?} Formally,
-  \[\pkt|_S \triangleq \{x \mapsto \pkt(x) \mid x \in S\}.\]
-  Two packets $\pkt$, $\pkt'$ are equivalent up to $S \subseteq \Var$, written
-  $\pkt =_S \pkt'$, iff $\pkt|_S = \pkt'|_s$. A set of packets $P$ is a subset
-  of $P'$ up to $S$, written $P \subseteq_S P'$ iff for every packet $\pkt \in
-  P$, there exists $\pkt' \in P'$ such that $\pkt =_S \pkt'$. Two sets of
-  packets $P$ and $P'$ are $S$-equivalent, written $P =_S P'$ iff $P \subseteq_S
-  P'$ and $P \subseteq_S P'$. A set $P \subseteq \Pkt$ is a $V$-equivalence
-  class if $\forall \pkt_1, \pkt_2 \in P$, $\pkt_1 =_V \pkt_2$.
+ Two packets $\pkt$, $\pkt'$ are equivalent up to $V \subseteq \Var$, written
+ $\pkt =_V \pkt'$, iff $\forall x \in V \pkt(x) = \pkt'(x)$. A set of packets
+ $P$ is a subset of $P'$ up to $S$, written $P \subseteq_S P'$ iff for every
+ packet $\pkt \in P$, there exists $\pkt' \in P'$ such that $\pkt =_S \pkt'$.
+ Two sets of packets $P$ and $P'$ are $S$-equivalent, written $P =_S P'$ iff $P
+ \subseteq_S P'$ and $P \subseteq_S P'$. A set $P \subseteq \Pkt$ is a
+ $V$-equivalence class if $\forall \pkt_1, \pkt_2 \in P$, $\pkt_1 =_V \pkt_2$.
 \end{definition}
 
-
-\begin{lemma}[Projection Union-Distributivity]
-  \label{lem:proj-union-set}
-  For all $P,Q \subseteq \Pkt$, $V \subseteq \Var$,
-  $(P\cup Q)|_V = P|_V \cup Q|_V$
-\end{lemma}
-
-\begin{proof}
-  Let $P,Q \subseteq \Pkt$ and $V \subseteq \Var$ be given. Compute:
-
-  \[\begin{array}{ll}
-  (P\cup Q)|_V\\
-  = \{\pkt|_V \mid \pkt \in P\cup Q\}\\
-  = \{\pkt|_V \mid \pkt \in P\}\cup \{\pkt|_V \mid \pkt \in Q\}\\
-  = P|_V \cup Q|_V
-  \end{array}\]
-\end{proof}
-
-\begin{lemma}[Projection Idempotence]
-  \label{lem:proj-idem}
-  For all $\pkt \in \Pkt$, $V \subseteq \Var$,
-  $(\pkt|_V)|_V = \pkt|_V$
-\end{lemma}
-
-\begin{proof}
-  Let $\pkt \in \Pkt$ and $V \subseteq \Var$ be given.
-  \[\begin{array}{ll}
-    (\pkt|_V)|_V \\
-    = \{x \mapsto (\pkt|_V)(x) \mid x \in V\} & \text{by definition}\\
-    = \{x \mapsto (\{y \mapsto \pkt(y) \mid y \in V\})(x) \mid x \in V\} & \text{by definition}\\
-    = \{x \mapsto \pkt(x) \mid x \in V\} & \beta\text{-reduction}\\
-    = \pkt|_V & \text{by definition}
-  \end{array}\]
-\end{proof}
-
-
-\begin{lemma}[Projection Idempotence for Sets]
-  \label{lem:proj-idem-set}
-  For all $P \subseteq \Pkt$, $V \subseteq \Var$,
-  $(P|_V)|_V = P|_V$
-\end{lemma}
-
-\begin{proof}
-  Let $P \subseteq \Pkt$ and $V \subseteq \Var$ be given. Compute:
-  \[\begin{array}{ll}
-  (P|_V)|_V \\
-  = \{\pkt|_V \mid \pkt \in P|_V\}
-  & \text{by definition of } (\cdot)|_V : \mathcal{P}(\Pkt) \to \mathcal{P}(\Pkt) \\
-  = \{\pkt|_V \mid \pkt \in \{\pkt'|_V \mid \pkt'\in P\}\}
-  & \text{by definition of } (\cdot)|_V : \mathcal{P}(\Pkt) \to \mathcal{P}(\Pkt) \\
-  = \{(\pkt|_V)|_V \mid \pkt \in P \}
-  & \text{by set theory} \\
-  = \{\pkt|_V \mid \pkt \in P\} & \text{by Lemma~\ref{lem:proj-idem}} \\
-  = P|_V & \text{by definition of } (\cdot)|_V : \mathcal{P}(\Pkt) \to \mathcal{P}(\Pkt)
-  \end{array}\]
-\end{proof}
+\begin{remark}
+  Standard equality and subset at all of these types is equivalent to projected
+  equality/subset on the universal set of variables, i.e. $(=) = (=_\Var)$ and
+  $(\subseteq) = (\subseteq_\Var)$.
+\end{remark}
 
 \begin{lemma}[Subset Packet Projection]
   \label{lem:subset-pkt-proj}
@@ -610,221 +555,41 @@ e} \\
   $\pkt =_U \pkt'$. The result follows.
 \end{proof}
 
-
 \begin{corollary}[Subset Implies Projected Subset]
-  \label{lem:subset-proj}
+  \label{cor:subset-proj}
   For $P,Q \subseteq \Pkt$, and $ V \subseteq \Var$,
   If $P \subseteq Q$ then $P \subseteq_V Q$.
 \end{corollary}
 
-\begin{lemma}[Subset Projection Equality]
-  \label{lem:subset-proj-equal}
+\begin{lemma}[Subset Projection Equals]
+  \label{lem:subset-proj-equals}
   For $P,Q \subseteq \Pkt$ and $U \subseteq V \subseteq \Var$,
   If $P =_V Q$, then $P =_U Q$.
 \end{lemma}
 
 \begin{proof}
-  Let $P$,$Q$,$U$,$V$ be given as above. Assume $P =_V Q$. Show $P =_U Q$. Let
-  $\pkt \in P$. Since $P =_V Q$, we know that $P \subseteq_V Q$ and $Q
-  \subseteq_V P$. By Lemma~\ref{lem:subset-proj-subset},$P \subseteq_U Q$ and $Q
-  \subseteq_U P$. Conclude $P =_U Q$.
+  Let $P$,$Q$,$U$,$V$ be given as above. Assume $P =_V Q$. By definition we have
+  $P \subseteq_V Q$ and $Q \subseteq_V P$. By
+  Lemma~\ref{lem:subset-proj-subset}, these become $P \subseteq_U Q$ and $Q\subseteq_U P$
+  Conclude $P =_U Q$.
 \end{proof}
 
 \begin{corollary}[Equality Implies Projected Equality]
-  \label{lem:equal-proj}
+  \label{cor:equal-proj}
   For $P,Q \subseteq \Pkt$, and $ V \subseteq \Var$, If $P = Q$ then $P =_V Q$.
 \end{corollary}
 
 
-
-\begin{lemma}[Union Packet Projection]
-  \label{lem:union-pkt-proj}
-  For $\pkt_1,\pkt_2 \in \Pkt$, and $U, V \subseteq \Pkt$, if $\pkt_1 =_U
-  \pkt_2$ and $\pkt_1 =_V \pkt_2$, then $\pkt_1 =_{U \cup V} \pkt_2$.
-\end{lemma}
-
-\begin{proof}
-  Let $\pkt_1$, $\pkt_2$, $U$, $V$ be given as above. Assume $\pkt_1 =_U \pkt_2$
-  and $\pkt_1 =_V \pkt_2$. Let $x \in U \cup V$. There are two cases. If $x \in
-  U$, the assumption $\pkt_1 =_U \pkt_2 $ gives $\pkt_1(x) = \pkt_2(x)$.
-  Conversely if $x \in V$, the assumption $\pkt_1 =_V \pkt_2$ gives $\pkt_1(x) =
-  \pkt_2(x)$. Conclude $\pkt_1 =_{U \cup V} \pkt_2$.
-\end{proof}
-
-\begin{lemma}[Expression Projection]
-  \label{lem:proj-expr}
-  For every set of variables $V \subseteq \Var$, packet $\pkt \in \Pkt$ and
-  expression $e \in \BVExpr$, such that $\efvs(e) \subseteq V$, $\edenote{e}\pkt =
-  \edenote{e}(\pkt|_V)$.
-\end{lemma}
-\begin{proof}
-  Let $V \subseteq \Var$ be given.
-  Proceed by induction on $e$, leaving $\pkt$ arbitrary.
-  \begin{enumerate}[align=left]
-  \item[($e = v$)] Let $\pkt$ be given. $\edenote{v}\pkt = v = \edenote{v}{\pkt|_V}$
-  \item[($e = x$)] Let $\pkt$ be given. Note that $\efvs(x) = \{x\} \subseteq V$. Compute:
-    \[\begin{array}{ll}
-    \edenote{x}(\pkt|_V) \\
-    = (\pkt|_V)(x)
-    & \text{by definition of }\edenote\cdot\\
-    = \{y \mapsto \pkt(y) \mid y \in V\}(x)
-    & \text{by definition of }(\cdot)|_V : \Pkt \to \Pkt\\
-    = \pkt(x) & \text{since } x \in V
-    \end{array}
-    \]
-  \item[($e = e_1 \binop e_2$)] Let $\pkt$ be given. Compute:
-    \[\begin{array}{ll}
-    \edenote{e_1 \binop e_2}\pkt \\
-    = \edenote{e_1}\pkt \binop \edenote{e_2}\pkt & \text{definition of }\edenote\cdot \\
-    = \edenote{e_1}(\pkt|_V) \binop \edenote{e_2}(\pkt|_V) & \text{by IHS since }\efvs(e_i) \subseteq \efvs(e_1 \binop e_2) \subseteq V, i = 1,2 \\
-    = \edenote{e_1 \binop e_2}(\pkt|_V) & \text{definition of }\edenote\cdot
-    \end{array}\]
-  \item[($e = \unop e$)] Let $\pkt$ be given. Compute:
-    \[\begin{array}{ll}
-    \edenote{\unop e}\pkt \\
-    = \unop \edenote{e}\pkt & \text{definition of }\edenote\cdot \\
-    = \unop \edenote{e}(\pkt|_V) & \text{by IH, since } \efvs(e) = \efvs(\unop e) \subseteq V \\
-    = \edenote{\unop e}(\pkt|_V) & \text{definition of }\edenote\cdot
-    \end{array}\]
-  \end{enumerate}
-\end{proof}
-
-\begin{lemma}[Satisfaction Projection]
-  \label{lem:proj-satis}
-  For every set of variables $V \subseteq \Var$, packet $\pkt \in \Pkt$ and
-  boolean expression $b \in \BExpr$, such that $\bfvs(b) \subseteq V$,
-  $\pkt \models b$ iff $\pkt|_V \models b$.
-\end{lemma}
-
-\begin{proof}
-  Let $V \subseteq \Var$ be given.
-  Proceed by induction on $b$, leaving $\pkt$ arbitrary.
-  \begin{enumerate}[align=left]
-  \item[($b = \FALSE$)] Immediate.
-  \item[($b = b_1 \Rightarrow b_2$)]
-    Let $\pkt$ be given. Compute:
-    \[\begin{array}{ll}
-    \pkt \models b_1 \Rightarrow b_2 \\
-    \iff \pkt \not\models b_1 \text{or} \pkt\models b_2 & \text{by definition of } \models   \\
-    \iff \pkt|_V \not\models b_1 \text{or} \pkt|_V \models b_2  & \text{by IHs, since} \bfvs(b_i) \subseteq \bfvs(b_1 \Rightarrow b_2) \subseteq V, i = 1,2  \\
-    \iff \pkt|_V \models b_1 \Rightarrow b_2
-    & \text{by definition of } \models
-    \end{array}\]
-
-  \item[($b = e_1 = e_2$)] Let $\pkt$ be given. Compute:
-    \[\begin{array}{ll}
-    \pkt \models e_1 = e_2 \\
-    \iff \edenote{e_1}\pkt = \edenote{e_2}\pkt
-    & \text{by definition of }\models \\
-    \iff \edenote{e_1}(\pkt|_V) = \edenote{e_2}(\pkt|_V)
-    & \text{by Lemma~\ref{lem:proj-expr}, since } \efvs(e_i) \subseteq \bfvs(e_1 = e_2) \subseteq V, i = 1,2 \\
-    \iff \pkt|_V \models e_1 = e_2
-    & \text{by definition of }\models
-    \end{array}\]
-
-  \end{enumerate}
-
-\end{proof}
-
-
 \begin{lemma}[Projection-Denotation Commutativity]
   \label{lem:proj-den-comm}
-  For a closed action $c \in \Cmd$, $\fvs(c) \subseteq V \subseteq \Var$ and
-  $\pkt \in \Pkt$, $\denote{c} \pkt =_V \denote{c} \pkt|_V$.
+  For an action $c \in \Cmd$, $\fvs(c) \subseteq V \subseteq \Var$ and $\pkt \in \Pkt$,
+  if $P =_V Q$, then $\denote{c}^\dagger P =_V \denote{c}^\dagger Q$.
 \end{lemma}
 
 \begin{proof}
-  Proceed by induction on $c$, leaving $\pkt$ general.
-  \begin{enumerate}[align=left]
-  \item[$(c = x:=e)$] Let $\pkt$ be given. Compute:
-    \[\begin{array}{ll}
-    (\denote{x:=e} (\pkt|_V))|_V\\
-    = ((\pkt|_V)\{x:=\edenote{e}(\pkt|_V)\})|_V
-    & \text{definition} \\
-    = ((\pkt|_V)\{x := \edenote{e}\pkt\})|_V
-    & \text{By Lemma~\ref{lem:proj-expr} since } \fvs(e) \subseteq \fvs(x := e) \subseteq V \\
-    = (\pkt\{x := \edenote{e}\pkt\}|_V)|_V
-    & \text{since } x \in \fvs(x:=e) \subseteq V \\
-    = ((\denote{x:=e}\pkt)|_V)|_V
-    & \text{by definition of }\denote{\cdot}\\
-    = (\denote{x:=e}\pkt)|_V
-    & \text{by Lemma~\ref{lem:proj-idem}}
-    \end{array}\]
-    The result follows by definition of $=_V$.
-
-  \item[$(c = \havoc x)$] Contradictory; $\havoc x$ is not an action.
-  \item[$(c = \assume b)$]
-    Let $\pkt$ be given. Compute:
-    \[\begin{array}{ll}
-    (\denote{\assume b} \pkt)|_V \\
-    = (\{\pkt \mid \pkt \models b\})|_V
-    & \text{definition of}\denote\cdot\\
-    = ((\{\pkt \mid \pkt \models b\})|_V)|_V
-    & \text{By Lemma~\ref{lem:proj-idem-set}} \\
-    = (\{\pkt|_V \mid \pkt \models b\})|_V
-    & \text{definition of }(\cdot)|_V : \mathcal P (\Pkt) \to \mathcal P (\Pkt) \\
-    = (\{\pkt|_V \mid \pkt|_V \models b\})|_V
-    & \text{By Lemma~\ref{lem:proj-satis} since } \fvs(b) \subseteq \fvs(\assume b) \subseteq V \\
-    = (\denote{\assume b}(\pkt|_V))|_V
-    & \text{by definition of}\denote\cdot
-    \end{array}
-    \]
-    The result follows by definition of $=_V$.
-
-  \item[$(c = \assert b)$] \textit{sim.}
-  \item[$(c = c_1;c_2)$] Let $\pkt$ be given. Compute:
-    \[\begin{array}{>{\displaystyle}ll}
-    (\denote{c_1;c_2}\pkt)|_V \\
-    = (\denote{c_2}^\dagger(\denote{c_1}\pkt))|_V
-    & \text{definition of }\denote\cdot \\
-    = \left(\bigcup_{\pkt' \in \denote{c_1} \pkt} \denote{c_2}\pkt'\right)|_V
-    & \text{definition of }(\cdot)^\dagger \\
-    = \bigcup_{\pkt' \in \denote{c_1} \pkt} (\denote{c_2}\pkt')|_V
-    & \text{by Lemma~\ref{lem:proj-union-set}} \\
-    = \bigcup_{\pkt' \in \denote{c_1}\pkt} (\denote{c_2}(\pkt'|_V))|_V
-    & \text{IH}(c_2)  \\
-    =\bigcup_{\pkt' \in (\denote{c_1}\pkt)|_V} (\denote{c_2} \pkt')|_V
-    & \text{by set theory} \\
-    = \bigcup_{\pkt' \in (\denote{c_1}(\pkt|_V))|_V} (\denote{c_2} \pkt')|_V
-    & \text{by IH}(c_1) \\
-    = \bigcup_{\pkt' \in \denote{c_1}(\pkt|_V)} (\denote{c_2} (\pkt'|_V))|_V
-    & \text{by set theory} \\
-    = \bigcup_{\pkt' \in \denote{c_1}(\pkt|_V)} ((\denote{c_2} \pkt')|_V)|_V
-    & \text{by IH}(c_2) \\
-    = \bigcup_{\pkt' \in \denote{c_1}(\pkt|_V)} (\denote{c_2} \pkt')|_V
-    & \text{by Lemma~\ref{lem:proj-idem-set}} \\
-    = \left(\bigcup_{\pkt' \in \denote{c_1}(\pkt|_V)} \denote{c_2}\pkt'\right)|_V
-    & \text{by Lemma~\ref{lem:proj-union-set}} \\
-    = \denote{c_2}^\dagger(\denote{c_1}(\pkt|_V))|_V
-    & \text{By definition of }(\cdot)^\dagger\\
-    = (\denote{c_1;c_2}(\pkt|_V))|_V
-    & \text{By definition of }\denote\cdot
-    \end{array}\]
-    The result follows by definition of $=_V$.
-
-  \item[$(c = c_1 \choice c_2)$] Let $\pkt$ be given.
-    \[\begin{array}{ll}
-    (\denote{c_1\choice c_2}\pkt)|_V \\
-    = (\denote{c_1}\pkt \cup \denote{c_2}\pkt)|_V
-    & \text{By definition of }\denote\cdot \\
-    = (\denote{c_1}\pkt)|_V \cup (\denote{c_2}\pkt)|_V
-    & \text{By Lemma~\ref{lem:proj-union-set}} \\
-    = (\denote{c_1}(\pkt|_V))|_V \cup (\denote{c_2}(\pkt|_V))|_V
-    & \text{By IHs} \\
-    = ((\denote{c_1}(\pkt|_V) \cup \denote{c_2}(\pkt|_V))|_V)|_V
-    & \text{By Lemma~\ref{lem:proj-union-set}} \\
-    = (\denote{c_1}(\pkt|_V) \cup \denote{c_2}(\pkt|_V))|_V
-    & \text{By Lemma~\ref{lem:proj-idem-set}}\\
-    = (\denote{c_1 \choice c_2}(\pkt|_V))|_V
-    & \text{By definition of }\denote\cdot \\
-    \end{array}\]
-
-    The result follows by definition of $=_V$.
-
-  \item[$(c = t.\apply())$] Contradictory; $t.\apply()$ is not an action.
-  \end{enumerate}
-
+  By Lemma~\ref{lem:param-noninter-set}
 \end{proof}
+
 
 
 
@@ -1052,7 +817,7 @@ By Lemma~\ref{lem:parametricity}.
 \begin{lemma}[Unused Variable Noninterference]
   \label{lem:param-noninter}
   For $c \in \Cmd$, $\sigma : \State$, $\pkt \in \Pkt$,
-  $\{v_1,v_2\} \subseteq \Value$, $y \in \Var \setminus \fvs(c)$,
+  $v_1,v_2 \in \Value$, $y \in \Var \setminus \fvs(c)$,
   $\denote{c}^\sigma \pkt\{y \mapsto v\} =_{\Var \setminus \{y\}}\denote{c}^\sigma\pkt\{y \mapsto v\}$.
 \end{lemma}
 
@@ -1105,7 +870,7 @@ By Lemma~\ref{lem:parametricity}.
     \end{array}
     \]
 
-    The result follows by Lemma~\ref{lem:equal-proj}.
+    The result follows by Corollary~\ref{cor:equal-proj}.
 
   \item[$(c = \assume b)$]
     Let $\pkt$ by given. Since $\bfvs(b) \subseteq \fvs(\assume b)$, $y \not\in \bfvs(b)$.
@@ -1118,7 +883,7 @@ By Lemma~\ref{lem:parametricity}.
     \end{array}
     \]
 
-    The result follows by Lemma~\ref{lem:equal-proj}.
+    The result follows by Corollary~\ref{cor:equal-proj}.
 
     \item[$(c = \assert b)$] \textit{sim}.
     \item[$(c = c_1;c_2)$] Observe that $\fvs(c_i) \subseteq \fvs(c_1;c_2)$ for
@@ -1158,7 +923,7 @@ By Lemma~\ref{lem:parametricity}.
       \end{array}
       \]
 
-      The result follows by Lemma~\ref{lem:equal-proj}.
+      The result follows by Corollary~\ref{cor:equal-proj}.
 
     \item[$(c = t.\apply())$]
       There are two cases, corresponding to hitting and missing.
@@ -1175,7 +940,7 @@ By Lemma~\ref{lem:parametricity}.
           Lemma~\ref{lem:bool-noninter}, there is now $r \in \sigma(t)$ such
           that $\pkt\{y \mapsto v_2\} \models t.\matchrow(r)$. Then by definitions:
           \[\denote{t.\apply()}^\sigma \pkt\{y \mapsto v_1\} = \{\pkt\{y \mapsto v_1\}\} = \{\pkt\{y \mapsto v_2\}\} = \denote{t.\apply()}^\sigma \pkt\{y \mapsto v_2\}\]
-          The result follows by Lemma~\ref{lem:equal-proj}.
+          The result follows by Corollary~\ref{cor:equal-proj}.
       \end{enumerate}
 
   \end{enumerate}
@@ -1185,8 +950,8 @@ By Lemma~\ref{lem:parametricity}.
 \begin{lemma}[Unused Variable Set Noninterference]
   \label{lem:param-noninter-set}
   For $c \in \Cmd$, $\sigma : \State$, $\pkt \in \Pkt$,
-  $\{v_1,v_2\} \subseteq \Value$, $Y \subseteq \Var \setminus \fvs(c)$,
-  $\denote{c}^\sigma \pkt\{y \mapsto v\} =_{\Var \setminus Y}\denote{c}^\sigma\pkt\{y \mapsto v\}$.
+  $V_1,V_2 \subseteq \Value$, $Y \subseteq \Var \setminus \fvs(c)$,
+  $\denote{c}^\sigma \pkt\{Y \mapsto V_1\} =_{\Var \setminus Y}\denote{c}^\sigma\pkt\{Y \mapsto V_2\}$.
 \end{lemma}
 
 \begin{proof}
@@ -1511,7 +1276,7 @@ values of the packet when evaluating $t.\keys$.
   \]
   \caption{Symbolic State Encoding. Where $T \subseteq \Table$. We write
     $\state\sigma_c$ where $c \in \Cmd$ as shorthand for $\state\sigma_{\tables(c)}$.}
-  \label{fig:table-instrument}
+  \label{fig:state-encode}
 \end{figure}
 
 \begin{lemma}[Symbolic State Distributes]
@@ -1574,7 +1339,7 @@ values of the packet when evaluating $t.\keys$.
   \item[$(c = \havoc x)$] \textit{sim}.
   \item[$(c = \assume b)$] \textit{sim}.
   \item[$(c = \assert b)$] \textit{sim}.
-  \item[$(c = c_1;c_2)$] Note that well-formedness\todo{define well formedness as single-use tables} implies $\tables(c_1) \cap
+  \item[$(c = c_1;c_2)$] Note that well-formedness implies $\tables(c_1) \cap
     \tables(c_2) = \emptyset$. Let $T_2 = \tables(c_2)$ and $T_1 = T \setminus
     T_2$. Let $R_2 = \{\rho_t.* \mid t \in T_2\}$ and $R_1 = R \setminus R_2$.
     Let $G_2 = \{\rho_t.* \mid t \in T_2\}$ and $G_1 = G \setminus G_2$. Compute
@@ -1604,7 +1369,7 @@ values of the packet when evaluating $t.\keys$.
     & \text{by definition of }\denote{-}^\sigma\\
     \end{array}\]
 
-    The result follows by Lemma~\ref{lem:equal-proj}.
+    The result follows by Corollary~\ref{cor:equal-proj}.
 
   \item[$(c = c_1\choice c_2)$]
     \[\begin{array}{ll}
@@ -1637,7 +1402,7 @@ values of the packet when evaluating $t.\keys$.
     \end{array}
     \]
 
-    The result follows by Lemma~\ref{lem:equal-proj}.
+    The result follows by Corollary~\ref{cor:equal-proj}.
 
   \item[$(c = t.\apply())$] Let $\pkt$ and $\sigma$ be arbitrary. Let
     $[r_1,\ldots, r_n] = \sigma(t)$.
@@ -1740,8 +1505,8 @@ values of the packet when evaluating $t.\keys$.
 
        which is $V$-equivalent to
        $\denote{t.\action[r_i.\action](r_i.\data)}\,\pkt$ by
-       Lemma~\ref{lem:proj-den-comm}. The result follows by the IH on
-       $t.\action[r_i.\action](r_i.\data)$ and Lemma~\ref{lem:equal-proj}.
+       Lemma~\ref{lem:proj-den-comm}, since $H_{r_i.\action} =_v \{\pkt\}$. The result follows by the IH on
+       $t.\action[r_i.\action](r_i.\data)$ and Corollary~\ref{cor:equal-proj}.
 
      \item[\text{Case 2}.]Assume that there is no $1 \leq i \leq n$ such that
        $\pkt \models t.\matchrow(r_i)$. Then, by definition,
@@ -1761,8 +1526,8 @@ values of the packet when evaluating $t.\keys$.
         which means that $\gamma_t.\hitAction > n$, and that $\gamma_t.\miss =
         1$. Conclude that $H_a = \emptyset$ and $M \neq \emptyset$. Since
         $\emptyset \neq M \subseteq P =_V \{\pkt\}$, $M =_V \{\pkt\}$ by
-        Lemma~\ref{lem:subset-proj}. The result follows by
-        Lemma~\ref{lem:equal-proj}.
+        Corollary~\ref{cor:subset-proj}. The result follows by
+        Corollary~\ref{cor:equal-proj}.
     \end{enumerate}
 
   \end{enumerate}
