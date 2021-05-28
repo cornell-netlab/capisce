@@ -48,6 +48,7 @@
 \newcommand{\List}{\mathsf{List}}
 \newcommand{\Var}{\mathsf{Var}}
 \newcommand{\SymbRow}{\mathsf{SymbRow}}
+\newcommand{\Ghost}{\mathsf{Ghost}}
 \newcommand{\State}{\mathsf{State}}
 \newcommand{\Kind}{\mathsf{Kind}}
 
@@ -106,10 +107,18 @@
 \newcommand{\tables}{\mathop{\mathsf{tables}}}
 
 % Theorems
+\theoremstyle{plain}
 \newtheorem{theorem}{Theorem}
 \newtheorem{lemma}{Lemma}
 \newtheorem{conjecture}{Conjecture}
+\newtheorem{corollary}{Corollary}
+
+\theoremstyle{definition}
 \newtheorem{definition}{Definition}
+
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+
 
 \begin{document}
 
@@ -173,20 +182,29 @@
 
 The following sections describe aspects of the grammar shown in Figure~\ref{fig:grammar}.
 
+
+\paragraph{Variables}
+Dataplane programs use variables $x \in \Var$ to represent packet state.
+
+\paragraph{Values}
+Values $v \in \Value$ are bitvector literals, written $[n]_w$, where $n$
+is a natural value and $w$ is the width. We say that $[n]_w = [m]_l$ is
+undefined if $w \neq l$, and otherwise is true iff $n \equiv m \mod 2^w$.
+
+
 \paragraph{Packets}
 Our dataplane programs will reason about structured representations of packets,
-that is, they will be transformations on sets of packet headers. In P4 programs,
-packet headers $h \in \Hdr$ are essentially structs with fields $f \in \Field$.
-Write $h.f$ for a header $h$ and a field $f$ is the value $v$ of $f$ in header
-$h$. Our simple command language just treats ``h.f'' as a variable.
-
-
+that is, they will be transformations on sets of packet headers. We define
+Packets to be functions from variables to values, that is $\Pkt = \Value^\Var$.
+Use the syntax $\pkt\{x \mapsto v\}$ to represent the packet that is equivalent
+to $\pkt$ on all variables fields except $x$, which maps to $v$. Use $\pkt(x)$
+to look up the value of $x$ in packet $\pkt$.
 
 \paragraph{Tables}
 A table $t \in \Table$ is a record with a few fields described below:
 \begin{enumerate}[align=left]
-  \item[($t.\id$)] A table's unique identifier. A well-formed program can only have
-    one occurence of each table identifier.
+  \item[($t.\id$)] A table's unique identifier. A well-formed program can only
+    have one occurence of each table identifier.
   \item[($t.\keys$)] A list of header field accesses indicating the match keys and their match kind.
   \item[($t.\actions$)] A list of actions that can be executed. An action is a lambda
     expression $\lambda \vec x. c$ where the variables $x$ are in scope for the
@@ -205,12 +223,14 @@ $l$, the first $l$ bits of the key must be equivalent to the match.
 
 
 \paragraph{Symbolic Table Rows}
-A symbolic table row $\rho \in \SymbRow$ represents a symbolic row. These rows are represented in our programs as simple variables $x$. Like tables,
-rows are also records with the following fields \todo{Well formedness constraint?}
+A symbolic table row $\rho_t \in \SymbRow \subseteq \Var$ represents a symbolic row for table
+$t$. These rows are represented in our programs as simple variables. Like
+tables, rows are also ``records'' with the following fields \todo{well formedness constraint?}
 \begin{enumerate}[align=left]
-  \item[($\rho.\matches$)] A list variable of length representing the possible match keys.
-  \item[($\rho.\action$)] A variable representing the action choice
-  \item[($\rho.\data$)] A list variable representing the possible action data
+  \item[($\rho_t.\matches$)] A list variable of length representing the possible match keys.
+  \item[($\rho_t.\action$)] A variable representing the action choice
+  \item[($\rho_t.\data$)] A list variable representing the possible action data
+  \item[($\rho_t.\id$)] A single variable representing the row's index.
 \end{enumerate}
 
 To represent the $i$th match variable in $\rho$, use standard list
@@ -219,10 +239,25 @@ access notation: $\rho.\matches[i]$.
 Note that symbolic table rows are only meant to be used in the instrumentation
 stage and not by a programmer.
 
-\paragraph{Values}
-Values $v \in \BVExpr$ are bitvector literals, written $[n]_w$, where $n$
-is a natural value and $w$ is the width. We say that $[n]_w = [m]_l$ is
-undefined if $w \neq l$, and otherwise is true iff $n \equiv m \mod 2^w$.
+For a set of tables $T \subseteq \Table$, we absue set-builder notation to write the shorthand
+$\{\rho_t.*| t \in T \}$ to indicate the set $\{\rho_t.f | t \in T, f \in
+\{\action, \id, \matches[0], \ldots, \matches[n_t], \data[0], ldots, \data[m_t]
+\}\}$ where $n_t = |t.\keys|$ and $m_t = \max\{|\vec x| \mid\lambda \vec x. c
+\in t.\actions\}$
+
+
+\paragraph{Ghost Variables}
+A ghost varaible $\gamma_t \in \Ghost \subseteq \Var$ represents some ghost
+state for table $t$. These ghost variables are represented as simple variables
+in our program. They are ``records'' with the following fields
+\begin{enumerate}[align=left]
+\item[($\gamma_t.\miss$)] Equal to $[1]_1$ if the table packet misses in the table, and $[0]_1$ otherwise.
+\item[$(\gamma_t.\keys)$] A list variable that captures the values of the keys at table-application time.
+\end{enumerate}
+
+For a set of tables $T \subseteq \Table$, we absue set-builder notation to write
+the shorthand $\{\gamma_t.*| t \in T \}$ to indicate the set $\{\gamma_t.f | t \in
+T, f \in \{\miss, \keys[0], \ldots, \keys[n_t]\}\}$ where $n_t = |t.\keys|$.
 
 \paragraph{Bitvector Expressions}
 Bitvector expressions $e \in \BVExpr$ can be values $v$, header accesses $h.f$,
@@ -247,13 +282,22 @@ We can represent other standard boolean operators by using standard encodings:
 \end{array}\]
 
 \paragraph{Commands}
-Data plane programs $c \in \mathsf{Cmd}$ can be assignments ($h.f := e$), havoc statements ($\havoc x$),
-assumptions ($\assume b$), assertions ($\assert b$), table application
-($t.\apply()$), sequential composition ($c_1;c_2$ for two commands $c_1$ and $c_2$), and
-nondeterministic choice ($c_1 \choice c_2$ for two commands $c_1$ and $c_2$).
+Data plane programs $c \in \mathsf{Cmd}$ can be assignments ($h.f := e$), havoc
+statements ($\havoc x$), assumptions ($\assume b$), assertions ($\assert b$),
+table application ($t.\apply()$), sequential composition ($c_1;c_2$ for two
+commands $c_1$ and $c_2$), and nondeterministic choice ($c_1 \choice c_2$ for
+two commands $c_1$ and $c_2$). Note that table application, havoc, and
+nondeterministic choice are is prohibited in action bodies.
+
+\begin{definition}
+  \label{def:well-formed-command}
+   A command $c \in \Cmd$ is \emph{well-formed} if tables only occur once in the
+   program and each has a unique $t.\id$.
+\end{definition}
 
 We define $\SKIP$ as syntactic sugar for $\assume \TRUE$. We also lift havoc to
 sets of variables $\havoc \{x_1,\ldots,x_n\} = \SKIP; \havoc{x_1}; \cdots; \havoc{x_n}$.
+
 
 It is sensible to use sets here (rather than lists), because havocs commute:
 
@@ -292,49 +336,32 @@ Define $\tables(c) \subset \Table$ to be the set of all tables that occur in $c$
 First we describe the semantic objects packet and state before giving semantics
 to bitvector expressions, boolean expressions, and commands.
 
-\paragraph{Packets}
-A packet $\pkt$ is a map from header fields to values. Use the syntax $\pkt[x
-  \mapsto v]$ to represent the packet that is equivalent to $\pkt$ on all variables
-fields except $x$, which maps to $v$.
 
 \paragraph{State}
 On-switch state is represented by a mapping from tables identifiers $t.\id$ to
-lists of rows $[r_1,\ldots,r_n] \in \Row(t)^*$.
+lists of rows $[r_1,\ldots,r_n] \in \Row(t)^*$. I.e. the set of states $\State =
+\Value \to \Row^*$
 
 A similar to a symbolic row $\rho$, a concrete row $r$ comprises a list of match
-values $r.\matches$, an action identifier $r.\action$, and a list of action data
-$r.\data$. A concrete row $r$ is in the set $\Row(t)$ if it is well formed for a
-table $t$ iff the following conditions hold:
+values $r.\matches$, an action identifier $r.\action$, a list of action data
+$r.\data$, and an index $r.\id$. A concrete row $r$ is in the set $\Row(t)$ if
+it is well-formed for a table $t$ iff the following conditions hold:
 \begin{enumerate}
 \item $|r.\matches| = |t.\keys|$
 \item $r.\action < |t.\actions|$
 \item $|r.\data| = |\vec x|$ where $\lambda \vec x. c = t.\actions[r.\action]$
-\end{enumerate}\
-
-A state map $\sigma : \Value \to \Row^*$ is well-formed for a command $c$ iff the
-following conditions hold:
-\begin{enumerate}[align=left]
-\item[(\textsc{Total})] For every $t \in \tables(c)$ $\pkt \in \pkt$ there exists a row $r \in \sigma(t.\id)$ such that $r.matches = \pkt(t.keys)$.
-\item[(\textsc{WellFormedRows})] For every $t\in \tables(c)$, every row in $\sigma(t.\id)$ is well-formed.
-\item[(\textsc{NoShadow})] For every $t \in \tables(c)$, with $r_1,\ldots,r_n =
-  \sigma(t.\id)$, for every $1 \leq i \leq n$, there does not exist $1 \leq j <
-  i$ such that $r_i.\matches = r_j.\matches$.
 \end{enumerate}
 
-Importantly, we assume that all state is \emph{total}, that is, no packet locally misses
-in the table. This is formally defined in Definition~\ref{def:total-state}.
+A state map $\sigma : \Value \to \Row^*$ is well-formed for a command $c$ iff
+the following conditions hold:
+\begin{enumerate}[align=left]
+\item[(\textsc{WellFormedRows})] For every $t\in \tables(c)$, every row in $\sigma(t.\id)$ is well-formed.
+\item[(\textsc{SelfRef})] For every $t \in tables(c)$, such that $[r_1,\ldots,
+  r_n] = \sigma(t.\id)$, $r_i.\id = i$ for all $1 \leq i \leq n$.
+\end{enumerate}
 
-%% \begin{definition}[Total State]
-%%   \label{def:total-state}
-%%   A state $\sigma$ is total if for every $t \in \dom(\sigma)$, the following
-%%   formula is valid:
-%%   \[\bigvee_{r \in \sigma(t.\id)} t.\keys = r.\matches \]
-%% \end{definition}
-
-%% Henceforth we assume that all states are total.
-
-%% \todo[inline]{Can be Removed(?)}
-
+Because of the well-formedness assumption about commands, overload $\sigma(t)
+\triangleq \sigma(t.\id)$.
 
 \paragraph{Expressions}
 The semantics of expressions is shown in Figure~\label{fig:sem-expr}. Note that
@@ -459,7 +486,7 @@ e} \\
 
 \subsection{Definitions}
 
-\begin{definition}[Variables]
+\begin{definition}[Free Variables]
   The free variables of a command $c$, written $\fvs(c) \subseteq \Var$, is the
   set of variables that occur at any point in $c$ (i.e. as the lhs of an
   assignment, in a boolean expression, a bitvector expression, as a key in a
@@ -559,29 +586,69 @@ e} \\
   \end{array}\]
 \end{proof}
 
+\begin{lemma}[Subset Packet Projection]
+  \label{lem:subset-pkt-proj}
+ Let $\pkt_1,\pkt_2 \in \Pkt$ and $U \subseteq V \subseteq \Var$,
+  If $\pkt_1 =_V \pkt_2$, then $\pkt_1 =_U \pkt_2$.
+\end{lemma}
+\begin{proof}
+  Let $\pkt_1$,$\pkt_2$, $U$, $V$ be given as above. Assume $\pkt_1 =_V \pkt_2$.
+  Let $x \in U$, show that $\pkt_1(x) = \pkt_2(x)$. Since $U \subseteq V$, $x
+  \in V$, so by assumption $\pkt_1(x) = \pkt_2(x)$.
+\end{proof}
 
-\begin{lemma}[Subset Implies Projected Subset]
+\begin{lemma}[Subset Projection Subset]
+  \label{lem:subset-proj-subset}
+  For $P,Q \subseteq \Pkt$ and $U \subseteq V \subseteq \Var$,
+  If $P \subseteq_V Q$, then $P \subseteq_U Q$.
+\end{lemma}
+
+\begin{proof}
+  Let $P$,$Q$,$U$,$V$ be given as above. Assume $P \subseteq_V Q$. Show $P
+  \subseteq_U Q$. Let $\pkt \in P$. Since $P \subseteq_V Q$, we know that there
+  is some $\pkt' \in Q$ such that $\pkt =_V \pkt'$. By Lemma~\ref{lem:subset-pkt-proj},
+  $\pkt =_U \pkt'$. The result follows.
+\end{proof}
+
+
+\begin{corollary}[Subset Implies Projected Subset]
   \label{lem:subset-proj}
   For $P,Q \subseteq \Pkt$, and $ V \subseteq \Var$,
   If $P \subseteq Q$ then $P \subseteq_V Q$.
+\end{corollary}
+
+\begin{lemma}[Subset Projection Equality]
+  \label{lem:subset-proj-equal}
+  For $P,Q \subseteq \Pkt$ and $U \subseteq V \subseteq \Var$,
+  If $P =_V Q$, then $P =_U Q$.
 \end{lemma}
 
 \begin{proof}
-Let $P,Q \subseteq \Pkt$ and $V \subseteq \Var$ be given. Assume $P \subseteq Q$,
-to show that $P \subseteq_V Q$.
-
-Let $\pkt \in P$. Since $P \subseteq Q$, $\pkt \in Q$. Notice that $\pkt =_V
-\pkt$, so $P \subseteq_V Q$.
+  Let $P$,$Q$,$U$,$V$ be given as above. Assume $P =_V Q$. Show $P =_U Q$. Let
+  $\pkt \in P$. Since $P =_V Q$, we know that $P \subseteq_V Q$ and $Q
+  \subseteq_V P$. By Lemma~\ref{lem:subset-proj-subset},$P \subseteq_U Q$ and $Q
+  \subseteq_U P$. Conclude $P =_U Q$.
 \end{proof}
 
-\begin{lemma}[Equality Implies Projected Equality]
+\begin{corollary}[Equality Implies Projected Equality]
   \label{lem:equal-proj}
-  For $P,Q \subseteq \Pkt$, and $ V \subseteq \Var$,
-  If $P = Q$ then $P =_V Q$.
+  For $P,Q \subseteq \Pkt$, and $ V \subseteq \Var$, If $P = Q$ then $P =_V Q$.
+\end{corollary}
+
+
+
+\begin{lemma}[Union Packet Projection]
+  \label{lem:union-pkt-proj}
+  For $\pkt_1,\pkt_2 \in \Pkt$, and $U, V \subseteq \Pkt$, if $\pkt_1 =_U
+  \pkt_2$ and $\pkt_1 =_V \pkt_2$, then $\pkt_1 =_{U \cup V} \pkt_2$.
 \end{lemma}
 
 \begin{proof}
-  By Lemma~\ref{lem:subset-proj}
+  Let $\pkt_1$, $\pkt_2$, $U$, $V$ be given as above. Assume $\pkt_1 =_U \pkt_2$
+  and $\pkt_1 =_V \pkt_2$. Let $x \in U \cup V$. There are two cases. If $x \in
+  U$, the assumption $\pkt_1 =_U \pkt_2 $ gives $\pkt_1(x) = \pkt_2(x)$.
+  Conversely if $x \in V$, the assumption $\pkt_1 =_V \pkt_2$ gives $\pkt_1(x) =
+  \pkt_2(x)$. Conclude $\pkt_1 =_{U \cup V} \pkt_2$.
 \end{proof}
 
 \begin{lemma}[Expression Projection]
@@ -590,7 +657,6 @@ Let $\pkt \in P$. Since $P \subseteq Q$, $\pkt \in Q$. Notice that $\pkt =_V
   expression $e \in \BVExpr$, such that $\efvs(e) \subseteq V$, $\edenote{e}\pkt =
   \edenote{e}(\pkt|_V)$.
 \end{lemma}
-
 \begin{proof}
   Let $V \subseteq \Var$ be given.
   Proceed by induction on $e$, leaving $\pkt$ arbitrary.
@@ -765,6 +831,42 @@ Let $\pkt \in P$. Since $P \subseteq Q$, $\pkt \in Q$. Notice that $\pkt =_V
 
 \subsection{Lemmas}
 
+\begin{lemma}[Input-Congruence]
+  \label{lem:input-congruence}
+  For $c,c',c_0 \in \Cmd$,
+  if for all $\sigma \in \State$ and $\pkt \in \Pkt$, $\denote{c}^\sigma \pkt = \denote{c'}^\sigma \pkt$,
+  then for all $\sigma \in \State$ and $\pkt \in \Pkt$, $\denote{c_0;c}^\sigma \pkt = \denote{c_0;c'}^\sigma\pkt$.
+\end{lemma}
+\begin{proof}
+  Let $c$, $c'$, $c_0$, $\sigma$ and $\pkt$ be given as above.
+  Let $\pkt_0 \in \denote{c_0}^\sigma \pkt$. By assumption $\denote{c}^\sigma \pkt_0 = \denote{c'}^\sigma \pkt_0$.
+  Conclude ${\denote{c}^\sigma}^\dagger\left(\denote{c_0}^\sigma\pkt\right) = {\denote{c'}^\sigma}^\dagger\left(\denote{c_0}^\sigma\pkt\right)$. The result follows
+
+\end{proof}
+
+
+\begin{lemma}[Congruence]
+  \label{lem:congruence}
+  For $c,c',c_a,c_b \in \Cmd$,
+  if for all $\sigma \in \State$ and $\pkt \in \Pkt$, $\denote{c}^\sigma \pkt = \denote{c'}^\sigma \pkt$,
+  then for all $\sigma \in \State$ and $\pkt \in \Pkt$, $\denote{c_a;c;c_b}^\sigma \pkt = \denote{c_a;c';c_b}^\sigma\pkt$.
+\end{lemma}
+
+\begin{proof}
+  Let $\sigma \in \State$ and $\pkt \in \Pkt$ be arbitrary. Compute:
+  \[\begin{array}{ll}
+  \denote{c_a;c;c_b}^\sigma \pkt \\
+  = {\denote{c_b}^\sigma}^\dagger\left({\denote{c}^\sigma}^\dagger\left(\denote{c_a}^\sigma \pkt\right)\right)\\
+  = {\denote{c_b}^\sigma}^\dagger\left({\denote{c'}^\sigma}^\dagger\left(\denote{c_a}^\sigma \pkt\right)\right)
+  & \text{By Lemma~\ref{lem:input-congruence}}\\
+  =\denote{c_a;c;c_b}^\sigma \pkt \\
+  \end{array}\]
+\end{proof}
+
+\begin{remark}
+  The proofs that follow rely so heavily on Lemma~\ref{lem:congruence}, that we omit recording it's use for simplicity.
+\end{remark}
+
 \begin{lemma}[Assume-Currying]
   \label{lem:assume-currying}
   For $b_1,b_2 \in \BExpr$, $\sigma : \Value \to \Row^*$,
@@ -802,9 +904,12 @@ Let $\pkt \in P$. Since $P \subseteq Q$, $\pkt \in Q$. Notice that $\pkt =_V
 \end{proof}
 
 
+
+
+
 \begin{lemma}[Pseudo-Parametricity]
   \label{lem:parametricity}
-  For $c \in \Cmd$, $\sigma : \State$, $y \in \Var$, $\pkt \in \Pkt$, if $y
+  For $c \in \Cmd$, $\sigma \in \State$, $y \in \Var$, $\pkt \in \Pkt$, if $y
   \not\in \fvs(c)$, then $\forall \pkt' \in \denote{c}^\sigma \pkt$, $\pkt'(y) =
   \pkt(y)$.
 \end{lemma}
@@ -1096,31 +1201,28 @@ By Lemma~\ref{lem:parametricity}.
   \denote{c_2;c_1}^\sigma \pkt$.
 \end{lemma}
 \begin{proof}
-  Let $c_1, c_2$, $\sigma$, and $\pkt$ be given as above.
-  Let $\{i,j\} = \{1,2\}$. Observe:
-  \[\begin{array}{ll}
-  \denote{c_i;c_j}^\sigma \pkt
-  = {\denote{c_j}\sigma}^\dagger\left(\denote{c_i}^\sigma \pkt\right)
-  \end{array}\]
+  Let $c_1, c_2$, $\sigma$, and $\pkt$ be given as above. Let $V = \Var
+  \setminus (\fvs(c_1)\cup \fvs(c_2))$Let $P_i = \denote{c_i}^\sigma \pkt$ for
+  $i = 1,2$, and $P_{ij} = { \denote{c_j}^\sigma}^\dagger P_i$ for $\{i,j\} =
+  \{1,2\}$. Note that $P_{ij} = \denote{c_i;c_j}^\sigma \pkt$.
 
-  Let $V = \Var \setminus \fvs(c_1;c_2)$. Let $P_1 = \denote{c_1}^\sigma \pkt$,
-  and $P_2 = \denote{c_2}^\sigma \pkt$. By Lemma~\ref{lem:parametricity-set}, the following hold
-  \[P_1 =_{\fvs(c_2) \cup V} \{\pkt\}\] \[P_2 =_{\fvs(c_1) \cup V} \{\pkt\}\]
-  So, Let $P_{12} = {\denote{c_2}^\sigma}^\dagger P_1$, and $P_{21} =
-  {\denote{c_1}^\sigma}^\dagger P_2$. Again, by
-  Lemma~\ref{lem:parametricity-set}, the following equivalences hold
-  \[P_{12} =_{\fvs(c_1) \cup V} P_1\] \[P_{21} =_{\fvs(c_2) \cup V} P_2\]
-  Now by Lemma~\ref{lem:proj-set-subset}, we know $P_{12} =_V \{\pkt\} = P_{21}$.
+  It suffices to show, without loss of generality, for $\pkt' \in P_{12}$,
+  there exists $\pkt_1 \in P_1$ and $\pkt_2 \in P_2$ such that
+  \[\pkt'(x) = \begin{cases}
+    \pkt_1(x),& \text{if } x \in \fvs(c_1)\\
+    \pkt_2(x),& \text{if } x \in \fvs(c_2)\\
+    \pkt(x), & \text{if } x \in V
+  \end{cases} \]
 
-  Now by Lemma~\ref{lem:param-noninter-set} we know
-  \[P_{21} =_{\fvs(c_1)} P_1\] \[P_{12} = \fvs(c_2) P_2\]
 
-  Then Lemma~\ref{lem:proj-set-subset} gives
-  \[P_{12} =_{\fvs(c_1)} {P_1}\] \[P_{21} =_{\fvs(c_2)} {P_2}\]
-
-  Finally Lemma~\ref{lem:union} proves our goal:
-  \[P_{12} =_{\fvs(c_1) \cup \fvs(c_2) \cup V} P_{21}\]
-
+  Let $\pkt' \in P_{12}$ be arbitrary. By definition, there exists $\pkt_1 \in
+  P_1$ such that $\pkt' \in \denote{c_2}^\sigma \pkt_1$. By
+  Lemma~\ref{lem:parametricity}, $\pkt'=_{\fvs(c_1)} \pkt_1$, so our first goal
+  is done. Further, by Lemma~\ref{lem:parametricity}, $\pkt_1 =_{\fvs(c_2)}
+  \pkt(x)$. So by Lemma~\ref{lem:param-noninter}, there is $\pkt_2 \in P_2$
+  such that $\pkt'(x) =_{\fvs(c_2)} \pkt_2(x)$. Then by
+  Lemma~\ref{lem:parametricity}, we know that $\pkt'(x) =_V \pkt(x)$. The result
+  follows.
 \end{proof}
 
 
@@ -1386,7 +1488,7 @@ values of the packet when evaluating $t.\keys$.
   \end{array}}
   \end{array}
   \]
-  \caption{Symbolic Table instrumentation. For simplicity, we
+  \caption{Symbolic Table Instrumentation. For simplicity, we
     assume each action in a table has the same number (and types) of parameters}
   \label{fig:table-instrument}
 \end{figure}
@@ -1402,14 +1504,34 @@ values of the packet when evaluating $t.\keys$.
   \wedge \bigwedge_{r_i \in \sigma(t.\id)} \left(\gamma_t.\hitAction \geq i \Leftrightarrow \bigwedge_{j=0}^{i-1} \neg t.\matchrow(r_j)[\gamma_t.\keys/t.\keys]\right)\\
   \end{array}\right)\\\\
 
-  \multicolumn{3}{l}{\state\sigma_c \in \BExpr} \\
-  \state\sigma_c &\triangleq
-  & \displaystyle\bigwedge_{ t \in \tables(c) } \state\sigma^t
+  \multicolumn{3}{l}{\state\sigma_T \in \BExpr} \\
+  \state\sigma_T &\triangleq
+  & \displaystyle\bigwedge_{ t \in T } \state\sigma^t
   \end{array}
   \]
-  \caption{Symbolic State Encoding}
+  \caption{Symbolic State Encoding. Where $T \subseteq \Table$. We write
+    $\state\sigma_c$ where $c \in \Cmd$ as shorthand for $\state\sigma_{\tables(c)}$.}
   \label{fig:table-instrument}
 \end{figure}
+
+\begin{lemma}[Symbolic State Distributes]
+  \label{lem:sigma-distrib}
+  For $\sigma : \Value \to \Row^*$, $T,T_1,T_2 \subseteq \Table$ such that $T = T_1 \subseteq T_2$,
+  $\state\sigma_{T} \Leftrightarrow \state{\sigma}_{T_1}\wedge\state{\sigma}_{T_2}$
+\end{lemma}
+
+\begin{proof}
+  Let $\sigma$, $T$, $T_1$, $T_2$ be given as above. Assume $T = T_1 \subseteq T_2$.
+  Compute:
+  \[\state\sigma_T\Leftrightarrow
+  \left(\bigwedge_{t \in T} \state\sigma^t\right) \Leftrightarrow
+  \left(\bigwedge_{t \in T_1 \cup T_2} \state\sigma^t\right) \Leftrightarrow
+  \left(\bigwedge_{t \in T_1} \state\sigma^t \wedge \bigwedge_{t \in T_2}\state\sigma^t \right) \Leftrightarrow
+  \state\sigma_{T_1} \wedge \state\sigma_{T_2}
+  \]
+
+\end{proof}
+
 
 \begin{lemma}[Symbolic State distributes over Sequence]
   \label{lem:sigma-distrib-seq}
@@ -1418,52 +1540,30 @@ values of the packet when evaluating $t.\keys$.
 \end{lemma}
 
 \begin{proof}
-  Let $\sigma : \Value \to \Row^*$ and $c_1,c_2\in \Cmd$ be given. Notice that
-  $\tables(c_1;c_2) = \tables(c_1) \cup \tables(c_2)$. Compute:
-  \[
-  \begin{array}{l >{\displaystyle}ll}
-    \state\sigma_{c_1;c_2}
-    & = \bigwedge_{ t \in \tables(c_1;c_2) } \state\sigma^t \\
-    & = \bigwedge_{ t \in \tables(c_1)\cup \tables(c_2) } \state\sigma^t \\
-    & = \bigwedge_{t \in \tables(c_1)} \state\sigma^t \wedge \bigwedge_{t \in \tables(c_2)} \state\sigma^t \\
-    & = \state\sigma_{c_1} \wedge \state\sigma_{c_2}
-  \end{array}
-  \]
+  By Lemma~\ref{lem:sigma-distrib} since $\tables(c_1;c_2) = \tables(c_1) \cup \tables(c_2)$.
 \end{proof}
 
-\begin{lemma}[Symbolic State distributes over Choice]
+\begin{lemma}[Symbolic State Distributes Over Choice]
   \label{lem:sigma-distrib-choice}
   For $\sigma : \Value \to \Row^*$, $c_1,c_2 \in \Cmd$,
   $\state\sigma_{c_1 \choice c_2} \Leftrightarrow \state{\sigma}_{c_1}\wedge\state{\sigma}_{c_2}$
 \end{lemma}
 
 \begin{proof}
-  Let $\sigma : \Value \to \Row^*$ and $c_1,c_2\in \Cmd$ be given. Notice that
-  $\tables(c_1 \choice c_2) = \tables(c_1) \cup \tables(c_2)$. Compute:
-  \[
-  \begin{array}{l >{\displaystyle}ll}
-    \state\sigma_{c_1 \choice c_2}
-    & = \bigwedge_{ t \in \tables(c_1 \choice c_2) } \state\sigma^t \\
-    & = \bigwedge_{ t \in \tables(c_1)\cup \tables(c_2) } \state\sigma^t \\
-    & = \bigwedge_{t \in \tables(c_1)} \state\sigma^t \wedge \bigwedge_{t \in \tables(c_2)} \state\sigma^t \\
-    & = \state\sigma_{c_1} \wedge \state\sigma_{c_2}
-  \end{array}
-  \]
+  By Lemma~\ref{lem:sigma-distrib} since $\tables(c_1;c_2) = \tables(c_1) \cup \tables(c_2)$.
 \end{proof}
-
-
 
 
 \begin{samepage}
 \begin{theorem}[Instrumentation Equivalence]
   \label{thm:instr-equiv}
   Given a set of variables $V \subseteq \Var$ that contains no ghost variables
-  or symbolic variables. For every $c \in \Cmd$ such that $\fvs(c) \subseteq V$,
+  or symbolic variables. For every well-formed $c \in \Cmd$ such that $\fvs(c) \subseteq V$,
   well-formed state $\sigma : \Value \to \Row^*$, and packet $\pkt \in \Pkt$,
-  where $R = \{\rho_t \mid t \in \tables(c)\}$, and $G = \{\gamma_t \mid t \in
-  \tables(c)\}$,
+  where $T \supseteq \tables(c)$, $R \supseteq \{\rho_t \mid t \in T\}$, and $G \supseteq \{\gamma_t \mid t \in
+  T\}$,
 
-  \[\denote{c}^\sigma\,\pkt =_V \denote{\havoc {R \cup G}; \assume{\state\sigma}_t; c\instr}\,\pkt  \]
+  \[\denote{c}^\sigma\,\pkt =_V \denote{\havoc {R \cup G}; \assume{\state\sigma}_T; c\instr}\,\pkt  \]
 \end{theorem}
 \end{samepage}
 
@@ -1474,28 +1574,29 @@ values of the packet when evaluating $t.\keys$.
   \item[$(c = \havoc x)$] \textit{sim}.
   \item[$(c = \assume b)$] \textit{sim}.
   \item[$(c = \assert b)$] \textit{sim}.
-  \item[$(c = c_1;c_2)$] Let $R_i = \{\rho_t \mid t \in \tables(c_i)\}$ for $i =
-    1,2$. Notice that $R = R_1 \cup R_2$. Similarly, let $G_i = \{\gamma_t \mid
-    t \in \tables(c_i)\}$ for $i = 1,2$. Notice that $G = G_1 \cup G_2$. Compute
+  \item[$(c = c_1;c_2)$] Note that well-formedness\todo{define well formedness as single-use tables} implies $\tables(c_1) \cap
+    \tables(c_2) = \emptyset$. Let $T_2 = \tables(c_2)$ and $T_1 = T \setminus
+    T_2$. Let $R_2 = \{\rho_t.* \mid t \in T_2\}$ and $R_1 = R \setminus R_2$.
+    Let $G_2 = \{\rho_t.* \mid t \in T_2\}$ and $G_1 = G \setminus G_2$. Compute
     as follows:
     \[\begin{array}{ll}
-    \denote{\havoc {R \cup G}; \assume{\state\sigma_{c_1;c_2}};(c_1;c_2)\instr}\,\pkt
+    \denote{\havoc {R \cup G}; \assume{\state\sigma_{T}};(c_1;c_2)\instr}\,\pkt
     & \\
-    = \denote{\havoc{R\cup G}; \assume{\state\sigma_{c_1;c_2}}; c_1\instr;c_2\instr}\,\pkt
+    = \denote{\havoc{R\cup G}; \assume{\state\sigma_{T}}; c_1\instr;c_2\instr}\,\pkt
     & \text{definition of }(\cdot)\instr \\
-    = \denote{\havoc{R\cup G}; \assume{\state\sigma_{c_1}};\assume{\state\sigma_{c_2}};c_1\instr;c_2\instr}\,\pkt
+    = \denote{\havoc{R\cup G}; \assume{\state\sigma_{T_1}};\assume{\state\sigma_{T_2}};c_1\instr;c_2\instr}\,\pkt
     & \text{By Lemmas~\ref{lem:sigma-distrib-seq} \&~\ref{lem:assume-currying}} \\
-    = \denote{\havoc{R_1};\havoc{G_1}; \havoc{R_2};\havoc{G_2}; \assume{\state\sigma_{c_1}};\assume{\state\sigma_{c_2}};c_1\instr;c_2\instr}\,\pkt
+    = \denote{\havoc{R_1 \cup G_1}; \havoc{R_2 \cup G_2}; \assume{\state\sigma_{T_1}};\assume{\state\sigma_{T_2}};c_1\instr;c_2\instr}\,\pkt
+    & \text{By definition } \\
+    = \denote{\havoc{R_1\cup G_1}; \havoc{R_2 \cup G_2}; \assume{\state\sigma_{T_1}};c_1\instr;\assume{\state\sigma_{T_2}};c_2\instr}\,\pkt
+    & \text{By Lemma~\ref{lem:disj-comm} and } \tables(c_1) \cap \tables(c_2) = \emptyset \\
+    = \denote{(\havoc{R_1 \cup G_1}; \assume{\state\sigma_{T_1}};c_1\instr);
+      (\havoc{R_2 \cup G_2};\assume{\state\sigma_{T_2}};c_2\instr)}\,\pkt
+    & \text{By Lemma~\ref{lem:disj-comm} and } \tables(c_1) \cap \tables(c_2) = \emptyset\\
+    = \denote{\havoc{R_2 \cup G_2};\assume{\state\sigma_{T_2}};c_2\instr}^\dagger
+    \left(\denote{\havoc{R_1 \cup G_1}; \assume{\state\sigma_{T_1}};c_1\instr}\,\pkt\right)
     & \text{by definition} \\
-    = \denote{\havoc{R_1};\havoc{G_1}; \havoc{R_2}; \havoc{G_2}; \assume{\state\sigma_{c_1}};c_1\instr;\assume{\state\sigma_{c_2}};c_2\instr}\,\pkt
-    & \text{By Lemma~\ref{lem:disj-comm}} \\
-    = \denote{(\havoc{R_1}; \havoc{G_1}; \assume{\state\sigma_{c_1}};c_1\instr);
-      (\havoc{R_2}; \havoc{G_2};\assume{\state\sigma_{c_2}};c_2\instr)}\,\pkt
-    & \text{By Lemma~\ref{lem:disj-comm}}\\
-    = \denote{\havoc{R_2}; \havoc{G_2};\assume{\state\sigma_{c_2}};c_2\instr}^\dagger
-    \left(\denote{\havoc{R_1}; \havoc{G_1}; \assume{\state\sigma_{c_1}};c_1\instr}\,\pkt\right)
-    & \text{by definition} \\
-    =_V {\denote{c_2}^\sigma}^\dagger \left(\denote{\havoc{\vec{\rho_{t_1}}}; \havoc{\vec\gamma_{t_1}}; \assume{\state\sigma_{c_1}};c_1\instr}\,\pkt\right)
+    =_V {\denote{c_2}^\sigma}^\dagger \left(\denote{\havoc{R_1 \cup G_1}; \assume{\state\sigma_{T_1}};c_1\instr}\,\pkt\right)
     & \text{by IH}(c_2) \text{ since } \fvs(c_2) \subseteq \fvs(c_1;c_2) \subseteq V \\
     =_V {\denote{c_2}^\sigma}^\dagger \left({\denote{c_1}^\sigma}^\dagger\pkt\right)
     & \text{by IH}(c_1) \text{ since } \fvs(c_1) \subseteq \fvs(c_1;c_2) \subseteq V \\
@@ -1505,35 +1606,32 @@ values of the packet when evaluating $t.\keys$.
 
     The result follows by Lemma~\ref{lem:equal-proj}.
 
-  \item[$(c = c_1\choice c_2)$] Let $R_i = \{\rho_t \mid t \in \tables(c_i)\}$ for $i =
-    1,2$. Notice that $R = R_1 \cup R_2$. Similarly, let $G_i = \{\gamma_t \mid
-    t \in \tables(c_i)\}$ for $i = 1,2$. Notice that $G = G_1 \cup G_2$. Compute
-    as follows:
+  \item[$(c = c_1\choice c_2)$]
     \[\begin{array}{ll}
-    \denote{\havoc{R \cup G};\assume{\state\sigma_{c_1\choice c_2}}; (c_1 \choice c_2)\instr}\,\pkt\\
+    \denote{\havoc{R \cup G};\assume{\state\sigma_{T}}; (c_1 \choice c_2)\instr}\,\pkt
     & \\
-    = \denote{\havoc{R \cup G};\assume{\state\sigma_{c_1\choice c_2}}; (c_1\instr \choice c_2\instr)}\,\pkt\\
+    = \denote{\havoc{R \cup G};\assume{\state\sigma_{T}}; (c_1\instr \choice c_2\instr)}\,\pkt
     & \text{by definition of }(\cdot)\instr\\
-    = \denote{\havoc{R \cup G};\assume{\state\sigma_{c_1} \wedge \state\sigma_{c_2}}; (c_1\instr \choice c_2\instr)}\,\pkt
-    & \text{By Lemma~\ref{lem:sigma-distrib-choice}}\\
-    = \denote{\havoc{R \cup G};\assume{\state\sigma_{c_1}}; \assume{\state\sigma_{c_2}}; (c_1\instr  \choice   c_2\instr)}\,\pkt
-    & \text{By Lemma~\ref{lem:assume-currying}}\\
-    = \denote{\havoc{R \cup G};\assume{\state\sigma_{c_1}}; \assume{\state\sigma_{c_2}}; c_1\instr
-      \choice \havoc{R \cup G};\assume{\state\sigma_{c_1}}; \assume{\state\sigma_{c_2}}; c_2\instr}\,\pkt
+    %% = \denote{\havoc{R \cup G};\assume{\state\sigma_{T_1} \wedge \state\sigma_{T_2}}; (c_1\instr \choice c_2\instr)}\,\pkt
+    %% & \text{By Lemma~\ref{lem:sigma-distrib-choice}}\\
+    %% = \denote{\havoc{R \cup G};\assume{\state\sigma_{T_1}}; \assume{\state\sigma_{T_2}}; (c_1\instr  \choice   c_2\instr)}\,\pkt
+    %% & \text{By Lemma~\ref{lem:assume-currying}}\\
+    = \denote{\havoc{R \cup G};\assume{\state\sigma_{T}}; c_1\instr
+      \choice \havoc{R \cup G};\assume{\state\sigma_{T}}; c_2\instr}\,\pkt
     & \text{By Lemma~\ref{lem:prod-sum}} \\
-    = \denote{\havoc{R \cup G}; \assume{\state\sigma_{c_1}}; c_1\instr
-      \choice \havoc{R \cup G}; \assume{\state\sigma_{c_2}}; c_2\instr}\,\pkt
-    & \text{BY UNUSED-VARIABLES -> TRIVIAL ASSUMPTIONS LEMMA} \\
-    =_V \denote{\havoc{R_1 \cup G_1}; \assume{\state\sigma_{c_1}}; c_1\instr
-      \choice \havoc{R_2 \cup G_2}; \assume{\state\sigma_{c_2}}; c_2\instr}\,\pkt
-    & \text{BY UNUSEDVARIABLE HAVOC ELIMINATION LEMMA } \\
-    = \denote{\havoc{R_1 \cup G_1}; \assume{\state\sigma_{c_1}}; c_1\instr}\,\pkt
-    \cup \denote{\havoc{R_2 \cup G_2}; \assume{\state\sigma_{c_2}}; c_2\instr}\,\pkt
+    %% = \denote{\havoc{R \cup G}; \assume{\state\sigma_{T_1}}; c_1\instr
+    %%   \choice \havoc{R \cup G}; \assume{\state\sigma_{T_2}}; c_2\instr}\,\pkt
+    %% & \text{BY UNUSED-VARIABLES -> TRIVIAL ASSUMPTIONS LEMMA} \\
+    %% =_V \denote{\havoc{R_1 \cup G_1}; \assume{\state\sigma_{c_1}}; c_1\instr
+    %%   \choice \havoc{R_2 \cup G_2}; \assume{\state\sigma_{c_2}}; c_2\instr}\,\pkt
+    %% & \text{BY UNUSEDVARIABLE HAVOC ELIMINATION LEMMA } \\
+    = \denote{\havoc{R \cup G}; \assume{\state\sigma_{T}}; c_1\instr}\,\pkt
+    \cup \denote{\havoc{R \cup G}; \assume{\state\sigma_{T}}; c_2\instr}\,\pkt
     & \text{by definition of }\denote{\cdot} \\
-    =_V \denote{c_1}^\sigma\pkt \cup \denote{\havoc{R_2 \cup G_2}; \assume{\state\sigma_{c_2}}; c_2\instr}\,\pkt
-    & \text{By IH}(c_1) \text{ since } \fvs(c_1) \subseteq \fvs(c_1 \choice c_2) \subseteq V \\
+    =_V \denote{c_1}^\sigma\pkt \cup \denote{\havoc{R \cup G}; \assume{\state\sigma_{T}}; c_2\instr}\,\pkt
+    & \text{By IH}(c_1) \text{ since } \fvs(c_1) \subseteq \fvs(c_1 \choice c_2) \subseteq V, \tables(c_1) \subseteq T \\
     =_V \denote{c_1}^\sigma\pkt \cup \denote{c_2}^\sigma\pkt
-    & \text{By IH}(c_2) \text{ since } \fvs(c_2) \subseteq \fvs(c_1 \choice c_2) \subseteq V \\
+    & \text{By IH}(c_2) \text{ since } \fvs(c_2) \subseteq \fvs(c_1 \choice c_2) \subseteq V, \tables(c_2) \subseteq T \\
     = \denote{c_1 \choice c_2}^\sigma\pkt
     & \text{by definition of }\denote{\cdot}^\sigma
     \end{array}
@@ -1545,7 +1643,7 @@ values of the packet when evaluating $t.\keys$.
     $[r_1,\ldots, r_n] = \sigma(t)$.
 
     Let $P = \{\pkt\{\rho_t.* \mapsto
-      v\}\{\gamma_t.* \mapsto v' \mid v,v' \in \Value\} \}$ \todo{clean this up}.
+      v\}\{\gamma_t.* \mapsto v' \mid v,v' \in \Value\} \}$.
       Compute as follows:
 
       \[\begin{array}{lcl}
@@ -1704,27 +1802,28 @@ $\rho$, and header values $h.f$ are unbound.
 
 \begin{theorem}[VC Correctness]
   \label{thm:vc-correct}
-  Given a set of variables $V$, for every $c \in \Cmd$ such that $\fvs(c) = V$,
+  Given a set of variables $V$, for every well-formed $c \in \Cmd$ such that $\fvs(c) = V$,
   and $\sigma \in \State$, the following formula is valid:
-  \[ \forall V. \WP(c[\sigma], \TRUE) \iff \forall V. (\forall \vec{\rho_t}. \forall \vec{\gamma_t}. \state\sigma_c \Rightarrow  \WP(c\instr,\TRUE)\]
+  \[ \forall V. \WP(c[\sigma], \TRUE) \iff \forall V. (\forall R. \forall G. \state\sigma_c \Rightarrow  \WP(c\instr,\TRUE)\]
+  where $R = \{\rho_t.* \mid t \in \tables(c)\}$ and $G = \{\gamma_t.*\mid t \in \tables (c)\}$.
 \end{theorem}
 
 \begin{proof}
-  Let $c$ and $\sigma$ be arbitary.
+  Let $V$, $c$, and $\sigma$ be given as above.
   Theorem~\ref{thm:instr-equiv} gives the equivalence
-  \[\forall \pkt. \denote{c}^\sigma\,\pkt =_{\fvs(c)} \denote{\havoc \vec{\rho_t}; \havoc{\vec{\gamma_t}}; \assume{\state\sigma_c}; c\instr}\,\pkt\]
+  \[\forall \pkt. \denote{c}^\sigma\,\pkt =_{\fvs(c)} \denote{\havoc{R \cup G}; \assume{\state\sigma_c}; c\instr}\,\pkt\]
 
   By Theorem~\ref{thm:subst}, we get
 
-  \[\forall \pkt.\denote{c[\sigma]}\,\pkt =_{\fvs(c)}  \denote{\havoc \vec{\rho_t}; \havoc{\vec{\gamma_t}}; \assume{\state\sigma_c}; c\instr}\,\pkt\]
+  \[\forall \pkt.\denote{c[\sigma]}\,\pkt =_{\fvs(c)}  \denote{\havoc{R \cup G}; \assume{\state\sigma_c}; c\instr}\,\pkt\]
 
   By Dijkstra, we can see
 
-  \[\forall V. \WP(c[\sigma], \TRUE) \iff \forall V. \WP(\havoc \vec{\rho_t}; \havoc{\vec{\gamma_t}}; \assume{\state\sigma_c}; c\instr, \TRUE))\]
+  \[\forall V. \WP(c[\sigma], \TRUE) \iff \forall V. \WP(\havoc{R \cup G}; \assume{\state\sigma_c}; c\instr, \TRUE))\]
 
   By definition of $\WP$, this is equivalent to
 
-  \[ \forall V. \WP(c[\sigma],\TRUE) \iff \forall V. \left(\forall \vec{\rho_t}.\forall \vec{\gamma_t}.\state\sigma_c \Rightarrow \WP(c\instr, \TRUE)\right)\]
+  \[ \forall V. \WP(c[\sigma],\TRUE) \iff \forall V. \left(\forall R.\forall G.\state\sigma_c \Rightarrow \WP(c\instr, \TRUE)\right)\]
 
 \end{proof}
 
@@ -1770,34 +1869,60 @@ In the following we assume a terminating function $\qe : \Var \times \BExpr \to
 \BExpr$ such that for $V \in \Var$ and $b \in \BExpr$, $\bfvs(\qe(V,b)) \cap V =
 \emptyset$ and $\qe(V,b) \Leftrightarrow \forall V. b$.
 
-%% \begin{lemma}[Universal Quantifier Weakness]
-%%   For $b \in \BExpr$ and $V \subseteq \bfvs(b)$, $\forall V. b$ is the weakest
-%%   formula on variables $\bfvs(b) \setminus V$ that implies $b$.
-%% \end{lemma}
-%% \begin{proof}
-%%   Elementary.
-%% \end{proof}
+\begin{lemma}[Universal Quantifier Weakness]
+  \label{lem:quantified-weakest}
+  For $b \in \BExpr$ and $V \subseteq \Var$, $\forall V. b$ is the weakest
+  formula on variables $\Var \setminus V$ that implies $b$.
+\end{lemma}
+\begin{proof}
+  Let $b$ and $V$ be given. Assume there is some $b' \Rightarrow b$ such that
+  $\bfvs(b') \subseteq \Var \setminus V$. Show that $b' \Rightarrow \forall
+  V.b$.
+
+  \[\begin{array}{rll}
+   1. & b' \Rightarrow b & \textit{assumption} \\
+   2. & b' & \textit{Assumption} \\
+   3. & V & \textit{arbitrary} \\
+   4. & b & \textit{modus ponens (1,2)} \\
+   5. & \forall V.b & \forall\textit{-intro (3-4)}\\
+   6. & b' \Rightarrow \forall V. b & \Rightarrow\textit{-intro (2-5)}
+  \end{array}\]
+
+
+\end{proof}
 
 \begin{theorem}[Quantifer Elimination]
-  For every instrumentation-free command $c \in \Cmd$, the formula $\qe(\fvs(c), \WP(c\instr, \TRUE))$ is a solution to the \textbf{Inference Problem}.
+  For $D \subseteq \Var$ a set of dataplane variables and $C \subseteq \Var$ a
+  set of control plane variables such that $D \cap C = \emptyset$, for every well-formed
+  command $c \in \Cmd$ such that $\fvs(c) \subseteq D$, the formula $\qe(D,
+  \WP(c\instr, \TRUE))$ is a solution to the \textbf{Inference Problem}.
 \end{theorem}
 
 \begin{proof}
-  Let $c \in \Cmd$ be instrumentation-free. Let $R$ be the set of symbolic row
-  variables in $c\instr$, and let $G$ be the set of ghost variables in $c\instr$,
-  Let $\varphi = \qe(\fvs(c),\WP(c\instr, \TRUE))$. Since $\bfvs(\varphi) \cap
-  \fvs(c) = \emptyset$, it is trivial to show \todo{do it} that $\varphi$ is a
-  control plane formula.
+  Let $D$, $C$, and $c$ be given as above. Let $R \subseteq C$ be the set of
+  symbolic row variables in $c\instr$, and let $G \subseteq C$ be the set of
+  ghost variables in $c\instr$. Notice that $\fvs(c\instr) = \fvs(c) \cup G \cup
+  R$. Let $\varphi = \qe(D,\WP(c\instr, \TRUE))$. Since
+  $\bfvs(\WP(c\instr,\TRUE)) \subseteq \fvs(c\instr)$, and $\bfvs(\varphi) \cap
+  D = \emptyset$, we know that $\varphi$ is a control plane formula.
 
   Now, let $\sigma$ be such that $\state\sigma_c \Rightarrow \varphi$ is valid,
   i.e. $\forall R. \forall G. \state\sigma_c \Rightarrow \varphi$ is valid. By
   assumption about $\qe$, this is equivalent to $\forall R.\forall G.
-  \state\sigma_c \Rightarrow \WP(c\instr, \TRUE)$. By
-  Theorem~\ref{thm:vc-correct}, $\WP(c[\sigma],\TRUE)$ is valid. By Dijkstra,
+  \state\sigma_c \Rightarrow \forall D. \WP(c\instr, \TRUE)$. Since
+  $\bfvs(\state\sigma_c) \cap D = \emptyset$, we can equivalently write $\forall
+  D. \forall R. \forall G. \state\sigma_c \Rightarrow \WP(c\instr,\TRUE)$. By
+  Theorem~\ref{thm:vc-correct}, $\forall D. \WP(c[\sigma],\TRUE)$ is valid. By Dijkstra,
   $\forall \pkt \in \Pkt. \denote{c[\sigma]} \neq \error$. Conclude $\forall
   \pkt \in \Pkt. \denote{c}^\sigma \neq \error$, by Theorem~\ref{thm:subst}.
 
-  \todo[inline]{weakest?}
+  Now, by Theorem~\ref{thm:vc-correct} it suffices to show that $\varphi$ is the
+  weakest control plane formula stronger than $\WP(c[?], \TRUE)$. By
+  Lemma~\ref{lem:quantified-weakest}, $\forall D. \WP(c\instr, \TRUE)$ is the
+  weakest condition on variables $C$ that is still stronger than
+  $\WP(c\instr,\TRUE)$. Since $\varphi \Leftrightarrow \forall D. \WP(c\instr,
+  \TRUE)$, $\varphi$ is the weakest condition stronger than $\WP(c\instr,\TRUE)$.
+
 \end{proof}
 
 
