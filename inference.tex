@@ -1210,10 +1210,10 @@ values of the packet when evaluating $t.\keys$.
   \multicolumn{3}{l}{
     \qquad
     \begin{array}[t]{l} \displaystyle
-      \assume t.\matchrow(\rho_t); \\
       \assume \gamma_t.\keys = t.\keys; \\
     \displaystyle \bigchoice_{i=0}^{|t.\action| -1}
     \left(\begin{array}{l}
+      \assume t.\matchrow(\rho_t); \\
       \assume \gamma_t.\miss = 0;\\
       \assume \rho_t.\action = i;\\
       \assume \gamma_t.\hitAction = \rho_t.\id;\\
