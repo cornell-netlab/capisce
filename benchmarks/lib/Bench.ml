@@ -33,5 +33,6 @@ let benchmark ntables =
   let prog = Cmd.sequence (gen_benchmark ntables []) in
   let asst = gen_asst (ntables - 1) in
   let phi = VCGen.wp prog asst in
-  let (ds,_) = Test.vars phi in
-  Test.Forall(ds, phi)
+  let (dvs,cvs) = Test.vars phi in
+  Test.Forall(dvs, phi)
+  |> Smt.string cvs 

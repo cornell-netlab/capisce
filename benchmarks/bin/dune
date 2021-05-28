@@ -1,4 +1,4 @@
 (executable
  (name main)
- (libraries core async pbench cohttp-async yojson)
+ (libraries pbench core)
  (preprocess (pps ppx_jane)))

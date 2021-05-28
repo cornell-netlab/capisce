@@ -1,11 +1,14 @@
 type bop =
   | BAnd
   | BOr
-  | BXor
   | UAdd
-  | USub
   | UMul
-   
+
+let bop_to_smtlib = function
+  | BAnd -> "bvand"
+  | BOr -> "bvor"
+  | UAdd -> "bvadd"
+  | UMul -> "bvmul"
    
 type t =
   | BV of Bigint.t * int
@@ -40,3 +43,16 @@ let rec vars e =
   | Neg e ->
      vars e
      
+
+let rec to_smtlib = function
+  | BV (n,w) ->
+     Printf.sprintf "(_ bv%s %d)" (Bigint.to_string n) w
+  | Var v ->
+     Var.str v
+  | BinOp (op, e1, e2) ->
+     Printf.sprintf "(%s %s %s)"
+       (bop_to_smtlib op)
+       (to_smtlib e1)
+       (to_smtlib e2)
+  | Neg e ->
+     Printf.sprintf "(bvnot %s)" (to_smtlib e)

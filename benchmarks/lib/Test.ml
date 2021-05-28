@@ -5,6 +5,11 @@ type bop =
   | LOr
   | LArr
 
+let bop_to_smtlib = function
+  | LAnd -> "and"
+  | LOr -> "or"
+  | LArr -> "=>"
+
 type t =
   | TFalse
   | TTrue
@@ -13,7 +18,23 @@ type t =
   | TEq of Expr.t * Expr.t
   | Forall of Var.t list * t
   | Exists of Var.t list * t
-         
+
+let rec to_smtlib = function
+  | TFalse -> "false"
+  | TTrue -> "true"
+  | TNot t -> Printf.sprintf "(not %s)" (to_smtlib t)
+  | TBin (b,t1,t2) ->
+     Printf.sprintf "(%s %s %s)" (bop_to_smtlib b) (to_smtlib t1) (to_smtlib t2)
+  | TEq (e1,e2) ->
+     Printf.sprintf "(= %s %s)" (Expr.to_smtlib e1) (Expr.to_smtlib e2)
+  | Forall (vs, t) ->
+     Printf.sprintf "(forall (%s) %s)"
+       (Var.list_to_smtlib_quant vs)
+       (to_smtlib t)
+  | Exists (vs, t) ->
+     Printf.sprintf "(exists (%s) %s)"
+       (Var.list_to_smtlib_quant vs)
+       (to_smtlib t)
                     
 let rec subst x e t =
   match t with
