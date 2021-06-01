@@ -19,6 +19,17 @@ type t =
   | Forall of Var.t list * t
   | Exists of Var.t list * t
 
+
+let false_ = TFalse
+let true_ = TTrue
+let not_ b = TNot b
+let and_ b1 b2 = TBin(LAnd, b1, b2)
+let or_ b1 b2 = TBin(LOr, b1, b2)
+let imp_ b1 b2 = TBin(LArr, b1, b2)
+let eq_ e1 e2 = TEq(e1,e2)
+let forall vs b = Forall(vs, b)
+let exists vs b = Exists(vs, b)                                  
+            
 let rec to_smtlib = function
   | TFalse -> "false"
   | TTrue -> "true"

@@ -1,6 +1,6 @@
 open Core
    
-type t = String.t * int [@@deriving compare, equal]
+type t = String.t * int [@@deriving compare]
 
 let make s i : t = (s,i)
 let str ((s,_) : t) = s
@@ -10,14 +10,14 @@ let dedup = List.dedup_and_sort ~compare
                      
 let ghost = "gamma"
 let is_ghost (s,_) = String.is_prefix s ~prefix:ghost           
-let ghost_var id k =
+let make_ghost id k =
   let x = Printf.sprintf "%s_%d__%s" ghost id (str k) in
   let w = size k in
   make x w
 
 let symbRow = "rho"
 let is_symbRow (s,_) = String.is_prefix s ~prefix:symbRow
-let symbRow_var id k =            
+let make_symbRow id k =            
   let x = Printf.sprintf "%s_%d__%s" symbRow id (str k)in
   let w = size k in
   make x w

@@ -16,6 +16,13 @@ type t =
   | BinOp of bop * t * t
   | Neg of t
 
+let bv n w = BV(n,w)
+let var v = Var v
+let band e1 e2 = BinOp(BAnd, e1, e2)
+let bor e1 e2 = BinOp(BOr, e1, e2)
+let badd e1 e2 = BinOp(UAdd, e1, e2)              
+let bmul e1 e2 = BinOp(UMul, e1, e2)
+
 let rec subst (x : Var.t) e0 e =
   match e with
   | BV _ -> e
