@@ -36,7 +36,7 @@ let negate = function
 let rec subst x e c =
   match c with
   | Assume t -> Assume (Test.subst x e t)
-  | Assert t -> Assume (Test.subst x e t)
+  | Assert t -> Assert (Test.subst x e t)
   | Havoc y ->
      if Var.(x = y) then
        failwith "tried to substitute an lvalue"
