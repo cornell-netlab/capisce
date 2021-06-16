@@ -16,8 +16,18 @@ let assign x e = Assign (x,e)
 let seq c1 c2 = Seq(c1,c2)
 let choice c1 c2 = Choice(c1,c2)              
             
-let sequence cs =
-  List.fold cs ~init:(Assume Test.true_) ~f:(fun acc c -> Seq(acc,c))
+let rec sequence cs =
+  match cs with
+  | [] -> failwith "sequence cannot be passed an empty list"
+  | [c] -> c
+  | c::cs -> Seq(c, sequence cs)
+  (* List.fold cs ~init:(Assume Test.true_) ~f:(fun acc c -> Seq(acc,c)) *)
+
+let negate = function
+  | Assume t -> Assume (Test.not_ t)
+  | Assert t -> Assert (Test.not_ t)
+  | _ -> failwith "Can only negate an assumption or assertion"
+
 (**/ END Smart Constructors*)            
 
 
@@ -51,11 +61,12 @@ let match_key id k =
   let open Test in
   let open Expr in
   let v = Var.make_symbRow id k in
-  let km = Var.(make (str k ^ "_match") (size k)) in
-  let m = Var.make_symbRow id km in
-  eq_
-    (band (var v) (var m))
-    (band (var k) (var m)) 
+  (* let km = Var.(make (str k ^ "_match") (size k)) in
+   * let m = Var.make_symbRow id km in *)
+  (* eq_
+   *   (band (var v) (var m))
+   *   (band (var k) (var m))  *)
+  eq_ (var v) (var k)
 
 let matchrow id ks =
   let open Test in

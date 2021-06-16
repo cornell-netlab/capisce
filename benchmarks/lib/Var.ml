@@ -2,20 +2,23 @@ open Core
    
 type t = String.t * int [@@deriving compare]
 
-let make s i : t = (s,i)
+let make s i : t =
+  if String.length s = 0 then
+    failwith "Variable cannot have length 0"
+  else (s,i)
 let str ((s,_) : t) = s
 let size ((_,i) : t) = i
 
 let dedup = List.dedup_and_sort ~compare
                      
-let ghost = "gamma"
+let ghost = "ghost"
 let is_ghost (s,_) = String.is_prefix s ~prefix:ghost           
 let make_ghost id k =
   let x = Printf.sprintf "%s_%d__%s" ghost id (str k) in
   let w = size k in
   make x w
 
-let symbRow = "rho"
+let symbRow = "row"
 let is_symbRow (s,_) = String.is_prefix s ~prefix:symbRow
 let make_symbRow id k =            
   let x = Printf.sprintf "%s_%d__%s" symbRow id (str k)in
