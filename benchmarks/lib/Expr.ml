@@ -1,9 +1,12 @@
+open Core
+   
 type bop =
   | BAnd
   | BOr
   | UAdd
   | UMul
   | USub
+  [@@deriving eq]
 
 let bop_to_smtlib = function
   | BAnd -> "bvand"
@@ -17,6 +20,7 @@ type t =
   | Var of Var.t
   | BinOp of bop * t * t
   | Neg of t
+  [@@deriving eq]
 
 let bv n w = BV(n,w)
 let var v = Var v
@@ -66,3 +70,13 @@ let rec to_smtlib = function
        (to_smtlib e2)
   | Neg e ->
      Printf.sprintf "(bvnot %s)" (to_smtlib e)
+
+
+let index_subst s_opt e =
+  match s_opt with
+  | None -> e    
+  | Some s -> 
+     Subst.to_vsub_list s
+     |> List.fold ~init:e
+          ~f:(fun e (x,x') -> subst x (var x') e)
+

@@ -526,12 +526,14 @@ assert meta.is_ext_if.init == 1;
   } [] {
     // nat_miss_ext_to_int
     assume ρ_nat.action == 2;
-    meta.do_forward := 0;
+    meta.do_forward := 0;    
+    meta.do_forward.init := 1;
     standard_metadata.egress_spec := DROP;
   } [] {
     // nat_hit_int_to_ext
     assume ρ_nat.action = 3;
     meta.do_forward := 1;
+    meta.do_forward.init := 1;
     meta.ipv4_sa := ρ_nat.data.srcAddr;
     meta.ipv4_sa.init := 1;
     meta.tcp_sp := ρ_nat.data.srcPort;
@@ -540,6 +542,7 @@ assert meta.is_ext_if.init == 1;
     // nat_hit_ext_to_int
     assume ρ_nat.action = 4;
     meta.do_forward := 1;
+    meta.do_forward.init := 1;
     meta.ipv4_da := ρ_nat.data.dstAddr;
     meta.ipv4_da.init := 1;
     meta.tcp_dp := ρ_nat.data.dstPort;

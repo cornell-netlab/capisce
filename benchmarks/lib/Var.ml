@@ -1,6 +1,6 @@
 open Core
    
-type t = String.t * int [@@deriving compare]
+type t = String.t * int [@@deriving compare, sexp]
 
 let make s i : t =
   if String.length s = 0 then
@@ -34,6 +34,8 @@ let (=) ((s1,n1) : t) ((s2,n2) : t) =
   else
     false
 
+let equal = (=)
+  
 let to_smtlib_quant ((s,i) : t ) : string =
   Printf.sprintf "(%s (_ BitVec %d))" s i
   

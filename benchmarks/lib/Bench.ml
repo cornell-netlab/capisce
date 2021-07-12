@@ -37,9 +37,8 @@ let benchmark ntables =
   let asst = gen_asst (ntables - 1) in
   let phi = Cmd.wp prog asst in
   let (dvs,cvs) = Test.vars phi in
-  (cvs, Test.forall dvs phi)
-
-
+  (cvs, Test.forall dvs phi)  
+  
 let rec benchmark_list max_tables =
   if max_tables <= 1 then
     []

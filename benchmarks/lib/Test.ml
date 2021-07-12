@@ -4,6 +4,7 @@ type bop =
   | LAnd
   | LOr
   | LArr
+  [@@deriving eq]
 
 let bop_to_smtlib = function
   | LAnd -> "and"
@@ -18,8 +19,10 @@ type t =
   | TEq of Expr.t * Expr.t
   | Forall of Var.t list * t
   | Exists of Var.t list * t
+  [@@deriving eq]
 
-
+let (=) = equal
+            
 let false_ = TFalse
 let true_ = TTrue
 let not_ b = TNot b
@@ -77,3 +80,11 @@ let rec vars t =
   | _ ->
      failwith "cannot compute vars from foralls/exists"
      
+
+let index_subst s_opt t : t =
+  match s_opt with
+  | None -> t    
+  | Some s -> 
+     Subst.to_vsub_list s
+     |> List.fold ~init:t
+          ~f:(fun t (x,x') -> subst x (Expr.var x') t)
