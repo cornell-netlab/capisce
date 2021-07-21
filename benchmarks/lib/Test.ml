@@ -25,11 +25,33 @@ let (=) = equal
             
 let false_ = TFalse
 let true_ = TTrue
-let not_ b = TNot b
-let and_ b1 b2 = TBin(LAnd, b1, b2)
-let or_ b1 b2 = TBin(LOr, b1, b2)
-let imp_ b1 b2 = TBin(LArr, b1, b2)
-let eq_ e1 e2 = TEq(e1,e2)
+let not_ = function
+  | TFalse -> true_
+  | TTrue -> false_
+  | TNot b -> b
+  | b -> TNot b
+let and_ b1 b2 = if b1 = true_ then b2 else if b2 = true_ then b1 else TBin(LAnd, b1, b2)
+let or_ b1 b2 = if b1 = false_ then b2 else if b2 = false_ then b1 else TBin(LOr, b1, b2)
+let imp_ b1 b2 =
+  if b2 = true_ || b1 = false_ then
+    true_
+  else if b2 = false_ then
+    not_ b1
+  else if b1 = true_ then
+    b2
+  else
+    TBin(LArr, b1, b2)
+let eq_ e1 e2 =
+  match Expr.static_eq e1 e2 with
+  | None -> TEq(e1,e2)
+  | Some true -> true_
+  | Some false -> false_
+
+let get_smart = function
+  | LAnd -> and_
+  | LOr -> or_
+  | LArr -> imp_
+
 let forall vs b = Forall(vs, b)
 let exists vs b = Exists(vs, b)                                  
             
@@ -53,10 +75,10 @@ let rec to_smtlib = function
 let rec subst x e t =
   match t with
   | TFalse | TTrue -> t
-  | TNot t -> subst x e t
-  | TBin (op, t1,t2) -> TBin(op, subst x e t1, subst x e t2)
+  | TNot t -> not_ (subst x e t)
+  | TBin (op, t1,t2) -> (get_smart op) (subst x e t1) (subst x e t2)
   | TEq (e1,e2) ->
-     TEq(Expr.subst x e e1, Expr.subst x e e2)
+     eq_ (Expr.subst x e e1) (Expr.subst x e e2)
   | Forall (vs, t) ->
      if List.exists vs ~f:(Var.(=) x) then
        Forall (vs, t)

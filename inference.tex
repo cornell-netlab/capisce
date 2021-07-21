@@ -97,6 +97,10 @@
 \newcommand{\efvs}{\textrm{efvs}}
 \newcommand{\bfvs}{\textrm{bfvs}}
 
+%% inference rules
+\newcommand{\andalso}{\quad}
+\newcommand{\pad}[1]{\mbox{}\;#1\;\mbox{}}
+\newcommand{\infrule}[3]{\ensuremath{\frac{\pad{#1}}{\pad{#2}}\;{\textsc{#3}}}}
 
 %% operators
 \newcommand{\bvand}{\mathop{\texttt{\&}}}
@@ -112,6 +116,7 @@
 \newtheorem{lemma}{Lemma}
 \newtheorem{conjecture}{Conjecture}
 \newtheorem{corollary}{Corollary}
+\newtheorem{proposition}{Proposition}
 
 \theoremstyle{definition}
 \newtheorem{definition}{Definition}
@@ -1656,8 +1661,91 @@ In the following we assume a terminating function $\qe : \Var \times \BExpr \to
 
 \end{proof}
 
+\subsection{Heuristic Rules}
+
+Here we posit a collection of heuristic elimination rules for quantified
+variables that seem to be effective (at least in some small examples). The goal
+here is to define a collection of rules that will remove quantifiers for a broad
+class of programs.
+
+\begin{figure}[H]
+  \[
+    \begin{array}{>{\displaystyle}c}
+      \infrule{
+      \psi[\forall x. \varphi_{1} \Rightarrow \varphi_{2}] \andalso x \not \in \fvs(\varphi_{1})}{\psi[\varphi_{1} \Rightarrow \forall x. \varphi_{2}]}{ReduceScopeR} \qquad
+
+      \infrule{\psi[\forall x. \varphi_{1} \Rightarrow \varphi_{2}] \andalso x \not \in \fvs(\varphi_{2})}{\psi[(\forall x. \neg \varphi_{1}) \vee \varphi_{2}]}{ReduceScopeL} \\[1em]
+
+      \infrule{\psi[\forall x. \varphi] \andalso x \not \in \fvs(\varphi)}{\psi[\varphi]}{UnusedUVar}
+      \qquad
+      \infrule{\psi[\exists x. \varphi] \andalso x \not \in \fvs(\varphi)}{\psi[\varphi]}{UnusedEVar}  \\[1em]
+
+      \infrule{\psi[\forall x. x = e]}{\FALSE}{UnivEq}
+      \qquad
+      \infrule{\psi[\exists x. x = e]}{\TRUE}{ExtEq}
+    \end{array}
+  \]
+\end{figure}
+
+Now we prove that these rules are sound, that is, applying them to a formulae
+$\psi$ produces a logically equivalent formula $\psi'$.
+
+\begin{proposition}[Rewrite Soundness]
+  The above rules are sound.
+\end{proposition}
+\begin{proof}
+  Consider each rule separately.
+  \begin{enumerate}[align=left]
+    \item[(\textsc{ReduceScopeR})]
+    Let $x$, $\varphi_{1}$ and $\varphi_{2}$ be given such that $x \not \in \fvs(\varphi)$. Let $\mu$ be a (total) model. Show that
+    \[\mu \models \forall x. \varphi_{1} \Rightarrow \varphi_{2} \iff \mu \models \varphi_{1} \Rightarrow \forall x. \varphi_{2}\]
+    Show each direction separately.
+    \begin{enumerate}[align=left]
+      \item[($\Rightarrow$)] Assume $\mu \models \forall x. \varphi_{1} \Rightarrow \varphi_{2}$. Further, assume $\mu \models \varphi_1$. Let $v$ be given to show $\mu[x \mapsto v] \models \varphi_{2}$. By the semantics of universal quantification $\mu[x \mapsto v] \models \varphi_{1} \Rightarrow \varphi_{2}$. Since $x$ does not occur in $\varphi_{1}$, and $\mu \models \varphi_{1}$ we know $\mu[x \mapsto v] \models \varphi_{1}$. By definition of the semantics of implication, we know $\mu[x \mapsto v] \models \varphi_{2}$. $\checkmark$
+
+      \item[$(\Leftarrow)$] Assume $\mu \models \varphi_1 \Rightarrow \forall x. \varphi_{2}$.
+      Let $v$ be given to show $\mu[x \mapsto v] \models \varphi_{1} \Rightarrow \varphi_{2}$.
+      Assume $\mu[x \mapsto v] \models \varphi_{1}$ (otherwise we'd be done), to show $\mu[x \mapsto v] \models \varphi_{2}$.
+      This assumption gives us $\mu \models \varphi_{1}$ since $x \not \in \fvs(\varphi_{1})$. Then
+      $\mu \models \forall x. \varphi_{2}$, which means, by definition of the semantics of universal quantification, that $\mu[x \mapsto v] \models \varphi_{2}$. $\checkmark$
+    \end{enumerate}
+
+    \item[(\textsc{ReduceScopeL})]
+    Let $x$, $\varphi_{2}$, and $\varphi_2$ such that $x \not \in \fvs(\varphi_{2})$.
+    Let $\mu$ be a total model, to show that
+    \[\mu \models \forall x. \varphi_{1} \Rightarrow \varphi_{2}
+      \iff
+      \mu \models (\forall x. \neg \varphi_{1}) \vee \varphi_{2}
+    \]
+    Prove each direction separately:
+    \begin{enumerate}[align=left]
+      \item[($\Rightarrow$)]
+      Assume $\mu \models \forall x. \varphi_{1} \Rightarrow \varphi_{2}$.
+      Assume $\mu \models \exists x. \varphi_{1}$ to show $\mu \models \varphi_{2}$.
+      Let $v$ be such that $\mu[x \mapsto v] \models \varphi_{1}$.
+      Then we know that $\mu[x \mapsto v] \models \varphi_{1} \Rightarrow \varphi_{2}$.
+      Further, since $\mu[x \mapsto v] \models \varphi_{1}$, we know $\mu[x \mapsto v] \models \varphi_{2}$. Since $x \not \in \fvs(\varphi_{2})$, conclude that $\mu \models \varphi_{2}$.
+      \hfill $\checkmark$
+
+      \item[($\Leftarrow$)]
+      Assume $\mu \models (\forall x. \neg \varphi_{1}) \vee \varphi_{2}$. To show that $\mu \models \forall x. \varphi_{1} \Rightarrow \varphi_{2}$. Let $v$ be arbitrary, and assume that $\mu[x \mapsto v] \models \varphi_{1}$ (otherwise we'd be done), to show that $\mu[x \mapsto v] \models \varphi_{2}$.
+
+      Our assumption gives us two cases. If $\mu \models \varphi_{2}$ then the result follows since $x \not \in \fvs(\varphi_{2})$ means $\mu[x \mapsto v] \models \varphi_{2}$.
+
+      In the second case, $\mu \models (\forall x. \neg \varphi_{1})$, which means that for our $v$,
+      $\mu[x \mapsto v] \not\models \varphi_{1}$. This contradicts the assumption that $\mu[x \mapsto v] \models \varphi_{1}$. And we're done.
+
+    \end{enumerate}
+
+    \item[(\textsc{UnusedUVar})] \todo[inline]{Prove this case}
+    \item[(\textsc{UnusedEVar})] \todo[inline]{Prove this case}
+    \item[(\textsc{UnivEq})] \todo[inline]{prove this case}
+    \item[(\textsc{ExtEq})] \todo[inline]{prove this case}
 
 
+  \end{enumerate}
+
+\end{proof}
 
 
 \clearpage

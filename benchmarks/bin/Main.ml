@@ -12,7 +12,8 @@ let main : Command.t =
   let open Command.Let_syntax in
   Command.basic ~summary:"Invokes the Princess benchmarker"
     [%map_open
-     let n = anon ("num tables" %: int) and 
+     let n = anon ("num tables" %: int) and
+         debug = flag "-D" no_arg ~doc:"show debugging info" and
          one = flag "-one" no_arg ~doc:"Only run the nth experiment" and
          princess = flag "-p" no_arg ~doc:"run the princess solver" and
          z3prince = flag "-b" no_arg ~doc:"run the sequenced solver" and
@@ -20,6 +21,7 @@ let main : Command.t =
          nat = flag "-nat" no_arg ~doc:"Print out the nat wp"
          in
          fun () ->
+         Pbench.Log.debug := debug;
          if nat then
            Printf.printf "%s" (Nat.smt ())
          else begin

@@ -30,6 +30,12 @@ let badd e1 e2 = BinOp(UAdd, e1, e2)
 let bmul e1 e2 = BinOp(UMul, e1, e2)
 let bsub e1 e2 = BinOp(USub, e1, e2)               
 
+let static_eq e1 e2 =
+  match e1, e2 with
+  | BV (v1,_), BV(v2,_) ->
+     Some Bigint.(v1 = v2)
+  | _, _ -> None
+               
 let rec subst (x : Var.t) e0 e =
   match e with
   | BV _ -> e
