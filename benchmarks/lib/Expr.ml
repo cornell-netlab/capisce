@@ -6,7 +6,7 @@ type bop =
   | UAdd
   | UMul
   | USub
-  [@@deriving eq, sexp, quickcheck]
+  [@@deriving eq, sexp, compare, quickcheck]
 
 let bop_to_smtlib = function
   | BAnd -> "bvand"
@@ -20,7 +20,7 @@ type t =
   | Var of Var.t
   | BinOp of bop * t * t
   | Neg of t
-  [@@deriving eq, sexp, quickcheck]
+  [@@deriving eq, sexp, compare, quickcheck]
 
 let bv n w = BV(n,w)
 let var v = Var v

@@ -1,0 +1,4 @@
+(test
+  (name tests)
+  (libraries pbench alcotest)
+  (preprocess (pps ppx_assert ppx_expect ppx_inline_test)))
