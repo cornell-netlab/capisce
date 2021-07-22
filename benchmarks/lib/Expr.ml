@@ -30,6 +30,13 @@ let badd e1 e2 = BinOp(UAdd, e1, e2)
 let bmul e1 e2 = BinOp(UMul, e1, e2)
 let bsub e1 e2 = BinOp(USub, e1, e2)               
 
+let uelim vs e1 e2 =
+  match e1, e2 with
+  | BV _, Var v | Var v, BV _ ->
+     List.exists vs ~f:(Var.equal v)
+  | _ ->
+     false
+               
 let static_eq e1 e2 =
   match e1, e2 with
   | BV (v1,_), BV(v2,_) ->
@@ -50,7 +57,7 @@ let rec subst (x : Var.t) e0 e =
      Neg (subst x e0 e)
 
 
-let rec vars e =
+let rec vars e : (Var.t list * Var.t list) =
   match e with
   | BV _ -> ([],[])
   | Var y ->

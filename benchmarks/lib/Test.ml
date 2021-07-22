@@ -52,7 +52,67 @@ let get_smart = function
   | LOr -> or_
   | LArr -> imp_
 
-let forall vs b = Forall(vs, b)
+let rec vars t : Var.t list * Var.t list =
+  match t with
+  | TFalse
+    | TTrue -> ([],[])
+  | TNot t -> vars t
+  | TBin (_, t1, t2) ->
+     Var.(Util.pairs_app_dedup ~dedup (vars t1) (vars t2))
+  | TEq (e1, e2) ->
+     Var.(Util.pairs_app_dedup ~dedup (Expr.vars e1) (Expr.vars e2))     
+  | _ ->
+     failwith "cannot compute vars from foralls/exists"
+
+    
+let rec forall vs b =
+  if List.is_empty vs then
+    b
+  else    
+    let bvs = Util.uncurry (@) (vars b) in
+    let vs' = Var.(Util.linter ~equal vs bvs) in
+    if List.is_empty vs' then
+      b
+    else
+      match b with
+      | TFalse -> false_
+      | TTrue -> true_
+      | TNot (TEq(e1,e2)) | TEq (e1, e2) when Expr.uelim vs' e1 e2 ->
+         false_
+      | TBin (op, b1, b2) ->
+         begin match op with
+         | LArr | LOr ->
+            let open Util in
+            let frees1 = vars b1 |> uncurry (@) in
+            let frees2 = vars b2 |> uncurry (@) in
+            (* vs_ni is the (v)ariable(s) in vs' that do (n)ot occur in bi  *)            
+            let vs_n1 = Var.(ldiff ~equal vs' frees1) in
+            let vs_n2 = Var.(ldiff ~equal vs' frees2) in
+            (* vs'' is the variables that occur in both b1 and b2*)
+            let vs'' = Var.(linter ~equal frees1 frees2) in
+            (* vsi is the variables that occur only in vsi *)
+            let vs2 = Var.(ldiff ~equal vs_n1 vs'') in
+            let vs1 = Var.(ldiff ~equal vs_n2 vs'') in
+            (* its the case that vs' = vs'' @ vs2 @ vs1 *)
+            (* This is a simple sanity check *)
+            assert(Int.(List.length vs' = List.length(vs'' @ vs2 @ vs1)));
+            forall_simplify vs'' op (forall vs1 b1) (forall vs2 b2)
+         | LAnd -> and_ (forall vs b1) (forall vs b2)
+         end
+      | Forall(vs'', b') -> forall (Var.dedup (vs' @ vs'')) b'
+      | _ ->
+         Forall(vs,b)
+and forall_simplify vs op a b =
+  forall vs @@
+    match op with
+    | LAnd -> and_ a b
+    | LArr -> or_ (not_ a) b
+    | LOr -> or_ a b
+            
+      
+    
+      
+    
 let exists vs b = Exists(vs, b)                                  
             
 let rec to_smtlib = function
@@ -89,18 +149,6 @@ let rec subst x e t =
        Exists (vs, t)
      else
        Exists (vs, subst x e t)         
-    
-let rec vars t =
-  match t with
-  | TFalse
-    | TTrue -> ([],[])
-  | TNot t -> vars t
-  | TBin (_, t1, t2) ->
-     Util.pairs_app_dedup ~dedup:Var.dedup (vars t1) (vars t2)
-  | TEq (e1, e2) ->
-     Util.pairs_app_dedup ~dedup:Var.dedup (Expr.vars e1) (Expr.vars e2)     
-  | _ ->
-     failwith "cannot compute vars from foralls/exists"
      
 
 let index_subst s_opt t : t =
