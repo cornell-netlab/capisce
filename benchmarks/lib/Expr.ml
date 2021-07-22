@@ -1,4 +1,5 @@
 open Core
+open Base_quickcheck   
    
 type bop =
   | BAnd
@@ -28,7 +29,8 @@ let band e1 e2 = BinOp(BAnd, e1, e2)
 let bor e1 e2 = BinOp(BOr, e1, e2)
 let badd e1 e2 = BinOp(UAdd, e1, e2)              
 let bmul e1 e2 = BinOp(UMul, e1, e2)
-let bsub e1 e2 = BinOp(USub, e1, e2)               
+let bsub e1 e2 = BinOp(USub, e1, e2)
+let bneg e = Neg e
 
 let uelim vs e1 e2 =
   match e1, e2 with
@@ -92,4 +94,35 @@ let index_subst s_opt e =
      Subst.to_vsub_list s
      |> List.fold ~init:e
           ~f:(fun e (x,x') -> subst x (var x') e)
+
+let rec well_formed = function
+  | BV (_,i) -> i > 0
+  | Var v -> Var.well_formed v
+  | BinOp (_, e1, e2) -> well_formed e1 && well_formed e2
+  | Neg e -> well_formed e
+    
+let quickcheck_generator : t Generator.t =
+  let open Quickcheck.Generator in
+  let open Let_syntax in
+  recursive_union
+    [
+      (let%bind n = Bigint.quickcheck_generator in
+       let%map w = filter Int.quickcheck_generator ~f:(fun i -> i > 0 && i <= 48) in
+       bv n w);
+      
+      (let%map v = Var.quickcheck_generator in
+       Printf.printf "Expr Generated %s\n%!" (Var.list_to_smtlib_quant [v]);
+       Var v
+      );
+    ]
+    ~f:(fun self ->
+      let bin =
+        let%bind e1 = self in
+        let%bind e2 = self in
+        let%map op = quickcheck_generator_bop in
+        BinOp (op, e1, e2) 
+      in
+      let neg = map self ~f:bneg in
+      [bin; neg]
+    )
 

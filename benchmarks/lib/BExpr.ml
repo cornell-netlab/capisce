@@ -1,3 +1,4 @@
+open Base_quickcheck
 open Core
    
 type bop =
@@ -108,12 +109,17 @@ and forall_simplify vs op a b =
     | LAnd -> and_ a b
     | LArr -> or_ (not_ a) b
     | LOr -> or_ a b
-            
-      
     
-      
-    
-let exists vs b = Exists(vs, b)                                  
+let exists vs b = Exists(vs, b)
+
+let rec simplify = function
+  | TFalse -> TFalse
+  | TTrue -> TTrue
+  | TNot b -> not_ (simplify b)
+  | TBin (op, b1, b2) -> get_smart op (simplify b1) (simplify b2)
+  | TEq (e1, e2) -> eq_ e1 e2
+  | Forall (vs, b) -> forall vs b
+  | Exists (vs, b) -> exists vs b
             
 let rec to_smtlib = function
   | TFalse -> "false"
@@ -158,3 +164,45 @@ let index_subst s_opt t : t =
      Subst.to_vsub_list s
      |> List.fold ~init:t
           ~f:(fun t (x,x') -> subst x (Expr.var x') t)
+
+let quickcheck_generator : t Generator.t =
+  let open Quickcheck.Generator in
+  let open Let_syntax in
+  recursive_union
+    [
+      singleton TFalse;
+      singleton TTrue;
+      (let%bind e1 = Expr.quickcheck_generator in
+       let%map e2 = Expr.quickcheck_generator in
+       TEq(e1,e2))
+    ]
+    ~f:(fun self ->
+      [
+        (let%map e = self in TNot e);
+
+        (let%bind op = quickcheck_generator_bop in
+         let%bind b1 = self in
+         let%map b2 = self in
+         Printf.printf "Generate LHS %s RHS %s\n%!" (to_smtlib b1) (to_smtlib b2);         
+         TBin (op,b1,b2)
+        );
+
+        (let%bind v = Var.quickcheck_generator in
+         let%map b = self in
+         Forall ([v], b));
+
+        (let%bind v = Var.quickcheck_generator in
+         let%map b = self in
+         Exists ([v], b)
+        )
+      ]
+    )                                    
+  
+
+let rec well_formed b =
+  match b with
+  | TTrue | TFalse -> true
+  | TEq (e1,e2) -> Expr.well_formed e1 && Expr.well_formed e2
+  | TBin(_,b1,b2) -> well_formed b1 && well_formed b2
+  | TNot b | Forall (_,b) | Exists(_,b) -> well_formed b 
+  

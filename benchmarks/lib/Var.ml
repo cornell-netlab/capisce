@@ -1,6 +1,6 @@
 open Core
    
-type t = String.t * int [@@deriving compare, sexp, quickcheck]
+type t = String.t * int [@@deriving compare, sexp]
 
 let make s i : t =
   if String.length s = 0 then
@@ -9,6 +9,8 @@ let make s i : t =
 let str ((s,_) : t) = s
 let size ((_,i) : t) = i
 
+let well_formed ((s,i) : t) = String.length s > 0 && i > 0
+                     
 let dedup = List.dedup_and_sort ~compare
                      
 let ghost = "ghost"
@@ -49,3 +51,23 @@ let to_smtlib_decl ((s, i) : t) : string =
 let list_to_smtlib_decls : t list -> string =
   List.fold ~init:"\n"
   ~f:(fun acc v -> Printf.sprintf "%s%s" acc (to_smtlib_decl v))
+
+let quickcheck_generator =
+  let open Quickcheck.Generator in
+  let open Let_syntax in
+  let networklike_size i = i < 48 && i > 1 in  
+  let%bind v = of_list ["x";"y";"z";"a";"b";"c";"n";"m";"h";"i";"j";"k";"l"] in
+  let%map n = filter Int.quickcheck_generator ~f:(networklike_size) in
+  Printf.printf "GENERATING %s#%i\n%!" v n;
+  make v n
+  
+
+let quickcheck_observer =
+  let open Quickcheck.Observer in
+  tuple2 String.quickcheck_observer Int.quickcheck_observer
+
+let quickcheck_shrinker =
+  let open Base_quickcheck.Shrinker in
+  let open Quickcheck.Shrinker in
+  tuple2 atomic Int.quickcheck_shrinker
+  

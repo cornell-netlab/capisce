@@ -18,3 +18,6 @@ val subst : Var.t -> Expr.t -> t -> t
 val vars : t -> Var.t list * Var.t list
                   
 val index_subst : Subst.t option -> t -> t
+
+val simplify : t -> t
+val well_formed : t -> bool                       
