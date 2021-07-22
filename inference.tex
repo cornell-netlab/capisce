@@ -1680,15 +1680,77 @@ class of programs.
       \qquad
       \infrule{\psi[\exists x. \varphi] \andalso x \not \in \fvs(\varphi)}{\psi[\varphi]}{UnusedEVar}  \\[1em]
 
-      \infrule{\psi[\forall x. x = e]}{\FALSE}{UnivEq}
+      \infrule{\psi[\forall x. x = v]}{\FALSE}{UnivEq}
       \qquad
-      \infrule{\psi[\exists x. x = e]}{\TRUE}{ExtEq}
+      \infrule{\psi[\exists x. x = v]}{\TRUE}{ExtEq}
     \end{array}
   \]
 \end{figure}
 
 Now we prove that these rules are sound, that is, applying them to a formulae
 $\psi$ produces a logically equivalent formula $\psi'$.
+
+\begin{lemma}[Model Freedom for Expressions]
+  \label{lem:model-freedom-expressions}
+  For $\mu$, $v$, $x$, $e$, such that $x \not \in \efvs(e)$,
+  $\edenote e \mu = \edenote e \mu[x \mapsto v]$
+\end{lemma}
+\begin{proof}
+  Proceed by induction on $e$.
+  \begin{enumerate}[align=left]
+    \item[($e = v$)] Immediate.
+    \item[($e = y$)] Let $\mu$, $v$ and $x$ be such that $x \not \in \{y\}$.
+    $\edenote y \mu = \mu(y) = \mu[x \mapsto v](y) = \edenote y \mu[x \mapsto v]$.
+    \item[$(e = e_{1} \binop e_{2})$] Let $\mu$, $v$ and $x$ be such that
+    $x \not \in \efvs(e_{1})$ and $x \not \in \efvs(e_{2})$.
+    Then the IHs give $\edenote{e_{i}}\mu = \edenote{e_{i}}\mu[x \mapsto v]$, for $i=1,2$.
+    The result follows by the definition of semantics of binary operations.
+    \item[$(e = \unop e)$] \textit{sim.}
+  \end{enumerate}
+\end{proof}
+
+
+\begin{lemma}[Model Freedom]
+  \label{lem:model-freedom}
+  For $\mu$, $v$, $x$, $\varphi$ such that $x \not \in \fvs(\varphi)$,
+  $\mu \models \varphi$ iff $\mu[x \mapsto v] \models \varphi$
+\end{lemma}
+\begin{proof}
+  Proceed by induction on $\varphi$.
+  \begin{enumerate}[align=left]
+    \item[$(\FALSE)$] Each direction follows vacuously, there is no such $\mu$, $x$, and $v$.
+    \item[$(\varphi_{1} \Rightarrow \varphi_{2})$] Let $\mu$, $v$, and $x$ be such that $x \not \in \fvs(\varphi_{1} \Rightarrow \varphi_{1})$. Calculate as follows:
+
+    \[\begin{array}{ll}
+        \mu \models \varphi_{1} \Rightarrow \varphi_{2}\\
+    \iff \mu \not \models \varphi_{1} \text{ or } \mu \models \varphi_{2} \\
+    \iff \mu[x \mapsto v] \not\models \varphi_{1} \text{ or } \mu[x \mapsto v] \models \varphi_{2} & \text{By IH}\\
+    \iff\mu[x \mapsto v] \models \varphi_{1} \Rightarrow \varphi_{2}
+      \end{array}\]
+
+    \item[$(\forall y. \varphi)$] Let $\mu$, $v$, and $x$ be such that $x \not \in \fvs(\varphi) \setminus \{y\}$. There are two cases $y = x$ or $y \neq x$.
+    Consider the first case (i.e. where $x = y$):
+    \[ \begin{array}{l}
+         \mu \models \forall x. \varphi\\
+         \iff \forall v'. \mu[x \mapsto v'] \models \varphi \\
+         \iff \forall v'. \mu[x \mapsto v][x \mapsto v'] \models \varphi \\
+         \iff \mu[x \mapsto v] \models \forall x. \varphi \hfill \checkmark
+       \end{array}
+     \]
+
+  Consider the second case (i.e. where $y \neq x$):
+  \[\begin{array}{ll}
+      \mu \models \forall y. \varphi\\
+      \iff \forall v'. \mu[y \mapsto v'] \models \varphi \\
+      \iff \forall v'. \mu[y \mapsto v'][x \mapsto v] \models \varphi & \text{By IHs}\\
+      \iff \forall v'. \mu[x \mapsto v][y \mapsto v'] \models \varphi & \text{Since } y \neq x\\
+      \iff \mu[x \mapsto v] \models \forall y. \varphi \hfill \checkmark
+    \end{array}\]
+
+  \item[$(e_{1} = e_{2})$] Let $\mu$, $v$, and $x$ be such that $x \not \in \efvs(e_{1})\cup\efvs(e_{2})$.
+  Since this also means $x \not \in \efvs(e_{i})$ for $i = 1,2$, Lemma~\ref{lem:model-freedom-expressions} gives $\edenote{e_{i}}\mu = \edenote{e_{i}} \mu[x \mapsto v]$ for $i=1,2$. The result is immediate. \hfill $\checkmark$
+  \end{enumerate}
+\end{proof}
 
 \begin{proposition}[Rewrite Soundness]
   The above rules are sound.
@@ -1737,11 +1799,29 @@ $\psi$ produces a logically equivalent formula $\psi'$.
 
     \end{enumerate}
 
-    \item[(\textsc{UnusedUVar})] \todo[inline]{Prove this case}
-    \item[(\textsc{UnusedEVar})] \todo[inline]{Prove this case}
-    \item[(\textsc{UnivEq})] \todo[inline]{prove this case}
-    \item[(\textsc{ExtEq})] \todo[inline]{prove this case}
+    \item[(\textsc{UnusedUVar})] Let $x$ and $\varphi$ be given such that
+    $x \not \in \fvs(\varphi)$. Let $\mu$ be a (total) model. Show that
+    \[\mu \models \forall x. \varphi \iff \mu \models \varphi\]
+    Prove each direction separately:
+    \begin{enumerate}[align=left]
+      \item[($\Rightarrow$)] Assume $\mu \models \forall x. \varphi$ to show
+      $\mu \models \varphi$. Since $\mu$ is total, the assumption gives $\mu[x\mapsto \mu(x)] \models \varphi$. \hfill $\checkmark$
 
+      \item[($\Leftarrow$)] Assume $\mu \models \varphi$, to show $\mu \models \varphi$. Let $v$ be arbitrary. Since $x \not \in \fvs(\varphi)$, the assumption gives $\mu[x \mapsto v] \models \varphi$. \hfill $\checkmark$
+    \end{enumerate}
+
+    \item[(\textsc{UnusedEVar})] \todo[inline]{Prove this case}
+    \item[(\textsc{UnivEq})]
+    Let $x$ and $e$ be given. Let $\mu$ be a (total) model. Show that
+    \[\mu \not\models \forall x. x = v\]
+    Equivalently, show that $\mu \models \exists x. x \neq v$.
+    There are two cases either $v = 0$ or $v \neq 0$. If $v \neq 0$ then $\mu[x \mapsto 0] \models x \neq v$.
+    If $v = 0$ then $\mu[x \mapsto 1] \models x \neq v$. \hfill $\checkmark$
+
+    \item[(\textsc{ExtEq})]
+    Let $x$ and $\varphi$ be given. Let $\mu$ be a total model. Show that
+    \[\mu \models \exists x. x = v\]
+    This is immediate since $\mu[x \mapsto v] \models x = v$.
 
   \end{enumerate}
 
