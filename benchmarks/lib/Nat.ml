@@ -22,13 +22,13 @@ let setone s = assign (Var.make s 1) (one 1)
 let evar s n = Expr.var (Var.make s n)
 
              
-let asmeq e1 e2 = assume (Test.eq_ e1 e2)
+let asmeq e1 e2 = assume (BExpr.eq_ e1 e2)
 let asmeq_sv s v sz = asmeq (evar s sz) (Expr.bv (Bigint.of_int v) sz)                
 let asmeq_ss s1 s2 sz = asmeq (evar s1 sz) (evar s2 sz)
 let asm0 s1 sz = asmeq (evar s1 sz) (zero sz)
 let asm1 s1 sz = asmeq (evar s1 sz) (one sz)
                
-let asteq e1 e2 = assert_ (Test.eq_ e1 e2)
+let asteq e1 e2 = assert_ (BExpr.eq_ e1 e2)
 let asteq_sv s v sz = asteq (evar s sz) (Expr.bv (Bigint.of_int v) sz)                
 let asteq_ss s1 s2 sz = asteq (evar s1 sz) (evar s2 sz)
 let ast0 s1 sz = asteq (evar s1 sz) (zero sz)
@@ -44,11 +44,11 @@ let decrement s sz = set s (Expr.bsub (evar s sz) (one sz)) sz
 let choice_seq cs1 cs2 = choice (sequence cs1) (sequence cs2)  
 
 let choice_seqs cs =
-  List.fold cs ~init:(assume Test.false_)
+  List.fold cs ~init:(assume BExpr.false_)
     ~f:(fun c cs -> choice c (sequence cs))
 
 let ifelse t c1 c2 =
-  choice_seq (assume t::c1) (assume (Test.not_ t)::c2)
+  choice_seq (assume t::c1) (assume (BExpr.not_ t)::c2)
                        
 let ternary d r sz =
   let v x = evar x sz in
@@ -62,7 +62,7 @@ let ternary d r sz =
 let copy_meta_to_hf hdr fld meta sz =
   let hf = Printf.sprintf "%s__%s" hdr fld in
   let init = Printf.sprintf "%s__init" in
-  let h_is_valid = Test.eq_ (evar (Printf.sprintf "%s__isValid" hdr) 1) (one 1) in
+  let h_is_valid = BExpr.eq_ (evar (Printf.sprintf "%s__isValid" hdr) 1) (one 1) in
   [ (* ast1 (init meta) 1; *)
     copy hf meta sz;
     ifelse h_is_valid [setone (init hf)] [];
@@ -125,7 +125,7 @@ let prog =
     
     (* assign (Var.make "meta__if_index" 9) (Expr.var (Var.make "standard_metadata__ingress_port" 9));
      * 
-     * ifelse Test.(eq_ (evar"pkt__lookahead" 64) (zero 64))
+     * ifelse BExpr.(eq_ (evar"pkt__lookahead" 64) (zero 64))
      *   [ asm0 "pkt__lookahead" 64;
      *     setone "cpu_header__isValid";
      *     setone "cpu_header__preamble__init";    
@@ -272,9 +272,9 @@ let prog =
       [asm1 "ghost_nat__miss" 1];
 
     (* ast1 "meta__do_forward__init" 1; *)
-    ifelse Test.(eq_ (evar "meta__do_forward" 1) (one 1)) [
+    ifelse BExpr.(eq_ (evar "meta__do_forward" 1) (one 1)) [
         (* ast1 "ipv4__ttl__init" 1; *)
-        ifelse Test.(not_ (eq_ (evar "ipv4__ttl" 8) (zero 8))) [
+        ifelse BExpr.(not_ (eq_ (evar "ipv4__ttl" 8) (zero 8))) [
             (* ipv4_lpm *)
             (* asmeq_ss "ghost_ipv4_lpm__meta__ipv4_da" "meta__ipv4_da" 32; *)
             choice_seq              
@@ -327,15 +327,15 @@ let prog =
       ]
       [];
 
-    assert_ Test.(not_ (eq_ (evar "standard_metadata__egress_spec" 9) (zero 9)));
+    assert_ BExpr.(not_ (eq_ (evar "standard_metadata__egress_spec" 9) (zero 9)));
     (*/ ingress*)
   ] |> sequence
     (* egress *)
-  (*   ifelse Test.( eq_ (evar "standard_metadata__egress_spec" 9) drop)
+  (*   ifelse BExpr.( eq_ (evar "standard_metadata__egress_spec" 9) drop)
    *     []
    *     [ copy "standard_metadata__egress_port" "standard_metadata__egress_spec" 9;
    * 
-   *       ifelse Test.(eq_ (evar "standard_metadata__instance_type" 32) (zero 32))
+   *       ifelse BExpr.(eq_ (evar "standard_metadata__instance_type" 32) (zero 32))
    *       [ (\* send_frame *\)
    *         (\* asmeq_ss "standard_metadata__egress_port" "ghost_send_frame__standard_metadata__egress_port" 9; *\)
    *         choice_seq
@@ -465,22 +465,22 @@ let proglite =
      *     asm1 "ghost_forward__miss" 1;
      *   ];             *)
       (*/forward*)  
-    assert_ Test.(not_ (eq_ (evar "standard_metadata__egress_spec" 9) (zero 9)));
+    assert_ BExpr.(not_ (eq_ (evar "standard_metadata__egress_spec" 9) (zero 9)));
     
   ]
   |> sequence
 
 let smt () =
   Log.print (Cmd.to_string proglite );
-  let phi = wp proglite Test.true_ in
-  let (dvs, cvs) = Test.vars phi in
-  Test.forall dvs phi
+  let phi = wp proglite BExpr.true_ in
+  let (dvs, cvs) = BExpr.vars phi in
+  BExpr.forall dvs phi
   |> Smt.simplify cvs       
                      
 let smt_slicing () =
   let cs = Cmd.assert_slices prog in
-  let phis = List.map cs ~f:(fun prog -> Cmd.wp prog Test.true_) in
+  let phis = List.map cs ~f:(fun prog -> Cmd.wp prog BExpr.true_) in
   List.map phis ~f:(fun phi ->
-        let (dvs, cvs) = Test.vars phi in
-        Test.forall dvs phi
+        let (dvs, cvs) = BExpr.vars phi in
+        BExpr.forall dvs phi
         |> Smt.simplify cvs)

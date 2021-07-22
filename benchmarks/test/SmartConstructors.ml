@@ -1,8 +1,9 @@
+open Pbench
 open Base_quickcheck    
 let identity () =
   Test.run_exn
-    (module Pbench.Test)
-    ~f:(fun b -> [%test_eq: Pbench.Test.t] b b)
+    (module BExpr)
+    ~f:(fun b -> [%test_eq: BExpr.t] b b)
 
 
 

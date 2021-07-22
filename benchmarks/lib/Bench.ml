@@ -13,11 +13,11 @@ let tablegen n : Cmd.t =
       assign (x n) (Expr.var d)
     ]
   in
-  let def = assume Test.true_ in
+  let def = assume BExpr.true_ in
   table n keys actions def
 
-let rec gen_asst n : Test.t =
-  let open Test in
+let rec gen_asst n : BExpr.t =
+  let open BExpr in
   if n <= 0 then
     true_
   else 
@@ -36,8 +36,8 @@ let benchmark ntables =
   let prog = Cmd.sequence (gen_benchmark ntables []) in
   let asst = gen_asst (ntables - 1) in
   let phi = Cmd.wp prog asst in
-  let (dvs,cvs) = Test.vars phi in
-  (cvs, Test.forall dvs phi)  
+  let (dvs,cvs) = BExpr.vars phi in
+  (cvs, BExpr.forall dvs phi)  
   
 let rec benchmark_list max_tables =
   if max_tables <= 1 then

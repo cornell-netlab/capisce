@@ -1,8 +1,8 @@
 open Core
 
 type t =
-  | Assume of Test.t
-  | Assert of (Test.t * int option)
+  | Assume of BExpr.t
+  | Assert of (BExpr.t * int option)
   | Havoc of Var.t
   | Assign of Var.t * Expr.t
   | Seq of t * t
@@ -13,8 +13,8 @@ let rec to_string_aux indent (c : t) : string =
   let open Printf in
   let space = Util.space indent in
   match c with
-  | Assume t -> sprintf "%sassume %s" space (Test.to_smtlib t)
-  | Assert (t,_) -> sprintf "%sassert %s" space (Test.to_smtlib t)
+  | Assume t -> sprintf "%sassume %s" space (BExpr.to_smtlib t)
+  | Assert (t,_) -> sprintf "%sassert %s" space (BExpr.to_smtlib t)
   | Assign (x,e) -> sprintf "%s%s := %s" space (Var.str x) (Expr.to_smtlib e)
   | Havoc x -> sprintf "%shavoc %s" space (Var.str x)
   | Seq (c1,c2) ->
@@ -26,7 +26,7 @@ let to_string = to_string_aux 0
     
 
 (** Smart Constructors *)
-let skip = Assume (Test.true_)            
+let skip = Assume (BExpr.true_)            
 let assume t = Assume t
 let assert_ t = Assert (t,None)
 let havoc x = Havoc x
@@ -47,8 +47,8 @@ let rec sequence cs =
   | c::cs -> Seq(c, sequence cs)
 
 let negate = function
-  | Assume t -> Assume (Test.not_ t)
-  | Assert (t,i) -> Assert ((Test.not_ t), i)
+  | Assume t -> Assume (BExpr.not_ t)
+  | Assert (t,i) -> Assert ((BExpr.not_ t), i)
   | _ -> failwith "Can only negate an assumption or assertion"
 
 (**/ END Smart Constructors*)            
@@ -58,8 +58,8 @@ let negate = function
 (* PRE: x is not an lvalue in c *)            
 let rec subst x e c =
   match c with
-  | Assume t -> Assume (Test.subst x e t)
-  | Assert (t,i) -> Assert (Test.subst x e t, i)
+  | Assume t -> Assume (BExpr.subst x e t)
+  | Assert (t,i) -> Assert (BExpr.subst x e t, i)
   | Havoc y ->
      if Var.(x = y) then
        failwith "tried to substitute an lvalue"
@@ -76,12 +76,12 @@ let rec subst x e c =
      Choice (subst x e c1, subst x e c2)
           
 let ghost_copy id k =
-  let open Test in
+  let open BExpr in
   let open Expr in
   eq_ (var (Var.make_ghost id k)) (var k)
 
 let match_key id k =
-  let open Test in
+  let open BExpr in
   let open Expr in
   let v = Var.make_symbRow id k in
   (* let km = Var.(make (str k ^ "_match") (size k)) in
@@ -92,28 +92,28 @@ let match_key id k =
   eq_ (var v) (var k)
 
 let matchrow id ks =
-  let open Test in
+  let open BExpr in
   List.fold ks ~init:true_
     ~f:(fun acc k -> match_key id k |> and_ acc)  
 
 let ghost_hit id =
   let open Expr in 
   let miss_var = Var.make "miss" 1 |> Var.make_ghost id in
-  Test.eq_ (var miss_var) (bv Bigint.one 1)
+  BExpr.eq_ (var miss_var) (bv Bigint.one 1)
 
 let ghost_miss id =
-  Test.not_ (ghost_hit id)
+  BExpr.not_ (ghost_hit id)
 
 let row_action tid act_id n =
   let open Expr in 
   let v = Var.make_symbRow tid (Var.make "action" n) in
-  Test.eq_ (var v) (bv (Bigint.of_int act_id) n)
+  BExpr.eq_ (var v) (bv (Bigint.of_int act_id) n)
 
 let row_id tid =
   let open Expr in
   let g = Var.make_ghost tid (Var.make "hitAction" 32) in
   let r = Var.make_symbRow tid (Var.make "id" 32) in
-  Test.eq_ (var g) (var r)
+  BExpr.eq_ (var g) (var r)
 
 let action_subst tid (x, c) =
   let r_data = Var.make_symbRow tid x in
@@ -121,7 +121,7 @@ let action_subst tid (x, c) =
   
   
 let table (id : int) (ks : Var.t list) (acts : (Var.t * t) list) (def : t) : t =
-  let open Test in
+  let open BExpr in
   let gs = List.fold ks ~init:true_ ~f:(fun acc k -> ghost_copy id k |> and_ acc) in
   let hit act_id act =
     [Assume (matchrow id ks);
@@ -139,7 +139,7 @@ let table (id : int) (ks : Var.t list) (acts : (Var.t * t) list) (def : t) : t =
 (* let rec vars c : Var.t list =
  *   match c with
  *   | Assume t | Assert (t,_) ->
- *      Util.uncurry ((@)) (Test.vars t)
+ *      Util.uncurry ((@)) (BExpr.vars t)
  *   | Havoc _ -> []
  *   | Assign (x,e) ->
  *      x :: Util.uncurry ((@)) (Expr.vars e)     
@@ -152,7 +152,7 @@ let table (id : int) (ks : Var.t list) (acts : (Var.t * t) list) (def : t) : t =
 (* let zip_eq (l1 : (Var.t * Var.t) list) =
  *   let open List.Let_syntax in
  *   let%map (v1, v2) = l1 in
- *   Test.eq_ (Expr.var v1) (Expr.var v2)
+ *   BExpr.eq_ (Expr.var v1) (Expr.var v2)
  *   |> assume 
  *   
  *                     
@@ -172,20 +172,20 @@ let table (id : int) (ks : Var.t list) (acts : (Var.t * t) list) (def : t) : t =
  *   let open Option.Let_syntax in
  *   match c with
  *   | Assert (t,_) ->
- *      if Test.(t = false_) then
- *        return (None, assert_ (Test.false_))
+ *      if BExpr.(t = false_) then
+ *        return (None, assert_ (BExpr.false_))
  *      else
- *        return (s0, assert_ (Test.index_subst s0 t))
+ *        return (s0, assert_ (BExpr.index_subst s0 t))
  *   | Assume t ->
- *      if Test.(t = false_) then
- *        return (None, assume (Test.false_))
+ *      if BExpr.(t = false_) then
+ *        return (None, assume (BExpr.false_))
  *      else
- *        return (s0, assume (Test.index_subst s0 t))
+ *        return (s0, assume (BExpr.index_subst s0 t))
  *   | Havoc x ->
  *      return (s0, havoc x)
  *   | Assign (x, e) ->
  *      let%map x', s1 = Subst.incr s0 x in
- *      (Some s1, assume (Test.eq_ (Expr.var x') (Expr.index_subst s0 e)))
+ *      (Some s1, assume (BExpr.eq_ (Expr.var x') (Expr.index_subst s0 e)))
  *   | Seq (c1,c2) ->
  *      let%bind s1, c1'  = passify s0 c1 in
  *      let%bind s2, c2' = passify s1 c2 in
@@ -201,16 +201,16 @@ let table (id : int) (ks : Var.t list) (acts : (Var.t * t) list) (def : t) : t =
  *     | Assume t -> t
  *   | Assign _ -> failwith "Assigns are not permitted in passive form"                
  *   | Havoc _ -> failwith "HAVOCS ARE CONFUSING"
- *   | Seq (c1,c2) -> Test.and_ (norm_execs c1) (norm_execs c2)
- *   | Choice (c1,c2) -> Test.or_ (norm_execs c1) (norm_execs c2)
+ *   | Seq (c1,c2) -> BExpr.and_ (norm_execs c1) (norm_execs c2)
+ *   | Choice (c1,c2) -> BExpr.or_ (norm_execs c1) (norm_execs c2)
  *   
  * let rec bad_execs = function
- *   | Assert (t,_) -> Test.not_ t
- *   | Assume _ -> Test.false_
+ *   | Assert (t,_) -> BExpr.not_ t
+ *   | Assume _ -> BExpr.false_
  *   | Assign _ -> failwith "Assigns are not permitted in passive form"
  *   | Havoc _ -> failwith "HAVOCS ARE CONFUSING"
- *   | Seq (c1, c2) -> Test.(or_ (bad_execs c1) (and_ (norm_execs c1) (bad_execs c2)))
- *   | Choice (c1, c2) -> Test.or_ (bad_execs c1) (bad_execs c2)
+ *   | Seq (c1, c2) -> BExpr.(or_ (bad_execs c1) (and_ (norm_execs c1) (bad_execs c2)))
+ *   | Choice (c1, c2) -> BExpr.or_ (bad_execs c1) (bad_execs c2)
  *      
  * let wp c t =
  *   let s = Subst.init (vars c) in  
@@ -218,17 +218,17 @@ let table (id : int) (ks : Var.t list) (acts : (Var.t * t) list) (def : t) : t =
  *   | None -> failwith "couldn't compute the passive form of the program"
  *   | Some (_,p)->
  *      Log.print (to_string p);
- *      let open Test in  
+ *      let open BExpr in  
  *      and_ (imp_ (norm_execs p) t)
  *           (not_ (bad_execs p)) *)
 
 let rec wp c t =
-  let open Test in
+  let open BExpr in
   match c with
   | Assume t1 -> imp_ t1 t
   | Assert (t1,_) -> and_ t1 t
   | Havoc x -> forall [x] t
-  | Assign (x,e) -> Test.subst x e t
+  | Assign (x,e) -> BExpr.subst x e t
   | Seq (c1,c2) ->  wp c2 t |> wp c1
   | Choice (c1,c2) -> and_ (wp c1 t) (wp c2 t)
 
@@ -251,7 +251,7 @@ let rec number_asserts c i =
 let rec keep_assert_with_id c id =
   match c with 
   | Assert (t,Some i) when i = id -> Assert (t, Some id)
-  | Assert _ -> Assume Test.true_
+  | Assert _ -> Assume BExpr.true_
   | Assume _ | Havoc _ | Assign _ -> c
   | Seq (c1,c2) ->
      seq
