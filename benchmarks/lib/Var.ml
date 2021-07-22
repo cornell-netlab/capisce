@@ -1,6 +1,6 @@
 open Core
    
-type t = String.t * int [@@deriving compare, sexp]
+type t = String.t * int [@@deriving compare, sexp, quickcheck]
 
 let make s i : t =
   if String.length s = 0 then

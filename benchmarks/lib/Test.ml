@@ -4,7 +4,7 @@ type bop =
   | LAnd
   | LOr
   | LArr
-  [@@deriving eq]
+  [@@deriving eq, sexp, quickcheck]
 
 let bop_to_smtlib = function
   | LAnd -> "and"
@@ -19,7 +19,7 @@ type t =
   | TEq of Expr.t * Expr.t
   | Forall of Var.t list * t
   | Exists of Var.t list * t
-  [@@deriving eq]
+  [@@deriving eq, sexp, quickcheck]
 
 let (=) = equal
             
