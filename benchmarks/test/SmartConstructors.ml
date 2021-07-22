@@ -1,14 +1,15 @@
-(* open Base_quickcheck   
- *    
- * let test_equiv = Alcotest.testable
- *                    (Fmt.of_to_string Pbench.Test.to_smtlib)
- *                    (Pbench.Test.equal)
- * 
- * let equiv_expr = Alcotest.(check test_equiv) "Z3 proves equivalent" *)
+open Base_quickcheck    
+let identity () =
+  Test.run_exn
+    (module Pbench.Test)
+    ~f:(fun b -> [%test_eq: Pbench.Test.t] b b)
 
 
 
-    
-    
+let tests =
+  [
+    Alcotest.test_case "Quickcheck Identity" `Quick identity
+  ]
+
   
                    
