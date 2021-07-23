@@ -28,14 +28,35 @@ type t =
 
 let (=) = equal
 
+let rec to_smtlib = function
+  | TFalse -> "false"
+  | TTrue -> "true"
+  | TNot t -> Printf.sprintf "(not %s)" (to_smtlib t)
+  | TBin (b,t1,t2) ->
+     Printf.sprintf "(%s %s %s)" (bop_to_smtlib b) (to_smtlib t1) (to_smtlib t2)
+  | TEq (e1,e2) ->
+     Printf.sprintf "(= %s %s)" (Expr.to_smtlib e1) (Expr.to_smtlib e2)
+  | Forall (vs, t) ->
+     Printf.sprintf "(forall (%s) %s)"
+       (Var.list_to_smtlib_quant vs)
+       (to_smtlib t)
+  | Exists (vs, t) ->
+     Printf.sprintf "(exists (%s) %s)"
+       (Var.list_to_smtlib_quant vs)
+       (to_smtlib t)        
+
 let ctor1 ~default ~smart a =
   match !__testing__only__smart with
   | `On -> smart default a
-  | `Off -> default a
+  | `Off ->
+     Printf.printf "DEFAULT\n%!";     
+     default a
 let ctor2 ~default ~smart a b =
   match !__testing__only__smart with
   | `On -> smart default a b
-  | `Off -> default a b
+  | `Off ->
+     Printf.printf "DEFAULT\n%!";
+     default a b
 let rec ctor2rec ~default ~smart a b =
   match !__testing__only__smart with
   | `On -> smart (ctor2rec ~default ~smart) default a b
@@ -46,7 +67,9 @@ let true_ = TTrue
 let not_ =
   ctor1
     ~default:(fun b -> TNot b)
-    ~smart:(fun default -> function
+    ~smart:(fun default b ->
+      Log.print @@ Printf.sprintf "simplifying NOT (%s)" (to_smtlib b);
+      match b with
       | TFalse -> true_
       | TTrue -> false_
       | TNot b -> b
@@ -91,7 +114,7 @@ let iff_ =
     ~default:(fun e1 e2 -> TBin(LIff, e1, e2))
     ~smart:(fun default e1 e2 ->
       if e1 = e2 then
-        true_
+        true_      
       else
         default e1 e2
     )
@@ -131,20 +154,29 @@ let rec vars t : Var.t list * Var.t list =
      Var.(Util.ldiff ~equal dvs vs, Util.ldiff ~equal cvs vs)
        
 let forall_simplify forall vs op a b =
-  forall vs @@
+  let b' =
     match op with
     | LAnd -> and_ a b
     | LArr -> or_ (not_ a) b
     | LOr -> or_ a b
     | LIff -> iff_ a b
+  in
+  Log.print @@ Printf.sprintf "∀-simplifying: %s\n%!" (to_smtlib b');        
+  forall vs b
             
 let forall =
   ctor2rec
-    ~default:(fun vs b -> Forall(vs,b))
-    ~smart:(fun self default vs b ->
+    ~default:(fun vs b ->
       if List.is_empty vs then
         b
-      else    
+      else
+        Forall(vs,b)      
+    )
+    ~smart:(fun self default vs b ->
+      let () = Log.print @@ Printf.sprintf "∀-optimizing: %s\n%!" (to_smtlib b) in               
+      if List.is_empty vs then
+        b
+      else        
         let bvs = Util.uncurry (@) (vars b) in
         let vs' = Var.(Util.linter ~equal vs bvs) in
         if List.is_empty vs' then
@@ -178,37 +210,30 @@ let forall =
              end
           | Forall(vs'', b') -> self (Var.dedup (vs' @ vs'')) b'
           | _ ->
-             Forall(vs,b)
-    )
+             default vs b)
 
     
 let exists vs b = Exists(vs, b)
 
-let rec simplify = function
+let rec simplify_inner = function
   | TFalse -> TFalse
   | TTrue -> TTrue
-  | TNot b -> not_ (simplify b)
-  | TBin (op, b1, b2) -> get_smart op (simplify b1) (simplify b2)
+  | TNot b -> not_ (simplify_inner b)
+  | TBin (op, b1, b2) -> get_smart op (simplify_inner b1) (simplify_inner b2)
   | TEq (e1, e2) -> eq_ e1 e2
-  | Forall (vs, b) -> forall vs b
-  | Exists (vs, b) -> exists vs b
+  | Forall (vs, b) -> simplify_inner b |> forall vs
+  | Exists (vs, b) -> simplify_inner b |> exists vs
+
+let simplify b =
+  Log.print "==SIMPLIFYING==";
+  simplify_inner b
+  (* let b' = simplify_inner b in
+   * if b = b' then
+   *   b
+   * else
+   *   simplify b' *)
             
-let rec to_smtlib = function
-  | TFalse -> "false"
-  | TTrue -> "true"
-  | TNot t -> Printf.sprintf "(not %s)" (to_smtlib t)
-  | TBin (b,t1,t2) ->
-     Printf.sprintf "(%s %s %s)" (bop_to_smtlib b) (to_smtlib t1) (to_smtlib t2)
-  | TEq (e1,e2) ->
-     Printf.sprintf "(= %s %s)" (Expr.to_smtlib e1) (Expr.to_smtlib e2)
-  | Forall (vs, t) ->
-     Printf.sprintf "(forall (%s) %s)"
-       (Var.list_to_smtlib_quant vs)
-       (to_smtlib t)
-  | Exists (vs, t) ->
-     Printf.sprintf "(exists (%s) %s)"
-       (Var.list_to_smtlib_quant vs)
-       (to_smtlib t)
+
                     
 let rec subst x e t =
   match t with
@@ -219,7 +244,7 @@ let rec subst x e t =
      eq_ (Expr.subst x e e1) (Expr.subst x e e2)
   | Forall (vs, t) ->
      if List.exists vs ~f:(Var.(=) x) then
-       Forall (vs, t)
+       forall vs t
      else
        Forall(vs, subst x e t)
   | Exists (vs, t) ->
@@ -263,7 +288,7 @@ let quickcheck_generator : t Generator.t =
          Log.print "Generate Forall\n";
          let vs = vars b |> Util.uncurry (@) in
          if List.is_empty vs then
-           return (Forall ([], b))
+           return b
          else
            let%map v = vars b |> Util.uncurry (@) |> of_list in 
            Forall ([v], b));
@@ -272,7 +297,7 @@ let quickcheck_generator : t Generator.t =
          Log.print "Generate Exists\n";
          let vs = vars b |> Util.uncurry (@) in         
          if List.is_empty vs then
-           return (Exists ([], b))
+           return b
          else
            let%map v = vars b |> Util.uncurry (@) |> of_list in          
            Exists ([v], b)
@@ -297,5 +322,5 @@ let equivalence a b =
   let qa = forall avars a in
   let qb = forall bvars b in
   Log.print @@ Printf.sprintf "CHECKING %s = %s \n%!" (to_smtlib qa) (to_smtlib qb);
-  iff_ (forall avars a) (forall bvars b)
+  dumb (fun () -> iff_ (forall avars a) (forall bvars b))
   
