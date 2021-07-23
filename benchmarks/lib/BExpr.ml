@@ -93,6 +93,8 @@ let or_ =
         b2
       else if b2 = false_ then
         b1
+      else if b1 = true_ || b2 = true_ then
+        true_
       else
         default b1 b2)
 
@@ -191,16 +193,14 @@ let forall =
              begin match op with
              | LArr | LOr ->
                 let open Util in
-                let frees1 = vars b1 |> uncurry (@) in
-                let frees2 = vars b2 |> uncurry (@) in
-                (* vs_ni is the (v)ariable(s) in vs' that do (n)ot occur in bi  *)            
-                let vs_n1 = Var.(ldiff ~equal vs' frees1) in
-                let vs_n2 = Var.(ldiff ~equal vs' frees2) in
-                (* vs'' is the variables that occur in both b1 and b2*)
-                let vs'' = Var.(linter ~equal frees1 frees2) in
-                (* vsi is the variables that occur only in vsi *)
-                let vs2 = Var.(ldiff ~equal vs_n1 vs'') in
-                let vs1 = Var.(ldiff ~equal vs_n2 vs'') in
+                let dedup = List.dedup_and_sort ~compare:Var.compare in
+                let frees1 = vars b1 |> uncurry (@) |> dedup |> linter ~equal:Var.equal vs' in
+                let frees2 = vars b2 |> uncurry (@) |> dedup |> linter ~equal:Var.equal vs' in
+                (* vs2 = vs' ∩ (frees(b2) \ frees(b1))
+                 * vs1 = vs' ∩ (frees(b1) \ frees(b2)) *)                
+                let vs1 = Var.(ldiff ~equal frees1 frees2) |> dedup in
+                let vs2 = Var.(ldiff ~equal frees2 frees1) |> dedup in
+                let vs'' = Var.(linter ~equal frees1 frees2) |> dedup in 
                 (* its the case that vs' = vs'' @ vs2 @ vs1 *)
                 (* This is a simple sanity check *)
                 assert(Int.(List.length vs' = List.length(vs'' @ vs2 @ vs1)));

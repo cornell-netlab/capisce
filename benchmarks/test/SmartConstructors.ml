@@ -88,6 +88,13 @@ let single_forall () =
   let simplified = simplify start in 
   Alcotest.(check bexpr) "syntactically equivalent" expected simplified
 
+let true_or_phi__true () =
+  let open BExpr in
+  Test.run_exn
+    (module BExpr)
+    ~f:(fun b -> [%test_eq: BExpr.t] true_ (or_ true_ b))
+  
+  
 
 let single_foralls1 () =
   let open BExpr in
@@ -153,6 +160,7 @@ let tests =
     Alcotest.test_case "simplify(∀z. z=4 ⇒ (∀ a. 73722014=a)) ≡ ∀z. z=4 ⇒ (∀ a. 73722014=a)" `Quick nested_foralls1;
     Alcotest.test_case "simplify(¬∀z. z=4 ⇒ (∀ a. 73722014=a)) ≡ true" `Quick nested_foralls_literal;
     Alcotest.test_case "simplify(∀a. 73722014 = a) = smart(∀a.73722014=a)" `Quick single_forall;
+    Alcotest.test_case "Quickcheck ⊤ ∨ ϕ = ⊤" `Quick true_or_phi__true;
   ]
 
   
