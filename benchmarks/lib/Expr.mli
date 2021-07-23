@@ -1,12 +1,14 @@
 type t [@@deriving eq, sexp, compare, quickcheck]
 
 val bv : Bigint.t -> int -> t
+val bvi : int -> int -> t  
 val var : Var.t -> t
 val band : t -> t -> t
 val bor : t -> t -> t
 val badd : t -> t -> t
 val bmul : t -> t -> t
-val bsub : t -> t -> t  
+val bsub : t -> t -> t
+val bneg : t -> t  
 
 val static_eq : t -> t -> bool option  
 val subst : Var.t -> t -> t -> t

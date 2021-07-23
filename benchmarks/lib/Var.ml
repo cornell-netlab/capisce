@@ -55,19 +55,16 @@ let list_to_smtlib_decls : t list -> string =
 let quickcheck_generator =
   let open Quickcheck.Generator in
   let open Let_syntax in
-  let networklike_size i = i < 48 && i > 1 in  
-  let%bind v = of_list ["x";"y";"z";"a";"b";"c";"n";"m";"h";"i";"j";"k";"l"] in
-  let%map n = filter Int.quickcheck_generator ~f:(networklike_size) in
-  Printf.printf "GENERATING %s#%i\n%!" v n;
-  make v n
+  (* let networklike_size i = i < 48 && i > 1 in   *)
+  let%map v = of_list ["x";"y";"z";"a";"b";"c";"n";"m";"h";"i";"j";"k";"l"] in
+  (* let%map n = filter Int.quickcheck_generator ~f:(networklike_size) in *)
+  Printf.printf "GENERATING %s#%i\n%!" v 32;
+  make v 32
   
 
 let quickcheck_observer =
   let open Quickcheck.Observer in
   tuple2 String.quickcheck_observer Int.quickcheck_observer
 
-let quickcheck_shrinker =
-  let open Base_quickcheck.Shrinker in
-  let open Quickcheck.Shrinker in
-  tuple2 atomic Int.quickcheck_shrinker
+let quickcheck_shrinker = Base_quickcheck.Shrinker.atomic
   

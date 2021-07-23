@@ -9,6 +9,7 @@ val not_ : t -> t
 val and_ : t -> t -> t
 val or_ : t -> t -> t
 val imp_ : t -> t -> t
+val iff_ : t -> t -> t  
 val eq_ : Expr.t -> Expr.t -> t
 val forall : Var.t list -> t -> t
 val exists : Var.t list -> t -> t
@@ -21,3 +22,8 @@ val index_subst : Subst.t option -> t -> t
 
 val simplify : t -> t
 val well_formed : t -> bool                       
+
+val equivalence : t -> t -> t                         
+
+(* FOR TESTING PURPOSES ONLY *)
+val dumb : (unit -> t) -> t

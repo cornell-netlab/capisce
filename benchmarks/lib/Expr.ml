@@ -24,6 +24,7 @@ type t =
   [@@deriving eq, sexp, compare, quickcheck]
 
 let bv n w = BV(n,w)
+let bvi n w = bv (Bigint.of_int n) w
 let var v = Var v
 let band e1 e2 = BinOp(BAnd, e1, e2)
 let bor e1 e2 = BinOp(BOr, e1, e2)
@@ -106,9 +107,9 @@ let quickcheck_generator : t Generator.t =
   let open Let_syntax in
   recursive_union
     [
-      (let%bind n = Bigint.quickcheck_generator in
-       let%map w = filter Int.quickcheck_generator ~f:(fun i -> i > 0 && i <= 48) in
-       bv n w);
+      (let%map n = filter Bigint.quickcheck_generator ~f:(fun i -> Bigint.(i > zero && i < pow (of_int 2) (of_int 32))) in
+       (* let%map w = filter Int.quickcheck_generator ~f:(fun i -> i > 0 && i <= 48) in *)
+       bv n 32);
       
       (let%map v = Var.quickcheck_generator in
        Printf.printf "Expr Generated %s\n%!" (Var.list_to_smtlib_quant [v]);
