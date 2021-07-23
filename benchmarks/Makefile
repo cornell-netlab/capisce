@@ -11,4 +11,9 @@ all:
 clean:
 	rm -fr _build
 
+check:
+	dune build ./test/tests.exe && ./_build/default/test/tests.exe
+
+check-q:
+	dune build ./test/tests.exe && ./_build/default/test/tests.exe -q
 # end
