@@ -108,7 +108,6 @@ let quickcheck_generator : t Generator.t =
   recursive_union
     [
       (let%map n = filter Bigint.quickcheck_generator ~f:(fun i -> Bigint.(i > zero && i < pow (of_int 2) (of_int 32))) in
-       (* let%map w = filter Int.quickcheck_generator ~f:(fun i -> i > 0 && i <= 48) in *)
        bv n 32);
       
       (let%map v = Var.quickcheck_generator in
@@ -127,3 +126,4 @@ let quickcheck_generator : t Generator.t =
       [bin; neg]
     )
 
+let quickcheck_shrinker : t Shrinker.t = Shrinker.atomic    

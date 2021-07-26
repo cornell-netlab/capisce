@@ -156,18 +156,18 @@ let rec vars t : Var.t list * Var.t list =
      Var.(Util.ldiff ~equal dvs vs, Util.ldiff ~equal cvs vs)
        
 let forall_simplify forall vs op a b =
-  let b' =
+  let phi =
     match op with
     | LAnd -> and_ a b
     | LArr -> or_ (not_ a) b
     | LOr -> or_ a b
     | LIff -> iff_ a b
   in
-  Log.print @@ Printf.sprintf "∀-simplifying: %s\n%!" (to_smtlib b');        
-  forall vs b
+  Log.print @@ Printf.sprintf "∀-simplifying: ∀ %s. %s\n%!" (Var.list_to_smtlib_quant vs) (to_smtlib phi);        
+  forall vs phi
             
-let forall =
-  ctor2rec
+let forall vs b =
+  ctor2rec vs b
     ~default:(fun vs b ->
       if List.is_empty vs then
         b
@@ -175,8 +175,8 @@ let forall =
         Forall(vs,b)      
     )
     ~smart:(fun self default vs b ->
-      let () = Log.print @@ Printf.sprintf "∀-optimizing: %s\n%!" (to_smtlib b) in               
       if List.is_empty vs then
+        let () = Log.print @@ Printf.sprintf "Emptiness is a warm gun: %s" (to_smtlib b) in
         b
       else        
         let bvs = Util.uncurry (@) (vars b) in
@@ -210,7 +210,9 @@ let forall =
              end
           | Forall(vs'', b') -> self (Var.dedup (vs' @ vs'')) b'
           | _ ->
-             default vs b)
+             default vs b 
+    )
+    
 
     
 let exists vs b = Exists(vs, b)
@@ -305,9 +307,7 @@ let quickcheck_generator : t Generator.t =
       ]
     )                                    
 
-let quickcheck_shrinker : t Shrinker.t =
-  let open Shrinker in
-  atomic
+let quickcheck_shrinker : t Shrinker.t = Shrinker.atomic
   
 let rec well_formed b =
   match b with
