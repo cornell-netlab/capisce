@@ -30,4 +30,6 @@ let linter ~equal xs ys =
 
 let ldiff ~equal xs ys =
   List.filter xs ~f:(fun x -> not(List.exists ys ~f:(equal x)))
+
+let lmem ~equal x xs = List.exists xs ~f:(equal x)
   

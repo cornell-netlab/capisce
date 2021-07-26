@@ -466,7 +466,6 @@ let proglite =
      *   ];             *)
       (*/forward*)  
     assert_ BExpr.(not_ (eq_ (evar "standard_metadata__egress_spec" 9) (zero 9)));
-    
   ]
   |> sequence
 

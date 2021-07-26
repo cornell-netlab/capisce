@@ -83,6 +83,8 @@ let and_ =
         b2
       else if b2 = true_ then
         b1
+      else if b1 = false_ || b2 = false_ then
+        false_
       else default b1 b2)
   
 let or_ =
@@ -155,13 +157,13 @@ let rec vars t : Var.t list * Var.t list =
      let dvs, cvs = vars b in
      Var.(Util.ldiff ~equal dvs vs, Util.ldiff ~equal cvs vs)
        
-let forall_simplify forall vs op a b =
+let forall_simplify forall vs vsa a op vsb b =
   let phi =
     match op with
-    | LAnd -> and_ a b
-    | LArr -> or_ (not_ a) b
-    | LOr -> or_ a b
-    | LIff -> iff_ a b
+    | LAnd -> and_ (forall vsa a) (forall vsb b)
+    | LArr -> or_ (forall vsa (not_ a)) (forall vsb b)
+    | LOr  -> or_ (forall vsa a) (forall vsb b)
+    | LIff -> iff_ (forall vsa a) (forall vsb b)
   in
   Log.print @@ Printf.sprintf "∀-simplifying: ∀ %s. %s\n%!" (Var.list_to_smtlib_quant vs) (to_smtlib phi);        
   forall vs phi
@@ -204,7 +206,7 @@ let forall vs b =
                 (* its the case that vs' = vs'' @ vs2 @ vs1 *)
                 (* This is a simple sanity check *)
                 assert(Int.(List.length vs' = List.length(vs'' @ vs2 @ vs1)));
-                forall_simplify self vs'' op (self vs1 b1) (self vs2 b2)
+                forall_simplify self vs'' vs1 b1 op vs2 b2
              | LAnd -> and_ (self vs b1) (self vs b2)
              | LIff -> default vs' (iff_ b1 b2)
              end

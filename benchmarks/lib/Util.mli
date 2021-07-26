@@ -20,3 +20,5 @@ val ldiff : equal:('a -> 'a -> bool) -> 'a list -> 'a list -> 'a list
 (** [ldiff ~equal xs ys] is a list of the elements of [xs] that are not in [ys]. Contains duplicates iff ldiff contains duplicates.*)
                                                                   
                     
+val lmem : equal:('a -> 'a -> bool) -> 'a -> 'a list -> bool
+(** [lmem ~equal x xs] returns true if [x] occurs in [xs]  *)
