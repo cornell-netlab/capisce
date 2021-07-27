@@ -189,8 +189,8 @@ let forall vs b =
           match b with
           | TFalse -> false_
           | TTrue -> true_
-          | TNot (TEq(e1,e2)) | TEq (e1, e2) when Expr.uelim vs' e1 e2 ->
-             false_
+          | TNot (TEq(e1,e2)) when Expr.uelim `Neq vs' e1 e2 -> false_
+          | TEq(e1,e2) when Expr.uelim `Eq vs' e1 e2 -> false_
           | TBin (op, b1, b2) ->
              begin match op with
              | LArr | LOr ->

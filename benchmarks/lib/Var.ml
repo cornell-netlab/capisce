@@ -23,9 +23,12 @@ let make_ghost id k =
 let symbRow = "row"
 let is_symbRow (s,_) = String.is_prefix s ~prefix:symbRow
 let make_symbRow id k =            
-  let x = Printf.sprintf "%s_%d__%s" symbRow id (str k)in
+  let x = Printf.sprintf "%s_%d__%s" symbRow id (str k) in
   let w = size k in
   make x w
+let is_sym_of ~sym ~data =
+  is_symbRow sym && String.is_suffix (str sym) ~suffix:(str data)
+  
 
 let (=) ((s1,n1) : t) ((s2,n2) : t) =
   if String.(s1 = s2) then

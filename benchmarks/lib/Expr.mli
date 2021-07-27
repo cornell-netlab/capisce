@@ -17,8 +17,8 @@ val to_smtlib : t -> string
 
 val index_subst : Subst.t option -> t -> t
 
-val uelim : Var.t list -> t -> t -> bool
-(** [uelim vs e1 e2] heuristically determines whether we can falsify a quantified term *)
+val uelim : [`Neq | `Eq] -> Var.t list -> t -> t -> bool
+(** [uelim sign vs e1 e2] heuristically determines whether we can falsify [forall vs (e1 sign e2)] *)
 
 val well_formed : t -> bool
 (** [well_formed e] returns true iff the variables are well-formed and no bitvector has negative length *)

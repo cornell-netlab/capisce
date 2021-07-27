@@ -342,6 +342,36 @@ let buggy_qc_example_2 () =
   in
   Alcotest.(check smt_equiv) "logically equivalent" (dumb phi) (phi ())
   
+let symbolic () =
+  let sym = Var.make "meta__ipv4_da" 32 in
+  let data = Var.make "row_ipv4_lpm__meta_ipv4" 32 in
+  Var.is_sym_of ~sym ~data
+  |> Alcotest.(check bool) "is symbolic extension" true 
+  
+  
+let rewrite_unused_mask () =
+  let open BExpr in
+  let open Expr in  
+  let meta__ipv4_da = Var.make "meta__ipv4_da" 32 in
+  let row_ipv4_lpm__meta_ipv4 = Var.make "row_ipv4_lpm__meta_ipv4" 32 in
+  let row_ipv4_lpm__meta_ipv4Mask = Var.make "row_ipv4_lpm__meta_ipv4Mask" 32 in
+  let phi =
+    forall [meta__ipv4_da]
+      (not_ (eq_ (band (var meta__ipv4_da) (var row_ipv4_lpm__meta_ipv4Mask))
+               (band (var row_ipv4_lpm__meta_ipv4) (var row_ipv4_lpm__meta_ipv4Mask)))) in
+  Alcotest.(check bexpr) "syntactically equivalent" false_ phi
+
+let rewrite_unused_mask_equivalent () =
+  let open BExpr in
+  let open Expr in  
+  let meta__ipv4_da = Var.make "meta__ipv4_da" 32 in
+  let row_ipv4_lpm__meta_ipv4 = Var.make "row_ipv4_lpm__meta_ipv4" 32 in
+  let row_ipv4_lpm__meta_ipv4Mask = Var.make "row_ipv4_lpm__meta_ipv4Mask" 32 in
+  let phi () =
+    forall [meta__ipv4_da]
+      (not_ (eq_ (band (var meta__ipv4_da) (var row_ipv4_lpm__meta_ipv4Mask))
+               (band (var row_ipv4_lpm__meta_ipv4) (var row_ipv4_lpm__meta_ipv4Mask)))) in
+  Alcotest.(check smt_equiv) "syntactically equivalent" (dumb phi) (phi ())   
   
 
 let single_foralls1 () =
@@ -395,6 +425,23 @@ let and_not_example_literal () =
   let simplified = BExpr.simplify init in
   Alcotest.(check bexpr) "literal equivalence" expected simplified
   
+
+let eliminate_quantified_variable_neq () =
+  let open BExpr in
+  let open Expr in
+  let ipv4__isValid = Var.make "ipv4__isValid" 1 in
+  let row_nat__ipv4__isValid = Var.make "row_nat__ipv4__isValid" 1 in 
+  let b () = forall [ipv4__isValid] (not_ (eq_ (var ipv4__isValid) (var row_nat__ipv4__isValid))) in
+  Alcotest.(check bexpr) "literal equivalence" false_ (b ())
+
+let eliminate_quantified_variable_eq () =
+  let open BExpr in
+  let open Expr in
+  let ipv4__isValid = Var.make "ipv4__isValid" 1 in
+  let row_nat__ipv4__isValid = Var.make "row_nat__ipv4__isValid" 1 in 
+  let b () = forall [ipv4__isValid] (eq_ (var ipv4__isValid) (var row_nat__ipv4__isValid)) in
+  Alcotest.(check bexpr) "literal equivalence" false_ (b ())  
+                                                                                                 
   
 let tests =
   [
@@ -411,6 +458,10 @@ let tests =
     Alcotest.test_case "∀ z. (¬ ∃ a. a = V) ⇒ (⊥ ⇔ z = N-1) = (¬ ∃ a. a = V) ⇒ ∀ z. (⊥ ⇔ z = N-1)" `Quick buggy_qc_example_literal;
     Alcotest.test_case "∀m. (m = e) ⇒ ∀ c h z. z|(h-c) = ~3 simplifies correctly" `Quick buggy_qc_example_1;
     Alcotest.test_case "complicated formula simplifies correctly" `Quick buggy_qc_example_2;
+    Alcotest.test_case "(∀x. x ≠ y) reduces to (false) via smarts" `Quick eliminate_quantified_variable_neq;
+    Alcotest.test_case "(∀x. x = y) reduces to (false) via smarts" `Quick eliminate_quantified_variable_eq;
+    Alcotest.test_case "∀ x. (x & ρ.m) ≠ (ρ.x & ρ.m) reduces to ⊥" `Quick rewrite_unused_mask;
+    Alcotest.test_case "∀ x. (x & ρ.m) ≠ (ρ.x & ρ.m) ⇔ ⊥" `Quick rewrite_unused_mask_equivalent;        
     Alcotest.test_case "QC Smart QE" `Slow identity;
     Alcotest.test_case "QC ⊤ ∨ φ = ⊤" `Quick true_or_phi__true;
     Alcotest.test_case "QC ⊥ ∨ φ = φ" `Quick false_or_phi__phi;

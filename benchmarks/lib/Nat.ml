@@ -474,6 +474,7 @@ let smt () =
   let phi = wp proglite BExpr.true_ in
   let (dvs, cvs) = BExpr.vars phi in
   BExpr.forall dvs phi
+  |> BExpr.simplify 
   |> Smt.simplify cvs       
                      
 let smt_slicing () =

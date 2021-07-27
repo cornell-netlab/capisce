@@ -33,10 +33,18 @@ let bmul e1 e2 = BinOp(UMul, e1, e2)
 let bsub e1 e2 = BinOp(USub, e1, e2)
 let bneg e = Neg e
 
-let uelim vs e1 e2 =
-  match e1, e2 with
-  | BV _, Var v | Var v, BV _ ->
-     List.exists vs ~f:(Var.equal v)
+let uelim sign vs e1 e2 =
+  let open Var in 
+  match sign, e1, e2 with
+  | _, BV _, Var v | _, Var v, BV _ ->
+     Var.(Util.lmem ~equal v vs) 
+  | _, Var v, Var v' ->
+     not (Var.(v = v')) && (not @@ List.is_empty @@ Util.linter ~equal [v;v'] vs)
+  | `Neq, (BinOp (BAnd,Var v1,Var vm)), (BinOp (BAnd, Var vk, Var vm')) ->
+     let open Var in
+     vm = vm'
+     && is_symbRow vk
+     && Util.lmem ~equal v1 vs  
   | _ ->
      false
                
