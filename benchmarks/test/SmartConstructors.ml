@@ -140,7 +140,7 @@ let phi_and_true__phi () =
 
 let reduce_scope_right () =
   Test.run_exn
-    ~config:{z3_config with test_count = 50}
+    ~config:{z3_config with test_count = 100}
     (module struct
        type t = Var.t * BExpr.t * BExpr.t [@@deriving quickcheck, sexp]
        let quickcheck_generator : t Generator.t =
@@ -163,7 +163,7 @@ let reduce_scope_right () =
 
 let reduce_scope_left () =
   Test.run_exn
-    ~config:{z3_config with test_count = 25}
+    ~config:{z3_config with test_count = 50}
     (module struct
        type t = Var.t * BExpr.t * BExpr.t [@@deriving quickcheck, sexp]
        let quickcheck_generator : t Generator.t =
