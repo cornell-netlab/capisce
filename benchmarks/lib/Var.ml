@@ -56,10 +56,11 @@ let list_to_smtlib_decls : t list -> string =
   ~f:(fun acc v -> Printf.sprintf "%s%s" acc (to_smtlib_decl v))
 
 let quickcheck_generator =
+  let open Base_quickcheck.Generator in
   let open Quickcheck.Generator in
   let open Let_syntax in
   (* let networklike_size i = i < 48 && i > 1 in   *)
-  let%map v = of_list ["x";"y";"z";"a";"b";"c";"n";"m";"h";"i";"j";"k";"l"] in
+  let%map v = string_with_length_of ~length:2 char_lowercase in
   (* let%map n = filter Int.quickcheck_generator ~f:(networklike_size) in *)
   Printf.printf "GENERATING %s#%i\n%!" v 32;
   make v 32
