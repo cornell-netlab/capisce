@@ -1,4 +1,12 @@
-# First, A Bunch of Problems
+# Proposal for new Approach
+
+I propose we modify our semantics & instrumentation understanding tables as
+total functions from a packet slice to an action choice (which may be the
+default action). This means killing our darlings and not treating hit and miss
+as special. Though I do discuss how to implement them as a dataplane-only
+construct using the total-function semantics at the end.
+
+## First, A Problem
 
 I found a bug in my approach to this problem. 
 
@@ -403,3 +411,100 @@ Not only is this much cleaner, it solves our bugs too.
 With this setting we need to revise our Theorem 3 and polish theorem 4. Theorem
 3 should be rephrased in terms of the new symbolic interpretation of σ, and
 theorem 4 needs to merge G and D.
+
+
+## Implementing Hit & Miss.
+
+If we still want the hit and miss predicates, we can implement them as
+dataplane-only construct. Consider an example table4
+
+    table t {
+      keys = {y}
+      action {x := 0} {x := 1} {@defaultonly Skip}
+      default_action = Skip
+    }
+
+Simply translate this table into the following
+
+    table t {
+      keys = {y}
+      action {x := 0; miss_t = 0}
+             {x := 1; miss_t = 0} 
+             {@defaultonly Skip; miss_t = 1}
+    }
+
+And we're done. We can even leverage this technique to allow the controller to
+modify the default action.
+
+## Improved controller expressiveness
+
+Now we can implement the controller's ability to change the default action,
+which we couldnt do before without more instrumentation. Here it simply
+falls out as the controller changing the state σ.
+
+If we want to be able to inspect "hit" and "miss" at the dataplane level, we can
+also implement it as a register change or action data change. 
+
+### As a register
+
+To implement the controller's modification of default actions using a register,
+we can modify the following program
+    
+    table t {
+      keys = {y}
+      action {x := 0} {x := 1} {@defaultonly Skip}
+      default_action = Skip
+    }
+
+to become
+
+    register<bool> is_default_0 := false;
+    register<bool> is_default_1 := false; 
+    register<bool> is_default_2 := true;
+    
+    table t {
+      keys = {y}
+      action {x := 0; miss_t := is_default_0} 
+             {x := 1; miss_t := is_default_1} 
+             {skip; miss_t := is_default_2}
+    }
+    
+Then modifying the default action comprises (1) manipulating σ accordingly (2)
+modifying the `is_default_i` registers, ensuring that only one is true.
+
+I think this may not work cleanly if the default action can have specialized
+action data. It may require the controller to pass a parameter indicating whether the action is intended to represent a hit or a miss. For example 
+
+    {λ d x → x := x; miss_t := d ? is_default_2 : false}
+
+
+### As Action Data
+
+To implement the controller's modification of default actions using action data,
+we can modify the following program
+    
+    table t {
+      keys = {y}
+      action {x := 0} {x := 1} {@defaultonly Skip}
+      default_action = Skip
+    }
+
+to become
+   
+    table t {
+      keys = {y}
+      action {λ d → x := 0; miss_t := d} 
+             {λ d → x := 1; miss_t := d} 
+             {λ d → skip; miss_t := d}
+    }
+    
+Then, modifying the default action just means updating the action data for
+existing rows, and modifying the matches accordingly.
+
+### A note on efficiency
+
+Both of these seem to require much more manipulation of the control plane state
+than in the standard default-action approach, but remember that this is a
+logical encoding that we will use to check the state σ. We don't need to worry,
+so much about what the actual interface is, so long as we can translate back and
+forth.
