@@ -1,4 +1,4 @@
-# Proposal for new Approach
+# Proposal for Returning To Table Totality
 
 I propose we modify our semantics & instrumentation understanding tables as
 total functions from a packet slice to an action choice (which may be the
@@ -6,9 +6,11 @@ default action). This means killing our darlings and not treating hit and miss
 as special. Though I do discuss how to implement them as a dataplane-only
 construct using the total-function semantics at the end.
 
-## First, A Problem
+From a platonic perspective this makes sense. A table can be thought of as a
+function from packets to action/action data pairs. This is, I think, how
+Petr4/Poulet4 handle tables.
 
-I found a bug in my approach to this problem. 
+## First, A Problem
 
 In order to provide semantics to dataplane constructs like "hit", I've
 instrumented the program with ghost state (a la p4v) and then I use that ghost
@@ -477,6 +479,7 @@ action data. It may require the controller to pass a parameter indicating whethe
 
     {λ d x → x := x; miss_t := d ? is_default_2 : false}
 
+Another solution is to create a hit and miss version of each action.
 
 ### As Action Data
 
