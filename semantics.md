@@ -1,4 +1,4 @@
-# Proposal for Returning To Table Totality
+# Totality
 
 I propose we modify our semantics & instrumentation understanding tables as
 total functions from a packet slice to an action choice (which may be the
