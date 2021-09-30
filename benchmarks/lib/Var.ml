@@ -13,17 +13,17 @@ let well_formed ((s,i) : t) = String.length s > 0 && i > 0
                      
 let dedup = List.dedup_and_sort ~compare
                      
-let ghost = "ghost"
+let ghost = "$"
 let is_ghost (s,_) = String.is_prefix s ~prefix:ghost           
 let make_ghost id k =
-  let x = Printf.sprintf "%s_%d__%s" ghost id (str k) in
+  let x = Printf.sprintf "%s%s_%d" ghost (str k) id in
   let w = size k in
   make x w
 
-let symbRow = "row"
+let symbRow = "?"
 let is_symbRow (s,_) = String.is_prefix s ~prefix:symbRow
 let make_symbRow id k =            
-  let x = Printf.sprintf "%s_%d__%s" symbRow id (str k) in
+  let x = Printf.sprintf "%s%s_%d" symbRow (str k) id in
   let w = size k in
   make x w
 let is_sym_of ~sym ~data =

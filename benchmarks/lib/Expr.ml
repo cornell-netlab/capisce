@@ -72,7 +72,7 @@ let rec vars e : (Var.t list * Var.t list) =
   match e with
   | BV _ -> ([],[])
   | Var y ->
-     if Var.is_ghost y || Var.is_symbRow y then
+     if Var.is_symbRow y then
        ([],[y])
      else
        ([y],[])

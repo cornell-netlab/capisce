@@ -8,7 +8,7 @@ let run_and_print_exp f one n =
       Printf.printf "%d,%f,%b\n%!" (i+2) (Time.Span.to_ms t) (Bench.answer_ok s)
     )
              
-let main : Command.t =
+let bench : Command.t =
   let open Command.Let_syntax in
   Command.basic ~summary:"Invokes the Princess benchmarker"
     [%map_open
@@ -17,14 +17,11 @@ let main : Command.t =
          one = flag "-one" no_arg ~doc:"Only run the nth experiment" and
          princess = flag "-p" no_arg ~doc:"run the princess solver" and
          z3prince = flag "-b" no_arg ~doc:"run the sequenced solver" and
-         z3 = flag "-z" no_arg ~doc:"run z3-only solver" and
-         nat = flag "-nat" no_arg ~doc:"Print out the nat wp"
+         z3 = flag "-z" no_arg ~doc:"run z3-only solver"
          in
          fun () ->
          Pbench.Log.debug := debug;
-         if nat then
-           Printf.printf "%s" (Nat.smt ())
-         else begin
+         begin
              if z3prince then begin
                  Printf.printf "Checking Z3 then Princess . . . \n%!";
                  run_and_print_exp Bench.z3_princess one n
@@ -40,6 +37,31 @@ let main : Command.t =
            end
     ]
 
+let nat : Command.t =
+  let open Command.Let_syntax in
+  Command.basic ~summary:"Runs NAT example"
+    [%map_open
+     let debug = flag "-D" no_arg ~doc:"show debugging info" in
+         fun () ->         
+         Pbench.Log.debug := debug;
+         Printf.printf "%s" (Nat.smt ())
+    ]
 
-let () = Command.run main
+let beastiary : Command.t =
+  let open Command.Let_syntax in
+  Command.basic ~summary:"Runs the Beastiary of Examples"
+    [%map_open
+     let debug = flag "-D" no_arg ~doc:"show debugging info" in
+         fun () ->         
+         Pbench.Log.debug := debug;
+         Pbench.MicroExamples.run_all ()
+    ]
+  
 
+let main =
+  Command.group ~summary:"research toy for exploring verification & synthesis of p4 programs"
+    [("bench", bench);
+     ("nat", nat);
+     ("beastiary", beastiary)]
+
+let () = Command.run main    

@@ -22,7 +22,7 @@ is obvious/irrelevant/inferrable.
 
 I also use symbolic variables to represent the symbolic controller state, using
 ρₜ.f as the prefix. We have also (following Avenir) used ?fₜ to represent
-these variables. We write Rᶜ for the set of ghost variables in a command c,
+these variables. We write Rᶜ for the set of CP variables in a command c,
 or just R when c is obvious/irrelevant/inferrable.
 
 Theorem 4 proves that if we quantifier-eliminate the dataplane variables we get
@@ -43,8 +43,8 @@ The algorithm we suggest is the following
          return ψ(R,G)
          
 The "correctness" follows Lemma 20 which says that ψ(R,G) ⇒ ∀ D. φ(D,R,G), and
-ψ(R,G) is weakest, and from Theorem 3, which says that wp(c[σ],⊤) = ⦇σ⦈ᶜ ⇒
-wp(c[?], ⊤)
+ψ(R,G) is weakest, and from Theorem 3, which says that 
+                        wp(c[σ],⊤) ⇔ (⦇σ⦈ᶜ ⇒ wp(c[?], ⊤))
          
 Here's the problem. ψ(R,G) is expressed in terms of symbolic variables R
 (which is fine), and ghost variables G (which is not). The ghost variables,
@@ -61,6 +61,8 @@ plane interface, and didn't include these problematic ghost/dataplane variables
 G. Then, the definition is
     
      ⦇σ⦈ᶜ ≜ ⋀{ ⋁{rᵢ = ρₜ | rᵢ ∈ σ(t)} | t in tables(c) }
+     
+     ρₜ.action ρₜ.keys, ρₜ.data
      
 *Sidenote*. Note that we need σ(t) to be non-empty for this definition to be
 sensible. If σ(t) = [] then the the ρₜ variables are unconstrained, which
@@ -430,9 +432,9 @@ Simply translate this table into the following
 
     table t {
       keys = {y}
-      action {x := 0; miss_t = 0}
-             {x := 1; miss_t = 0} 
-             {@defaultonly Skip; miss_t = 1}
+      action {x := 0; miss_t := 0}
+             {x := 1; miss_t := 0} 
+             {@defaultonly Skip; miss_t := 1}
     }
 
 And we're done. We can even leverage this technique to allow the controller to
@@ -511,3 +513,16 @@ than in the standard default-action approach, but remember that this is a
 logical encoding that we will use to check the state σ. We don't need to worry,
 so much about what the actual interface is, so long as we can translate back and
 forth.
+
+
+## Skolemization
+
+
+
+∀ D. D.ks = t.ks ⇒ 
+    ?action = 0 ⇒ a(data)
+
+
+
+
+

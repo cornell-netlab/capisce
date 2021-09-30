@@ -1,7 +1,7 @@
 open Base_quickcheck
 open Core
 
-let __testing__only__smart = ref `On
+let __testing__only__smart = ref `Off
    
 type bop =
   | LAnd
@@ -28,35 +28,49 @@ type t =
 
 let (=) = equal
 
-let rec to_smtlib = function
-  | TFalse -> "false"
-  | TTrue -> "true"
-  | TNot t -> Printf.sprintf "(not %s)" (to_smtlib t)
+let rec to_smtlib_aux indent b =
+  let space = Util.space (2 * indent) in
+  match b with
+  | TFalse ->
+     Printf.sprintf "%sfalse" space
+  | TTrue ->
+     Printf.sprintf "%strue" space
+  | TNot t ->
+     Printf.sprintf "%s(not\n%s)" space (to_smtlib_aux (indent + 1) t)
   | TBin (b,t1,t2) ->
-     Printf.sprintf "(%s %s %s)" (bop_to_smtlib b) (to_smtlib t1) (to_smtlib t2)
+     Printf.sprintf "%s(%s\n%s\n%s)"
+       space
+       (bop_to_smtlib b)
+       (to_smtlib_aux (indent + 1) t1)
+       (to_smtlib_aux (indent + 1) t2)
   | TEq (e1,e2) ->
-     Printf.sprintf "(= %s %s)" (Expr.to_smtlib e1) (Expr.to_smtlib e2)
+     Printf.sprintf "%s(= %s %s)"
+       space
+       (Expr.to_smtlib e1)
+       (Expr.to_smtlib e2)
   | Forall (vs, t) ->
-     Printf.sprintf "(forall (%s) %s)"
+     Printf.sprintf "%s(forall (%s)\n %s)\n"
+       space
        (Var.list_to_smtlib_quant vs)
-       (to_smtlib t)
+       (to_smtlib_aux (indent + 1) t)
   | Exists (vs, t) ->
-     Printf.sprintf "(exists (%s) %s)"
+     Printf.sprintf "%s(exists (%s)\n %s)\n"
+       space
        (Var.list_to_smtlib_quant vs)
-       (to_smtlib t)        
+       (to_smtlib_aux (indent + 1) t)        
 
+let to_smtlib = to_smtlib_aux 0
+    
 let ctor1 ~default ~smart a =
   match !__testing__only__smart with
   | `On -> smart default a
   | `Off ->
-     Printf.printf "DEFAULT\n%!";     
      default a
 let ctor2 ~default ~smart a b =
   match !__testing__only__smart with
   | `On -> smart default a b
   | `Off ->
-     Printf.printf "DEFAULT\n%!";
-     default a b
+    default a b
 let rec ctor2rec ~default ~smart a b =
   match !__testing__only__smart with
   | `On -> smart (ctor2rec ~default ~smart) default a b
@@ -284,7 +298,6 @@ let quickcheck_generator : t Generator.t =
         (let%bind op = quickcheck_generator_bop in
          let%bind b1 = self in
          let%map b2 = self in
-         Printf.printf "Generate LHS %s RHS %s\n%!" (to_smtlib b1) (to_smtlib b2);         
          TBin (op,b1,b2)
         );
 

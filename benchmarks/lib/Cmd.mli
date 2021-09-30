@@ -7,7 +7,8 @@ val assert_ : BExpr.t -> t
 val havoc : Var.t -> t
 val assign : Var.t -> Expr.t -> t
 val seq : t -> t -> t
-val choice : t -> t -> t  
+val choice : t -> t -> t
+val skip : t
 val sequence : t list -> t
 
 val negate : t -> t
