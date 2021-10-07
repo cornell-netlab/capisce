@@ -101,19 +101,6 @@ let and_ =
         false_
       else default b1 b2)
   
-let or_ =
-  ctor2
-    ~default:(fun b1 b2 -> TBin(LOr, b1, b2))    
-    ~smart:(fun default b1 b2 ->
-      if b1 = false_ then
-        b2
-      else if b2 = false_ then
-        b1
-      else if b1 = true_ || b2 = true_ then
-        true_
-      else
-        default b1 b2)
-
 let imp_ =
   ctor2
     ~default:(fun b1 b2 -> TBin(LArr, b1, b2))
@@ -123,6 +110,19 @@ let imp_ =
       else if b2 = false_ then
         not_ b1
       else if b1 = true_ then
+        b2
+      else
+        default b1 b2)
+
+let or_ =
+    ctor2
+    ~default:(fun b1 b2 -> TBin(LOr, b1, b2))
+    ~smart:(fun default b1 b2 ->
+      if b2 = true_ || b1 = true_ then
+        true_
+      else if b2 = false_ then
+        b1
+      else if b1 = false_ then
         b2
       else
         default b1 b2)
@@ -174,13 +174,24 @@ let rec vars t : Var.t list * Var.t list =
 let forall_simplify forall vs vsa a op vsb b =
   let phi =
     match op with
-    | LAnd -> and_ (forall vsa a) (forall vsb b)
-    | LArr -> or_ (forall vsa (not_ a)) (forall vsb b)
-    | LOr  -> or_ (forall vsa a) (forall vsb b)
-    | LIff -> iff_ (forall vsa a) (forall vsb b)
+    | LAnd ->
+       and_ (forall vsa a) (forall vsb b)
+    | LArr ->
+       let out = or_ (forall vsa (not_ a)) (forall vsb b) in
+       Log.print @@ Printf.sprintf "(or (forall (%s) %s) (forall (%s) %s))\n became %s\n"
+                      (Var.list_to_smtlib_quant vsa) (to_smtlib (not_ a)) (Var.list_to_smtlib_quant vsb) (to_smtlib b)
+                      (to_smtlib out);
+       out
+    | LOr  ->
+       or_ (forall vsa a) (forall vsb b)
+    | LIff ->
+       iff_ (forall vsa a) (forall vsb b)
   in
-  Log.print @@ Printf.sprintf "∀-simplifying: ∀ %s. %s\n%!" (Var.list_to_smtlib_quant vs) (to_smtlib phi);        
-  forall vs phi
+  Log.print @@ Printf.sprintf "∀-simplifying: ∀ %s. %s\n%!" (Var.list_to_smtlib_quant vs) (to_smtlib phi);
+  if Int.(List.length vsa = 0 && List.length vsb = 0) then
+    Forall(vs, phi)
+  else
+    forall vs phi
             
 let forall vs b =
   ctor2rec vs b
@@ -191,6 +202,7 @@ let forall vs b =
         Forall(vs,b)      
     )
     ~smart:(fun self default vs b ->
+      Log.print @@ Printf.sprintf "%s" (Forall (vs, b) |> to_smtlib);
       if List.is_empty vs then
         let () = Log.print @@ Printf.sprintf "Emptiness is a warm gun: %s" (to_smtlib b) in
         b
@@ -219,6 +231,15 @@ let forall vs b =
                 let vs'' = Var.(linter ~equal frees1 frees2) |> dedup in 
                 (* its the case that vs' = vs'' @ vs2 @ vs1 *)
                 (* This is a simple sanity check *)
+                Log.print @@ Printf.sprintf
+                               "*****\nof %s filtered to %s,\n(%s) are in\n%s\n\nand (%s) are in%s\n*****\n"
+                               (Var.list_to_smtlib_quant vs)
+                               (Var.list_to_smtlib_quant vs')
+                               (Var.list_to_smtlib_quant vs1)
+                               (to_smtlib b1)
+                               (Var.list_to_smtlib_quant vs2)
+                               (to_smtlib b2);
+                
                 assert(Int.(List.length vs' = List.length(vs'' @ vs2 @ vs1)));
                 forall_simplify self vs'' vs1 b1 op vs2 b2
              | LAnd -> and_ (self vs b1) (self vs b2)
@@ -243,8 +264,11 @@ let rec simplify_inner = function
   | Exists (vs, b) -> simplify_inner b |> exists vs
 
 let simplify b =
-  Log.print "==SIMPLIFYING==";
-  simplify_inner b
+  let tmp = !__testing__only__smart in
+  __testing__only__smart := `On;
+  let b' = simplify_inner b in
+  __testing__only__smart := tmp;
+  b'
   (* let b' = simplify_inner b in
    * if b = b' then
    *   b

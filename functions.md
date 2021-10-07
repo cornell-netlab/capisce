@@ -1,7 +1,11 @@
 # Interpreting Tables as functions
 
 The most-correct approach we've seen so far. Uses a (second-order) function to
-describe tables. This is dramatically more expressive and allows us to make cross-row comparisons in a way that we cannot do using FOL. P4v and Vera suggest that for DP verification we don't need this much power. In this document I sketch a way to use propositional quantifier elimination to compute a second-order condition.
+describe tables. This is dramatically more expressive and allows us to make
+cross-row comparisons in a way that we cannot do using FOL. P4v and Vera suggest
+that for DP verification we don't need this much power. In this document I
+sketch a way to use propositional quantifier elimination to compute a
+second-order condition.
 
 First though I want to remind us _why_ we want to use functions at all
 

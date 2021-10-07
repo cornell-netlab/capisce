@@ -7,15 +7,9 @@ let dur st nd = Time.(Span.(diff nd st |> to_ms))
    
 let format_print num p4 program vc =
   let (data_plane_vars, control_plane_vars) = BExpr.vars vc in
-  let quantified_vc = BExpr.forall data_plane_vars (BExpr.exists control_plane_vars vc) |> BExpr.simplify in
+  let quantified_vc = BExpr.forall data_plane_vars vc in
+  let frees = Var.list_to_smtlib_decls control_plane_vars in
   let smtlib = Printf.sprintf "%s\n%!" (BExpr.to_smtlib quantified_vc) in
-  let t1 = Time.now() in 
-  let result = Printf.sprintf "(assert %s)\n(check-sat)" smtlib |> Solver.run_z3 in
-  let t2 = Time.now() in
-  let z3_qe = Printf.sprintf "(assert %s)\n(apply qe)" smtlib |> Solver.run_z3 in
-  let t3 = Time.now() in  
-  let p_qe = Printf.sprintf "(simplify %s)\n%!" smtlib |> Solver.run_princess in
-  let t4 = Time.now() in
   Printf.printf "======================================\n\n%!";
   Printf.printf "               Example %d \n\n%!" num;  
   Printf.printf "======================================\n%!";
@@ -28,14 +22,26 @@ let format_print num p4 program vc =
   Printf.printf "                 VC\n%!";
   Printf.printf "--------------------------------------\n%!";
   Printf.printf "%s\n%!" smtlib;
+  let simplified_smtlib = Printf.sprintf "%s\n%!" (BExpr.to_smtlib (BExpr.simplify quantified_vc)) in  
+  Printf.printf "--------------------------------------\n%!";
+  Printf.printf "              Heuristics\n%!";
+  Printf.printf "--------------------------------------\n%!";
+  Printf.printf "%s\n%!" simplified_smtlib;
+  let t1 = Time.now() in 
+  let result = Printf.sprintf "%s\n(assert %s)\n(check-sat)" frees smtlib |> Solver.run_z3 in
+  let t2 = Time.now() in  
   Printf.printf "--------------------------------------\n%!";
   Printf.printf "            Result (%fms)\n%!" (dur t1 t2);
   Printf.printf "--------------------------------------\n%!";
   Printf.printf "%s\n%!" result;
+  let z3_qe = Printf.sprintf "%s\n(assert %s)\n(apply qe)" frees smtlib |> Solver.run_z3 in
+  let t3 = Time.now() in    
   Printf.printf "--------------------------------------\n%!";
   Printf.printf "             Z3 QE (%fms)\n%!" (dur t2 t3);
   Printf.printf "--------------------------------------\n%!";
   Printf.printf "%s\n%!" z3_qe;
+  let p_qe = Printf.sprintf "%s\n(simplify %s)\n%!" frees smtlib |> Solver.run_princess in
+  let t4 = Time.now() in  
   Printf.printf "--------------------------------------\n%!";
   Printf.printf "            Princess QE (%fms)\n%!" (dur t3 t4);
   Printf.printf "--------------------------------------\n%!";
@@ -84,7 +90,7 @@ let format_print num p4 program vc =
         hit(t) ∧ ?x = 1
  *)
 let ex1 () =
-  let act = Var.(make_symbRow 1 (make "action" 1))in
+  let act = Var.(make_symbRow 1 (make "action" 1)) in
   let one = bvi 1 1 in
   let zero = bvi 0 1 in
   let x = Var.make "x" 1 in
@@ -141,7 +147,7 @@ let ex1 () =
 
  *)
 let ex2 () =
-  let act = Var.(make_symbRow 2 (make "action" 1))in
+  let act = Var.(make_symbRow 2 (make "action" 1)) in
   let one = bvi 1 1 in
   let zero = bvi 0 1 in
   let valid = Var.make "x__is_valid" 1 in
@@ -210,7 +216,7 @@ let ex3 () =
   let one = bvi 1 1 in
   let zero = bvi 0 1 in
   let x = Var.make "x" 1 in
-  let cp_x = Var.make "__x" 1 in
+  let cp_x = Var.make_symbRow 3 x in
   let z = Var.make "z" 1 in
   let cp_z = Var.make_symbRow 3 z in
   let program =
@@ -282,7 +288,7 @@ let ex4 () =
   let one = bvi 1 1 in
   let zero = bvi 0 1 in
   let x = Var.make "x" 1 in
-  let cp_x = Var.make "__x" 1 in
+  let cp_x = Var.make_symbRow 4 x in
   let program =
     sequence [
         assume (eq_ (var x) (var cp_x));
@@ -373,10 +379,10 @@ let join_ex () =
   let one = bvi 1 1 in
   let zero = bvi 0 1 in
   let x = Var.make "x" 1 in
-  let cp_x = Var.make "__x" 1 in
+  let cp_x = Var.make_symbRow 1 x in
   let m = Var.make "m" 1 in
-  let cp_m1 = Var.(make_symbRow 1 m) in
-  let cp_m2 = Var.make "__m" 1 in  
+  let cp_m1 = Var.make_symbRow 1 m in
+  let cp_m2 = Var.make_symbRow 2 m in  
   let p = Var.make "p" 1 in
   let g_p = Var.make_ghost 0 p in
   let cp_p = Var.(make_symbRow 2 p) in
@@ -462,12 +468,12 @@ control {
     In this case we would be just fine.
  *)
 let hv_ex () =
-  let act1 = Var.(make_symbRow 1 (make "action" 1))in
-  let act2 = Var.(make_symbRow 2 (make "action" 1))in  
+  let act1 = Var.(make_symbRow 1 (make "action" 1)) in
+  let act2 = Var.(make_symbRow 2 (make "action" 1)) in  
   let one = bvi 1 1 in
   let zero = bvi 0 1 in
   let x = Var.make "x" 1 in
-  let cp_x = Var.make "__x" 1 in
+  let cp_x = Var.make_symbRow 1 x in
   let m = Var.make "m" 1 in
   let cp_m1 = Var.(make_symbRow 1 m) in
   let yv = Var.make "yv" 1 in
@@ -489,6 +495,7 @@ control {
   let program =
     sequence[
         assume (eq_ (var x) (var cp_x));
+        (* assign x (var cp_x); *)
         choice
           (sequence [assume (eq_ (var act1) zero);
                      assign m (var cp_m1)])
@@ -502,10 +509,6 @@ control {
       ] in
   let vc = wp program true_ in
   format_print 6 p4 program vc
-  
-
-
-
   
   
 let run_all _ =
