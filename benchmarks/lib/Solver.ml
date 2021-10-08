@@ -1,8 +1,8 @@
 open Core
    
 let princess_exe = "/home/ericthewry/Downloads/princess-bin-2021-05-10/princess -inputFormat=smtlib +mostGeneralConstraint +incremental "
-let z3_exe = "/usr/bin/z3 -smt2 "
-
+let z3_exe = "/usr/bin/z3 -smt2"
+let cvc4_exe = "/usr/bin/cvc4 --lang smt2"           
 
 let tmp () =
   Printf.sprintf "/tmp/tmp_%d.smt2" (Random.int 1000)
@@ -25,4 +25,5 @@ let run_proc p str =
   String.concat strs ~sep:"\n"
   
 let run_princess = run_proc princess_exe
-let run_z3 = run_proc z3_exe                     
+let run_z3 = run_proc z3_exe
+let run_cvc4 = run_proc cvc4_exe               

@@ -22,31 +22,41 @@ let format_print num p4 program vc =
   Printf.printf "                 VC\n%!";
   Printf.printf "--------------------------------------\n%!";
   Printf.printf "%s\n%!" smtlib;
-  let simplified_smtlib = Printf.sprintf "%s\n%!" (BExpr.to_smtlib (BExpr.simplify quantified_vc)) in  
+  let t0 = Time.now() in  
+  let simplified_smtlib = Printf.sprintf "%s\n%!" (BExpr.to_smtlib (BExpr.simplify quantified_vc)) in
+  let t1 = Time.now() in
   Printf.printf "--------------------------------------\n%!";
-  Printf.printf "              Heuristics\n%!";
+  Printf.printf "              Heuristics(%fms)\n%!" (dur t0 t1);
   Printf.printf "--------------------------------------\n%!";
   Printf.printf "%s\n%!" simplified_smtlib;
-  let t1 = Time.now() in 
   let result = Printf.sprintf "%s\n(assert %s)\n(check-sat)" frees smtlib |> Solver.run_z3 in
   let t2 = Time.now() in  
   Printf.printf "--------------------------------------\n%!";
   Printf.printf "            Result (%fms)\n%!" (dur t1 t2);
   Printf.printf "--------------------------------------\n%!";
   Printf.printf "%s\n%!" result;
-  let z3_qe = Printf.sprintf "%s\n(assert %s)\n(apply qe)" frees smtlib |> Solver.run_z3 in
-  let t3 = Time.now() in    
-  Printf.printf "--------------------------------------\n%!";
-  Printf.printf "             Z3 QE (%fms)\n%!" (dur t2 t3);
-  Printf.printf "--------------------------------------\n%!";
-  Printf.printf "%s\n%!" z3_qe;
-  let p_qe = Printf.sprintf "%s\n(simplify %s)\n%!" frees smtlib |> Solver.run_princess in
+  let t3 = Time.now() in        
+  let cvc4_qe = Printf.sprintf "(set-logic UFBV)%s\n(simplify %s)\n%!" frees smtlib |> Solver.run_cvc4 in
   let t4 = Time.now() in  
   Printf.printf "--------------------------------------\n%!";
-  Printf.printf "            Princess QE (%fms)\n%!" (dur t3 t4);
+  Printf.printf "            CVC4 (%fms)\n%!" (dur t3 t4);
+  Printf.printf "--------------------------------------\n%!";
+  Printf.printf "%s\n%!" cvc4_qe;  
+  let t5 = Time.now() in        
+  let p_qe = Printf.sprintf "%s\n(simplify %s)\n%!" frees smtlib |> Solver.run_princess in
+  let t6 = Time.now() in  
+  Printf.printf "--------------------------------------\n%!";
+  Printf.printf "            Princess QE (%fms)\n%!" (dur t5 t6);
   Printf.printf "--------------------------------------\n%!";
   Printf.printf "%s\n%!" p_qe;  
-  Printf.printf "======================================\n%!";
+  let t7 = Time.now() in
+  let z3_qe = Printf.sprintf "(set-option :timeout 5000)%s\n(assert %s)\n(apply qe)" frees smtlib |> Solver.run_z3 in
+  let t8 = Time.now() in
+  Printf.printf "--------------------------------------\n%!";
+  Printf.printf "             Z3 QE (%fms)\n%!" (dur t7 t8);
+  Printf.printf "--------------------------------------\n%!";
+  Printf.printf "%s\n%!" z3_qe;
+  Printf.printf "======================================\n%!";  
   Printf.printf "\n\n\n\n\n"
 
 (** The goal is to examine the ways in which control-plane state and data plane
@@ -509,6 +519,98 @@ control {
       ] in
   let vc = wp program true_ in
   format_print 6 p4 program vc
+
+(** Example 6   simple_nat ingress
+
+    A simplified version of the simple_nat program from the bf4 paper.
+ *)
+let simplest_nat () =
+  let one = bvi 1 in
+  let zero = bvi 0 in
+  let ipv4_addr_width = 32 in
+  let tcp_port_width = 32 in
+  let port_width = 9 in
+  let inst_type_width = 32 in
+
+  let nat_id = 0 in
+  let nat__action = Var.make_symbRow nat_id (Var.make "action" 2) in
+  
+  let ipv4_lpm_id = 1 in
+  let ipv4_lpm__action = Var.make_symbRow ipv4_lpm_id (Var.make "action" 2) in
+  
+  let ipv4__valid = Var.make "ipv4__valid" 1 in
+  let nat_ipv4__valid = Var.make_symbRow nat_id ipv4__valid in
+  let tcp__valid = Var.make "tcp__valid" 1 in
+  let nat_tcp__valid = Var.make_symbRow nat_id ipv4__valid in
+  let ipv4__srcAddr = Var.make "ipv4__srcAddr" ipv4_addr_width in
+  let nat_ipv4__srcAddr = Var.make_symbRow nat_id ipv4__srcAddr in
+  let ipv4__dstAddr = Var.make "ipv4__dstAddr" ipv4_addr_width in
+  let nat_ipv4__dstAddr = Var.make_symbRow nat_id ipv4__dstAddr in
+
+  let tcp__srcPort = Var.make "tcp__srcPort" tcp_port_width in
+  let nat_tcp__srcPort = Var.make_symbRow nat_id tcp__srcPort in
+  let tcp__dstPort = Var.make "tcp__dstPort" tcp_port_width in
+  let nat_tcp__dstPort = Var.make_symbRow nat_id tcp__dstPort in
+  let stdmeta__egress = Var.make "standard_metadata__egress_spec"  port_width in
+  let stdmeta__inst_typ = Var.make "standard_metadata__instance_type" inst_type_width in
+
+  let meta__ipv4_da = Var.make "meta__ipv4_da" ipv4_addr_width in
+  (* let meta__ipv4_sa = Var.make "meta__ipv4_sa" ipv4_addr_width in *)
+  (* let meta__tcp_dp = Var.make "meta__tcp_dp" tcp_port_width in
+   * let meta__tcp_sa = Var.make "meta__tcp_sp" tcp_port_width in *)
+
+  let ipv4_lpm__meta__ipv4_da = Var.make_symbRow ipv4_lpm_id meta__ipv4_da in
+  (* let ipv4_lpm__meta__ipv4_sa = Var.make_symbRow ipv4_lpm_id meta__ipv4_sa in *)
+  let ipv4_lpm__port = Var.make_symbRow ipv4_lpm_id (Var.make "port" port_width) in
+  
+  let drop = Expr.bvi 511 port_width in
+  let clone = Expr.bvi 999 inst_type_width in
+  let program =
+    [ assume (eq_ (var ipv4__valid) (var nat_ipv4__valid)); 
+      assume (eq_ (var tcp__valid) (var nat_tcp__valid));
+      assume (eq_ (var ipv4__srcAddr) (var nat_ipv4__srcAddr));
+      assume (eq_ (var ipv4__dstAddr) (var  nat_ipv4__dstAddr));
+      assume (eq_ (var tcp__srcPort) (var nat_tcp__srcPort));
+      assume (eq_ (var tcp__dstPort) (var nat_tcp__dstPort));
+      choice_seqs
+        [[assume (eq_ (var nat__action) (zero 2));
+          assign stdmeta__egress drop];
+
+         [assume (eq_ (var nat__action) (one 2));
+          assign stdmeta__inst_typ clone
+         ];
+         [assume (eq_ (var nat__action) (Expr.bvi 2 2)); skip];
+         [assume (eq_ (var nat__action) (Expr.bvi 3 2)); skip]
+        ];
+      assume (eq_ (var meta__ipv4_da) (var ipv4_lpm__meta__ipv4_da));
+      choice_seqs [
+          [
+            (* set_nhop *)
+            assume (eq_ (var ipv4_lpm__action) (zero 2));
+            (* copy "meta__nhop_ipv4" "row_ipv4_lpm__nhop_ipv4" 32;
+             * setone "meta__nhop_ipv4__init"; *)
+            assign stdmeta__egress (var ipv4_lpm__port);
+            (* ast1 "ipv4__ttl__init" 1; *)
+            (* decrement "ipv4__ttl" 8; *)
+          ];
+          [(* _drop *)
+            assume (eq_ (var ipv4_lpm__action) (one 2));
+            assign stdmeta__egress drop;
+          ];
+          [(*default (skip)*)
+            assume (eq_ (var ipv4_lpm__action) (Expr.bvi 2 2));
+            skip
+          ];
+          [(*default (skip)*)
+            assume (eq_ (var ipv4_lpm__action) (Expr.bvi 3 2));
+            skip
+          ]          
+        ];
+      assert_ BExpr.(not_ (eq_ (var stdmeta__egress) (zero 9)));    
+  ] |> sequence in 
+  let vc = wp program true_ in
+  format_print 7 "" program vc
+
   
   
 let run_all _ =
@@ -525,4 +627,5 @@ let run_all _ =
   ex3 ();
   ex4 ();
   join_ex ();
-  hv_ex ()
+  hv_ex ();
+  simplest_nat ();

@@ -51,6 +51,12 @@ let negate = function
   | Assert (t,i) -> Assert ((BExpr.not_ t), i)
   | _ -> failwith "Can only negate an assumption or assertion"
 
+let choice_seq cs1 cs2 = choice (sequence cs1) (sequence cs2)  
+
+let choice_seqs cs =
+  List.fold cs ~init:(assume BExpr.false_)
+    ~f:(fun c cs -> choice c (sequence cs))
+       
 (**/ END Smart Constructors*)            
 
 
