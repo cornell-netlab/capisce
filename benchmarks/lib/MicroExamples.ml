@@ -611,7 +611,69 @@ let simplest_nat () =
   let vc = wp program true_ in
   format_print 7 "" program vc
 
-  
+let multi_table_bf4_ex () =
+  let p4 ={|
+table t₁ {
+  keys = {k₁};
+  actions= {validate_H; nop}      
+}
+table₂ {
+  keys = {k₂};
+  actions = {use_H;}
+}
+action validate_H(){
+  H.setValid()           
+}
+action use_H () {
+  assert H.isValid();
+  h.f := 55;  
+}
+control {
+  H.setInvalid();
+  t1.apply();
+  t2.apply()
+}|} in
+  let w = 8 in
+  let k1 = Var.make "k1" w in
+  let k2 = Var.make "k2" w in
+  let t1 = 1 in
+  let t2 = 2 in
+  let zero = Expr.bvi 0 1 in
+  let one = Expr.bvi 1 1 in
+  let t1_k1 = Var.make_symbRow t1 k1 in
+  let t2_k1 = Var.make_symbRow t2 k1 in  
+  let t2_k2 = Var.make_symbRow t2 k2 in
+  let t1_act = Var.make_symbRow t1 (Var.make "action" 1) in
+  let t2_act = Var.make_symbRow t2 (Var.make "action" 1) in
+  let h__valid = Var.make "h__valid" 1 in
+  let h__f = Var.make "h__f" w in
+  let program =
+    sequence [
+        assign h__valid zero;
+        assume (eq_ (var k1) (var t1_k1));
+        choice_seqs [
+            [assume (eq_ (var t1_act) zero);
+             assign h__valid one;
+            ];            
+            [assume (eq_ (var t1_act) one);
+             skip]
+          ];
+        assume (eq_ (var k1) (var t2_k1));
+        assume (eq_ (var k2) (var t2_k2));
+        choice_seqs [
+            [assume (eq_ (var t2_act) zero);
+             assert_ (eq_ (var h__valid) one);
+             assign h__f (Expr.bvi 16 w); 
+            ];
+            [assume (eq_ (var t2_act) one);
+             skip
+            ]
+          ]
+      ]
+  in
+  let vc = wp program true_ in
+  format_print 8 p4 program vc
+
   
 let run_all _ =
   Printf.printf "+------------------------------------+\n%!";
@@ -629,3 +691,4 @@ let run_all _ =
   join_ex ();
   hv_ex ();
   simplest_nat ();
+  multi_table_bf4_ex ();
