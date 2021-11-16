@@ -7,14 +7,14 @@ let x tid = Var.make (Printf.sprintf "x%d" tid) bitwidth
 let tablegen n : Cmd.t =
   let open Cmd in
   let keys = [k n] in
-  let d = Var.make "d" bitwidth in
+  let d = Var.make_symbRow n (Var.make "d" bitwidth) in
   let actions = [
-      d,
-      assign (x n) (Expr.var d)
+      Some d,
+      assign (x n) (Expr.var d);
+      None, skip
     ]
   in
-  let def = assume BExpr.true_ in
-  table n keys actions def
+  table n keys actions
 
 let rec gen_asst n : BExpr.t =
   let open BExpr in
@@ -35,9 +35,7 @@ let rec gen_benchmark ntables cs =
 let benchmark ntables =  
   let prog = Cmd.sequence (gen_benchmark ntables []) in
   let asst = gen_asst (ntables - 1) in
-  let phi = Cmd.wp prog asst in
-  let (dvs,cvs) = BExpr.vars phi in
-  (cvs, BExpr.forall dvs phi)  
+  (prog, asst)
   
 let rec benchmark_list max_tables =
   if max_tables <= 1 then
@@ -45,10 +43,10 @@ let rec benchmark_list max_tables =
   else
     benchmark_list (max_tables - 1) @ [benchmark max_tables]
 
-let exp ~f one max_tables =
+let exp ~f simpl one max_tables =
   benchmark_list max_tables
   |> (if one then List.(Fn.compose return last_exn) else Fn.id) 
-  |> List.map ~f 
+  |> List.map ~f:(f simpl) 
 
 let doesnt_contain_any s subs =
   List.for_all subs ~f:(fun substring -> not (String.is_substring s ~substring))
@@ -58,40 +56,32 @@ let answer_ok s =
   && String.length s > 0
              
 
-let log_row dur str =
-  Printf.printf "%f,%b\n%!" (Time.Span.to_ms dur) (answer_ok str)
-  
-  
-let princess_inner (cvs, phi) =
-  let c = Clock.start () in
-  let phi_str = Smt.simplify cvs phi in
-  let res = Solver.run_princess phi_str in
-  let dur = Clock.stop c in
-  log_row dur res;
-  (dur, res)
-  
+let log_row dur str size  use_solver =
+  Printf.eprintf "%f,%b,%d,%b\n%!" (Time.Span.to_ms dur) (answer_ok str) size use_solver
 
-let z3_inner (cvs, phi) =
-  let c = Clock.start () in
-  let phi_str = Smt.assert_apply cvs phi in
-  let res = Solver.run_z3 phi_str in
-  let dur = Clock.stop c in
-  log_row dur res;
-  (dur, res)
-    
+let exp_inner stringifier runner simpl (prog, asst) =
+ let c = Clock.start () in
+  let body = Cmd.wp prog asst in
+  let (dvs,cvs) = BExpr.vars body in
+  let phi =  BExpr.forall dvs body in    
+  let phi = if simpl then BExpr.simplify phi else phi in
+  let size = BExpr.size phi in
+  if BExpr.qf phi then
+    let res = BExpr.to_smtlib phi in
+    let dur = Clock.stop c in
+    log_row dur res size false;
+    (dur, res, size, false)
+  else
+    let phi_str = stringifier cvs phi in
+    let res = runner phi_str in
+    let dur = Clock.stop c in
+    log_row dur res size true;
+    (dur, res, size, true)
 
-let z3_princess_inner (cvs,phi) =
-  let c = Clock.start () in
-  let phi_str = Smt.simplify cvs phi in
-  let simpl_phi = Solver.run_z3 phi_str in
-  let simpl_phi_str = Smt.simplify_str cvs simpl_phi in
-  let res = Solver.run_princess simpl_phi_str in
-  let dur = Clock.stop c in
-  log_row dur res;
-  (dur, res)
-
-  
-  
+let cvc4_inner = exp_inner Smt.simplify Solver.run_cvc4    
+let z3_inner = exp_inner Smt.assert_apply Solver.run_z3
+let princess_inner = exp_inner Smt.simplify Solver.run_princess
+               
 let princess = exp ~f:princess_inner   
 let z3 = exp ~f:z3_inner
-let z3_princess = exp ~f:z3_princess_inner
+let cvc4 = exp ~f:cvc4_inner

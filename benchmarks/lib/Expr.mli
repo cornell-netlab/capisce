@@ -22,3 +22,6 @@ val uelim : [`Neq | `Eq] -> Var.t list -> t -> t -> bool
 
 val well_formed : t -> bool
 (** [well_formed e] returns true iff the variables are well-formed and no bitvector has negative length *)
+
+val size : t -> int
+(** [size e] is the size of e's AST *)

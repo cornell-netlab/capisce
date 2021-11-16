@@ -1,5 +1,7 @@
 type t [@@deriving eq, sexp, compare, quickcheck]
 
+val enable_smart_constructors : [`On | `Off] ref
+   
 val (=) : t -> t -> bool
    
 val false_ : t
@@ -21,6 +23,8 @@ val vars : t -> Var.t list * Var.t list
 val index_subst : Subst.t option -> t -> t
 
 val simplify : t -> t
+val size : t -> int  
+val qf : t -> bool
 val well_formed : t -> bool                       
 
 val equivalence : t -> t -> t                         

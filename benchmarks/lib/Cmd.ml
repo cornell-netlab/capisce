@@ -81,10 +81,10 @@ let rec subst x e c =
   | Choice (c1, c2) ->
      Choice (subst x e c1, subst x e c2)
           
-let ghost_copy id k =
-  let open BExpr in
-  let open Expr in
-  eq_ (var (Var.make_ghost id k)) (var k)
+(* let ghost_copy id k =
+ *   let open BExpr in
+ *   let open Expr in
+ *   eq_ (var (Var.make_ghost id k)) (var k) *)
 
 let match_key id k =
   let open BExpr in
@@ -102,44 +102,62 @@ let matchrow id ks =
   List.fold ks ~init:true_
     ~f:(fun acc k -> match_key id k |> and_ acc)  
 
-let ghost_hit id =
-  let open Expr in 
-  let miss_var = Var.make "miss" 1 |> Var.make_ghost id in
-  BExpr.eq_ (var miss_var) (bv Bigint.one 1)
+let assign_key id k =
+  let open Expr in
+  let v = Var.make_symbRow id k in
+  (* let km = Var.(make (str k ^ "_match") (size k)) in
+   * let m = Var.make_symbRow id km in *)
+  (* eq_
+   *   (band (var v) (var m))
+   *   (band (var k) (var m))  *)
+  assign k (var v)
 
-let ghost_miss id =
-  BExpr.not_ (ghost_hit id)
+let assignrow id ks =
+  List.map ks ~f:(assign_key id)
+  |> sequence 
+
+  
+(* let ghost_hit id =
+ *   let open Expr in 
+ *   let miss_var = Var.make "miss" 1 |> Var.make_ghost id in
+ *   BExpr.eq_ (var miss_var) (bv Bigint.one 1)
+ * 
+ * let ghost_miss id =
+ *   BExpr.not_ (ghost_hit id) *)
 
 let row_action tid act_id n =
-  let open Expr in 
+  let open Expr in
   let v = Var.make_symbRow tid (Var.make "action" n) in
   BExpr.eq_ (var v) (bv (Bigint.of_int act_id) n)
 
-let row_id tid =
-  let open Expr in
-  let g = Var.make_ghost tid (Var.make "hitAction" 32) in
-  let r = Var.make_symbRow tid (Var.make "id" 32) in
-  BExpr.eq_ (var g) (var r)
+(* let row_id tid =
+ *   let open Expr in
+ *   let g = Var.make_ghost tid (Var.make "hitAction" 32) in
+ *   let r = Var.make_symbRow tid (Var.make "id" 32) in
+ *   BExpr.eq_ (var g) (var r) *)
 
-let action_subst tid (x, c) =
-  let r_data = Var.make_symbRow tid x in
-  subst x (Expr.var r_data) c
+let action_subst tid (x_opt, c) =
+  match x_opt with
+  | None ->
+     c
+  | Some x ->
+     let r_data = Var.make_symbRow tid x in
+     subst x (Expr.var r_data) c
   
   
-let table (id : int) (ks : Var.t list) (acts : (Var.t * t) list) (def : t) : t =
-  let open BExpr in
-  let gs = List.fold ks ~init:true_ ~f:(fun acc k -> ghost_copy id k |> and_ acc) in
+let table (id : int) (ks : Var.t list) (acts : (Var.t option * t) list) : t =
+  let read_keys = matchrow id ks in
+  let assign_keys = assignrow id ks in
   let hit act_id act =
-    [Assume (matchrow id ks);
-     Assume (ghost_hit id);
-     Assume (row_action id act_id (List.length acts));
-     Assume (row_id id);
-     action_subst id act 
-    ] |> sequence
+    [Assume (row_action id act_id (List.length acts));
+     action_subst id act ]
   in
-  let default = Seq(Assume (ghost_miss id), def) in
-  let actions = List.foldi acts ~init:default ~f:(fun i acc act -> Choice(acc,hit i act)) in
-  Seq(Assume gs, actions)
+  let actions = List.foldi acts ~init:[] ~f:(fun i acc act -> (hit i act)::acc) in
+  [Assume read_keys;
+   if false then assign_keys else skip;
+   choice_seqs actions]
+  |> sequence 
+  
 
 
 (* let rec vars c : Var.t list =
@@ -237,9 +255,6 @@ let rec wp c t =
   | Assign (x,e) -> BExpr.subst x e t
   | Seq (c1,c2) ->  wp c2 t |> wp c1
   | Choice (c1,c2) -> and_ (wp c1 t) (wp c2 t)
-
-
-     
      
 let rec number_asserts c i =
   match c with 

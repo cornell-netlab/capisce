@@ -16,7 +16,7 @@ let tmp_write str =
   file
   
 let run_proc p str =
-  Log.print @@ Printf.sprintf "Z3 Query:\n%s\n%!" str;
+  Log.print @@ lazy (Printf.sprintf "SMT Query:\n%s\n%!" str);
   let file = tmp_write str in
   let chan = Unix.open_process_in (Printf.sprintf "%s %s 2> /tmp/errors.log" p file) in
   (* let chan = Unix.open_process_in (Printf.sprintf "%s %s" p file) in   *)

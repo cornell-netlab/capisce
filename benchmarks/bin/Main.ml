@@ -2,10 +2,18 @@ open Core
 module Bench = Pbench.Bench
 module Nat = Pbench.Nat             
 
-let run_and_print_exp f one n =
-  List.iteri (f one n)
-    ~f:(fun i (t,s) ->
-      Printf.printf "%d,%f,%b\n%!" (i+2) (Time.Span.to_ms t) (Bench.answer_ok s)
+let run_and_print_exp f smart one n =
+  f smart one n
+  |> List.iteri
+    ~f:(fun i (time,str,size,used_solver) ->
+      let ok = Bench.answer_ok str in
+      Printf.printf "%d,%f,%b,%d,%b\n%!"
+        (if one then n else i+2)
+        (Time.Span.to_ms time)
+        ok
+        size
+        used_solver;
+      if not ok then Printf.printf "%s\n%!" str; 
     )
              
 let bench : Command.t =
@@ -16,25 +24,28 @@ let bench : Command.t =
          debug = flag "-D" no_arg ~doc:"show debugging info" and
          one = flag "-one" no_arg ~doc:"Only run the nth experiment" and
          princess = flag "-p" no_arg ~doc:"run the princess solver" and
-         z3prince = flag "-b" no_arg ~doc:"run the sequenced solver" and
-         z3 = flag "-z" no_arg ~doc:"run z3-only solver"
+         cvc4 = flag "-cvc4" no_arg ~doc:"run the cvc4 solver" and         
+         z3 = flag "-z" no_arg ~doc:"run z3-only solver" and
+         smart = flag "-s" no_arg ~doc:"enable heuristic smart constructors" and
+         simpl = flag "-simpl" no_arg ~doc:"run ex-post facto heuristic analysis" 
          in
          fun () ->
          Pbench.Log.debug := debug;
+         Pbench.BExpr.enable_smart_constructors := if smart then `On else `Off;
          begin
-             if z3prince then begin
-                 Printf.printf "Checking Z3 then Princess . . . \n%!";
-                 run_and_print_exp Bench.z3_princess one n
-               end;
              if princess then begin           
-                 Printf.printf "Checking Princess. . . \n%!";
-                 run_and_print_exp Bench.princess one n
+                 (* Printf.printf "Checking Princess. . . \n%!"; *)
+                 run_and_print_exp Bench.princess simpl one n
                end;
              if z3 then begin
-                 Printf.printf "Checking Z3. . . \n%!";
-                 run_and_print_exp Bench.z3 one n
+                 (* Printf.printf "Checking Z3. . . \n%!"; *)
+                 run_and_print_exp Bench.z3 simpl one n
+               end;
+             if cvc4 then begin
+                 (* Printf.printf "checking cvc4. . . \n%!"; *)
+                 run_and_print_exp Bench.cvc4 simpl one n
                end
-           end
+         end
     ]
 
 let nat : Command.t =

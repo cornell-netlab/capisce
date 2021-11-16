@@ -19,7 +19,7 @@ val choice_seqs : t list list -> t
 val negate : t -> t
   
 val subst : Var.t -> Expr.t -> t -> t  
-val table : int -> Var.t list -> (Var.t * t) list -> t -> t
+val table : int -> Var.t list -> (Var.t option * t) list -> t
 
 val wp : t -> BExpr.t -> BExpr.t                                                            
 

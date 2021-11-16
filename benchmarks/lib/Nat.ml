@@ -470,7 +470,7 @@ let proglite =
   |> sequence
 
 let smt () =
-  Log.print (Cmd.to_string proglite );
+  Log.print @@ lazy (Cmd.to_string proglite);
   let phi = wp proglite BExpr.true_ in
   let (dvs, cvs) = BExpr.vars phi in
   BExpr.forall dvs phi

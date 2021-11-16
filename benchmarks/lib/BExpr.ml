@@ -1,7 +1,7 @@
 open Base_quickcheck
 open Core
 
-let __testing__only__smart = ref `Off
+let enable_smart_constructors = ref `Off
    
 type bop =
   | LAnd
@@ -62,17 +62,17 @@ let rec to_smtlib_aux indent b =
 let to_smtlib = to_smtlib_aux 0
     
 let ctor1 ~default ~smart a =
-  match !__testing__only__smart with
+  match !enable_smart_constructors with
   | `On -> smart default a
   | `Off ->
      default a
 let ctor2 ~default ~smart a b =
-  match !__testing__only__smart with
+  match !enable_smart_constructors with
   | `On -> smart default a b
   | `Off ->
     default a b
 let rec ctor2rec ~default ~smart a b =
-  match !__testing__only__smart with
+  match !enable_smart_constructors with
   | `On -> smart (ctor2rec ~default ~smart) default a b
   | `Off -> default a b
         
@@ -82,7 +82,7 @@ let not_ =
   ctor1
     ~default:(fun b -> TNot b)
     ~smart:(fun default b ->
-      Log.print @@ Printf.sprintf "simplifying NOT (%s)" (to_smtlib b);
+      Log.print @@ lazy (Printf.sprintf "simplifying NOT (%s)" (to_smtlib b));
       match b with
       | TFalse -> true_
       | TTrue -> false_
@@ -147,9 +147,9 @@ let eq_ =
       | Some false -> false_)
 
 let dumb f =
-  __testing__only__smart := `Off;
+  enable_smart_constructors := `Off;
   let b = f () in
-  __testing__only__smart := `On;
+  enable_smart_constructors := `On;
   b
   
 let get_smart = function
@@ -178,16 +178,16 @@ let forall_simplify forall vs vsa a op vsb b =
        and_ (forall vsa a) (forall vsb b)
     | LArr ->
        let out = or_ (forall vsa (not_ a)) (forall vsb b) in
-       Log.print @@ Printf.sprintf "(or (forall (%s) %s) (forall (%s) %s))\n became %s\n"
-                      (Var.list_to_smtlib_quant vsa) (to_smtlib (not_ a)) (Var.list_to_smtlib_quant vsb) (to_smtlib b)
-                      (to_smtlib out);
+       Log.print @@ lazy (Printf.sprintf "(or (forall (%s) %s) (forall (%s) %s))\n became %s\n"
+                            (Var.list_to_smtlib_quant vsa) (to_smtlib (not_ a)) (Var.list_to_smtlib_quant vsb) (to_smtlib b)
+                            (to_smtlib out));
        out
     | LOr  ->
        or_ (forall vsa a) (forall vsb b)
     | LIff ->
        iff_ (forall vsa a) (forall vsb b)
   in
-  Log.print @@ Printf.sprintf "∀-simplifying: ∀ %s. %s\n%!" (Var.list_to_smtlib_quant vs) (to_smtlib phi);
+  Log.print @@ lazy (Printf.sprintf "∀-simplifying: ∀ %s. %s\n%!" (Var.list_to_smtlib_quant vs) (to_smtlib phi));
   if Int.(List.length vsa = 0 && List.length vsb = 0) then
     Forall(vs, phi)
   else
@@ -202,9 +202,9 @@ let forall vs b =
         Forall(vs,b)      
     )
     ~smart:(fun self default vs b ->
-      Log.print @@ Printf.sprintf "%s" (Forall (vs, b) |> to_smtlib);
+      Log.print @@ lazy (Printf.sprintf "%s" (Forall (vs, b) |> to_smtlib));
       if List.is_empty vs then
-        let () = Log.print @@ Printf.sprintf "Emptiness is a warm gun: %s" (to_smtlib b) in
+        let () = Log.print @@ lazy (Printf.sprintf "Emptiness is a warm gun: %s" (to_smtlib b)) in
         b
       else        
         let bvs = Util.uncurry (@) (vars b) in
@@ -231,16 +231,17 @@ let forall vs b =
                 let vs'' = Var.(linter ~equal frees1 frees2) |> dedup in 
                 (* its the case that vs' = vs'' @ vs2 @ vs1 *)
                 (* This is a simple sanity check *)
-                Log.print @@ Printf.sprintf
-                               "*****\nof %s filtered to %s,\n(%s) are in\n%s\n\nand (%s) are in%s\n*****\n"
-                               (Var.list_to_smtlib_quant vs)
-                               (Var.list_to_smtlib_quant vs')
-                               (Var.list_to_smtlib_quant vs1)
-                               (to_smtlib b1)
-                               (Var.list_to_smtlib_quant vs2)
-                               (to_smtlib b2);
+                Log.print @@ lazy (Printf.sprintf
+                                     "*****\nof %s filtered to %s,\n(%s) are in\n%s\n\nand (%s) are in%s\n*****\n"
+                                     (Var.list_to_smtlib_quant vs)
+                                     (Var.list_to_smtlib_quant vs')
+                                     (Var.list_to_smtlib_quant vs1)
+                                     (to_smtlib b1)
+                                     (Var.list_to_smtlib_quant vs2)
+                                     (to_smtlib b2));
                 
                 assert(Int.(List.length vs' = List.length(vs'' @ vs2 @ vs1)));
+                
                 forall_simplify self vs'' vs1 b1 op vs2 b2
              | LAnd -> and_ (self vs b1) (self vs b2)
              | LIff -> default vs' (iff_ b1 b2)
@@ -264,10 +265,10 @@ let rec simplify_inner = function
   | Exists (vs, b) -> simplify_inner b |> exists vs
 
 let simplify b =
-  let tmp = !__testing__only__smart in
-  __testing__only__smart := `On;
+  let tmp = !enable_smart_constructors in
+  enable_smart_constructors := `On;
   let b' = simplify_inner b in
-  __testing__only__smart := tmp;
+  enable_smart_constructors := tmp;
   b'
   (* let b' = simplify_inner b in
    * if b = b' then
@@ -326,7 +327,6 @@ let quickcheck_generator : t Generator.t =
         );
 
         (let%bind b = self in
-         Log.print "Generate Forall\n";
          let vs = vars b |> Util.uncurry (@) in
          if List.is_empty vs then
            return b
@@ -335,7 +335,6 @@ let quickcheck_generator : t Generator.t =
            Forall ([v], b));
 
         (let%bind b = self in
-         Log.print "Generate Exists\n";
          let vs = vars b |> Util.uncurry (@) in         
          if List.is_empty vs then
            return b
@@ -358,8 +357,30 @@ let rec well_formed b =
 let equivalence a b =
   let avars = vars a |> Util.uncurry (@) in
   let bvars = vars b |> Util.uncurry (@) in
-  let qa = forall avars a in
-  let qb = forall bvars b in
-  Log.print @@ Printf.sprintf "CHECKING %s = %s \n%!" (to_smtlib qa) (to_smtlib qb);
   dumb (fun () -> iff_ (forall avars a) (forall bvars b))
+  
+
+let rec size = function
+  | TFalse | TTrue -> 1
+  | TEq (e1,e2) -> Expr.size e1 + 1 + Expr.size e2
+  | TNot b -> size b + 1
+  | TBin (_, a, b) -> 1 + size a + size b
+  | Forall (vs, b) | Exists (vs, b) ->
+     1 + List.length vs + size b
+    
+let rec qf = function
+  | TFalse
+    | TTrue
+    | TEq _ -> true
+  | TNot b -> qf b
+  | TBin (_,a,b) -> qf a && qf b
+  | Forall ([],b) ->
+     qf b
+  | Forall (_,_) ->
+     false
+  | Exists ([],b) ->
+     qf b
+  | Exists (_,_) ->
+     false
+     
   

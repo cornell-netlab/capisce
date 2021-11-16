@@ -109,7 +109,13 @@ let rec well_formed = function
   | Var v -> Var.well_formed v
   | BinOp (_, e1, e2) -> well_formed e1 && well_formed e2
   | Neg e -> well_formed e
-    
+
+
+let rec size = function
+  | BV (_, _) | Var _ -> 1
+  | BinOp (_, e1, e2) -> size e1 + 1 + size e2
+  | Neg e -> 1 + size e 
+           
 let quickcheck_generator : t Generator.t =
   let open Quickcheck.Generator in
   let open Let_syntax in
