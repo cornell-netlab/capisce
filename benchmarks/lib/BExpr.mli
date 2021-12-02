@@ -7,12 +7,27 @@ val (=) : t -> t -> bool
 val false_ : t
 val true_ : t
 
+(*Unary Operations*)
 val not_ : t -> t
+
+(* Binary Operations *)  
 val and_ : t -> t -> t
 val or_ : t -> t -> t
 val imp_ : t -> t -> t
-val iff_ : t -> t -> t  
+val iff_ : t -> t -> t
+
+(* Comparisons *)
 val eq_ : Expr.t -> Expr.t -> t
+val ult_ : Expr.t -> Expr.t -> t
+val ule_ : Expr.t -> Expr.t -> t
+val ugt_ : Expr.t -> Expr.t -> t
+val uge_ : Expr.t -> Expr.t -> t
+val slt_ : Expr.t -> Expr.t -> t
+val sle_ : Expr.t -> Expr.t -> t
+val sgt_ : Expr.t -> Expr.t -> t
+val sge_ : Expr.t -> Expr.t -> t
+  
+(* Quantifiers *)
 val forall : Var.t list -> t -> t
 val exists : Var.t list -> t -> t
 

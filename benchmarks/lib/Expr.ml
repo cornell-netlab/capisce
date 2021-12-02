@@ -4,35 +4,65 @@ open Base_quickcheck
 type bop =
   | BAnd
   | BOr
-  | UAdd
-  | UMul
-  | USub
+  | BAdd
+  | BMul
+  | BSub
+  | BXor
+  | BConcat
+  | BShl
+  | BAshr
+  | BLshr
   [@@deriving eq, sexp, compare, quickcheck]
 
 let bop_to_smtlib = function
   | BAnd -> "bvand"
   | BOr -> "bvor"
-  | UAdd -> "bvadd"
-  | UMul -> "bvmul"
-  | USub -> "bvsub"
-   
+  | BXor -> "bvxor"
+  | BAdd -> "bvadd"
+  | BMul -> "bvmul"
+  | BSub -> "bvsub"
+  | BConcat -> "concat"
+  | BShl -> "bvshl"
+  | BAshr -> "bvashr"
+  | BLshr -> "bvlshr"
+
+type uop =
+  | UNot
+  | USlice of int * int
+  [@@deriving eq, sexp, compare, quickcheck]
+            
+let uop_to_smtlib = function
+  | UNot ->
+     "bvnot"
+  | USlice (lo, hi) ->
+     Printf.sprintf "(_ extract %d %d)" lo hi 
+
 type t =
   | BV of Bigint.t * int
   | Var of Var.t
   | BinOp of bop * t * t
-  | Neg of t
+  | UnOp of uop * t
   [@@deriving eq, sexp, compare, quickcheck]
 
 let bv n w = BV(n,w)
 let bvi n w = bv (Bigint.of_int n) w
 let var v = Var v
+          
 let band e1 e2 = BinOp(BAnd, e1, e2)
 let bor e1 e2 = BinOp(BOr, e1, e2)
-let badd e1 e2 = BinOp(UAdd, e1, e2)              
-let bmul e1 e2 = BinOp(UMul, e1, e2)
-let bsub e1 e2 = BinOp(USub, e1, e2)
-let bneg e = Neg e
-
+let badd e1 e2 = BinOp(BAdd, e1, e2)              
+let bmul e1 e2 = BinOp(BMul, e1, e2)
+let bsub e1 e2 = BinOp(BSub, e1, e2)
+let bxor e1 e2 = BinOp(BXor, e1, e2)
+let bconcat e1 e2 = BinOp (BConcat, e1, e2)
+let shl_ e1 e2 = BinOp(BShl, e1, e2)
+let ashr_ e1 e2 = BinOp(BAshr, e1, e2)
+let lshr_ e1 e2 = BinOp(BLshr, e1, e2)             
+               
+let bnot e = UnOp(UNot, e)          
+let bcast _ _ = failwith "cast unimplemented"
+let bslice lo hi e =  UnOp(USlice(lo, hi), e)
+           
 let uelim sign vs e1 e2 =
   let open Var in 
   match sign, e1, e2 with
@@ -64,8 +94,8 @@ let rec subst (x : Var.t) e0 e =
        Var y
   | BinOp (op, e1, e2) ->
      BinOp(op, subst x e0 e1, subst x e0 e2)
-  | Neg e ->
-     Neg (subst x e0 e)
+  | UnOp (op, e) ->
+     UnOp(op, subst x e0 e)
 
 
 let rec vars e : (Var.t list * Var.t list) =
@@ -78,7 +108,7 @@ let rec vars e : (Var.t list * Var.t list) =
        ([y],[])
   | BinOp (_, e1, e2) ->
      Util.pairs_app_dedup ~dedup:Var.dedup (vars e1) (vars e2)
-  | Neg e ->
+  | UnOp (_,e) ->
      vars e
      
 
@@ -92,8 +122,8 @@ let rec to_smtlib = function
        (bop_to_smtlib op)
        (to_smtlib e1)
        (to_smtlib e2)
-  | Neg e ->
-     Printf.sprintf "(bvnot %s)" (to_smtlib e)
+  | UnOp (op,e) ->
+     Printf.sprintf "(%s %s)" (uop_to_smtlib op) (to_smtlib e)
 
 
 let index_subst s_opt e =
@@ -108,14 +138,23 @@ let rec well_formed = function
   | BV (_,i) -> i > 0
   | Var v -> Var.well_formed v
   | BinOp (_, e1, e2) -> well_formed e1 && well_formed e2
-  | Neg e -> well_formed e
-
+  | UnOp(_, e) -> well_formed e
 
 let rec size = function
   | BV (_, _) | Var _ -> 1
   | BinOp (_, e1, e2) -> size e1 + 1 + size e2
-  | Neg e -> 1 + size e 
-           
+  | UnOp(_,e) -> 1 + size e 
+
+let quickcheck_generator_uop : uop Generator.t =
+  let open Quickcheck.Generator in
+  let open Let_syntax in
+  union [
+      return UNot;
+      (let%bind lo = filter Int.quickcheck_generator ~f:(fun lo -> lo >= 0 && lo < 31) in
+       let%map hi = filter Int.quickcheck_generator ~f:(fun hi -> hi > lo && hi <= 32) in
+       USlice (lo, hi))
+    ]
+               
 let quickcheck_generator : t Generator.t =
   let open Quickcheck.Generator in
   let open Let_syntax in
@@ -125,7 +164,6 @@ let quickcheck_generator : t Generator.t =
        bv n 32);
       
       (let%map v = Var.quickcheck_generator in
-       Printf.printf "Expr Generated %s\n%!" (Var.list_to_smtlib_quant [v]);
        Var v
       );
     ]
@@ -136,8 +174,12 @@ let quickcheck_generator : t Generator.t =
         let%map op = quickcheck_generator_bop in
         BinOp (op, e1, e2) 
       in
-      let neg = map self ~f:bneg in
-      [bin; neg]
+      let un =
+        let%bind e = self in
+        let%map op = quickcheck_generator_uop in
+        UnOp(op,e)
+      in
+      [bin; un]
     )
 
 let quickcheck_shrinker : t Shrinker.t = Shrinker.atomic    

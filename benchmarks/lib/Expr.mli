@@ -1,14 +1,28 @@
 type t [@@deriving eq, sexp, compare, quickcheck]
 
+(* Constants *)
 val bv : Bigint.t -> int -> t
-val bvi : int -> int -> t  
+val bvi : int -> int -> t
+
+(* Constructor *)
 val var : Var.t -> t
+
+(* Binary operators *)  
 val band : t -> t -> t
 val bor : t -> t -> t
 val badd : t -> t -> t
 val bmul : t -> t -> t
 val bsub : t -> t -> t
-val bneg : t -> t  
+val bxor : t -> t -> t  
+val bconcat : t -> t -> t
+val shl_ : t -> t -> t
+val lshr_ : t -> t -> t
+val ashr_ : t -> t -> t  
+
+(* Unary-ish Operators *)
+val bnot : t -> t
+val bcast : int -> t -> t
+val bslice : int -> int -> t -> t
 
 val static_eq : t -> t -> bool option  
 val subst : Var.t -> t -> t -> t

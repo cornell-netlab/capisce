@@ -16,12 +16,35 @@ let bop_to_smtlib = function
   | LArr -> "=>"
   | LIff -> "="
 
+type comp =
+  | Eq
+  | Ult
+  | Ule
+  | Uge
+  | Ugt
+  | Slt
+  | Sle
+  | Sgt
+  | Sge
+  [@@deriving eq, sexp, compare, quickcheck]
+
+let comp_to_smtlib = function
+  | Eq -> "="
+  | Ult -> "bvult"
+  | Ule -> "bvule"
+  | Uge -> "bvuge"
+  | Ugt -> "bvugt"
+  | Slt -> "bvslt"
+  | Sle -> "bvsle"
+  | Sgt -> "bvsgt"
+  | Sge -> "bvsge"
+  
 type t =
   | TFalse
   | TTrue
   | TNot of t
   | TBin of bop * t * t
-  | TEq of Expr.t * Expr.t
+  | TComp of (comp * Expr.t * Expr.t)
   | Forall of Var.t list * t
   | Exists of Var.t list * t
   [@@deriving eq, sexp, compare, quickcheck]
@@ -43,9 +66,10 @@ let rec to_smtlib_aux indent b =
        (bop_to_smtlib b)
        (to_smtlib_aux (indent + 1) t1)
        (to_smtlib_aux (indent + 1) t2)
-  | TEq (e1,e2) ->
-     Printf.sprintf "%s(= %s %s)"
+  | TComp (comp, e1, e2) ->
+     Printf.sprintf "%s(%s %s %s)"
        space
+       (comp_to_smtlib comp)
        (Expr.to_smtlib e1)
        (Expr.to_smtlib e2)
   | Forall (vs, t) ->
@@ -139,12 +163,52 @@ let iff_ =
                 
 let eq_ =
   ctor2
-    ~default:(fun e1 e2 -> TEq(e1,e2))
+    ~default:(fun e1 e2 -> TComp(Eq,e1,e2))
     ~smart:(fun default e1 e2 ->
       match Expr.static_eq e1 e2 with
       | None -> default e1 e2
       | Some true -> true_
       | Some false -> false_)
+
+let ult_ =
+  ctor2
+    ~default:(fun e1 e2 -> TComp(Ult,e1,e2))
+    ~smart:(fun default e1 e2 -> default e1 e2)
+
+let ule_ =
+  ctor2
+    ~default:(fun e1 e2 -> TComp(Ule,e1,e2))
+    ~smart:(fun default e1 e2 -> default e1 e2)
+
+let uge_ =
+  ctor2
+    ~default:(fun e1 e2 -> TComp(Uge,e1,e2))
+    ~smart:(fun default e1 e2 -> default e1 e2)
+
+let ugt_ =
+  ctor2
+    ~default:(fun e1 e2 -> TComp(Ugt,e1,e2))
+    ~smart:(fun default e1 e2 -> default e1 e2)
+
+let slt_ =
+  ctor2
+    ~default:(fun e1 e2 -> TComp(Slt,e1,e2))
+    ~smart:(fun default e1 e2 -> default e1 e2)
+
+let sle_ =
+  ctor2
+    ~default:(fun e1 e2 -> TComp(Sle,e1,e2))
+    ~smart:(fun default e1 e2 -> default e1 e2)
+
+let sge_ =
+  ctor2
+    ~default:(fun e1 e2 -> TComp(Sge,e1,e2))
+    ~smart:(fun default e1 e2 -> default e1 e2)
+
+let sgt_ =
+  ctor2
+    ~default:(fun e1 e2 -> TComp(Sgt,e1,e2))
+    ~smart:(fun default e1 e2 -> default e1 e2)
 
 let dumb f =
   enable_smart_constructors := `Off;
@@ -158,6 +222,17 @@ let get_smart = function
   | LArr -> imp_
   | LIff -> iff_
 
+let get_smart_comp = function
+  | Eq -> eq_
+  | Ult -> ult_
+  | Ule -> ule_
+  | Uge -> uge_
+  | Ugt -> ugt_
+  | Slt -> slt_
+  | Sle -> sle_
+  | Sgt -> sgt_
+  | Sge -> sge_
+
 let rec vars t : Var.t list * Var.t list =
   match t with
   | TFalse
@@ -165,7 +240,7 @@ let rec vars t : Var.t list * Var.t list =
   | TNot t -> vars t
   | TBin (_, t1, t2) ->
      Var.(Util.pairs_app_dedup ~dedup (vars t1) (vars t2))
-  | TEq (e1, e2) ->
+  | TComp (_, e1, e2) ->
      Var.(Util.pairs_app_dedup ~dedup (Expr.vars e1) (Expr.vars e2))     
   | Forall (vs, b) | Exists (vs, b) ->
      let dvs, cvs = vars b in
@@ -215,8 +290,8 @@ let forall vs b =
           match b with
           | TFalse -> false_
           | TTrue -> true_
-          | TNot (TEq(e1,e2)) when Expr.uelim `Neq vs' e1 e2 -> false_
-          | TEq(e1,e2) when Expr.uelim `Eq vs' e1 e2 -> false_
+          | TNot (TComp(Eq,e1,e2)) when Expr.uelim `Neq vs' e1 e2 -> false_
+          | TComp(Eq, e1,e2) when Expr.uelim `Eq vs' e1 e2 -> false_
           | TBin (op, b1, b2) ->
              begin match op with
              | LArr | LOr ->
@@ -259,8 +334,10 @@ let rec simplify_inner = function
   | TFalse -> TFalse
   | TTrue -> TTrue
   | TNot b -> not_ (simplify_inner b)
-  | TBin (op, b1, b2) -> get_smart op (simplify_inner b1) (simplify_inner b2)
-  | TEq (e1, e2) -> eq_ e1 e2
+  | TBin (op, b1, b2) ->
+     get_smart op (simplify_inner b1) (simplify_inner b2)
+  | TComp (op, e1, e2) ->
+     get_smart_comp op e1 e2
   | Forall (vs, b) -> simplify_inner b |> forall vs
   | Exists (vs, b) -> simplify_inner b |> exists vs
 
@@ -282,9 +359,9 @@ let rec subst x e t =
   match t with
   | TFalse | TTrue -> t
   | TNot t -> not_ (subst x e t)
-  | TBin (op, t1,t2) -> (get_smart op) (subst x e t1) (subst x e t2)
-  | TEq (e1,e2) ->
-     eq_ (Expr.subst x e e1) (Expr.subst x e e2)
+  | TBin (op,t1,t2) -> get_smart op (subst x e t1) (subst x e t2)
+  | TComp (comp,e1,e2) ->
+     get_smart_comp comp (Expr.subst x e e1) (Expr.subst x e e2)
   | Forall (vs, t) ->
      if List.exists vs ~f:(Var.(=) x) then
        forall vs t
@@ -313,8 +390,9 @@ let quickcheck_generator : t Generator.t =
       singleton TFalse;
       singleton TTrue;
       (let%bind e1 = Expr.quickcheck_generator in
-       let%map e2 = Expr.quickcheck_generator in
-       TEq(e1,e2))
+       let%bind e2 = Expr.quickcheck_generator in
+       let%map c = quickcheck_generator_comp in 
+       TComp(c,e1,e2))
     ]
     ~f:(fun self ->
       [
@@ -350,7 +428,7 @@ let quickcheck_shrinker : t Shrinker.t = Shrinker.atomic
 let rec well_formed b =
   match b with
   | TTrue | TFalse -> true
-  | TEq (e1,e2) -> Expr.well_formed e1 && Expr.well_formed e2
+  | TComp (_,e1,e2) -> Expr.well_formed e1 && Expr.well_formed e2
   | TBin(_,b1,b2) -> well_formed b1 && well_formed b2
   | TNot b | Forall (_,b) | Exists(_,b) -> well_formed b
 
@@ -362,7 +440,7 @@ let equivalence a b =
 
 let rec size = function
   | TFalse | TTrue -> 1
-  | TEq (e1,e2) -> Expr.size e1 + 1 + Expr.size e2
+  | TComp (_,e1,e2) -> Expr.size e1 + 1 + Expr.size e2
   | TNot b -> size b + 1
   | TBin (_, a, b) -> 1 + size a + size b
   | Forall (vs, b) | Exists (vs, b) ->
@@ -371,7 +449,7 @@ let rec size = function
 let rec qf = function
   | TFalse
     | TTrue
-    | TEq _ -> true
+    | TComp _ -> true
   | TNot b -> qf b
   | TBin (_,a,b) -> qf a && qf b
   | Forall ([],b) ->
