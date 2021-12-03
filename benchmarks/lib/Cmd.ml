@@ -86,66 +86,63 @@ let rec subst x e c =
  *   let open Expr in
  *   eq_ (var (Var.make_ghost id k)) (var k) *)
 
-let match_key id k =
+let match_key (id : string) k =
   let open BExpr in
   let open Expr in
-  let v = Var.make_symbRow id k in
-  (* let km = Var.(make (str k ^ "_match") (size k)) in
-   * let m = Var.make_symbRow id km in *)
-  (* eq_
-   *   (band (var v) (var m))
-   *   (band (var k) (var m))  *)
+  let v = Var.make_symbRow_str id k in
   eq_ (var v) (var k)
 
-let matchrow id ks =
+let matchrow (id : string) ks =
   let open BExpr in
   List.fold ks ~init:true_
     ~f:(fun acc k -> match_key id k |> and_ acc)  
 
-let assign_key id k =
+let assign_key (id : string) k =
   let open Expr in
-  let v = Var.make_symbRow id k in
-  (* let km = Var.(make (str k ^ "_match") (size k)) in
-   * let m = Var.make_symbRow id km in *)
-  (* eq_
-   *   (band (var v) (var m))
-   *   (band (var k) (var m))  *)
+  let v = Var.make_symbRow_str id k in
   assign k (var v)
 
 let assignrow id ks =
   List.map ks ~f:(assign_key id)
   |> sequence 
 
-  
-(* let ghost_hit id =
- *   let open Expr in 
- *   let miss_var = Var.make "miss" 1 |> Var.make_ghost id in
- *   BExpr.eq_ (var miss_var) (bv Bigint.one 1)
- * 
- * let ghost_miss id =
- *   BExpr.not_ (ghost_hit id) *)
-
-let row_action tid act_id n =
+let row_action (tid : string) act_id n =
   let open Expr in
-  let v = Var.make_symbRow tid (Var.make "action" n) in
+  let v = Var.make_symbRow_str tid (Var.make "action" n) in
   BExpr.eq_ (var v) (bv (Bigint.of_int act_id) n)
 
-(* let row_id tid =
- *   let open Expr in
- *   let g = Var.make_ghost tid (Var.make "hitAction" 32) in
- *   let r = Var.make_symbRow tid (Var.make "id" 32) in
- *   BExpr.eq_ (var g) (var r) *)
-
-let action_subst tid (x_opt, c) =
+let action_subst (tid : string) (x_opt, c) =
   match x_opt with
   | None ->
      c
   | Some x ->
-     let r_data = Var.make_symbRow tid x in
+     let r_data = Var.make_symbRow_str tid x in
      subst x (Expr.var r_data) c
+
+(** [mint_keyvar t i w] is a Var.t of width [w] corresponding to the [i]th key
+   in table [t]*)     
+let mint_keyvar t i w =
+  let name = Printf.sprintf "_%s_key_$%d" t i in
+  Var.make name w
+     
+let rec mint_key_names_aux idx assignments varkeys tbl_name ks =
+  match ks with
+  | [] -> (assignments, varkeys)
+  | (kwidth, kexpr)::ks' ->
+     (* mint key *)
+     let v = mint_keyvar tbl_name idx kwidth in
+     (* update recursive state *)
+     let idx' = idx + 1 in
+     let assignments' = assign v kexpr :: assignments in
+     let varkeys' = v :: varkeys in
+     (* make recusive call with updated state *)
+     mint_key_names_aux idx' assignments' varkeys' tbl_name ks'
+     
+(** [mint_key_names tbl_name keys] is a pair of lists [(as,vs)] where [vs] is the set of variable keys and [as] is the list of assignments copying [keys] to [vs] *)
+let mint_key_names = mint_key_names_aux 0 [] [] 
   
-  
-let table (id : int) (ks : Var.t list) (acts : (Var.t option * t) list) : t =
+(* a lightweight table encoding scheme used for benchmarking *)     
+let table (id : string) (ks : Var.t list) (acts : (Var.t option * t) list) : t =
   let read_keys = matchrow id ks in
   let assign_keys = assignrow id ks in
   let hit act_id act =
@@ -157,94 +154,19 @@ let table (id : int) (ks : Var.t list) (acts : (Var.t option * t) list) : t =
    if false then assign_keys else skip;
    choice_seqs actions]
   |> sequence 
-  
 
-
-(* let rec vars c : Var.t list =
- *   match c with
- *   | Assume t | Assert (t,_) ->
- *      Util.uncurry ((@)) (BExpr.vars t)
- *   | Havoc _ -> []
- *   | Assign (x,e) ->
- *      x :: Util.uncurry ((@)) (Expr.vars e)     
- *   | Seq (c1,c2) | Choice (c1,c2) ->
- *      vars c1 @ vars c2
- *      |> List.dedup_and_sort ~compare:Var.compare  *)
-  
-  
-  
-(* let zip_eq (l1 : (Var.t * Var.t) list) =
- *   let open List.Let_syntax in
- *   let%map (v1, v2) = l1 in
- *   BExpr.eq_ (Expr.var v1) (Expr.var v2)
- *   |> assume 
- *   
- *                     
- * (\** PRE, Assume s1 and s2 are defined on the same set of variables*\)
- * let merge (s1 : Subst.t option) (s2 : Subst.t option) : (Subst.t option * t * t) =
- *   match s1, s2 with
- *   | None, None -> None, skip, skip
- *   | Some _, None -> s1, skip, skip
- *   | None, Some _ -> s2, skip, skip
- *   | Some sa, Some sb ->
- *      let s' = Subst.max sa sb in
- *      let ra = Subst.sync sa s' |> zip_eq |> sequence in
- *      let rb = Subst.sync sb s' |> zip_eq |> sequence in
- *      (Some s', ra, rb) *)
-                    
-(* let rec passify (s0 : Subst.t option) c : (Subst.t option * t) option =
- *   let open Option.Let_syntax in
- *   match c with
- *   | Assert (t,_) ->
- *      if BExpr.(t = false_) then
- *        return (None, assert_ (BExpr.false_))
- *      else
- *        return (s0, assert_ (BExpr.index_subst s0 t))
- *   | Assume t ->
- *      if BExpr.(t = false_) then
- *        return (None, assume (BExpr.false_))
- *      else
- *        return (s0, assume (BExpr.index_subst s0 t))
- *   | Havoc x ->
- *      return (s0, havoc x)
- *   | Assign (x, e) ->
- *      let%map x', s1 = Subst.incr s0 x in
- *      (Some s1, assume (BExpr.eq_ (Expr.var x') (Expr.index_subst s0 e)))
- *   | Seq (c1,c2) ->
- *      let%bind s1, c1'  = passify s0 c1 in
- *      let%bind s2, c2' = passify s1 c2 in
- *      return (s2, seq c1' c2')
- *   | Choice (c1, c2) ->
- *      let%bind s1, c1' = passify s0 c1 in
- *      let%bind s2, c2' = passify s0 c2 in
- *      let s3, r1, r2 = merge s1 s2 in
- *      return (s3, choice (seq c1' r1) (seq c2' r2))
- * 
- * let rec norm_execs = function
- *   | Assert (t,_) 
- *     | Assume t -> t
- *   | Assign _ -> failwith "Assigns are not permitted in passive form"                
- *   | Havoc _ -> failwith "HAVOCS ARE CONFUSING"
- *   | Seq (c1,c2) -> BExpr.and_ (norm_execs c1) (norm_execs c2)
- *   | Choice (c1,c2) -> BExpr.or_ (norm_execs c1) (norm_execs c2)
- *   
- * let rec bad_execs = function
- *   | Assert (t,_) -> BExpr.not_ t
- *   | Assume _ -> BExpr.false_
- *   | Assign _ -> failwith "Assigns are not permitted in passive form"
- *   | Havoc _ -> failwith "HAVOCS ARE CONFUSING"
- *   | Seq (c1, c2) -> BExpr.(or_ (bad_execs c1) (and_ (norm_execs c1) (bad_execs c2)))
- *   | Choice (c1, c2) -> BExpr.or_ (bad_execs c1) (bad_execs c2)
- *      
- * let wp c t =
- *   let s = Subst.init (vars c) in  
- *   match passify (Some s) c with
- *   | None -> failwith "couldn't compute the passive form of the program"
- *   | Some (_,p)->
- *      Log.print (to_string p);
- *      let open BExpr in  
- *      and_ (imp_ (norm_execs p) t)
- *           (not_ (bad_execs p)) *)
+(* a full table encoding scheme for interfacing with p4*)
+let full_table (tbl_name : string) (ks : (int * Expr.t) list) (acts : (string * t) list) : t =
+  let (asgns, varkeys) = mint_key_names tbl_name ks in 
+  let read_keys = matchrow tbl_name varkeys in
+  let hit act_id act =
+    [assume (row_action tbl_name act_id (List.length acts));
+     act ]
+  in
+  let actions = List.foldi acts ~init:[] ~f:(fun i acc (_,act) -> (hit i act)::acc) in
+  let table = [Assume read_keys; choice_seqs actions] in
+  (* TODO optimization. Rather than sequencing asgns, do the substitution! *)
+  sequence (asgns @ table)
 
 let rec wp c t =
   let open BExpr in

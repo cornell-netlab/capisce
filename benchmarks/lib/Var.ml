@@ -26,6 +26,12 @@ let make_symbRow id k =
   let x = Printf.sprintf "%s%s_%d" symbRow (str k) id in
   let w = size k in
   make x w
+
+let make_symbRow_str id k =
+  let x = Printf.sprintf "%s%s_%s" symbRow (str k) id in
+  let w = size k in
+  make x w
+  
 let is_sym_of ~sym ~data =
   is_symbRow sym && String.is_suffix (str sym) ~suffix:(str data)
   

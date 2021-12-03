@@ -20,6 +20,8 @@ val negate : t -> t
   
 val subst : Var.t -> Expr.t -> t -> t  
 val table : int -> Var.t list -> (Var.t option * t) list -> t
+val full_table : string -> (int * Expr.t) list -> (string * t) list -> t
+  
 
 val wp : t -> BExpr.t -> BExpr.t                                                            
 
