@@ -142,7 +142,8 @@ let rec mint_key_names_aux idx assignments varkeys tbl_name ks =
 let mint_key_names = mint_key_names_aux 0 [] [] 
   
 (* a lightweight table encoding scheme used for benchmarking *)     
-let table (id : string) (ks : Var.t list) (acts : (Var.t option * t) list) : t =
+let table (id_int : int) (ks : Var.t list) (acts : (Var.t option * t) list) : t =
+  let id = Printf.sprintf "%d" id_int in
   let read_keys = matchrow id ks in
   let assign_keys = assignrow id ks in
   let hit act_id act =

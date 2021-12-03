@@ -68,11 +68,36 @@ let beastiary : Command.t =
          Pbench.MicroExamples.run_all ()
     ]
   
+let infer : Command.t =
+  let open Command.Let_syntax in
+  Command.basic ~summary:"Infers control plane constraint from data plane"
+    [%map_open
+     let source = anon ("p4 source file" %: string) and
+         includes = flag "-I" (listed string) ~doc:"includes directories" and
+         debug = flag "-D" no_arg ~doc:"show debugging info" and
+         gas_opt = flag "-g" (optional int) ~doc:"how much gas to pass the compiler"
+         in
+         fun () ->         
+         Pbench.Log.debug := debug;
+         Pbench.BExpr.enable_smart_constructors := `On;
+         let gas = Option.value gas_opt ~default:1000 in
+         let cmd = Pbench.P4Parse.as_cmd_from_file includes source gas debug in
+         let (dur, res, _, didnt_call_solver) =
+           Bench.cvc4_inner false (cmd, Pbench.BExpr.true_)
+         in
+         Printf.printf "Done in %f seconds with%s calling the solver. Got: \n%s\n%!"
+           (Time.Span.to_ms dur)
+           (if didnt_call_solver then "out" else "")
+           res
+    ]
 
+  
 let main =
   Command.group ~summary:"research toy for exploring verification & synthesis of p4 programs"
     [("bench", bench);
      ("nat", nat);
-     ("beastiary", beastiary)]
+     ("beastiary", beastiary);
+     ("infer", infer)
+    ]
 
 let () = Command.run main    
