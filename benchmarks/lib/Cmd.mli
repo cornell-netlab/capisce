@@ -26,3 +26,5 @@ val full_table : string -> (int * Expr.t) list -> (string * t) list -> t
 val wp : t -> BExpr.t -> BExpr.t                                                            
 
 val assert_slices : t -> t list
+
+val normalize_names : t -> t                           

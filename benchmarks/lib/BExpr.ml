@@ -432,6 +432,25 @@ let rec well_formed b =
   | TBin(_,b1,b2) -> well_formed b1 && well_formed b2
   | TNot b | Forall (_,b) | Exists(_,b) -> well_formed b
 
+let rec normalize_names b =
+  match b with
+  | TTrue | TFalse -> b
+  | TComp (comp,e1,e2) ->
+     let e1' = Expr.normalize_names e1 in
+     let e2' = Expr.normalize_names e2 in
+     TComp(comp, e1', e2')
+  | TBin(op,b1,b2) ->
+     let b1' = normalize_names b1 in
+     let b2' = normalize_names b2 in
+     TBin(op,b1',b2')
+  | TNot b ->
+     TNot (normalize_names b)
+  | Forall (xs,b) ->
+     Forall (List.map xs ~f:Var.normalize_name, normalize_names b)
+  | Exists(xs,b) ->
+     Exists (List.map xs ~f:Var.normalize_name, normalize_names b)
+  
+                                         
 let equivalence a b =
   let avars = vars a |> Util.uncurry (@) in
   let bvars = vars b |> Util.uncurry (@) in

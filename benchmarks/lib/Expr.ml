@@ -140,6 +140,20 @@ let rec well_formed = function
   | BinOp (_, e1, e2) -> well_formed e1 && well_formed e2
   | UnOp(_, e) -> well_formed e
 
+let rec normalize_names (e : t) : t =
+  match e with
+  | BV _ ->
+     e
+  | Var x ->
+     Var (Var.normalize_name x)
+  | BinOp(op, e1, e2) ->
+     let e1' = normalize_names e1 in
+     let e2' = normalize_names e2 in
+     BinOp(op, e1', e2')
+  | UnOp (op, e) ->
+     let e' = normalize_names e in
+     UnOp (op, e')
+                
 let rec size = function
   | BV (_, _) | Var _ -> 1
   | BinOp (_, e1, e2) -> size e1 + 1 + size e2
