@@ -75,19 +75,21 @@ let infer : Command.t =
      let source = anon ("p4 source file" %: string) and
          includes = flag "-I" (listed string) ~doc:"includes directories" and
          debug = flag "-D" no_arg ~doc:"show debugging info" and
-         gas_opt = flag "-g" (optional int) ~doc:"how much gas to pass the compiler"
+         gas_opt = flag "-g" (optional int) ~doc:"how much gas to pass the compiler" and
+         no_smart = flag "--disable-smart" no_arg ~doc:"disable smart constructors" 
          in
          fun () ->         
          Pbench.Log.debug := debug;
-         Pbench.BExpr.enable_smart_constructors := `On;
+         Pbench.BExpr.enable_smart_constructors := if no_smart then `Off else `On;
          let gas = Option.value gas_opt ~default:1000 in
          let cmd = Pbench.P4Parse.as_cmd_from_file includes source gas debug in
-         let (dur, res, _, didnt_call_solver) =
+         Pbench.Log.print @@ lazy (Pbench.Cmd.to_string cmd);
+         let (dur, res, _, called_solver) =
            Bench.cvc4_inner false (cmd, Pbench.BExpr.true_)
          in
          Printf.printf "Done in %f seconds with%s calling the solver. Got: \n%s\n%!"
            (Time.Span.to_ms dur)
-           (if didnt_call_solver then "out" else "")
+           (if called_solver then "" else "out")
            res
     ]
 

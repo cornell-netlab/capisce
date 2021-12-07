@@ -38,6 +38,7 @@ val vars : t -> Var.t list * Var.t list
 val index_subst : Subst.t option -> t -> t
 
 val simplify : t -> t
+val normalize_names : t -> t   
 val size : t -> int  
 val qf : t -> bool
 val well_formed : t -> bool                       

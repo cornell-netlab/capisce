@@ -10,6 +10,10 @@ let str ((s,_) : t) = s
 let size ((_,i) : t) = i
 
 let well_formed ((s,i) : t) = String.length s > 0 && i > 0
+let normalize_name (s,i) =
+  let open String in
+  let s' = substr_replace_all s ~pattern:"'" ~with_:"$" in
+  (s', i) 
                      
 let dedup = List.dedup_and_sort ~compare
                      

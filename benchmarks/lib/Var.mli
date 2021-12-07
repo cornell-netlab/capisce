@@ -12,6 +12,8 @@ val str : t -> string
 val size : t -> int
 
 val well_formed : t -> bool 
+
+val normalize_name : t -> t 
   
 val is_ghost : t -> bool
 val make_ghost : int -> t -> t   

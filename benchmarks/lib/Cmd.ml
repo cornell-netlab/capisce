@@ -209,3 +209,16 @@ let rec keep_assert_with_id c id =
 let assert_slices c =
   let c', i = number_asserts c 0 in
   List.map (Util.range (i-1)) ~f:(keep_assert_with_id c')
+
+let rec normalize_names (c : t) : t = 
+  match c with
+  | Havoc x -> Havoc (Var.normalize_name x)
+  | Assign (x,e) -> Assign (Var.normalize_name x, Expr.normalize_names e)
+  | Assert (b, id) ->
+     Assert (BExpr.normalize_names b, id)
+  | Assume b ->
+     Assume (BExpr.normalize_names b)
+  | Seq (c1,c2) ->
+     seq (normalize_names c1) (normalize_names c2)
+  | Choice (c1,c2) ->
+     seq (normalize_names c1) (normalize_names c2)
