@@ -78,10 +78,11 @@ let exp_inner stringifier runner simpl (prog, asst) =
     log_row dur res size true;
     (dur, res, size, true)
 
-let cvc4_inner = exp_inner Smt.simplify Solver.run_cvc4
-let z3_inner = exp_inner Smt.assert_apply Solver.run_z3
-let princess_inner = exp_inner Smt.simplify Solver.run_princess
+let cvc4_infer = exp_inner Smt.simplify Solver.run_cvc4
+let cvc4_check = exp_inner Smt.check_sat Solver.run_cvc4
+let z3_infer = exp_inner Smt.assert_apply Solver.run_z3
+let princess_infer = exp_inner Smt.simplify Solver.run_princess
 
-let princess = exp ~f:princess_inner
-let z3 = exp ~f:z3_inner
-let cvc4 = exp ~f:cvc4_inner
+let princess = exp ~f:princess_infer
+let z3 = exp ~f:z3_infer
+let cvc4 = exp ~f:cvc4_infer

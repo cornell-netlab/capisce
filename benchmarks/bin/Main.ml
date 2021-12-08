@@ -76,7 +76,8 @@ let infer : Command.t =
          includes = flag "-I" (listed string) ~doc:"includes directories" and
          debug = flag "-D" no_arg ~doc:"show debugging info" and
          gas_opt = flag "-g" (optional int) ~doc:"how much gas to pass the compiler" and
-         no_smart = flag "--disable-smart" no_arg ~doc:"disable smart constructors" 
+         no_smart = flag "--disable-smart" no_arg ~doc:"disable smart constructors" and
+         check = flag "--check" no_arg ~doc:"simply check the existence of a solution"
          in
          fun () ->         
          Pbench.Log.debug := debug;
@@ -85,12 +86,15 @@ let infer : Command.t =
          let cmd = Pbench.P4Parse.as_cmd_from_file includes source gas debug in
          Pbench.Log.print @@ lazy (Pbench.Cmd.to_string cmd);
          let (dur, res, _, called_solver) =
-           Bench.cvc4_inner false (cmd, Pbench.BExpr.true_)
+           if check then 
+             Bench.cvc4_check false (cmd, Pbench.BExpr.true_)
+           else
+             Bench.cvc4_infer false (cmd, Pbench.BExpr.true_)
          in
-         Printf.printf "Done in %f seconds with%s calling the solver. Got: \n%s\n%!"
-           (Time.Span.to_ms dur)
-           (if called_solver then "" else "out")
-           res
+           Printf.printf "Done in %f seconds with%s calling the solver. Got: \n%s\n%!"
+             (Time.Span.to_ms dur)
+             (if called_solver then "" else "out")
+             res
     ]
 
   

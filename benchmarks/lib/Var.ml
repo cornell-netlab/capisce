@@ -24,8 +24,8 @@ let make_ghost id k =
   let w = size k in
   make x w
 
-let symbRow = "?"
-let is_symbRow (s,_) = String.is_prefix s ~prefix:symbRow
+let symbRow = "_symb"
+let is_symbRow (s,_) = String.is_substring s ~substring:symbRow
 let make_symbRow id k =            
   let x = Printf.sprintf "%s%s_%d" symbRow (str k) id in
   let w = size k in

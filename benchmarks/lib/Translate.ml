@@ -126,7 +126,9 @@ let rec gcl_to_cmd (t : target) : Cmd.t =
   | GAssume phi ->
      Cmd.assume (form_to_bexpr phi)
   | GAssert phi ->
-     Cmd.assume (form_to_bexpr phi)
+     Cmd.assert_ (form_to_bexpr phi)
+  | GExternVoid ("assert",[phi]) ->
+     Cmd.assert_ (BExpr.eq_ (bv_to_expr phi) (Expr.bvi 1 1)) 
   | GExternVoid _ | GExternAssn _ ->
      failwith "Externs should have been eliminated"
  

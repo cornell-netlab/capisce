@@ -156,6 +156,7 @@ control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t
         } else {
             send_to_cpu.apply();
         }
+        assert(standard_metadata.egress_spec != 9w0);
     }
 }
 
