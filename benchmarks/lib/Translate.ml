@@ -85,14 +85,10 @@ let comparison (lcomp : Form.lcomp) : Expr.t -> Expr.t -> BExpr.t =
   match lcomp with
   | LEq -> BExpr.eq_ 
   | LNeq -> fun e1 e2 -> BExpr.not_ (BExpr.eq_ e1 e2)
-  | LLt true -> BExpr.slt_
-  | LLt false -> BExpr.ult_
-  | LGt true -> BExpr.sgt_
-  | LGt false -> BExpr.ugt_
-  | LLe true -> BExpr.sle_
-  | LLe false -> BExpr.ule_
-  | LGe true -> BExpr.sge_
-  | LGe false -> BExpr.uge_
+  | LLt signed -> if signed then BExpr.slt_ else BExpr.ult_
+  | LGt signed -> if signed then BExpr.sgt_ else BExpr.ugt_
+  | LLe signed -> if signed then BExpr.sle_ else BExpr.ule_
+  | LGe signed -> if signed then BExpr.sge_ else BExpr.uge_
           
 let rec form_to_bexpr (phi : Form.t) : BExpr.t =
   match phi with
@@ -122,7 +118,9 @@ let rec gcl_to_cmd (t : target) : Cmd.t =
   | GSeq (g1,g2) ->
      Cmd.seq (gcl_to_cmd g1) (gcl_to_cmd g2) 
   | GChoice (g1,g2) ->
-     Cmd.choice (gcl_to_cmd g1) (gcl_to_cmd g2)
+     let c1 = gcl_to_cmd g1 in
+     let c2 = gcl_to_cmd g2 in
+     Cmd.choice c1 c2
   | GAssume phi ->
      Cmd.assume (form_to_bexpr phi)
   | GAssert phi ->

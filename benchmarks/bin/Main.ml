@@ -48,16 +48,6 @@ let bench : Command.t =
          end
     ]
 
-let nat : Command.t =
-  let open Command.Let_syntax in
-  Command.basic ~summary:"Runs NAT example"
-    [%map_open
-     let debug = flag "-D" no_arg ~doc:"show debugging info" in
-         fun () ->         
-         Pbench.Log.debug := debug;
-         Printf.printf "%s" (Nat.smt ())
-    ]
-
 let beastiary : Command.t =
   let open Command.Let_syntax in
   Command.basic ~summary:"Runs the Beastiary of Examples"
@@ -91,7 +81,7 @@ let infer : Command.t =
            else
              Bench.cvc4_infer false (cmd, Pbench.BExpr.true_)
          in
-           Printf.printf "Done in %f seconds with%s calling the solver. Got: \n%s\n%!"
+           Printf.printf "Done in %fms with%s calling the solver. Got: \n%s\n%!"
              (Time.Span.to_ms dur)
              (if called_solver then "" else "out")
              res
@@ -101,7 +91,6 @@ let infer : Command.t =
 let main =
   Command.group ~summary:"research toy for exploring verification & synthesis of p4 programs"
     [("bench", bench);
-     ("nat", nat);
      ("beastiary", beastiary);
      ("infer", infer)
     ]

@@ -221,4 +221,4 @@ let rec normalize_names (c : t) : t =
   | Seq (c1,c2) ->
      seq (normalize_names c1) (normalize_names c2)
   | Choice (c1,c2) ->
-     seq (normalize_names c1) (normalize_names c2)
+     choice (normalize_names c1) (normalize_names c2)
