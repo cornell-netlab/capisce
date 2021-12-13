@@ -28,7 +28,7 @@ let bop_to_smtlib = function
 
 type uop =
   | UNot
-  | USlice of int * int
+  | USlice of int * int (* lo, hi *)
   [@@deriving eq, sexp, compare, quickcheck]
             
 let uop_to_smtlib = function
@@ -44,6 +44,22 @@ type t =
   | UnOp of uop * t
   [@@deriving eq, sexp, compare, quickcheck]
 
+
+let rec get_width = function
+  | BV (_,w) -> w
+  | Var x -> Var.size x
+  | BinOp(op, e1, e2) ->
+     begin match op with
+     | BConcat ->
+        get_width e1 + get_width e2
+     | _ ->
+        get_width e1
+     end
+  | UnOp(op, e) ->
+     match op with
+     | UNot -> get_width e
+     | USlice (lo,hi) -> hi - lo
+          
 let bv n w = BV(n,w)
 let bvi n w = bv (Bigint.of_int n) w
 let var v = Var v
@@ -58,11 +74,14 @@ let bconcat e1 e2 = BinOp (BConcat, e1, e2)
 let shl_ e1 e2 = BinOp(BShl, e1, e2)
 let ashr_ e1 e2 = BinOp(BAshr, e1, e2)
 let lshr_ e1 e2 = BinOp(BLshr, e1, e2)             
-               
-let bnot e = UnOp(UNot, e)          
-let bcast _ _ = failwith "cast unimplemented"
-let bslice lo hi e =  UnOp(USlice(lo, hi), e)
-           
+                
+let bnot e = UnOp(UNot, e)
+let bslice lo hi e =  UnOp(USlice(lo, hi), e)           
+let bcast width e =
+  if get_width e = width then
+    e
+  else
+    bslice 0 width e
 let uelim sign vs e1 e2 =
   let open Var in 
   match sign, e1, e2 with
