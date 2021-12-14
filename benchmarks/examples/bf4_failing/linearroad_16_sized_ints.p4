@@ -606,7 +606,7 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
     }
     @name(".calc_ewma_spd") action calc_ewma_spd() {
         seg_ewma_spd_reg.read(meta.seg_meta.ewma_spd, (bit<32>)((bit<16>)hdr.pos_report.xway * 16w200 + (bit<16>)(hdr.pos_report.seg * 8w2) + (bit<16>)hdr.pos_report.dir));
-        meta.seg_meta.ewma_spd = (bit<16>)((bit<32>)meta.seg_meta.ewma_spd * 32w96 + (bit<32>)((bit<16>)hdr.pos_report.spd * 16w32) >> 167);
+        meta.seg_meta.ewma_spd = (bit<16>)((bit<32>)meta.seg_meta.ewma_spd * 32w96 + (bit<32>)((bit<16>)hdr.pos_report.spd * 16w32) >> 16w7);
         seg_ewma_spd_reg.write((bit<32>)((bit<16>)hdr.pos_report.xway * 16w200 + (bit<16>)(hdr.pos_report.seg * 8w2) + (bit<16>)hdr.pos_report.dir), (bit<16>)meta.seg_meta.ewma_spd);
     }
     @name(".set_new_seg") action set_new_seg() {
@@ -620,7 +620,7 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         v_lane_reg.read(meta.v_state.prev_lane, (bit<32>)hdr.pos_report.vid);
         v_seg_reg.read(meta.v_state.prev_seg, (bit<32>)hdr.pos_report.vid);
         v_dir_reg.read(meta.v_state.prev_dir, (bit<32>)hdr.pos_report.vid);
-        v_valid_reg.write((bit<32>)hdr.pos_report.vid, (bit<1>)1);
+        v_valid_reg.write((bit<32>)hdr.pos_report.vid, (bit<1>)1w1);
         v_spd_reg.write((bit<32>)hdr.pos_report.vid, (bit<8>)hdr.pos_report.spd);
         v_xway_reg.write((bit<32>)hdr.pos_report.vid, (bit<8>)hdr.pos_report.xway);
         v_lane_reg.write((bit<32>)hdr.pos_report.vid, (bit<3>)hdr.pos_report.lane);
