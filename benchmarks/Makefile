@@ -5,7 +5,7 @@
 # @version 0.1
 
 all:
-	rm -f cpi && dune build bin/main.exe && cp _build/default/bin/main.exe cpi
+	rm -f capisce && dune build bin/main.exe && cp _build/default/bin/main.exe capisce
 
 
 clean:
