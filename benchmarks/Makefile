@@ -5,7 +5,7 @@
 # @version 0.1
 
 all:
-	rm -f capisce && dune build bin/main.exe && cp _build/default/bin/main.exe capisce
+	rm -f icecap && dune build bin/main.exe && cp _build/default/bin/main.exe icecap
 
 
 clean:

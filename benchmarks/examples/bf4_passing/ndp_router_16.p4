@@ -106,7 +106,7 @@ control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t
             cont;
         }
         key = {
-            meta.meta.ndpflags: range;
+            meta.meta.ndpflags: ternary;
         }
         size = 2;
     }
@@ -162,7 +162,7 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
             directpriohigh;
         }
         key = {
-            meta.meta.register_tmp: range;
+            meta.meta.register_tmp: ternary;
         }
         size = 2;
     }
@@ -191,7 +191,7 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
             readbuffer;
         }
         key = {
-            meta.meta.register_tmp: range;
+            meta.meta.register_tmp: ternary;
         }
         size = 2;
     }
@@ -201,7 +201,7 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
             setpriohigh;
         }
         key = {
-            meta.meta.register_tmp: range;
+            meta.meta.register_tmp: ternary;
         }
         size = 2;
     }
