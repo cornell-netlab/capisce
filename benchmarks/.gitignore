@@ -2,3 +2,7 @@ _build
 _opam
 pbench
 *.smt2
+capisce
+icecap
+cpi
+**/ccompiled.c
