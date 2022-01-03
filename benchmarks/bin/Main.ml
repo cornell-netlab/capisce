@@ -79,7 +79,7 @@ let infer : Command.t =
            if check then 
              Bench.cvc4_check false (cmd, Pbench.BExpr.true_)
            else
-             Bench.cvc4_infer false (cmd, Pbench.BExpr.true_)
+             Bench.cvc4_z3_infer false (cmd, Pbench.BExpr.true_)
          in
            Printf.printf "Done in %fms with%s calling the solver. Got: \n%s\n%!"
              (Time.Span.to_ms dur)

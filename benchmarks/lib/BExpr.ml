@@ -106,7 +106,6 @@ let not_ =
   ctor1
     ~default:(fun b -> TNot b)
     ~smart:(fun default b ->
-      Log.print @@ lazy (Printf.sprintf "simplifying NOT (%s)" (to_smtlib b));
       match b with
       | TFalse -> true_
       | TTrue -> false_
@@ -252,17 +251,13 @@ let forall_simplify forall vs vsa a op vsb b =
     | LAnd ->
        and_ (forall vsa a) (forall vsb b)
     | LArr ->
-       let out = or_ (forall vsa (not_ a)) (forall vsb b) in
-       Log.print @@ lazy (Printf.sprintf "(or (forall (%s) %s) (forall (%s) %s))\n became %s\n"
-                            (Var.list_to_smtlib_quant vsa) (to_smtlib (not_ a)) (Var.list_to_smtlib_quant vsb) (to_smtlib b)
-                            (to_smtlib out));
-       out
+       or_ (forall vsa (not_ a)) (forall vsb b)
     | LOr  ->
        or_ (forall vsa a) (forall vsb b)
     | LIff ->
        iff_ (forall vsa a) (forall vsb b)
   in
-  Log.print @@ lazy (Printf.sprintf "∀-simplifying: ∀ %s. %s\n%!" (Var.list_to_smtlib_quant vs) (to_smtlib phi));
+  (* Log.print @@ lazy (Printf.sprintf "∀-simplifying: ∀ %s. %s\n%!" (Var.list_to_smtlib_quant vs) (to_smtlib phi)); *)
   if Int.(List.length vsa = 0 && List.length vsb = 0) then
     Forall(vs, phi)
   else
@@ -277,9 +272,9 @@ let forall vs b =
         Forall(vs,b)      
     )
     ~smart:(fun self default vs b ->
-      Log.print @@ lazy (Printf.sprintf "%s" (Forall (vs, b) |> to_smtlib));
+      (* Log.print @@ lazy (Printf.sprintf "%s" (Forall (vs, b) |> to_smtlib)); *)
       if List.is_empty vs then
-        let () = Log.print @@ lazy (Printf.sprintf "Emptiness is a warm gun: %s" (to_smtlib b)) in
+        (* let () = Log.print @@ lazy (Printf.sprintf "Emptiness is a warm gun: %s" (to_smtlib b)) in *)
         b
       else        
         let bvs = Util.uncurry (@) (vars b) in
@@ -306,14 +301,14 @@ let forall vs b =
                 let vs'' = Var.(linter ~equal frees1 frees2) |> dedup in 
                 (* its the case that vs' = vs'' @ vs2 @ vs1 *)
                 (* This is a simple sanity check *)
-                Log.print @@ lazy (Printf.sprintf
-                                     "*****\nof %s filtered to %s,\n(%s) are in\n%s\n\nand (%s) are in%s\n*****\n"
-                                     (Var.list_to_smtlib_quant vs)
-                                     (Var.list_to_smtlib_quant vs')
-                                     (Var.list_to_smtlib_quant vs1)
-                                     (to_smtlib b1)
-                                     (Var.list_to_smtlib_quant vs2)
-                                     (to_smtlib b2));
+                (* Log.print @@ lazy (Printf.sprintf
+                 *                      "*****\nof %s filtered to %s,\n(%s) are in\n%s\n\nand (%s) are in%s\n*****\n"
+                 *                      (Var.list_to_smtlib_quant vs)
+                 *                      (Var.list_to_smtlib_quant vs')
+                 *                      (Var.list_to_smtlib_quant vs1)
+                 *                      (to_smtlib b1)
+                 *                      (Var.list_to_smtlib_quant vs2)
+                 *                      (to_smtlib b2)); *)
                 
                 assert(Int.(List.length vs' = List.length(vs'' @ vs2 @ vs1)));
                 

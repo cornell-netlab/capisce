@@ -5,6 +5,7 @@ includes_dir="./examples/includes"
 success_dir="./examples/bf4_passing"
 nocomp_dir="./examples/bf4_nocompile"
 dup_dir="./examples/bf4_dups"
+log_dir="./examples/logs"
 
 # coloration
 RED='\033[0;31m'
@@ -24,6 +25,9 @@ if [ ! -d $nocomp_dir ]; then
 fi
 if [ ! -d $dup_dir ]; then
     mkdir $dup_dir
+fi
+if [ ! -d $log_dir ]; then
+    mkdir $log_dir
 fi
 
 if [ ! -d $test_dir ]; then
@@ -54,20 +58,25 @@ make
 if [ $? -eq 0 ]; then
     # iterate through test programs
     for f in $test_dir/*.p4; do
+        b=$(basename $f)
+        log=${log_dir}/${b}.log
         # check if the program works with the petr4 frontend
-        errors=$(petr4 typecheck $f -I $includes_dir 2>&1 >/dev/null)
+        errors=$(petr4 typecheck $f -I $includes_dir > ${log} 2>&1)
         # if it doesn't move it to the directory of non-compiling programs
         if [ ! -z "${errors}" ]; then
-            echo -e "$BUNK petr4 typecheck $f -I $includes_dir"
+            echo -e "$BUNK ${b}"
+            echo -e "\tDetails are in   ${log}"
             mv $f $nocomp_dir
         else
             # otherwise run icecap
-            ./icecap infer $f -I $includes_dir >/dev/null 2>&1
+            ./icecap infer $f -I $includes_dir > ${log} 2>&1
             if [ $? -eq 0 ]; then
-                echo -e "$PASS ./icecap infer $f -I $includes_dir"
+                echo -e "$PASS ${b}"
+                echo -e "\tConstraint is in ${log}"
                 mv $f $success_dir/
             else
-                echo -e "$FAIL ./icecap infer $f -I $includes_dir"
+                echo -e "$FAIL ${b}"
+                echo -e "\tDetails are in   ${log} "
             fi
         fi
     done

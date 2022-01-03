@@ -35,7 +35,8 @@ let uop_to_smtlib = function
   | UNot ->
      "bvnot"
   | USlice (lo, hi) ->
-     Printf.sprintf "(_ extract %d %d)" lo hi 
+     (* Intentionally swap the order here*)
+     Printf.sprintf "(_ extract %d %d)" hi lo
 
 type t =
   | BV of Bigint.t * int
@@ -78,10 +79,14 @@ let lshr_ e1 e2 = BinOp(BLshr, e1, e2)
 let bnot e = UnOp(UNot, e)
 let bslice lo hi e =  UnOp(USlice(lo, hi), e)           
 let bcast width e =
-  if get_width e = width then
+  let ew = get_width e in
+  if ew = width then
     e
+  else if ew > width then
+    bslice 0 (width - 1) e
   else
-    bslice 0 width e
+    bconcat (bvi 0 (width - ew)) e
+  
 let uelim sign vs e1 e2 =
   let open Var in 
   match sign, e1, e2 with

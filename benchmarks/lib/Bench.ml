@@ -56,7 +56,7 @@ let answer_ok s =
   && String.length s > 0
 
 
-let log_row dur str size  use_solver =
+let log_row dur str size use_solver =
   Printf.eprintf "%f,%b,%d,%b\n%!" (Time.Span.to_ms dur) (answer_ok str) size use_solver
 
 let exp_inner stringifier runner simpl (prog, asst) =
@@ -75,6 +75,12 @@ let exp_inner stringifier runner simpl (prog, asst) =
     let phi_str = stringifier cvs phi in
     let res = runner phi_str in
     let dur = Clock.stop c in
+    (* let are_equiv_str = Solver.run_cvc4 (Smt.check_equiv cvs (BExpr.to_smtlib phi) cvs res) in
+     * if doesnt_contain_any are_equiv_str ["unsat"; "unknown"; "error"]
+     *    && String.is_substring are_equiv_str ~substring:"sat"
+     * then ()
+     * else Printf.eprintf "CVC4 QE is unsound:\n %s" are_equiv_str;
+     * Log.print (lazy "equivalent"); *)
     log_row dur res size true;
     (dur, res, size, true)
 
@@ -82,6 +88,21 @@ let cvc4_infer = exp_inner Smt.simplify Solver.run_cvc4
 let cvc4_check = exp_inner Smt.check_sat Solver.run_cvc4
 let z3_infer = exp_inner Smt.assert_apply Solver.run_z3
 let princess_infer = exp_inner Smt.simplify Solver.run_princess
+
+let cvc4_z3_infer simpl (prog, asst) =
+  let (dur, res, size, use_solver) = cvc4_infer simpl (prog, asst) in
+  let (dvs,cvs) = BExpr.vars (Cmd.wp prog asst) in  
+  if doesnt_contain_any res ["forall"; "exists"] then
+    (dur,res,size,use_solver)
+  else
+    let () = Log.print @@ lazy (Printf.sprintf "CVC4 computed gave\n%s" res) in
+    let c = Clock.start () in
+    let uneliminated_dvs = List.filter dvs ~f:(fun v -> String.is_substring res ~substring:(Var.str v)) in
+    let quantified_res = Printf.sprintf "(forall (%s) %s)" (Var.list_to_smtlib_quant uneliminated_dvs) res in 
+    let res = Solver.run_z3 (Smt.assert_apply_str cvs quantified_res) in
+    let z3_dur = Clock.stop c in 
+    (Time.Span.(dur + z3_dur), res, size, true)
+    
 
 let princess = exp ~f:princess_infer
 let z3 = exp ~f:z3_infer

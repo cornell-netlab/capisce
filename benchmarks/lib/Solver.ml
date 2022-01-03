@@ -1,7 +1,7 @@
 open Core
    
 let princess_exe = "/home/ericthewry/Downloads/princess-bin-2021-05-10/princess -inputFormat=smtlib +mostGeneralConstraint +incremental "
-let z3_exe = "/usr/bin/z3 -smt2"
+let z3_exe = "/usr/bin/z3 -smt2 -t:30000"
 let cvc4_exe = "/usr/bin/cvc4 --lang smt2"           
 
 let tmp () =
