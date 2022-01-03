@@ -100,8 +100,8 @@ let rec form_to_bexpr (phi : Form.t) : BExpr.t =
        (form_to_bexpr rhs)
   | LNot (arg) ->
      BExpr.not_ (form_to_bexpr arg)
-  | LVar (s) ->
-     failwith ("shouldnt have logical variables, and yet, i got" ^ s)
+  | LVar s ->
+     BExpr.eq_ (Expr.var (Var.make s 1)) (Expr.bvi 1 1)
   | LComp (c, bv1, bv2) ->
      comparison c (bv_to_expr bv1) (bv_to_expr bv2)
    

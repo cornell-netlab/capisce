@@ -11,6 +11,9 @@ all:
 clean:
 	rm -fr _build
 
+test: all
+	bash ./testbf4.sh
+
 check:
 	dune build ./test/tests.exe && ./_build/default/test/tests.exe
 

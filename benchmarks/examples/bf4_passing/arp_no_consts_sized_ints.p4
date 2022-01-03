@@ -7,9 +7,9 @@
  ***********************  C O N S T A N T S  *****************************
  *************************************************************************/
       /*  Define the useful global constants for your program */
-const bit<16> ETHERTYPE_IPV4 = 0x0800;
-const bit<16> ETHERTYPE_ARP  = 0x0806;
-const bit<8>  IPPROTO_ICMP   = 0x01;
+// const bit<16> ETHERTYPE_IPV4 = 0x0800;
+// const bit<16> ETHERTYPE_ARP  = 0x0806;
+// const bit<8>  IPPROTO_ICMP   = 0x01;
 
 /*************************************************************************
  ***********************  H E A D E R S  *********************************
@@ -44,12 +44,12 @@ header ipv4_t {
     ipv4_addr_t  dstAddr;
 }
 
-const bit<16> ARP_HTYPE_ETHERNET = 0x0001;
-const bit<16> ARP_PTYPE_IPV4     = 0x0800;
-const bit<8>  ARP_HLEN_ETHERNET  = 6;
-const bit<8>  ARP_PLEN_IPV4      = 4;
-const bit<16> ARP_OPER_REQUEST   = 1;
-const bit<16> ARP_OPER_REPLY     = 2;
+// const bit<16> ARP_HTYPE_ETHERNET = 0x0001;
+// const bit<16> ARP_PTYPE_IPV4     = 0x0800;
+// const bit<8>  ARP_HLEN_ETHERNET   = 6;
+// const bit<8>  ARP_PLEN_IPV4      = 4;
+// const bit<16> ARP_OPER_REQUEST   = 1;
+// const bit<16> ARP_OPER_REPLY     = 2;
 
 header arp_t {
     bit<16> htype;
@@ -66,8 +66,8 @@ header arp_ipv4_t {
     ipv4_addr_t tpa;
 }
 
-const bit<8> ICMP_ECHO_REQUEST = 8;
-const bit<8> ICMP_ECHO_REPLY   = 0;
+// const bit<8> ICMP_ECHO_REQUEST = 8;
+// const bit<8> ICMP_ECHO_REPLY   = 0;
 
 header icmp_t {
     bit<8>  type;
@@ -109,8 +109,8 @@ parser MyParser(
     state start {
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
-            ETHERTYPE_IPV4 : parse_ipv4;
-            ETHERTYPE_ARP  : parse_arp;
+            16w0x0800 : parse_ipv4;
+            16w0x0806  : parse_arp;
             default        : accept;
         }
     }
@@ -119,8 +119,8 @@ parser MyParser(
         packet.extract(hdr.arp);
         transition select(hdr.arp.htype, hdr.arp.ptype,
                           hdr.arp.hlen,  hdr.arp.plen) {
-            (ARP_HTYPE_ETHERNET, ARP_PTYPE_IPV4,
-             ARP_HLEN_ETHERNET,  ARP_PLEN_IPV4) : parse_arp_ipv4;
+            (16w0x0001, 16w0x0800,
+             8w6,  8w4) : parse_arp_ipv4;
             default : accept;
         }
     }
@@ -135,7 +135,7 @@ parser MyParser(
         packet.extract(hdr.ipv4);
         meta.dst_ipv4 = hdr.ipv4.dstAddr;
         transition select(hdr.ipv4.protocol) {
-            IPPROTO_ICMP : parse_icmp;
+            8w0x01 : parse_icmp;
             default      : accept;
         }
     }
@@ -150,7 +150,7 @@ parser MyParser(
  ************   C H E C K S U M    V E R I F I C A T I O N   *************
  *************************************************************************/
 control MyVerifyChecksum(
-    in    my_headers_t   hdr,
+    inout my_headers_t   hdr,
     inout my_metadata_t  meta)
 {
     apply {     }
@@ -187,7 +187,7 @@ control MyIngress(
     action forward_ipv4() {
         hdr.ethernet.dstAddr = meta.mac_da;
         hdr.ethernet.srcAddr = meta.mac_sa;
-        hdr.ipv4.ttl         = hdr.ipv4.ttl - 1;
+        hdr.ipv4.ttl         = hdr.ipv4.ttl - 8w1;
         
         standard_metadata.egress_spec = meta.egress_port;
     }
@@ -196,7 +196,7 @@ control MyIngress(
         hdr.ethernet.dstAddr = hdr.arp_ipv4.sha;
         hdr.ethernet.srcAddr = meta.mac_da;
         
-        hdr.arp.oper         = ARP_OPER_REPLY;
+        hdr.arp.oper         = 16w2;
         
         hdr.arp_ipv4.tha     = hdr.arp_ipv4.sha;
         hdr.arp_ipv4.tpa     = hdr.arp_ipv4.spa;
@@ -218,8 +218,8 @@ control MyIngress(
         hdr.ipv4.dstAddr     = hdr.ipv4.srcAddr;
         hdr.ipv4.srcAddr     = tmp_ip;
 
-        hdr.icmp.type        = ICMP_ECHO_REPLY;
-        hdr.icmp.checksum    = 0; // For now
+        hdr.icmp.type        = 8w0;
+        hdr.icmp.checksum    = 16w0; // For now
 
         standard_metadata.egress_spec = standard_metadata.ingress_port;
     }
@@ -241,17 +241,17 @@ control MyIngress(
         }
         const default_action = drop();
         const entries = {
-            ( true, ARP_OPER_REQUEST, true, false, false, _  ) :
+            ( true, 16w1, true, false, false, _  ) :
                                                          send_arp_reply();
             ( false, _,               false, true, false, _  ) :
                                                          forward_ipv4();
-            ( false, _,               false, true, true, ICMP_ECHO_REQUEST ) :
+            ( false, _,               false, true, true, 8w8 ) :
                                                          send_icmp_reply();
         }
     }
     
     apply {
-        meta.my_mac = 0x000102030405;
+        meta.my_mac = 48w0x000102030405;
         ipv4_lpm.apply();
         forward.apply();
     }
