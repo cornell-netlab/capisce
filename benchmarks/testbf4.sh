@@ -11,6 +11,7 @@ log_dir="./examples/logs"
 RED='\033[0;31m'
 GRN='\033[0;32m'
 YLW='\033[0;33m'
+BLU='\033[0;34m'
 NC='\033[0m' # No Color
 PASS="${GRN}[PASS]${NC}"
 FAIL="${RED}[FAIL]${NC}"
@@ -64,19 +65,20 @@ if [ $? -eq 0 ]; then
         errors=$(petr4 typecheck $f -I $includes_dir > ${log} 2>&1)
         # if it doesn't move it to the directory of non-compiling programs
         if [ ! -z "${errors}" ]; then
-            echo -e "$BUNK ${b}"
-            echo -e "\tDetails are in   ${log}"
+            echo -e "$BUNK ${BLU}${b}${NC}"
+            echo -e "\tcat ${log}"
             mv $f $nocomp_dir
         else
             # otherwise run icecap
             ./icecap infer $f -I $includes_dir > ${log} 2>&1
             if [ $? -eq 0 ]; then
-                echo -e "$PASS ${b}"
-                echo -e "\tConstraint is in ${log}"
+                echo -e "$PASS ${BLU}${b}${NC}"
+                echo -e "\tcat ${log}"
                 mv $f $success_dir/
             else
-                echo -e "$FAIL ${b}"
-                echo -e "\tDetails are in   ${log} "
+                echo -e "$FAIL ${BLU}${b}${NC}"
+                echo -e "\tcat ${log}"
+                echo -e "\t./icecap infer ${f} -I ${includes_dir} -D"
             fi
         fi
     done

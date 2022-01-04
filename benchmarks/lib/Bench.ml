@@ -51,8 +51,15 @@ let exp ~f simpl one max_tables =
 let doesnt_contain_any s subs =
   List.for_all subs ~f:(fun substring -> not (String.is_substring s ~substring))
 
+let success s =
+  doesnt_contain_any s ["error"; "unknown"; "UNKNOWN"; "timeout"; "Killed"]
+
+let qf s =
+  doesnt_contain_any s ["forall"; "exists"]
+  
 let answer_ok s =
-  doesnt_contain_any s ["forall"; "exists"; "error"; "unknown"; "UNKNOWN"]
+  success s
+  && qf s
   && String.length s > 0
 
 
@@ -102,6 +109,69 @@ let cvc4_z3_infer simpl (prog, asst) =
     let res = Solver.run_z3 (Smt.assert_apply_str cvs quantified_res) in
     let z3_dur = Clock.stop c in 
     (Time.Span.(dur + z3_dur), res, size, true)
+
+let var_still_used smtstring var =
+  String.is_substring smtstring ~substring:(Var.str var)
+
+let solve solver cvs smt =
+  match solver with
+  | `Z3 ->
+     Log.print @@ lazy "Z3";
+     Solver.run_z3 (Smt.assert_apply_str cvs smt)
+  | `CVC4 ->
+     Log.print @@ lazy "CVC4";
+     Solver.run_cvc4 (Smt.simplify_str cvs smt)
+
+let normalize solver dvs res =
+  if success res then
+      match solver with
+      | `Z3 ->
+         Solver.extract_z3_goals res
+      | `CVC4 ->
+         let dvs' = List.filter dvs ~f:(var_still_used res) in
+         if List.is_empty dvs' then
+           res
+         else
+           Printf.sprintf "(forall (%s) %s)" (Var.list_to_smtlib_quant dvs') res
+  else
+    begin
+      Printf.eprintf "Solver failed:\n %s" res;
+      exit (-1)
+    end
+      
+let rec solver_fixpoint gas solvers dvs cvs (smt : string) : string =
+  if gas <= 0 then smt else
+    let dvs' = List.filter dvs ~f:(var_still_used smt) in
+    let cvs' = List.filter cvs ~f:(var_still_used smt) in
+    match solvers with
+    | [] ->
+       failwith "Ran out of solvers to try"
+    | solver :: solvers' ->
+       let res = normalize solver dvs (solve solver cvs' smt) in
+       if qf res then
+         res
+       else
+         solver_fixpoint (gas-1) (solvers'@[solver]) dvs' cvs' res
+
+let cvc4_z3_fix gas simpl (prog, asst) =
+  let c = Clock.start () in
+  let body = Cmd.wp prog asst in
+  let (dvs,cvs) = BExpr.vars body in
+  let phi =  BExpr.forall dvs body in
+  let phi = if simpl then BExpr.simplify phi else phi in
+  let size = BExpr.size phi in
+  if BExpr.qf phi then
+    let res = BExpr.to_smtlib phi in
+    let dur = Clock.stop c in
+    log_row dur res size false;
+    (dur, res, size, false)
+  else    
+    let phi_str = BExpr.to_smtlib phi in
+    let solvers = [`CVC4; `Z3 ] in
+    let res = solver_fixpoint gas solvers dvs cvs phi_str in
+    let dur = Clock.stop c in
+    log_row dur res size true;
+    (dur, res, size, true) 
     
 
 let princess = exp ~f:princess_infer
