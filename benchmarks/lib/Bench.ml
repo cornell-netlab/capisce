@@ -80,6 +80,7 @@ let exp_inner stringifier runner simpl (prog, asst) =
     (dur, res, size, false)
   else
     let phi_str = stringifier cvs phi in
+    Log.print @@ lazy phi_str;
     let res = runner phi_str in
     let dur = Clock.stop c in
     (* let are_equiv_str = Solver.run_cvc4 (Smt.check_equiv cvs (BExpr.to_smtlib phi) cvs res) in
@@ -92,7 +93,8 @@ let exp_inner stringifier runner simpl (prog, asst) =
     (dur, res, size, true)
 
 let cvc4_infer = exp_inner Smt.simplify Solver.run_cvc4
-let cvc4_check = exp_inner Smt.check_sat Solver.run_cvc4
+let cvc4_check = exp_inner Smt.check_sat Solver.run_cvc4 
+let z3_check = exp_inner Smt.check_sat Solver.run_z3              
 let z3_infer = exp_inner Smt.assert_apply Solver.run_z3
 let princess_infer = exp_inner Smt.simplify Solver.run_princess
 
@@ -155,7 +157,9 @@ let rec solver_fixpoint gas solvers dvs cvs (smt : string) : string =
 
 let cvc4_z3_fix gas simpl (prog, asst) =
   let c = Clock.start () in
+  Log.print @@ lazy "computing wp...";
   let body = Cmd.wp prog asst in
+  Log.print @@ lazy "getting variables";
   let (dvs,cvs) = BExpr.vars body in
   let phi =  BExpr.forall dvs body in
   let phi = if simpl then BExpr.simplify phi else phi in

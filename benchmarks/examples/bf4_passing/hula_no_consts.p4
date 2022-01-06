@@ -305,7 +305,7 @@ control MyIngress(inout headers hdr,
 
     apply {
         if (hdr.hula.isValid()){
-            if (hdr.hula.dir == 0){
+            if (hdr.hula.dir == 1w0){
                 switch(hula_fwd.apply().action_run){
 
                     /* if hula_dst action ran, this is the destination ToR */
@@ -356,7 +356,7 @@ control MyIngress(inout headers hdr,
             bit<16> port;
             flow_port_reg.read(port, (bit<32>)flow_hash);
 
-            if (port == 0){
+            if (port == 16w0){
                 /* if it is a new flow check hula paths */
                 hula_nhop.apply();
                 flow_port_reg.write((bit<32>)flow_hash, (bit<16>)standard_metadata.egress_spec);
@@ -385,7 +385,7 @@ control MyEgress(inout headers hdr,
                  inout metadata meta,
                  inout standard_metadata_t standard_metadata) {
     apply {
-        if (hdr.hula.isValid() && hdr.hula.dir == 0){
+        if (hdr.hula.isValid() && hdr.hula.dir == 1w0){
 
             /* pick max qdepth in hula forward path */
             if (hdr.hula.qdepth < (qdepth_t)standard_metadata.deq_qdepth){

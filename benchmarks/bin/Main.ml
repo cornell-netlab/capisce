@@ -57,7 +57,22 @@ let beastiary : Command.t =
          Pbench.Log.debug := debug;
          Pbench.MicroExamples.run_all ()
     ]
-  
+
+let compile : Command.t =
+  let open Command.Let_syntax in
+  Command.basic ~summary:"Infers control plane constraint from data plane"
+    [%map_open
+     let
+       source = anon ("p4 source file" %: string) and       
+       includes = flag "-I" (listed string) ~doc:"includes directories" and
+       gas_opt = flag "-g" (optional int) ~doc:"how much gas to pass the compiler"       
+       in
+       fun () -> 
+       let gas = Option.value gas_opt ~default:1000 in
+       let cmd = Pbench.P4Parse.as_cmd_from_file includes source gas false in
+       Printf.printf "GCL program:\n %s\n%!" @@ Pbench.Cmd.to_string cmd
+    ]
+       
 let infer : Command.t =
   let open Command.Let_syntax in
   Command.basic ~summary:"Infers control plane constraint from data plane"
@@ -67,7 +82,8 @@ let infer : Command.t =
          debug = flag "-D" no_arg ~doc:"show debugging info" and
          gas_opt = flag "-g" (optional int) ~doc:"how much gas to pass the compiler" and
          no_smart = flag "--disable-smart" no_arg ~doc:"disable smart constructors" and
-         check_only = flag "--check-only" no_arg ~doc:"simply check the existence of a solution"
+         check_only = flag "--check-only" no_arg ~doc:"simply check the existence of a solution" and
+         skip_check = flag "--skip-check" no_arg ~doc:"dont check whether a solution exists"
          in
          fun () ->         
          Pbench.Log.debug := debug;
@@ -76,7 +92,12 @@ let infer : Command.t =
          let cmd = Pbench.P4Parse.as_cmd_from_file includes source gas debug in
          Pbench.Log.print @@ lazy (Pbench.Cmd.to_string cmd);
          let (dur, res, _, called_solver) =
-           Bench.cvc4_check false (cmd, Pbench.BExpr.true_)
+           if skip_check then
+             (Time.Span.zero, "sat", 0, false)
+           else begin 
+               Pbench.Log.print @@ lazy "checking satisfiability\n";
+               Bench.z3_check false (cmd, Pbench.BExpr.true_)
+             end
          in
          if String.is_substring res ~substring:"sat"
             && not (String.is_substring res ~substring:"unsat") then
@@ -101,7 +122,8 @@ let main =
   Command.group ~summary:"research toy for exploring verification & synthesis of p4 programs"
     [("bench", bench);
      ("beastiary", beastiary);
-     ("infer", infer)
+     ("infer", infer);
+     ("compile", compile)
     ]
 
 let () = Command.run main    
