@@ -45,7 +45,19 @@ type t =
   | UnOp of uop * t
   [@@deriving eq, sexp, compare, quickcheck]
 
-
+let rec to_smtlib = function
+  | BV (n,w) ->
+     Printf.sprintf "(_ bv%s %d)" (Bigint.to_string n) w
+  | Var v ->
+     Var.str v
+  | BinOp (op, e1, e2) ->
+     Printf.sprintf "(%s %s %s)"
+       (bop_to_smtlib op)
+       (to_smtlib e1)
+       (to_smtlib e2)
+  | UnOp (op,e) ->
+     Printf.sprintf "(%s %s)" (uop_to_smtlib op) (to_smtlib e)
+          
 let rec get_width = function
   | BV (_,w) -> w
   | Var x -> Var.size x
@@ -64,7 +76,13 @@ let rec get_width = function
 let bv n w = BV(n,w)
 let bvi n w = bv (Bigint.of_int n) w
 let var v = Var v
-          
+let is_var = function
+  | Var _ -> true
+  | _ -> false
+let get_var = function
+  | Var x -> x
+  | e -> failwith ("tried to get_var of a non-var expression " ^ to_smtlib e)
+  
 let band e1 e2 = BinOp(BAnd, e1, e2)
 let bor e1 e2 = BinOp(BOr, e1, e2)
 let badd e1 e2 = BinOp(BAdd, e1, e2)              
@@ -131,22 +149,7 @@ let rec vars e : (Var.t list * Var.t list) =
   | BinOp (_, e1, e2) ->
      Util.pairs_app_dedup ~dedup:Var.dedup (vars e1) (vars e2)
   | UnOp (_,e) ->
-     vars e
-     
-
-let rec to_smtlib = function
-  | BV (n,w) ->
-     Printf.sprintf "(_ bv%s %d)" (Bigint.to_string n) w
-  | Var v ->
-     Var.str v
-  | BinOp (op, e1, e2) ->
-     Printf.sprintf "(%s %s %s)"
-       (bop_to_smtlib op)
-       (to_smtlib e1)
-       (to_smtlib e2)
-  | UnOp (op,e) ->
-     Printf.sprintf "(%s %s)" (uop_to_smtlib op) (to_smtlib e)
-
+     vars e    
 
 let index_subst s_opt e =
   match s_opt with

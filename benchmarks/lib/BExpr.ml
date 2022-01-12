@@ -111,7 +111,33 @@ let not_ =
       | TTrue -> false_
       | TNot b -> b
       | b -> default b)
-           
+
+
+let rec fun_subst f t =
+  match t with
+  | TFalse | TTrue -> t
+  | TNot t -> not_ (fun_subst f t)
+  | TBin (op,t1,t2) -> TBin (op, fun_subst f t1, fun_subst f t2)
+  | TComp (comp,e1,e2) ->
+     TComp (comp, Expr.fun_subst f e1, Expr.fun_subst f e2)
+  | Forall (vs, t) ->
+     let f' x = if List.exists vs ~f:(Var.(=) x) then
+                  Expr.var x
+                else f x in
+     Forall (vs, fun_subst f' t)
+  | Exists (vs, t) ->
+     let f' x = if List.exists vs ~f:(Var.(=) x) then
+                  Expr.var x
+                else
+                  f x in
+     Exists (vs, fun_subst f' t) 
+                    
+let subst x e t =
+  let f y = if Var.(y = x) then e else Expr.var y in
+  fun_subst f t
+  
+let one_point_rule = subst
+
 let and_ =
   ctor2
     ~default:(fun b1 b2 -> TBin(LAnd, b1, b2))
@@ -135,7 +161,11 @@ let imp_ =
       else if b1 = true_ then
         b2
       else
-        default b1 b2)
+        match b1 with
+        | TComp (Eq, x, e) when Expr.is_var x ->
+           default b1 (one_point_rule (Expr.get_var x) e b2)
+        | _ ->
+           default b1 b2)
 
 let or_ =
     ctor2
@@ -148,6 +178,14 @@ let or_ =
       else if b1 = false_ then
         b2
       else
+        match b1, b2 with
+        | TNot (TComp (Eq, x, e)) as asm, body when Expr.is_var x ->
+           one_point_rule (Expr.get_var x) e body           
+           |> default asm 
+        | body, (TNot (TComp (Eq, x, e) as asm)) when Expr.is_var x ->
+           one_point_rule (Expr.get_var x) e body           
+           |> default asm 
+        | _,_->
         default b1 b2)
   
 let iff_ =
@@ -348,29 +386,6 @@ let simplify b =
    * else
    *   simplify b' *)
             
-let rec fun_subst f t =
-  match t with
-  | TFalse | TTrue -> t
-  | TNot t -> not_ (fun_subst f t)
-  | TBin (op,t1,t2) -> get_smart op (fun_subst f t1) (fun_subst f t2)
-  | TComp (comp,e1,e2) ->
-     get_smart_comp comp (Expr.fun_subst f e1) (Expr.fun_subst f e2)
-  | Forall (vs, t) ->
-     let f' x = if List.exists vs ~f:(Var.(=) x) then
-                  Expr.var x
-                else f x in
-     forall vs (fun_subst f' t)
-  | Exists (vs, t) ->
-     let f' x = if List.exists vs ~f:(Var.(=) x) then
-                  Expr.var x
-                else
-                  f x in
-     Exists (vs, fun_subst f' t) 
-                    
-let subst x e t =
-  let f y = if Var.(y = x) then e else Expr.var y in
-  fun_subst f t
-
 let index_subst s_opt t : t =
   match s_opt with
   | None -> t    
@@ -507,7 +522,32 @@ let quickcheck_generator : t Generator.t =
            Exists ([v], b)
         )
       ]
+    )
+  
+let qf_quickcheck_generator : t Generator.t =
+  let open Quickcheck.Generator in
+  let open Let_syntax in
+  recursive_union
+    [
+      singleton TFalse;
+      singleton TTrue;
+      (let%bind e1 = Expr.quickcheck_generator in
+       let%bind e2 = Expr.quickcheck_generator in
+       let%map c = quickcheck_generator_comp in 
+       TComp(c,e1,e2))
+    ]
+    ~f:(fun self ->
+      [
+        (let%map e = self in TNot e);
+
+        (let%bind op = quickcheck_generator_bop in
+         let%bind b1 = self in
+         let%map b2 = self in
+         TBin (op,b1,b2)
+        );
+      ]
     )                                    
+  
 
 let quickcheck_shrinker : t Shrinker.t = Shrinker.atomic
   
@@ -564,4 +604,4 @@ let rec qf = function
   | Exists ([],b) ->
      qf b
   | Exists (_,_) ->
-     false
+     false       

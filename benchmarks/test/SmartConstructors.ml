@@ -4,15 +4,6 @@ open Base_quickcheck
 open Equivalences
 
 let count = ref 0   
-
-let z3_config =
-  let open Sequence in
-  let open Test.Config in
-    { seed = Seed.Nondeterministic;
-      test_count = 100;
-      shrink_count = 0;
-      sizes = unfold ~init:5 ~f:(function n -> Some (n, n+1));
-    } 
               
 let identity () =
   Test.run_exn (module BExpr) ~config:z3_config
@@ -139,15 +130,81 @@ let reduce_scope_right () =
      end)
     ~f:(fun (v,b1,b2) ->
       let open BExpr in
-      let phi = forall [v] (imp_ b1 b2)  |> simplify in
-      let phi' = imp_ b1 (forall [v] b2) |> simplify in
-      Alcotest.(check smt_equiv) "logically equivalent" phi phi'
+      let phi () = forall [v] (imp_ b1 b2)  in
+      let phi' () = imp_ b1 (forall [v] b2) in
+      Alcotest.(check smt_equiv) "logically equivalent" (dumb phi) (dumb phi')
     )
 
+let one_point_rule_imp () =
+  Test.run_exn
+    ~config:{z3_config with test_count = 200}
+    (module struct
+       type t = Var.t * Expr.t * BExpr.t [@@deriving quickcheck, sexp]
+       let quickcheck_generator : t Generator.t =
+         let open Quickcheck.Generator in
+         let open Let_syntax in
+         let%bind x = Var.quickcheck_generator in
+         let x_fresh e = Expr.vars e  |> Util.uncurry (@) |> Util.lmem ~equal:Var.equal x |> not in
+         (* let x_occur b = BExpr.vars b |> Util.uncurry (@) |> Util.lmem ~equal:Var.equal x in *)
+         let%bind e = Expr.quickcheck_generator |> filter ~f:x_fresh in 
+         let%bind b = BExpr.quickcheck_generator in (* |> filter ~f:x_occur in *)
+         return (x, e, b)
+     end)
+    ~f:(fun (x, e, b) ->
+      let open BExpr in
+      let open Expr in
+      let phi () = forall [x] (imp_ (eq_ (var x) e) b) in
+      Alcotest.(check smt_equiv) "logically equivalent" (dumb phi) (phi ())
+    )
 
+let one_point_rule_or_not_left () =
+  Test.run_exn
+    ~config:{z3_config with test_count = 200}
+    (module struct
+       type t = Var.t * Expr.t * BExpr.t [@@deriving quickcheck, sexp]
+       let quickcheck_generator : t Generator.t =
+         let open Quickcheck.Generator in
+         let open Let_syntax in
+         let%bind x = Var.quickcheck_generator in
+         let x_fresh e = Expr.vars e  |> Util.uncurry (@) |> Util.lmem ~equal:Var.equal x |> not in
+         (* let x_occur b = BExpr.vars b |> Util.uncurry (@) |> Util.lmem ~equal:Var.equal x in *)
+         let%bind e = Expr.quickcheck_generator |> filter ~f:x_fresh in 
+         let%bind b = BExpr.quickcheck_generator in (* |> filter ~f:x_occur in *)
+         return (x, e, b)
+     end)
+    ~f:(fun (x, e, b) ->
+      let open BExpr in
+      let open Expr in
+      let phi () = forall [x] (or_ (not_ (eq_ (var x) e)) b) in
+      Alcotest.(check smt_equiv) "logically equivalent" (dumb phi) (phi ())
+    )
+
+let one_point_rule_or_not_right () =
+  Test.run_exn
+    ~config:{z3_config with test_count = 200}
+    (module struct
+       type t = Var.t * Expr.t * BExpr.t [@@deriving quickcheck, sexp]
+       let quickcheck_generator : t Generator.t =
+         let open Quickcheck.Generator in
+         let open Let_syntax in
+         let%bind x = Var.quickcheck_generator in
+         let x_fresh e = Expr.vars e  |> Util.uncurry (@) |> Util.lmem ~equal:Var.equal x |> not in
+         (* let x_occur b = BExpr.vars b |> Util.uncurry (@) |> Util.lmem ~equal:Var.equal x in *)
+         let%bind e = Expr.quickcheck_generator |> filter ~f:x_fresh in 
+         let%bind b = BExpr.quickcheck_generator in (* |> filter ~f:x_occur in *)
+         return (x, e, b)
+     end)
+    ~f:(fun (x, e, b) ->
+      let open BExpr in
+      let open Expr in
+      let phi () = forall [x] (or_ b (not_ (eq_ (var x) e))) in
+      Alcotest.(check smt_equiv) "logically equivalent" (dumb phi) (phi ())
+    )    
+  
+  
 let reduce_scope_left () =
   Test.run_exn
-    ~config:{z3_config with test_count = 50}
+    ~config:{z3_config with test_count = 100}
     (module struct
        type t = Var.t * BExpr.t * BExpr.t [@@deriving quickcheck, sexp]
        let quickcheck_generator : t Generator.t =
@@ -425,7 +482,76 @@ let eliminate_quantified_variable_eq () =
   let row_nat__ipv4__isValid = Var.make "row_nat__ipv4__isValid" 1 in 
   let b () = forall [ipv4__isValid] (eq_ (var ipv4__isValid) (var row_nat__ipv4__isValid)) in
   Alcotest.(check bexpr) "literal equivalence" false_ (b ())  
-                                                                                                 
+
+let eliminate_trivial_vars () =
+  let open BExpr in
+  let open Expr in
+  let x = Var.make "x" 32 in
+  let y = Var.make "y" 32 in
+  let phi = dumb (fun () -> forall [x; y] (or_
+                                             (imp_ false_ true_)
+                                             (eq_ (var x) (var y)))) in
+  
+  Alcotest.(check smt_equiv) "proven equivalence" true_ phi
+
+
+let left_scope_failure () =
+  let open BExpr in
+  let open Expr in
+  let oo = Var.make "oo" 32 in
+  let phi () = forall [oo]
+              (imp_
+                 (eq_ (var oo) (bvi 353 32))
+                 (imp_ true_ true_)) in
+  let computed () =
+    (or_ (forall [oo] (not_ (eq_ (var oo) (bvi 353 32))))
+         (imp_ true_ true_)) in
+  Alcotest.(check smt_equiv) "logicall equivalence" (dumb phi) (dumb computed) 
+
+let rsl_bug_left () =
+  let open BExpr in
+  let open Expr in
+  let v = Var.make "ze" 32 in
+  let jm = Var.make "jm" 32 in
+  let mn = Var.make "mn" 32 in
+  let b1 = iff_
+             (not_ true_)
+             (iff_ (imp_ (or_ true_ true_) true_)
+                (iff_ true_ false_)) in
+  let b2 = eq_ (var jm) (var mn) in
+  let phi () = forall [v] (imp_ b1 b2) in
+  Alcotest.(check smt_equiv) "logically equivalent" (dumb phi) (phi ())
+  
+
+let rsl_bug_right () =
+  let open BExpr in
+  let open Expr in
+  let v = Var.make "ze" 32 in
+  let jm = Var.make "jm" 32 in
+  let mn = Var.make "mn" 32 in
+  let b1 = iff_
+             (not_ true_)
+             (iff_ (imp_ (or_ true_ true_) true_)
+                (iff_ true_ false_)) in
+  let b2 = eq_ (var jm) (var mn) in
+  let phi () = or_ (forall [v] (not_ b1)) b2 in
+  Alcotest.(check smt_equiv) "logically equivalent" (dumb phi) (phi ())
+
+let rsl_bug_dumbeq () =
+  let open BExpr in
+  let open Expr in
+  let v = Var.make "ze" 32 in
+  let jm = Var.make "jm" 32 in
+  let mn = Var.make "mn" 32 in
+  let b1 = iff_
+             (not_ true_)
+             (iff_ (imp_ (or_ true_ true_) true_)
+                (iff_ true_ false_)) in
+  let b2 = eq_ (var jm) (var mn) in
+  let orig () = forall [v] (imp_ b1 b2) in
+  let simpl () = or_ (forall [v] (not_ b1)) b2 in
+  Alcotest.(check smt_equiv) "logically equivalent" (dumb simpl) (orig ())
+  
   
 let tests =
   [
@@ -445,7 +571,12 @@ let tests =
     Alcotest.test_case "(∀x. x ≠ y) reduces to (false) via smarts" `Quick eliminate_quantified_variable_neq;
     Alcotest.test_case "(∀x. x = y) reduces to (false) via smarts" `Quick eliminate_quantified_variable_eq;
     Alcotest.test_case "∀ x. (x & ρ.m) ≠ (ρ.x & ρ.m) reduces to ⊥" `Quick rewrite_unused_mask;
-    Alcotest.test_case "∀ x. (x & ρ.m) ≠ (ρ.x & ρ.m) ⇔ ⊥" `Quick rewrite_unused_mask_equivalent;        
+    Alcotest.test_case "∀ x. (x & ρ.m) ≠ (ρ.x & ρ.m) ⇔ ⊥" `Quick rewrite_unused_mask_equivalent;
+    Alcotest.test_case "∀ xy. (⊥ ⇒ ⊤) ∨ (x = y) ⇔ ⊤" `Quick eliminate_trivial_vars;
+    Alcotest.test_case "rsl bug left" `Quick rsl_bug_left;
+    Alcotest.test_case "rsl bug right" `Quick rsl_bug_right;
+    Alcotest.test_case "rsl bug dumb equivalent" `Quick rsl_bug_dumbeq;
+    Alcotest.test_case "rsl failure" `Quick left_scope_failure;
     Alcotest.test_case "QC Smart QE" `Slow identity;
     Alcotest.test_case "QC ⊤ ∨ φ = ⊤" `Quick true_or_phi__true;
     Alcotest.test_case "QC ⊥ ∨ φ = φ" `Quick false_or_phi__phi;
@@ -454,7 +585,10 @@ let tests =
     Alcotest.test_case "QC φ ∧ ⊤ = φ" `Quick phi_and_true__phi;
     Alcotest.test_case "QC ⊤ ∧ φ = φ" `Quick true_and_phi__phi;
     Alcotest.test_case "QC φ ∧ ⊥ = ⊥" `Quick phi_and_false__false;
-    Alcotest.test_case "QC ⊥ ∧ φ = ⊥" `Quick false_and_phi__false;
+    Alcotest.test_case "QC ⊥ ∧ φ = ⊥" `Quick false_and_phi__false;    
+    Alcotest.test_case "QC one_point_rule_imp" `Slow one_point_rule_imp;
+    Alcotest.test_case "QC one_point_rule_or_not_left" `Slow one_point_rule_or_not_left;
+    Alcotest.test_case "QC one_point_rule_or_not_right" `Slow one_point_rule_or_not_right;        
     Alcotest.test_case "QC reduce_scope_right" `Slow reduce_scope_right;
     Alcotest.test_case "QC reduce_scope_left" `Slow reduce_scope_left;
     Alcotest.test_case "QC unused_u_var" `Quick unused_u_var;

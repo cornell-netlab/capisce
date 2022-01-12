@@ -125,8 +125,8 @@ let infer : Command.t =
            else
              let (inf_dur, inf_res, _, inf_called_solver) =
                (* Bench.z3_infer false (cmd, Pbench.BExpr.true_) *)
-               (* Bench.cvc4_z3_fix 4 false (cmd, Pbench.BExpr.true_) *)
-               Bench.cnf_fix_infer 4 false (cmd, Pbench.BExpr.true_) 
+               Bench.cvc4_z3_fix 4 false (cmd, Pbench.BExpr.true_)
+               (* Bench.cnf_fix_infer 4 false (cmd, Pbench.BExpr.true_)  *)
              in
              Printf.printf "Done in %fms with%s calling the solver in inference phase. Got: \n%s\n%!"
                (Time.Span.(to_ms (inf_dur + dur)))

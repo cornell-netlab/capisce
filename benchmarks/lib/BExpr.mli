@@ -1,3 +1,6 @@
+open Core
+open Base_quickcheck
+   
 type t [@@deriving eq, sexp, compare, quickcheck]
 
 val enable_smart_constructors : [`On | `Off] ref
@@ -53,5 +56,7 @@ val label : Context.t -> t -> t
 
 val equivalence : t -> t -> t                         
 
+val qf_quickcheck_generator : t Generator.t
+  
 (* FOR TESTING PURPOSES ONLY *)
 val dumb : (unit -> t) -> t

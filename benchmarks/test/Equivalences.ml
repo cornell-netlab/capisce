@@ -1,4 +1,5 @@
 open Core
+open Base_quickcheck
 open Pbench
 
 let z3_returned_sat s =
@@ -18,3 +19,12 @@ let log_eq b1 b2 =
 
 let bexpr = Alcotest.testable (Fmt.of_to_string BExpr.to_smtlib) (BExpr.(=))
 let smt_equiv = Alcotest.testable (Fmt.of_to_string BExpr.to_smtlib) (log_eq) 
+
+let z3_config =
+  let open Sequence in
+  let open Test.Config in
+  { seed = Seed.Nondeterministic;
+    test_count = 100;
+    shrink_count = 0;
+    sizes = unfold ~init:5 ~f:(function n -> Some (n, n+1));
+  } 

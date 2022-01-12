@@ -73,7 +73,7 @@ let quickcheck_generator =
   let open Base_quickcheck.Generator in
   let open Quickcheck.Generator in
   let open Let_syntax in
-  let%map v = string_with_length_of ~length:2 char_lowercase in
+  let%map v = string_with_length_of ~length:2 char_lowercase |> filter ~f:(Fn.non (String.(=) "or")) in
   make v 32
   
 
