@@ -25,7 +25,9 @@ val is_sym_of : sym:t -> data:t -> bool
 
 val list_to_smtlib_quant : t list -> string
 val list_to_smtlib_decls : t list -> string
-                                       
+
+val index : t -> int -> t 
+  
 val quickcheck_generator : t Generator.t
 val quickcheck_observer : t Observer.t
 val quickcheck_shrinker : t Shrinker.t

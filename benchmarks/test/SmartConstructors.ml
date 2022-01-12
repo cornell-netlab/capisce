@@ -1,26 +1,10 @@
 open Core
 open Pbench
-open Base_quickcheck    
+open Base_quickcheck
+open Equivalences
 
 let count = ref 0   
 
-let z3_returned_sat s =
-  let open String in
-  (is_substring ~substring:"sat" s || is_substring s ~substring:"unknown")
-  && not (is_substring ~substring:"unsat" s)
-  && not (is_substring ~substring:"error" s)
-    
-          
-let log_eq b1 b2 =
-  let () = Printf.printf "\nEquality\n%s\n = %s\n%!" (BExpr.to_smtlib b1) (BExpr.to_smtlib b2) in
-  let smtlib_exp = BExpr.equivalence b1 b2 |> Smt.check_sat ~timeout:(Some 100) [] in
-  let () = Printf.printf "Checking Z3 with \n %s \n%!" smtlib_exp in
-  let res =  Solver.run_z3 smtlib_exp in
-  let () = Printf.printf "Z3 responded with \n %s \n%!" res in
-  z3_returned_sat res
-
-let bexpr = Alcotest.testable (Fmt.of_to_string BExpr.to_smtlib) (BExpr.(=))
-let smt_equiv = Alcotest.testable (Fmt.of_to_string BExpr.to_smtlib) (log_eq) 
 let z3_config =
   let open Sequence in
   let open Test.Config in
@@ -269,7 +253,7 @@ let buggy_qc_example () =
       (imp_
         (not_ (exists [a] (eq_ (var a) (bvi 264974479 32))))
         (iff_ false_
-           (eq_ (bsub (bvi 5371006 32) (bneg (bvi 1 32))) (var z))))
+           (eq_ (bsub (bvi 5371006 32) (bnot (bvi 1 32))) (var z))))
   in
   let smart_phi = phi () in
   let dumb_phi = dumb phi in
@@ -285,11 +269,11 @@ let buggy_qc_example_literal () =
       (imp_
         (not_ (exists [a] (eq_ (var a) (bvi 264974479 32))))
         (iff_ false_
-           (eq_ (bsub (bvi 5371006 32) (bneg (bvi 1 32))) (var z)))) in
+           (eq_ (bsub (bvi 5371006 32) (bnot (bvi 1 32))) (var z)))) in
   let expected =
     dumb @@ fun () ->
               (or_ (exists [a] (eq_ (var a) (bvi 264974479 32)))
-                 (forall [z] (iff_ false_ (eq_ (bsub (bvi 5371006 32) (bneg (bvi 1 32))) (var z)))))
+                 (forall [z] (iff_ false_ (eq_ (bsub (bvi 5371006 32) (bnot (bvi 1 32))) (var z)))))
   in
   Alcotest.(check bexpr) "literally equivalent" expected got
 
@@ -313,7 +297,7 @@ let buggy_qc_example_1 () =
                       (eq_
                          (bor (var z)
                             (bsub (var h) (var c)))
-                         (bneg (bvi 3 32))))))))) in
+                         (bnot (bvi 3 32))))))))) in
   Alcotest.(check smt_equiv) "logically equivalent" (dumb phi) (phi ())
 
 let buggy_qc_example_2 () =
@@ -333,11 +317,11 @@ let buggy_qc_example_2 () =
                       (not_ true_)))
                 false_)
              (imp_ false_
-                (forall [m] (not_ (eq_ (bneg (bvi 679 32)) (var m))))))
+                (forall [m] (not_ (eq_ (bnot (bvi 679 32)) (var m))))))
           (forall [j]
              (eq_
                 (bor (var y)
-                   (bmul (bneg (var h)) (bvi 5173488 32))) 
+                   (bmul (bnot (var h)) (bvi 5173488 32))) 
                 (var j)))))
   in
   Alcotest.(check smt_equiv) "logically equivalent" (dumb phi) (phi ())
@@ -353,8 +337,8 @@ let rewrite_unused_mask () =
   let open BExpr in
   let open Expr in  
   let meta__ipv4_da = Var.make "meta__ipv4_da" 32 in
-  let row_ipv4_lpm__meta_ipv4 = Var.make "row_ipv4_lpm__meta_ipv4" 32 in
-  let row_ipv4_lpm__meta_ipv4Mask = Var.make "row_ipv4_lpm__meta_ipv4Mask" 32 in
+  let row_ipv4_lpm__meta_ipv4 = Var.make "_symb$ipv4_lpm$meta_ipv4" 32 in
+  let row_ipv4_lpm__meta_ipv4Mask = Var.make "_symb$pv4_lpm$meta_ipv4Mask" 32 in
   let phi =
     forall [meta__ipv4_da]
       (not_ (eq_ (band (var meta__ipv4_da) (var row_ipv4_lpm__meta_ipv4Mask))

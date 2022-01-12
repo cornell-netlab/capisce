@@ -22,9 +22,13 @@ val subst : Var.t -> Expr.t -> t -> t
 val table : int -> Var.t list -> (Var.t option * t) list -> t
 val full_table : string -> (int * Expr.t) list -> (string * t) list -> t
   
-
-val wp : t -> BExpr.t -> BExpr.t                                                            
-
+val wp : t -> BExpr.t -> BExpr.t
+val wrong : t -> BExpr.t
+val vc : t -> BExpr.t
+val optimize : t -> t
+  
 val assert_slices : t -> t list
 
-val normalize_names : t -> t                           
+val normalize_names : t -> t
+
+val passify : t -> t                             

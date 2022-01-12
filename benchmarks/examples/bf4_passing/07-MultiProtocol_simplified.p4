@@ -135,13 +135,14 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
     }
     @name(".start") state start {
         packet.extract(hdr.ethernet);
-        transition select(hdr.ethernet.etherType) {
-            16w0x8100: parse_vlan_tag;
-            16w0x9100: parse_vlan_tag;
-            16w0x800: parse_ipv4;
-            16w0x86dd: parse_ipv6;
-            default: accept;
-        }
+        transition accept;
+        // transition select(hdr.ethernet.etherType) {
+        //     // 16w0x8100: parse_vlan_tag;
+        //     // 16w0x9100: parse_vlan_tag;
+        //     16w0x800: parse_ipv4;
+        //     // 16w0x86dd: parse_ipv6;
+        //     default: accept;
+        // }
     }
 }
 
@@ -256,20 +257,22 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         }
     }
     apply {
-        // ADDED FOR SOLVABILITY
-        meta.ing_metadata.drop = 1w0;
-        switch (ethertype_match.apply().action_run) {
-            ipv4_packet: {
-                ipv4_match.apply();
-            }
-            mpls_packet:
-            ipv6_packet: {
-                // ipv6_match.apply();
-            }
-            default: {
-                // l2_match.apply();
-            }
-        }
+      assume (hdr.ethernet.isValid());
+      assert (hdr.ethernet.isValid());
+      // ethertype_match.apply();
+        // switch (ethertype_match.apply().action_run) {
+        //     ipv4_packet: {
+        //         // assert(hdr.ipv4.isValid());
+        //         ipv4_match.apply();
+        //     }
+        //     mpls_packet:
+        //     ipv6_packet: {
+        //         // ipv6_match.apply();
+        //     }
+        //     default: {
+        //         // l2_match.apply();
+        //     }
+        // }
         // if (hdr.tcp.isValid()) {
         //     tcp_check.apply();
         // } else {
@@ -281,7 +284,8 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         //         }
         //     }
         // }
-        set_egress.apply();
+        // set_egress.apply();
+        standard_metadata.egress_spec = 9w511;
     }
 }
 

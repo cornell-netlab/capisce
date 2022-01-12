@@ -1,7 +1,10 @@
 open Core
    
 let princess_exe = "/home/ericthewry/Downloads/princess-bin-2021-05-10/princess -inputFormat=smtlib +mostGeneralConstraint +incremental "
-let z3_exe = "/usr/bin/z3 -smt2 -t:30000"
+(* let z3_exe = "/usr/bin/z3 -smt2 -t:30000" *)
+
+let z3_exe = "/usr/bin/z3 -smt2"
+           
 let cvc4_exe = "/usr/bin/cvc4 --lang smt2"           
 
 
@@ -41,8 +44,9 @@ let tmp_write str =
 let run_proc p str =
   Log.print @@ lazy (Printf.sprintf "SMT Query:\n%s\n%!" str);
   let file = tmp_write str in
-  let chan = Unix.open_process_in (Printf.sprintf "%s %s 2> /tmp/errors.log" p file) in
-  (* let chan = Unix.open_process_in (Printf.sprintf "%s %s" p file) in   *)
+  (* let chan = Unix.open_process_in (Printf.sprintf "%s %s 2> /tmp/errors.log" p file) in *)
+  let chan = Unix.open_process_in (Printf.sprintf "%s %s" p file) in
+    (* let chan = Unix.open_process_in (Printf.sprintf "%s %s" p file) in   *)
   let strs = In_channel.input_lines chan in
   In_channel.close chan;
   String.concat strs ~sep:"\n"

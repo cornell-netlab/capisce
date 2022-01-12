@@ -70,7 +70,7 @@ if [ $? -eq 0 ]; then
             mv $f $nocomp_dir
         else
             # otherwise run icecap
-            ./icecap infer $f -I $includes_dir > ${log} 2>&1
+            ./icecap infer $f -I $includes_dir --skip-check > ${log} 2>&1
             if [ $? -eq 0 ]; then
                 echo -e "$PASS ${BLU}${b}${NC}"
                 echo -e "\tcat ${log}"

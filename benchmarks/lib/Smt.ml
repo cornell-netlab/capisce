@@ -5,7 +5,7 @@ let string_of_timeout =
 
 
 let simplify_str consts str =
-  Printf.sprintf "%s\n\n(simplify %s)\n%!"
+  Printf.sprintf "(set-logic UFBV)%s\n\n(simplify %s)\n%!"
     (Var.list_to_smtlib_decls consts)
     str
 

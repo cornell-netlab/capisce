@@ -65,6 +65,10 @@ let list_to_smtlib_decls : t list -> string =
   List.fold ~init:"\n"
   ~f:(fun acc v -> Printf.sprintf "%s%s" acc (to_smtlib_decl v))
 
+let index ((s,w) : t) (i : int) =
+  (Printf.sprintf "%s$_$%d" s i, w)
+      
+  
 let quickcheck_generator =
   let open Base_quickcheck.Generator in
   let open Quickcheck.Generator in

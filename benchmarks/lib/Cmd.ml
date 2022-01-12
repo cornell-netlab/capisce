@@ -1,5 +1,7 @@
 open Core
 
+module VarSet = Set.Make (Var)
+   
 type t =
   | Assume of BExpr.t
   | Assert of (BExpr.t * int option)
@@ -26,20 +28,36 @@ let to_string = to_string_aux 0
     
 
 (** Smart Constructors *)
-let skip = Assume (BExpr.true_)            
 let assume t = Assume t
 let assert_ t = Assert (t,None)
+let skip = assume BExpr.true_
+let pass = assert_ BExpr.true_         
+let abort = assert_ BExpr.false_
+let dead = assume BExpr.false_          
 let havoc x = Havoc x
 let assign x e = Assign (x,e)
 let seq c1 c2 =
-  if equal c2 skip then
+  if equal c2 skip || equal c2 pass then
     c1
-  else if equal c1 skip then
+  else if equal c1 skip || equal c1 pass then
     c2
+  else if equal c1 abort || equal c2 abort then
+    abort
+  else if equal c1 dead || equal c2 dead then
+    dead
   else
     Seq(c1,c2)
-let choice c1 c2 = Choice(c1,c2)              
-            
+
+let choice c1 c2 =
+  if equal c1 dead then
+    c2
+  else if equal c2 dead then
+    c1
+  else if equal c1 abort || equal c2 abort then
+    abort
+  else
+    Choice(c1,c2)              
+
 let rec sequence cs =
   match cs with
   | [] -> skip
@@ -222,3 +240,151 @@ let rec normalize_names (c : t) : t =
      seq (normalize_names c1) (normalize_names c2)
   | Choice (c1,c2) ->
      choice (normalize_names c1) (normalize_names c2)
+
+let rec normal (c : t) : BExpr.t =
+  let open BExpr in
+  match c with
+  | Havoc x -> failwith ("not sure what to do about havoc " ^ Var.str x)
+  | Assign _ -> failwith ("assignments should have been factored out "
+                          ^ to_string c) 
+  | Assert (b,_) | Assume b -> b
+  | Seq (c1, c2) ->
+     and_ (normal c1) (normal c2)
+  | Choice (c1, c2) ->
+     or_ (normal c1) (normal c2)
+     
+let rec wrong (c : t) : BExpr.t =
+  let open BExpr in 
+  match c with
+  | Havoc x -> failwith ("not sure what to do about havoc " ^ Var.str x)
+  | Assign _ -> failwith ("assignments should have been factored out "
+                          ^ to_string c) 
+  | Assert (b,_) ->
+     not_ b
+  | Assume _ ->
+     false_
+  | Seq (c1,c2) ->
+     or_
+       (wrong c1)
+       (and_ (normal c1) (wrong c2))
+  | Choice (c1,c2) ->
+     or_ (wrong c1) (wrong c2) 
+
+let rec update_resid x curr tgt resid =
+  if curr >= tgt then
+    resid
+  else
+    let x_ i = Expr.var (Var.index x i) in
+    BExpr.(and_ resid (eq_ (x_ curr) (x_ (curr+1))))      
+    |> update_resid x (curr + 1) tgt
+    
+let rec passify_aux (ctx : Context.t) (c : t) =
+  match c with
+  | Havoc x -> failwith ("dont know what to do about havoc " ^ Var.str x)
+  | Assign (x,e) ->
+     let ctx = Context.increment ctx x in
+     let x' = Context.label ctx x in
+     let e' = Expr.label ctx e in
+     (ctx, Assume (BExpr.eq_ (Expr.var x') e'))
+  | Assert (b, id) ->
+     (ctx, Assert (BExpr.label ctx b, id))
+  | Assume b ->
+     (ctx, Assume (BExpr.label ctx b))
+  | Seq (c1,c2) ->
+     let ctx, c1 = passify_aux ctx c1 in
+     let ctx, c2 = passify_aux ctx c2 in
+     (ctx, Seq (c1, c2))
+  | Choice (c1,c2) ->
+     let ctx1, c1 = passify_aux ctx c1 in
+     let ctx2, c2 = passify_aux ctx c2 in
+     let ctx, resid1, resid2 =
+       Context.merge ctx1 ctx2 ~init:(BExpr.true_) ~update:update_resid
+     in
+     let rc1 = Seq (c1, Assume resid1) in
+     let rc2 = Seq (c2, Assume resid2) in
+     (ctx, Choice (rc1, rc2))
+    
+let passify (c : t) : t =
+  snd (passify_aux Context.empty c)
+
+let rec const_prop_aux (f : Facts.t) (c : t) =
+  match c with
+  | Havoc x ->
+     (Facts.remove f x, c)
+  | Assign (x,e) ->
+     let e = Expr.fun_subst (Facts.lookup f) e in 
+     (Facts.update f x e, assign x e)
+  | Assert (b, id) ->
+     Log.print @@ lazy (Printf.sprintf "substitute %s using: %s\n" (to_string c) (Facts.to_string f));
+     let b = BExpr.fun_subst (Facts.lookup f) b in
+     Log.print @@ lazy (Printf.sprintf "Got assert(%s)\n" (BExpr.to_smtlib b));
+     (f, Assert (b,id))
+  | Assume b ->
+     let b = BExpr.fun_subst (Facts.lookup f) b in
+     (f, Assume b)
+  | Seq (c1, c2) ->
+     let f, c1 = const_prop_aux f c1 in
+     let f, c2 = const_prop_aux f c2 in
+     (f, seq c1 c2)
+  | Choice (c1, c2) ->
+     let f1, c1 = const_prop_aux f c1 in
+     let f2, c2 = const_prop_aux f c2 in
+     let f = Facts.merge f1 f2 in
+     Log.print @@ lazy (Printf.sprintf "After []:\n%s \n"
+                          (Facts.to_string f));
+     (f, choice c1 c2)
+  
+  
+let const_prop c = snd (const_prop_aux Facts.empty c)
+
+let rec dead_code_elim_aux c (reads : VarSet.t) : (t * VarSet.t) =
+  let open VarSet in
+  let concat (x,y) = x @ y in
+  match c with
+  | Havoc x ->
+     (havoc x, remove reads x) 
+  | Assign (x, e) ->
+     if exists reads ~f:(Var.(=) x) then
+       let read_by_e = of_list (concat (Expr.vars e)) in
+       let reads_minus_x = remove reads x in
+       let reads = union read_by_e reads_minus_x in
+       (assign x e, reads)
+     else
+       (skip, reads)
+  | Assert (b,_) -> 
+     let read_by_b = of_list (concat (BExpr.vars b)) in
+     let simpl_b = BExpr.simplify b in
+     (assert_ simpl_b, union reads read_by_b)
+  | Assume b ->
+     let read_by_b = of_list (concat (BExpr.vars b)) in
+     let simpl_b = BExpr.simplify b in
+     (assume simpl_b, union reads read_by_b)
+  | Choice (c1, c2) ->
+     let c1, read_by_c1 = dead_code_elim_aux c1 reads in
+     let c2, read_by_c2 = dead_code_elim_aux c2 reads in
+     (choice c1 c2, union read_by_c1 read_by_c2)
+  | Seq (c1, c2) ->
+     let c2, reads = dead_code_elim_aux c2 reads in
+     let c1, reads = dead_code_elim_aux c1 reads in
+     (seq c1 c2, reads)
+
+let dead_code_elim c = fst (dead_code_elim_aux c VarSet.empty)  
+
+
+let rec fix f x =
+  let x' = f x in
+  if equal x' x then
+    x
+  else
+    fix f x'
+                     
+let optimize c =
+  let o c = dead_code_elim (const_prop c) in 
+  fix o c
+                     
+let vc (c : t) : BExpr.t =
+  let o = optimize c in
+  let p = passify o in
+  let w = wrong p in
+  BExpr.(cnf (not_ w))
+  (* wp p BExpr.true_ *)

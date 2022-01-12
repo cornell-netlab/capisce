@@ -33,15 +33,23 @@ val exists : Var.t list -> t -> t
 
 val to_smtlib : t -> string
 val subst : Var.t -> Expr.t -> t -> t
+val fun_subst : (Var.t -> Expr.t) -> t -> t
+(** [fun_subst f b] substitutes b according to function [f] *)  
+
 val vars : t -> Var.t list * Var.t list
                   
 val index_subst : Subst.t option -> t -> t
 
 val simplify : t -> t
+val nnf : t -> t
+val cnf : t -> t  
 val normalize_names : t -> t   
 val size : t -> int  
 val qf : t -> bool
-val well_formed : t -> bool                       
+val well_formed : t -> bool
+val get_conjuncts : t -> t list
+  
+val label : Context.t -> t -> t
 
 val equivalence : t -> t -> t                         
 

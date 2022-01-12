@@ -30,7 +30,7 @@ module Parse = Make_parse(Conf)
 open Parse
 (* End Construct Parser *)
 
-let as_cmd_from_file (includes : string list) p4file gas verbose =
+let as_cmd_from_file (includes : string list) p4file gas unroll verbose =
   match parse_file includes p4file verbose with
   | `Error _ -> failwith "parsing failed"
   | `Ok (typed : Surface.program) ->
@@ -41,7 +41,7 @@ let as_cmd_from_file (includes : string list) p4file gas verbose =
         failwith (Printf.sprintf "Compilation Error in stage [P4light->P4cub]: %s" s)
      | Ok p4cub ->
         let instr s (_) keys acts = TableInstr.instr s keys acts in
-        match V1model.gcl_from_p4cub (P4Info.dummy) instr gas p4cub with
+        match V1model.gcl_from_p4cub (P4Info.dummy) instr gas unroll p4cub with
         | Error s ->
            failwith (Printf.sprintf "Compilation Error in stage [P4cub->GCL]: %s" s)
         | Ok gcl ->

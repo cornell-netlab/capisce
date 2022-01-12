@@ -107,20 +107,18 @@ let static_eq e1 e2 =
   | BV (v1,_), BV(v2,_) ->
      Some Bigint.(v1 = v2)
   | _, _ -> None
-               
-let rec subst (x : Var.t) e0 e =
+
+let rec fun_subst f e =
   match e with
   | BV _ -> e
-  | Var y ->
-     if Var.(y = x) then
-       e0
-     else
-       Var y
+  | Var y -> f y
   | BinOp (op, e1, e2) ->
-     BinOp(op, subst x e0 e1, subst x e0 e2)
+     BinOp (op, fun_subst f e1, fun_subst f e2)
   | UnOp (op, e) ->
-     UnOp(op, subst x e0 e)
+     UnOp (op, fun_subst f e)
 
+let subst (x : Var.t) e0 e =
+  fun_subst (fun y -> if Var.(x = y) then e0 else var y) e
 
 let rec vars e : (Var.t list * Var.t list) =
   match e with
@@ -181,16 +179,43 @@ let rec normalize_names (e : t) : t =
 let rec size = function
   | BV (_, _) | Var _ -> 1
   | BinOp (_, e1, e2) -> size e1 + 1 + size e2
-  | UnOp(_,e) -> 1 + size e 
+  | UnOp(_,e) -> 1 + size e
+
+
+let rec label (ctx : Context.t) (e : t) =
+  match e with
+  | BV _ -> e
+  | Var x -> Var (Context.label ctx x)
+  | BinOp (bop,e1,e2) ->
+     BinOp (bop, label ctx e1, label ctx e2)
+  | UnOp (uop, e) ->
+     UnOp (uop, label ctx e)
+               
 
 let quickcheck_generator_uop : uop Generator.t =
   let open Quickcheck.Generator in
   let open Let_syntax in
   union [
-      return UNot;
-      (let%bind lo = filter Int.quickcheck_generator ~f:(fun lo -> lo >= 0 && lo < 31) in
-       let%map hi = filter Int.quickcheck_generator ~f:(fun hi -> hi > lo && hi <= 32) in
-       USlice (lo, hi))
+      return UNot
+      (* (let%bind lo = filter Int.quickcheck_generator ~f:(fun lo -> lo >= 0 && lo < 31) in
+       *  let%map hi = filter Int.quickcheck_generator ~f:(fun hi -> hi > lo && hi <= 32) in
+       *  USlice (lo, hi)) *)
+    ]
+
+let quickcheck_generator_bop : bop Generator.t =
+  let open Quickcheck.Generator in
+  let open Let_syntax in
+  union [
+      return BAnd;
+      return BOr;
+      return BAdd;
+      return BMul;
+      return BSub;
+      return BXor;
+      (* return BConcat; *)
+      return BShl;
+      return BAshr;
+      return BLshr  
     ]
                
 let quickcheck_generator : t Generator.t =
@@ -214,7 +239,7 @@ let quickcheck_generator : t Generator.t =
       in
       let un =
         let%bind e = self in
-        let%map op = quickcheck_generator_uop in
+        let%map op =quickcheck_generator_uop in
         UnOp(op,e)
       in
       [bin; un]

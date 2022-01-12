@@ -348,26 +348,28 @@ let simplify b =
    * else
    *   simplify b' *)
             
-
-                    
-let rec subst x e t =
+let rec fun_subst f t =
   match t with
   | TFalse | TTrue -> t
-  | TNot t -> not_ (subst x e t)
-  | TBin (op,t1,t2) -> get_smart op (subst x e t1) (subst x e t2)
+  | TNot t -> not_ (fun_subst f t)
+  | TBin (op,t1,t2) -> get_smart op (fun_subst f t1) (fun_subst f t2)
   | TComp (comp,e1,e2) ->
-     get_smart_comp comp (Expr.subst x e e1) (Expr.subst x e e2)
+     get_smart_comp comp (Expr.fun_subst f e1) (Expr.fun_subst f e2)
   | Forall (vs, t) ->
-     if List.exists vs ~f:(Var.(=) x) then
-       forall vs t
-     else
-       Forall(vs, subst x e t)
+     let f' x = if List.exists vs ~f:(Var.(=) x) then
+                  Expr.var x
+                else f x in
+     forall vs (fun_subst f' t)
   | Exists (vs, t) ->
-     if List.exists vs ~f:(Var.(=) x) then
-       Exists (vs, t)
-     else
-       Exists (vs, subst x e t)         
-     
+     let f' x = if List.exists vs ~f:(Var.(=) x) then
+                  Expr.var x
+                else
+                  f x in
+     Exists (vs, fun_subst f' t) 
+                    
+let subst x e t =
+  let f y = if Var.(y = x) then e else Expr.var y in
+  fun_subst f t
 
 let index_subst s_opt t : t =
   match s_opt with
@@ -377,6 +379,95 @@ let index_subst s_opt t : t =
      |> List.fold ~init:t
           ~f:(fun t (x,x') -> subst x (Expr.var x') t)
 
+
+let rec label (ctx : Context.t) (b : t) : t =
+  match b with
+  | TFalse -> TFalse
+  | TTrue -> TTrue
+  | TNot b -> TNot (label ctx b)
+  | TBin (bop, b1, b2) ->
+     TBin (bop, label ctx b1, label ctx b2)
+  | TComp (comp, e1, e2) ->
+     TComp (comp, Expr.label ctx e1, Expr.label ctx e2) 
+  | Forall _ | Exists _ ->
+     failwith "Not sure how to label quantifiers"
+
+let rec nnf (b : t) : t = 
+  match b with
+  | TFalse | TTrue -> b
+  | TComp _ -> b
+  | Forall (vs, e) -> forall vs (nnf e)
+  | Exists (vs, e) -> exists vs (nnf e) 
+  | TBin (op, b1, b2) ->
+     begin match op with
+     | LAnd -> and_ (nnf b1) (nnf b2)
+     | LOr -> or_ (nnf b1) (nnf b2)
+     | LArr -> or_ (nnf (not_ b1)) (nnf b2)
+     | LIff -> and_
+                 (or_ (nnf (not_ b1)) (nnf b2))
+                 (or_ (nnf (not_ b2)) (nnf b1))
+     end
+  | TNot b ->
+     match b with
+     | TFalse -> TTrue
+     | TTrue -> TFalse
+     | TNot b -> nnf b
+     | TComp _ -> not_ b
+     | Forall (vs, b) -> exists vs (nnf (not_ b))
+     | Exists (vs, b) -> forall vs (nnf (not_ b))
+     | TBin (op, b1, b2) ->
+        match op with
+        | LAnd -> or_ (nnf (not_ b1)) (nnf (not_ b2))
+        | LOr -> and_ (nnf (not_ b1)) (nnf (not_ b2))
+        | LIff | LArr -> nnf (not_ (nnf b))
+
+let rec cnf_inner (b : t) : t list list =
+  match b with
+  | TFalse | TTrue ->
+     [[b]]
+  | TComp _ ->
+     [[b]]
+  | Forall _ ->
+     failwith "I swear, you shouldnt use me"
+  | Exists _ ->
+     failwith "what in the world is my purpose"
+  | TBin (op, b1, b2) ->
+     begin match op with
+     | LAnd ->
+        cnf_inner b1 @ cnf_inner b2 
+     | LOr ->
+        let open List.Let_syntax in
+        let%bind conj1 = cnf_inner b1 in
+        let%map conj2 = cnf_inner b2 in
+        conj1 @ conj2
+     | LArr -> failwith "whoops! crap on a carbunckle"
+     | LIff -> failwith "whangdoodle winkerdinker" 
+     end
+  | TNot b ->
+     match b with
+     | TFalse -> [[true_]]
+     | TTrue -> [[false_]]
+     | TComp _ -> [[not_ b]]
+     | _ ->
+        failwith (Printf.sprintf "You really shouldn't be out here this late with a (not %s) in your hands " (to_smtlib b))
+
+
+let cnf b =
+  let ands_of_ors = cnf_inner (nnf b) in
+  List.fold_right ands_of_ors ~init:true_
+    ~f:(fun ors ands ->
+      List.fold_right ors ~f:or_ ~init:false_        
+      |> and_ ands 
+    )
+
+
+let rec get_conjuncts b =
+  match b with
+  | TBin (LAnd,b1, b2) ->     
+     get_conjuncts b1 @ get_conjuncts b2
+  | _ ->
+     [b]
+    
 let quickcheck_generator : t Generator.t =
   let open Quickcheck.Generator in
   let open Let_syntax in
@@ -474,5 +565,3 @@ let rec qf = function
      qf b
   | Exists (_,_) ->
      false
-     
-  

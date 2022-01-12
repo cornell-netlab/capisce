@@ -41,3 +41,9 @@ val well_formed : t -> bool
 
 val size : t -> int
 (** [size e] is the size of e's AST *)
+
+val label : Context.t -> t -> t
+(** [label ctx e] indexes the variables in [e] according to [ctx] *)              
+
+val fun_subst : (Var.t -> t) -> t -> t
+(** [fun_subst f e] substitutes [e] according to function [f] *)        

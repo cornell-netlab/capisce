@@ -65,12 +65,24 @@ let compile : Command.t =
      let
        source = anon ("p4 source file" %: string) and       
        includes = flag "-I" (listed string) ~doc:"includes directories" and
-       gas_opt = flag "-g" (optional int) ~doc:"how much gas to pass the compiler"       
+       gas_opt = flag "-g" (optional int) ~doc:"how much gas to pass the compiler" and
+       unroll_opt = flag "-u" (optional int) ~doc:"how much to_unroll the parser"
        in
-       fun () -> 
+       fun () ->
+       Pbench.BExpr.enable_smart_constructors := `On;
+       Pbench.Log.debug := true;
        let gas = Option.value gas_opt ~default:1000 in
-       let cmd = Pbench.P4Parse.as_cmd_from_file includes source gas false in
-       Printf.printf "GCL program:\n %s\n%!" @@ Pbench.Cmd.to_string cmd
+       let unroll = Option.value unroll_opt ~default:10 in
+       let cmd = Pbench.P4Parse.as_cmd_from_file includes source gas unroll false in
+       let cmd_o = Pbench.Cmd.optimize cmd in 
+       let cmd_p = Pbench.Cmd.passify cmd in
+       Printf.printf "GCL program:\n%s\n\n%!" @@ Pbench.Cmd.to_string cmd;
+       Printf.printf "ConstProp'd:\n%s\n\n%!" @@ Pbench.Cmd.to_string cmd_o;
+       Printf.printf "Passified:\n%s \n%!" @@ Pbench.Cmd.to_string cmd_p;
+       Printf.printf "\n And its VC: \n %s\n"
+       @@ Pbench.BExpr.to_smtlib
+       (* @@ Pbench.Cmd.wp cmd Pbench.BExpr.true_ *)
+       @@ Pbench.Cmd.vc cmd_o
     ]
        
 let infer : Command.t =
@@ -81,6 +93,7 @@ let infer : Command.t =
          includes = flag "-I" (listed string) ~doc:"includes directories" and
          debug = flag "-D" no_arg ~doc:"show debugging info" and
          gas_opt = flag "-g" (optional int) ~doc:"how much gas to pass the compiler" and
+         unroll_opt = flag "-u" (optional int) ~doc:"how much to unroll the parser" and
          no_smart = flag "--disable-smart" no_arg ~doc:"disable smart constructors" and
          check_only = flag "--check-only" no_arg ~doc:"simply check the existence of a solution" and
          skip_check = flag "--skip-check" no_arg ~doc:"dont check whether a solution exists"
@@ -89,7 +102,9 @@ let infer : Command.t =
          Pbench.Log.debug := debug;
          Pbench.BExpr.enable_smart_constructors := if no_smart then `Off else `On;
          let gas = Option.value gas_opt ~default:1000 in
-         let cmd = Pbench.P4Parse.as_cmd_from_file includes source gas debug in
+         let unroll = Option.value unroll_opt ~default:10 in
+         let cmd = Pbench.P4Parse.as_cmd_from_file includes source gas unroll debug in
+         let cmd = Pbench.Cmd.optimize cmd in
          Pbench.Log.print @@ lazy (Pbench.Cmd.to_string cmd);
          let (dur, res, _, called_solver) =
            if skip_check then
@@ -99,6 +114,7 @@ let infer : Command.t =
                Bench.z3_check false (cmd, Pbench.BExpr.true_)
              end
          in
+         Printf.printf "%s\n%!" res;
          if String.is_substring res ~substring:"sat"
             && not (String.is_substring res ~substring:"unsat") then
            if check_only then
@@ -108,8 +124,9 @@ let infer : Command.t =
                res
            else
              let (inf_dur, inf_res, _, inf_called_solver) =
-               (* Bench.cvc4_z3_infer false (cmd, Pbench.BExpr.true_) *)
-               Bench.cvc4_z3_fix 4 false (cmd, Pbench.BExpr.true_)
+               (* Bench.z3_infer false (cmd, Pbench.BExpr.true_) *)
+               (* Bench.cvc4_z3_fix 4 false (cmd, Pbench.BExpr.true_) *)
+               Bench.cnf_fix_infer 4 false (cmd, Pbench.BExpr.true_) 
              in
              Printf.printf "Done in %fms with%s calling the solver in inference phase. Got: \n%s\n%!"
                (Time.Span.(to_ms (inf_dur + dur)))

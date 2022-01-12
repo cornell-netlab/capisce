@@ -1,5 +1,6 @@
 let test_suites : unit Alcotest.test list = [
-    "Smarts", SmartConstructors.tests
+    "Smarts", SmartConstructors.tests;
+    "Logic Algorithms", Algorithms.tests; 
   ]
           
 (* let%test_unit "identity" = SmartConstructors.identity () *)
