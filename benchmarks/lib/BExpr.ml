@@ -49,8 +49,18 @@ type t =
   | Exists of Var.t list * t
   [@@deriving eq, sexp, compare, quickcheck]
 
-let (=) = equal
+type s = t (*hack, is there a better way?*)        
+module Set_t = Set.Make (struct
+                 type t = s
+                 let sexp_of_t = sexp_of_t
+                 let t_of_sexp = t_of_sexp
+                 let compare = compare
+               end)
 
+module SetOfSet_t = Set.Make (Set_t)           
+
+let (=) = equal
+           
 let rec to_smtlib_aux indent b =
   let space = Util.space (2 * indent) in
   match b with
@@ -136,7 +146,22 @@ let subst x e t =
   let f y = if Var.(y = x) then e else Expr.var y in
   fun_subst f t
   
-let one_point_rule = subst
+let one_point_rule e1 e2 b : t =
+  if Expr.is_var e1 then
+    let v1 = Expr.get_var e1 in
+    if Expr.is_var e2 then
+      let v2 = Expr.get_var e2 in
+      if not (Var.is_symbRow v2) then
+        subst v2 e1 b
+      else
+        subst v1 e2 b
+    else
+      subst v1 e2 b
+  else if Expr.is_var e2 then
+    let v2 = Expr.get_var e2 in    
+    subst v2 e1 b
+  else
+    failwith "called one_point_rule but nothing was there!"
 
 let and_ =
   ctor2
@@ -162,8 +187,8 @@ let imp_ =
         b2
       else
         match b1 with
-        | TComp (Eq, x, e) when Expr.is_var x ->
-           default b1 (one_point_rule (Expr.get_var x) e b2)
+        | TComp (Eq, e1, e2) when Expr.is_var e1 || Expr.is_var e2 ->
+           default b1 (one_point_rule e1 e2 b2)
         | _ ->
            default b1 b2)
 
@@ -179,11 +204,11 @@ let or_ =
         b2
       else
         match b1, b2 with
-        | TNot (TComp (Eq, x, e)) as asm, body when Expr.is_var x ->
-           one_point_rule (Expr.get_var x) e body           
+        | TNot (TComp (Eq, e1, e2)) as asm, body when Expr.(is_var e1 || is_var e2) ->
+           one_point_rule e1 e2 body           
            |> default asm 
-        | body, (TNot (TComp (Eq, x, e) as asm)) when Expr.is_var x ->
-           one_point_rule (Expr.get_var x) e body           
+        | body, (TNot (TComp (Eq, e1, e2) as asm)) when Expr.(is_var e1 || is_var e2) ->
+           one_point_rule e1 e2 body           
            |> default asm 
         | _,_->
         default b1 b2)
@@ -270,19 +295,30 @@ let get_smart_comp = function
   | Sgt -> sgt_
   | Sge -> sge_
 
-let rec vars t : Var.t list * Var.t list =
+let varstime : float ref = ref 0.0
+
+let rec vars_inner (t : t) =
   match t with
   | TFalse
     | TTrue -> ([],[])
-  | TNot t -> vars t
+  | TNot t -> vars_inner t
   | TBin (_, t1, t2) ->
-     Var.(Util.pairs_app_dedup ~dedup (vars t1) (vars t2))
+     Var.(Util.pairs_app_dedup ~dedup (vars_inner t1) (vars_inner t2))
   | TComp (_, e1, e2) ->
      Var.(Util.pairs_app_dedup ~dedup (Expr.vars e1) (Expr.vars e2))     
   | Forall (vs, b) | Exists (vs, b) ->
-     let dvs, cvs = vars b in
+     let dvs, cvs = vars_inner b in
      Var.(Util.ldiff ~equal dvs vs, Util.ldiff ~equal cvs vs)
-       
+
+                         
+let vars t : Var.t list * Var.t list =
+  let c = Clock.start () in
+  let res = vars_inner t in
+  let dur = Clock.stop c |> Time.Span.to_ms in
+  varstime := Float.(!varstime + dur);
+  Log.print @@ lazy (Printf.sprintf "Vars has taken %fms" !varstime); 
+  res
+     
 let forall_simplify forall vs vsa a op vsb b =
   let phi =
     match op with
@@ -435,12 +471,10 @@ let rec nnf (b : t) : t =
         | LAnd -> or_ (nnf (not_ b1)) (nnf (not_ b2))
         | LOr -> and_ (nnf (not_ b1)) (nnf (not_ b2))
         | LIff | LArr -> nnf (not_ (nnf b))
-
-let rec cnf_inner (b : t) : t list list =
+                       
+let rec cnf_inner (b : t) : t list list=
   match b with
-  | TFalse | TTrue ->
-     [[b]]
-  | TComp _ ->
+  | TFalse | TTrue | TComp _ ->
      [[b]]
   | Forall _ ->
      failwith "I swear, you shouldnt use me"
@@ -454,7 +488,7 @@ let rec cnf_inner (b : t) : t list list =
         let open List.Let_syntax in
         let%bind conj1 = cnf_inner b1 in
         let%map conj2 = cnf_inner b2 in
-        conj1 @ conj2
+        conj1 @ conj2 |> List.dedup_and_sort ~compare
      | LArr -> failwith "whoops! crap on a carbunckle"
      | LIff -> failwith "whangdoodle winkerdinker" 
      end
@@ -466,14 +500,30 @@ let rec cnf_inner (b : t) : t list list =
      | _ ->
         failwith (Printf.sprintf "You really shouldn't be out here this late with a (not %s) in your hands " (to_smtlib b))
 
+let rec size = function
+  | TFalse | TTrue -> 1
+  | TComp (_,e1,e2) -> Expr.size e1 + 1 + Expr.size e2
+  | TNot b -> size b + 1
+  | TBin (_, a, b) -> 1 + size a + size b
+  | Forall (vs, b) | Exists (vs, b) ->
+     1 + List.length vs + size b
 
 let cnf b =
+  Log.print @@ lazy (Printf.sprintf "cnfing.. %i " (size b)); 
   let ands_of_ors = cnf_inner (nnf b) in
-  List.fold_right ands_of_ors ~init:true_
-    ~f:(fun ors ands ->
-      List.fold_right ors ~f:or_ ~init:false_        
-      |> and_ ands 
-    )
+  (* let sz = SetOfSet_t.fold ands_of_ors ~init:0 ~f:(fun sum conj -> sum + 1 + (Set_t.length conj)) in *)
+  Log.print @@ lazy (Printf.sprintf "un-cnfing...");
+  (* enable_smart_constructors := `Off; *)
+  let cnf =
+    List.fold_left ands_of_ors ~init:true_
+      ~f:(fun ands ors ->
+        let ored = List.fold_left ors ~f:or_ ~init:false_ in
+        and_ ands ored
+      )
+  in
+  (* enable_smart_constructors := `On; *)
+  (* Log.print @@ lazy (Printf.sprintf "done. (size %i)" (size cnf)); *)
+  cnf
 
 
 let rec get_conjuncts b =
@@ -546,9 +596,8 @@ let qf_quickcheck_generator : t Generator.t =
          TBin (op,b1,b2)
         );
       ]
-    )                                    
+    )
   
-
 let quickcheck_shrinker : t Shrinker.t = Shrinker.atomic
   
 let rec well_formed b =
@@ -582,14 +631,6 @@ let equivalence a b =
   let bvars = vars b |> Util.uncurry (@) in
   dumb (fun () -> iff_ (forall avars a) (forall bvars b))
   
-
-let rec size = function
-  | TFalse | TTrue -> 1
-  | TComp (_,e1,e2) -> Expr.size e1 + 1 + Expr.size e2
-  | TNot b -> size b + 1
-  | TBin (_, a, b) -> 1 + size a + size b
-  | Forall (vs, b) | Exists (vs, b) ->
-     1 + List.length vs + size b
     
 let rec qf = function
   | TFalse

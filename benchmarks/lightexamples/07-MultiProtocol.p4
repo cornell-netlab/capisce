@@ -135,10 +135,9 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
     }
     @name(".start") state start {
         packet.extract(hdr.ethernet);
-        // transition accept;
         transition select(hdr.ethernet.etherType) {
-            // 16w0x8100: parse_vlan_tag;
-            // 16w0x9100: parse_vlan_tag;
+            16w0x8100: parse_vlan_tag;
+            16w0x9100: parse_vlan_tag;
             16w0x800: parse_ipv4;
             16w0x86dd: parse_ipv6;
             default: accept;
@@ -257,14 +256,11 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         }
     }
     apply {
-      // assume (hdr.ethernet.isValid());
-      // assert (hdr.ethernet.isValid());
-      // ethertype_match.apply();
         switch (ethertype_match.apply().action_run) {
             ipv4_packet: {
                 ipv4_match.apply();
             }
-            mpls_packet:
+            mpls_packet: 
             ipv6_packet: {
                 ipv6_match.apply();
             }
@@ -275,17 +271,15 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         if (hdr.tcp.isValid()) {
             tcp_check.apply();
         } else {
-           // standard_metadata.egress_spec = 9w511;
-            // if (hdr.udp.isValid()) {
-            //     udp_check.apply();
-            // } else {
-            //     if (hdr.icmp.isValid()) {
-            //         icmp_check.apply();
-            //     }
-            // }
+            if (hdr.udp.isValid()) {
+                udp_check.apply();
+            } else {
+                if (hdr.icmp.isValid()) {
+                    icmp_check.apply();
+                }
+            }
         }
-        // set_egress.apply();
-        // standard_metadata.egress_spec = 9w511;
+        set_egress.apply();
     }
 }
 

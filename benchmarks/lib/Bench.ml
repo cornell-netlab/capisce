@@ -54,8 +54,7 @@ let doesnt_contain_any s subs =
 let success s =
   doesnt_contain_any s ["error"; "unknown"; "UNKNOWN"; "timeout"; "Killed"]
 
-let qf s =
-  doesnt_contain_any s ["forall"; "exists"]
+let qf s = doesnt_contain_any s ["forall"; "exists"]
   
 let answer_ok s =
   success s
@@ -69,18 +68,24 @@ let log_row dur str size use_solver =
 let vc prog asst =
   Cmd.(vc (seq prog (assert_ asst)))
 
-let qe solver simpl body c =        
+let qe solver simpl body c =
+  Log.print @@ lazy ("getting vars");
   let (dvs,cvs) = BExpr.vars body in
+  Log.print @@ lazy ("adding smart? forall");
   let phi =  BExpr.forall dvs body in
+  Log.print @@ lazy ("simplifying");
   let phi = if simpl then BExpr.simplify phi else phi in
-  let size = BExpr.size phi in
+  let size = -1 in
+  Log.print @@ lazy ("checking if phi is qf");
   if BExpr.qf phi then
+    let () = Log.print @@ lazy ("it is, stringify") in
     let res = BExpr.to_smtlib phi in
     let dur = Clock.stop c in
     log_row dur res size false;
     (dur, res, size, false)
   else    
     (* let phi_str = BExpr.to_smtlib phi in *)
+    let () = Log.print @@ lazy ("it aint, call solver") in    
     let res = solver dvs cvs phi in
     let dur = Clock.stop c in
     log_row dur res size true;
@@ -120,6 +125,9 @@ let solve solver cvs smt =
   | `Z3 ->
      Log.print @@ lazy "Z3";
      Solver.run_z3 (Smt.assert_apply_str cvs smt)
+  | `Z3Light ->
+     Log.print @@ lazy "Z3";
+     Solver.run_z3 (Smt.assert_apply_light_str cvs smt)
   | `CVC4 ->
      Log.print @@ lazy "CVC4";
      Solver.run_cvc4 (Smt.simplify_str cvs smt)
@@ -127,7 +135,7 @@ let solve solver cvs smt =
 let normalize solver dvs res =
   if success res then
       match solver with
-      | `Z3 ->
+      | `Z3 | `Z3Light ->
          let goals = Solver.extract_z3_goals res in
          if String.is_substring goals ~substring:":precision" then
            "true"
@@ -154,7 +162,7 @@ let rec solver_fixpoint_str gas solvers dvs cvs (smt : string) : string =
        failwith "Ran out of solvers to try"
     | solver :: solvers' ->
        let res = normalize solver dvs (solve solver cvs' smt) in
-       if qf res || String.(res = smt) then
+       if qf res then
          res
        else
          solver_fixpoint_str (gas-1) (solvers'@[solver]) dvs' cvs' res
@@ -163,20 +171,20 @@ let solver_fixpoint gas solvers dvs cvs phi =
     BExpr.to_smtlib phi
     |> solver_fixpoint_str gas solvers dvs cvs        
 
-let cvc4_z3_fix gas simpl (prog, asst) =
+let cvc4_z3_fix gas solvers simpl (prog, asst) =
   let c = Clock.start () in
   Log.print @@ lazy "computing wp...";
   let body = vc prog asst in
-  Log.print @@ lazy "getting variables";
-  qe (solver_fixpoint gas [`Z3; `CVC4]) simpl body c
+  Log.print @@ lazy "solving";
+  qe (solver_fixpoint gas solvers) simpl body c
 
-let cnf_fix_infer gas simpl (prog, asst) =
+let cnf_fix_infer gas solvers simpl (prog, asst) =
   let c = Clock.start () in
   Log.print @@ lazy "computing wps";
   let bodies = BExpr.get_conjuncts (vc prog asst) in
   let qe_bodies =
     List.fold bodies ~init:"" ~f:(fun acc body ->
-        let (_,res,_,_) = qe (solver_fixpoint gas [`Z3; `CVC4]) simpl body (Clock.start()) in
+        let (_,res,_,_) = qe (solver_fixpoint gas solvers) simpl body (Clock.start()) in
         Printf.sprintf "%s\n\t%s" acc res
       ) in
   (Clock.stop c,

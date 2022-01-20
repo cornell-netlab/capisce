@@ -96,13 +96,17 @@ let infer : Command.t =
          unroll_opt = flag "-u" (optional int) ~doc:"how much to unroll the parser" and
          no_smart = flag "--disable-smart" no_arg ~doc:"disable smart constructors" and
          check_only = flag "--check-only" no_arg ~doc:"simply check the existence of a solution" and
-         skip_check = flag "--skip-check" no_arg ~doc:"dont check whether a solution exists"
+         skip_check = flag "--skip-check" no_arg ~doc:"dont check whether a solution exists" and
+         iter = flag "--iter" no_arg ~doc:"use iterative solution" and
+         fix_opt = flag "--fix" (optional int) ~doc:"the number of iterations before finishing" and
+         solvers = flag "-s" (listed string) ~doc:"solving order"
          in
          fun () ->         
          Pbench.Log.debug := debug;
          Pbench.BExpr.enable_smart_constructors := if no_smart then `Off else `On;
          let gas = Option.value gas_opt ~default:1000 in
          let unroll = Option.value unroll_opt ~default:10 in
+         let fix = Option.value fix_opt ~default:4 in
          let cmd = Pbench.P4Parse.as_cmd_from_file includes source gas unroll debug in
          let cmd = Pbench.Cmd.optimize cmd in
          Pbench.Log.print @@ lazy (Pbench.Cmd.to_string cmd);
@@ -123,10 +127,17 @@ let infer : Command.t =
                (if called_solver then "" else "out")
                res
            else
+             let solvers = List.map solvers ~f:(function 
+                               | "CVC4" | "cvc4" | "c" -> `CVC4
+                               | "Z3" | "z3" | "z" -> `Z3
+                               | "z3-light" | "light" | "qe-light" -> `Z3Light
+                               |  _ -> failwith "unrecognized qe solver" ) in
              let (inf_dur, inf_res, _, inf_called_solver) =
                (* Bench.z3_infer false (cmd, Pbench.BExpr.true_) *)
-               Bench.cvc4_z3_fix 4 false (cmd, Pbench.BExpr.true_)
-               (* Bench.cnf_fix_infer 4 false (cmd, Pbench.BExpr.true_)  *)
+               if iter then
+                 Bench.cnf_fix_infer fix solvers false (cmd, Pbench.BExpr.true_)
+               else
+                 Bench.cvc4_z3_fix fix solvers false (cmd, Pbench.BExpr.true_)
              in
              Printf.printf "Done in %fms with%s calling the solver in inference phase. Got: \n%s\n%!"
                (Time.Span.(to_ms (inf_dur + dur)))

@@ -121,10 +121,12 @@ let uelim sign vs e1 e2 =
      false
                
 let static_eq e1 e2 =
-  match e1, e2 with
-  | BV (v1,_), BV(v2,_) ->
-     Some Bigint.(v1 = v2)
-  | _, _ -> None
+  if equal e1 e2 then
+    Some true
+  else match e1, e2 with
+       | BV (v1,_), BV(v2,_) ->
+          Some Bigint.(v1 = v2)
+       | _, _ -> None
 
 let rec fun_subst f e =
   match e with

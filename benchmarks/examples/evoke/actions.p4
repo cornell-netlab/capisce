@@ -14,11 +14,6 @@ header ethernet_t {
     bit<16> etherType;
 }
 
-header icmp_t {
-    bit<16> typeCode;
-    bit<16> hdrChecksum;
-}
-
 header ipv4_t {
     bit<4>  version;
     bit<4>  ihl;
@@ -34,44 +29,6 @@ header ipv4_t {
     bit<32> dstAddr;
 }
 
-header ipv6_t {
-    bit<4>   version;
-    bit<8>   trafficClass;
-    bit<20>  flowLabel;
-    bit<16>  payloadLen;
-    bit<8>   nextHdr;
-    bit<8>   hopLimit;
-    bit<128> srcAddr;
-    bit<128> dstAddr;
-}
-
-header tcp_t {
-    bit<16> srcPort;
-    bit<16> dstPort;
-    bit<32> seqNo;
-    bit<32> ackNo;
-    bit<4>  dataOffset;
-    bit<4>  res;
-    bit<8>  flags;
-    bit<16> window;
-    bit<16> checksum;
-    bit<16> urgentPtr;
-}
-
-header udp_t {
-    bit<16> srcPort;
-    bit<16> dstPort;
-    bit<16> length_;
-    bit<16> checksum;
-}
-
-header vlan_tag_t {
-    bit<3>  pcp;
-    bit<1>  cfi;
-    bit<12> vid;
-    bit<16> etherType;
-}
-
 struct metadata {
     @name(".ing_metadata") 
     ingress_metadata_t ing_metadata;
@@ -80,18 +37,9 @@ struct metadata {
 struct headers {
     @name(".ethernet") 
     ethernet_t ethernet;
-    @name(".icmp") 
-    icmp_t     icmp;
-    @name(".ipv4") 
+    @name(".ipv4")
     ipv4_t     ipv4;
-    @name(".ipv6") 
-    ipv6_t     ipv6;
-    @name(".tcp") 
-    tcp_t      tcp;
-    @name(".udp") 
-    udp_t      udp;
-    @name(".vlan_tag") 
-    vlan_tag_t vlan_tag;
+    ipv4_t     ipv4_2;
 }
 
 parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
@@ -113,38 +61,23 @@ control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t
 }
 
 control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    action l2_packet() {
-        meta.ing_metadata.packet_type = 4w0;
+    action drop_() { standard_metadata.egress_spec = 9w511; }
+    action validate_2() { hdr.ipv4_2.setValid();  }
+    action use_2() {hdr.ipv4_2.ttl = hdr.ipv4_2.ttl - 8w1; }
+
+    table t1 {
+          key = { hdr.ethernet.etherType : exact; }
+          actions = { validate_2; drop_; }
     }
-     action ipv4_packet() {
-        meta.ing_metadata.packet_type = 4w1;
+    table t2 {
+          key = { hdr.ethernet.srcAddr : exact; }
+          actions = { use_2; drop_; }
     }
-    action drop_() { mark_to_drop(standard_metadata); }
-    action ipv4_fwd(bit<9> port) {
-      hdr.ipv4.ttl = hdr.ipv4.ttl - 8w1;
-      standard_metadata.egress_spec = port;
-    }
-    table ethernet {
-        actions = {
-            l2_packet;
-            ipv4_packet;
-        }
-        key = {
-            hdr.ethernet.etherType: exact;
-        }
-    }
-    table fwd {
-        actions = {
-            drop_;
-            ipv4_fwd;
-        }
-        key = {
-            meta.ing_metadata.packet_type : exact;
-        }
-    }
+
     apply {
-      ethernet.apply();
-      fwd.apply();
+      t1.apply();
+      t2.apply();
+      standard_metadata.egress_spec = 9w5;
     }
 }
 

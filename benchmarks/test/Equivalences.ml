@@ -18,7 +18,8 @@ let log_eq b1 b2 =
   z3_returned_sat res
 
 let bexpr = Alcotest.testable (Fmt.of_to_string BExpr.to_smtlib) (BExpr.(=))
-let smt_equiv = Alcotest.testable (Fmt.of_to_string BExpr.to_smtlib) (log_eq) 
+let smt_equiv = Alcotest.testable (Fmt.of_to_string BExpr.to_smtlib) (log_eq)
+let cmd = Alcotest.testable (Fmt.of_to_string Cmd.to_string) (Cmd.equal)              
 
 let z3_config =
   let open Sequence in

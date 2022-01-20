@@ -66,7 +66,7 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
      action ipv4_packet() {
         meta.ing_metadata.packet_type = 4w1;
     }
-    action drop_() { meta.ing_metadata.drop = 1w1; }
+    action drop_() { mark_to_drop(standard_metadata); }
     action ipv4_fwd(bit<9> port) {
       hdr.ipv4.ttl = hdr.ipv4.ttl - 8w1;
       standard_metadata.egress_spec = port;
@@ -92,9 +92,6 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
     apply {
       ethernet.apply();
       fwd.apply();
-      if (meta.ing_metadata.drop == 1w1) {
-         mark_to_drop(standard_metadata);
-      }
     }
 }
 

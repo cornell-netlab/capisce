@@ -55,8 +55,11 @@ let choice c1 c2 =
     c1
   else if equal c1 abort || equal c2 abort then
     abort
-  else
-    Choice(c1,c2)              
+  else match c1, c2 with
+       | Assume b1, Assume b2 when BExpr.(b1 = not_ b2 || not_ b1 = b2) ->   
+          skip
+       | _ ->      
+          Choice(c1,c2)              
 
 let rec sequence cs =
   match cs with
@@ -370,7 +373,6 @@ let rec dead_code_elim_aux c (reads : VarSet.t) : (t * VarSet.t) =
 
 let dead_code_elim c = fst (dead_code_elim_aux c VarSet.empty)  
 
-
 let rec fix f x =
   let x' = f x in
   if equal x' x then
@@ -383,8 +385,16 @@ let optimize c =
   fix o c
                      
 let vc (c : t) : BExpr.t =
-  let o = optimize c in
-  let p = passify o in
-  let w = wrong p in
-  BExpr.(cnf (not_ w))
+  optimize c
+  |> passify
+  |> wrong
+  |> BExpr.not_
+  |> BExpr.cnf
+  |> BExpr.simplify
+  
+  (* let o = optimize c in
+   * let p = passify o in
+   * let w = BExpr.not_ (wrong p) in
+   * let c = BExpr.cnf w in
+   * BExpr.simplify c *)
   (* wp p BExpr.true_ *)
