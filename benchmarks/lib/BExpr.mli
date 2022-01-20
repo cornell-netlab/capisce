@@ -40,6 +40,7 @@ val fun_subst : (Var.t -> Expr.t) -> t -> t
 (** [fun_subst f b] substitutes b according to function [f] *)  
 
 val vars : t -> Var.t list * Var.t list
+val compute_vars : t -> Var.t list * Var.t list  
                   
 val index_subst : Subst.t option -> t -> t
 

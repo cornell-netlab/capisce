@@ -552,6 +552,23 @@ let rsl_bug_dumbeq () =
   let simpl () = or_ (forall [v] (not_ b1)) b2 in
   Alcotest.(check smt_equiv) "logically equivalent" (dumb simpl) (orig ())
   
+
+
+let cached_vars () =
+  Test.run_exn
+    ~config:{Test.default_config with test_count = 100000}
+    (module BExpr)
+    ~f:(fun b ->
+      let open BExpr in
+      let sort = List.dedup_and_sort ~compare:Var.compare in
+      let normalize (dvs,cvs) = (sort dvs, sort cvs) in
+      let b = simplify b in
+      let cached_vars = vars b |> normalize in
+      let computed_vars = compute_vars b |> normalize in
+      Alcotest.(check (pair (list var) (list var)))
+        "set-like equivalent pairs" computed_vars cached_vars
+    )
+
   
 let tests =
   [
@@ -594,7 +611,8 @@ let tests =
     Alcotest.test_case "QC unused_u_var" `Quick unused_u_var;
     Alcotest.test_case "QC unused_e_var" `Quick unused_e_var;
     Alcotest.test_case "QC univ_eq" `Quick univ_eq;
-    Alcotest.test_case "QC univ_neq" `Quick univ_neq;    
+    Alcotest.test_case "QC univ_neq" `Quick univ_neq;
+    Alcotest.test_case "QC cached_vars" `Quick cached_vars;
   ]
 
   

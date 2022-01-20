@@ -88,6 +88,7 @@ let qe solver simpl body c =
     let () = Log.print @@ lazy ("it aint, call solver") in    
     let res = solver dvs cvs phi in
     let dur = Clock.stop c in
+    let () = Log.print @@ lazy (Printf.sprintf "called, %fms" (Time.Span.to_ms dur)) in
     log_row dur res size true;
     (dur, res, size, true)
 
@@ -155,8 +156,10 @@ let normalize solver dvs res =
       
 let rec solver_fixpoint_str gas solvers dvs cvs (smt : string) : string =
   if gas <= 0 then smt else
+    let () = Log.print @@ lazy (Printf.sprintf "checking if vars %i are used in string of size %i" (List.length (dvs @ cvs)) (String.length smt)) in
     let dvs' = List.filter dvs ~f:(var_still_used smt) in
     let cvs' = List.filter cvs ~f:(var_still_used smt) in
+    let () = Log.print @@ lazy "\tdone" in 
     match solvers with
     | [] ->
        failwith "Ran out of solvers to try"
@@ -168,8 +171,9 @@ let rec solver_fixpoint_str gas solvers dvs cvs (smt : string) : string =
          solver_fixpoint_str (gas-1) (solvers'@[solver]) dvs' cvs' res
 
 let solver_fixpoint gas solvers dvs cvs phi =
-    BExpr.to_smtlib phi
-    |> solver_fixpoint_str gas solvers dvs cvs        
+  let () = Log.print @@ lazy "serializing to smt" in
+  BExpr.to_smtlib phi
+  |> solver_fixpoint_str gas solvers dvs cvs        
 
 let cvc4_z3_fix gas solvers simpl (prog, asst) =
   let c = Clock.start () in

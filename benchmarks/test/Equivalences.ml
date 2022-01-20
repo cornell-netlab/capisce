@@ -20,7 +20,8 @@ let log_eq b1 b2 =
 let bexpr = Alcotest.testable (Fmt.of_to_string BExpr.to_smtlib) (BExpr.(=))
 let smt_equiv = Alcotest.testable (Fmt.of_to_string BExpr.to_smtlib) (log_eq)
 let cmd = Alcotest.testable (Fmt.of_to_string Cmd.to_string) (Cmd.equal)              
-
+let var = Alcotest.testable (Fmt.of_to_string Var.str) (Var.equal)
+        
 let z3_config =
   let open Sequence in
   let open Test.Config in
