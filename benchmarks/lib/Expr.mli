@@ -36,8 +36,8 @@ val index_subst : Subst.t option -> t -> t
 val normalize_names : t -> t  
 
 val uelim : [`Neq | `Eq] -> Var.t list -> t -> t -> bool
-(** [uelim sign vs e1 e2] heuristically determines whether we can falsify [forall vs (e1 sign e2)] *)
-
+(** [uelim sign vs e1 e2] heuristically determines whether we can falsify [forall vs (e1 sign e2)] *)  
+  
 val well_formed : t -> bool
 (** [well_formed e] returns true iff the variables are well-formed and no bitvector has negative length *)
 

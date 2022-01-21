@@ -137,7 +137,7 @@ let reduce_scope_right () =
 
 let one_point_rule_imp () =
   Test.run_exn
-    ~config:{z3_config with test_count = 200}
+    ~config:{z3_config with test_count = 100}
     (module struct
        type t = Var.t * Expr.t * BExpr.t [@@deriving quickcheck, sexp]
        let quickcheck_generator : t Generator.t =
@@ -178,6 +178,48 @@ let one_point_rule_or_not_left () =
       let phi () = forall [x] (or_ (not_ (eq_ (var x) e)) b) in
       Alcotest.(check smt_equiv) "logically equivalent" (dumb phi) (phi ())
     )
+
+let one_point_rule_or_not_left_bug () =
+      let open BExpr in
+      let open Expr in
+      let x = Var.make "kk" 32 in
+      let e = var (Var.make "jy" 32) in 
+      let b () =
+        (ule_
+           (shl_ (bnot (badd (bvi 2839304728 32) (var (Var.make "rl" 32))))
+              (bnot (bnot (var (Var.make "uh" 32)))))
+           (badd
+              (ashr_ (bnot (bvi 24086778 32))
+                 (bnot (var (Var.make "ns" 32))))
+              (var (Var.make "jy" 32))))
+      in
+      let phi _u_ = forall [x] (or_ (not_ (eq_ (var x) e)) (b _u_)) in
+      Alcotest.(check smt_equiv) "logically equivalent" (dumb phi) (phi ())
+
+let funky_one_point_concrete () =
+      let open Expr in
+      let open BExpr in
+      let x = Var.make "kk" 32 in
+      let e = var (Var.make "jy" 32) in 
+      let b () =
+        (ule_
+           (var (Var.make "rl" 32))
+           (var x))
+      in
+      let b' _u_ = one_point_rule (var x) e (b _u_) in 
+      let expected () =
+          (ule_
+             (var (Var.make "rl" 32))
+             e) in
+      Alcotest.(check bexpr_sexp)  "syntactically equivalent" (expected ()) (b' ())
+
+      
+(* `(Forall(kk 32)
+ *   (TBin LOr(TNot(TComp
+ *                     Eq(Var(kk 32))(Var(jy 32))@@((jy 32)(kk 32)))@@((jy 32)(kk 32)))
+ *            (TComp Ule(Var(rl 32))(Var(kk 32))@@((kk 32)(rl 32))) 
+              @@((jy 32)(kk 32)(rl 32))))' *)
+
 
 let one_point_rule_or_not_right () =
   Test.run_exn
@@ -329,7 +371,7 @@ let buggy_qc_example_literal () =
            (eq_ (bsub (bvi 5371006 32) (bnot (bvi 1 32))) (var z)))) in
   let expected =
     dumb @@ fun () ->
-              (or_ (exists [a] (eq_ (var a) (bvi 264974479 32)))
+              (imp_ (not_ (exists [a] (eq_ (var a) (bvi 264974479 32))))
                  (forall [z] (iff_ false_ (eq_ (bsub (bvi 5371006 32) (bnot (bvi 1 32))) (var z)))))
   in
   Alcotest.(check bexpr) "literally equivalent" expected got
@@ -553,7 +595,6 @@ let rsl_bug_dumbeq () =
   Alcotest.(check smt_equiv) "logically equivalent" (dumb simpl) (orig ())
   
 
-
 let cached_vars () =
   Test.run_exn
     ~config:{Test.default_config with test_count = 100000}
@@ -569,12 +610,34 @@ let cached_vars () =
         "set-like equivalent pairs" computed_vars cached_vars
     )
 
+let cached_vars_ule_example () =
+  let open BExpr in
+  let sort = List.dedup_and_sort ~compare:Var.compare in
+  let normalize (dvs,cvs) = (sort dvs, sort cvs) in
+  let b =
+    let open Expr in
+    (ule_
+       (shl_ (bnot (badd (bvi 2839304728 32) (var (Var.make "rl" 32))))
+          (bnot (bnot (var (Var.make "uh" 32)))))
+       (badd
+          (ashr_ (bnot (bvi 24086778 32))
+             (bnot (var (Var.make "ns" 32))))
+          (var (Var.make "jy" 32))))
+  in
+  let cached_vars = vars b |> normalize in
+  let computed_vars = compute_vars b |> normalize in
+  Alcotest.(check (pair (list var) (list var)))
+    "set-like equivalent pairs" computed_vars cached_vars
+
   
 let tests =
   [
     Alcotest.test_case "Variable Generator is well-formed" `Quick well_formed_var;
     Alcotest.test_case "Expression Generator is well-formed" `Quick well_formed_expr;
     Alcotest.test_case "Boolean Generator is well-formed" `Quick well_formed_bexpr;
+    Alcotest.test_case "∀ kk. ¬(kk = jy) ∨ e(kk,jy,...)" `Quick one_point_rule_or_not_left_bug;
+    Alcotest.test_case "computed vars are cached e" `Quick cached_vars_ule_example;
+    Alcotest.test_case "one-point-style substitution works" `Quick funky_one_point_concrete;    
     Alcotest.test_case "QE buggy example" `Quick and_not_example;
     Alcotest.test_case "simplify((φ⇒⊥) ∧ ⊤) = ¬φ" `Quick and_not_example_literal;
     Alcotest.test_case "simplify(¬∀z. z=4 ⇒ (∀ a. 73722014=a)) ≡ ¬∀z. z=4 ⇒ (∀ a. 73722014=a)" `Quick nested_foralls;

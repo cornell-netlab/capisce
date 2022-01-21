@@ -185,12 +185,18 @@ let cvc4_z3_fix gas solvers simpl (prog, asst) =
 let cnf_fix_infer gas solvers simpl (prog, asst) =
   let c = Clock.start () in
   Log.print @@ lazy "computing wps";
-  let bodies = BExpr.get_conjuncts (vc prog asst) in
+  (* let bodies = BExpr.get_conjuncts (vc prog asst) in *)
+  let bodies = List.map (Cmd.pathify prog) ~f:(fun p -> vc p asst) in 
+  let count = ref 0 in
+  let total = List.length bodies in
   let qe_bodies =
-    List.fold bodies ~init:"" ~f:(fun acc body ->
+    List.fold bodies ~init:"" ~f:(fun acc body ->        
         let (_,res,_,_) = qe (solver_fixpoint gas solvers) simpl body (Clock.start()) in
+        count := !count + 1;
+        Printf.printf "%d out of %d analyzed\r%!" !count total;        
         Printf.sprintf "%s\n\t%s" acc res
       ) in
+  Printf.printf "\n%!";
   (Clock.stop c,
    Printf.sprintf "(and %s)" qe_bodies,
    -1,

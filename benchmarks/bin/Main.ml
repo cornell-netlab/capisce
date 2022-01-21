@@ -75,14 +75,14 @@ let compile : Command.t =
        let unroll = Option.value unroll_opt ~default:10 in
        let cmd = Pbench.P4Parse.as_cmd_from_file includes source gas unroll false in
        let cmd_o = Pbench.Cmd.optimize cmd in 
-       let cmd_p = Pbench.Cmd.passify cmd in
+       let cmd_p = Pbench.Cmd.passify cmd_o in
        Printf.printf "GCL program:\n%s\n\n%!" @@ Pbench.Cmd.to_string cmd;
        Printf.printf "ConstProp'd:\n%s\n\n%!" @@ Pbench.Cmd.to_string cmd_o;
        Printf.printf "Passified:\n%s \n%!" @@ Pbench.Cmd.to_string cmd_p;
        Printf.printf "\n And its VC: \n %s\n"
        @@ Pbench.BExpr.to_smtlib
        (* @@ Pbench.Cmd.wp cmd Pbench.BExpr.true_ *)
-       @@ Pbench.Cmd.vc cmd_o
+       @@ Pbench.Cmd.vc cmd
     ]
        
 let infer : Command.t =
@@ -137,7 +137,7 @@ let infer : Command.t =
                if iter then
                  Bench.cnf_fix_infer fix solvers false (cmd, Pbench.BExpr.true_)
                else
-                 Bench.cvc4_z3_fix fix solvers false (cmd, Pbench.BExpr.true_)
+                 Bench.cvc4_z3_fix fix solvers true (cmd, Pbench.BExpr.true_)
              in
              Printf.printf "Done in %fms with%s calling the solver in inference phase. Got: \n%s\n%!"
                (Time.Span.(to_ms (inf_dur + dur)))

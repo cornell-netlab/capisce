@@ -1,6 +1,7 @@
 type t [@@deriving eq]
 
 val to_string : t -> string
+val size : t -> int  
    
 val assume : BExpr.t -> t
 val assert_ : BExpr.t -> t
@@ -26,9 +27,10 @@ val wp : t -> BExpr.t -> BExpr.t
 val wrong : t -> BExpr.t
 val vc : t -> BExpr.t
 val optimize : t -> t
+val passify : t -> t  
+val pathify : t -> t list  
   
 val assert_slices : t -> t list
 
 val normalize_names : t -> t
 
-val passify : t -> t                             

@@ -12,8 +12,12 @@ let cnf_foils () =
   let b = prop "b" in
   let c = prop "c" in
   let d = prop "d" in
+  Pbench.BExpr.enable_smart_constructors := `Off;
   let phi = BExpr.(or_ (and_ a b) (and_ c d)) in
-  Alcotest.(check smt_equiv) "logically equivalent" phi (cnf phi)
+  let exp = BExpr.(and_ (and_ (and_ (or_ c a) (or_ c b)) (or_ a d)) (or_ b d)) in
+  let cphi = cnf phi in 
+  Pbench.BExpr.enable_smart_constructors := `On;
+  Alcotest.(check smt_equiv) "logically equivalent" exp cphi
 
 let cnf_equiv () =
   Test.run_exn
@@ -22,7 +26,7 @@ let cnf_equiv () =
        let quickcheck_generator : t Generator.t =
          BExpr.qf_quickcheck_generator
     end)
-    ~config:{z3_config with test_count = 1000}
+    ~config:{z3_config with test_count = 100}
     ~f:(fun b ->
       [%test_pred: BExpr.t] (log_eq b) (BExpr.cnf b))
 

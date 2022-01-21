@@ -25,7 +25,17 @@ let rec to_string_aux indent (c : t) : string =
      sprintf "%s{\n%s\n%s} [] {\n%s\n%s}" space (to_string_aux (indent+2) c1) space (to_string_aux (indent+2) c2) space
 
 let to_string = to_string_aux 0    
-    
+
+let rec size = function
+  | Assume t
+  | Assert (t,_) -> 1 + BExpr.size t
+  | Assign (_,e) ->
+     1 + Expr.size e
+  | Havoc _ -> 1
+  | Seq (c1,c2) ->
+     size c1 + 1 + size c2
+  | Choice (c1,c2) ->
+     size c1 + 1 + size c2
 
 (** Smart Constructors *)
 let assume t = Assume t
@@ -318,9 +328,9 @@ let rec const_prop_aux (f : Facts.t) (c : t) =
      let e = Expr.fun_subst (Facts.lookup f) e in 
      (Facts.update f x e, assign x e)
   | Assert (b, id) ->
-     Log.print @@ lazy (Printf.sprintf "substitute %s using: %s\n" (to_string c) (Facts.to_string f));
+     (* Log.print @@ lazy (Printf.sprintf "substitute %s using: %s\n" (to_string c) (Facts.to_string f)); *)
      let b = BExpr.fun_subst (Facts.lookup f) b in
-     Log.print @@ lazy (Printf.sprintf "Got assert(%s)\n" (BExpr.to_smtlib b));
+     (* Log.print @@ lazy (Printf.sprintf "Got assert(%s)\n" (BExpr.to_smtlib b)); *)
      (f, Assert (b,id))
   | Assume b ->
      let b = BExpr.fun_subst (Facts.lookup f) b in
@@ -333,8 +343,8 @@ let rec const_prop_aux (f : Facts.t) (c : t) =
      let f1, c1 = const_prop_aux f c1 in
      let f2, c2 = const_prop_aux f c2 in
      let f = Facts.merge f1 f2 in
-     Log.print @@ lazy (Printf.sprintf "After []:\n%s \n"
-                          (Facts.to_string f));
+     (* Log.print @@ lazy (Printf.sprintf "After []:\n%s \n"
+      *                      (Facts.to_string f)); *)
      (f, choice c1 c2)
   
   
@@ -383,14 +393,37 @@ let rec fix f x =
 let optimize c =
   let o c = dead_code_elim (const_prop c) in 
   fix o c
-                     
+
+
+let rec pathify_inner (c : t) : t list list =
+  match c with
+  | Assign _ -> [[c]]
+  | Assume _
+    | Assert _
+    | Havoc _ -> [[c]]
+  | Seq (c1,c2) ->
+     let open List.Let_syntax in
+     let%bind seq1 = pathify_inner c1 in
+     let%map seq2 = pathify_inner c2 in
+     seq1@seq2
+  | Choice (c1,c2) ->
+     pathify_inner c1 @ pathify_inner c2
+
+let pathify (c : t) =
+  let paths = pathify_inner c in
+  Printf.printf "There are %d paths\n%!" (List.length paths);
+  List.map paths ~f:sequence
+    
+  
+  
 let vc (c : t) : BExpr.t =
-  optimize c
-  |> passify
+  let o = optimize c in
+  passify o
   |> wrong
   |> BExpr.not_
-  |> BExpr.cnf
-  |> BExpr.simplify
+  |> BExpr.nnf
+  (* |> BExpr.cnf *)
+  |> BExpr.simplify 
   
   (* let o = optimize c in
    * let p = passify o in

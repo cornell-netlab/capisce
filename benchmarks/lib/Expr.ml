@@ -83,7 +83,16 @@ let get_var = function
   | Var x -> x
   | e -> failwith ("tried to get_var of a non-var expression " ^ to_smtlib e)
   
-let band e1 e2 = BinOp(BAnd, e1, e2)
+let band e1 e2 =
+  match e1, e2 with
+  | BV(i,w), _ | _, BV(i,w)->
+     if Bigint.(i = zero) then
+       bv i w
+     else
+       BinOp(BAnd, e1, e2)
+  | _,_ ->
+     BinOp(BAnd, e1, e2)
+     
 let bor e1 e2 = BinOp(BOr, e1, e2)
 let badd e1 e2 = BinOp(BAdd, e1, e2)              
 let bmul e1 e2 = BinOp(BMul, e1, e2)

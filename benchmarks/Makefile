@@ -14,9 +14,9 @@ clean:
 test: all
 	bash ./testbf4.sh
 
-check:
+check: all
 	dune build ./test/tests.exe && ./_build/default/test/tests.exe
 
-check-q:
+check-q: all
 	dune build ./test/tests.exe && ./_build/default/test/tests.exe -q
 # end

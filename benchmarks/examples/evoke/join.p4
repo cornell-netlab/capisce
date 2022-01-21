@@ -44,8 +44,11 @@ struct headers {
 parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
     @name(".parse_ipv4") state parse_ipv4 {
         packet.extract(hdr.ipv4);
+        transition accept;
     }
     @name(".start") state start {
+        hdr.ethernet.setInvalid();
+        hdr.ipv4.setInvalid();
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
             16w0x800: parse_ipv4;

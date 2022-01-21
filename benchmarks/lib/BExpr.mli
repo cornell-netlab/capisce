@@ -39,6 +39,8 @@ val subst : Var.t -> Expr.t -> t -> t
 val fun_subst : (Var.t -> Expr.t) -> t -> t
 (** [fun_subst f b] substitutes b according to function [f] *)  
 
+val one_point_rule : Expr.t -> Expr.t -> t -> t
+  
 val vars : t -> Var.t list * Var.t list
 val compute_vars : t -> Var.t list * Var.t list  
                   
@@ -55,7 +57,7 @@ val get_conjuncts : t -> t list
   
 val label : Context.t -> t -> t
 
-val equivalence : t -> t -> t                         
+val equivalence : t -> t -> t
 
 val qf_quickcheck_generator : t Generator.t
   
