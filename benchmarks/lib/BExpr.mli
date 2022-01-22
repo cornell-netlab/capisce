@@ -60,6 +60,10 @@ val label : Context.t -> t -> t
 val equivalence : t -> t -> t
 
 val qf_quickcheck_generator : t Generator.t
+
+val predicate_abstraction : t -> t
+val abstract_qvars : t -> string
+  
   
 (* FOR TESTING PURPOSES ONLY *)
 val dumb : (unit -> t) -> t

@@ -172,8 +172,13 @@ let rec solver_fixpoint_str gas solvers dvs cvs (smt : string) : string =
 
 let solver_fixpoint gas solvers dvs cvs phi =
   let () = Log.print @@ lazy "serializing to smt" in
-  BExpr.to_smtlib phi
-  |> solver_fixpoint_str gas solvers dvs cvs        
+  if true then  
+    let phi = BExpr.predicate_abstraction phi in
+    let str = Printf.sprintf "(forall (%s) %s)" (BExpr.abstract_qvars phi) (BExpr.to_smtlib phi) in
+    solver_fixpoint_str gas solvers [] cvs str
+  else
+    BExpr.to_smtlib phi
+    |> solver_fixpoint_str gas solvers dvs cvs        
 
 let cvc4_z3_fix gas solvers simpl (prog, asst) =
   let c = Clock.start () in
@@ -200,7 +205,7 @@ let cnf_fix_infer gas solvers simpl (prog, asst) =
   (Clock.stop c,
    Printf.sprintf "(and %s)" qe_bodies,
    -1,
-   true)
+   true) 
   
 
 let princess = exp ~f:princess_infer

@@ -42,6 +42,7 @@ let comp_to_smtlib = function
 type t =
   | TFalse
   | TTrue
+  | LVar of string
   | TNot of t * Var.t list
   | TBin of bop * t * t * Var.t list
   | TComp of comp * Expr.t * Expr.t * Var.t list
@@ -57,24 +58,33 @@ module Set_t = Set.Make (struct
                  let compare = compare
                end)
 
+module PredAbs = PredAbstract.Make (struct
+                 type t = s
+                 let sexp_of_t = sexp_of_t
+                 let t_of_sexp = t_of_sexp
+                 let compare = compare
+                   end)
+               
+             
 module SetOfSet_t = Set.Make (Set_t)           
 
 let (=) = equal
            
 let rec to_smtlib_buffer indent buff b : unit =
   let space = Util.space (2 * indent) in
+  Buffer.add_string buff space;
   match b with
   | TFalse ->
-     Buffer.add_string buff (Printf.sprintf "%sfalse" space)
+     Buffer.add_string buff "false"
   | TTrue ->
-     Buffer.add_string buff (Printf.sprintf "%strue" space)
+     Buffer.add_string buff "true"
+  | LVar a ->
+     Buffer.add_string buff a
   | TNot (t,_) ->
-     Buffer.add_string buff (Printf.sprintf "%s(not\n" space);
+     Buffer.add_string buff "(not\n";
      to_smtlib_buffer (indent + 1) buff t;
      Buffer.add_string buff ")";
-     
   | TBin (b,t1,t2,_) ->
-     Buffer.add_string buff space;
      Buffer.add_string buff "(";
      Buffer.add_string buff (bop_to_smtlib b);
      Buffer.add_string buff "\n";
@@ -83,7 +93,6 @@ let rec to_smtlib_buffer indent buff b : unit =
      to_smtlib_buffer (indent + 1) buff t2;
      Buffer.add_string buff ")";
   | TComp (comp, e1, e2,_) ->
-     Buffer.add_string buff space;
      Buffer.add_string buff "(";
      Buffer.add_string buff (comp_to_smtlib comp);
      Buffer.add_string buff " ";
@@ -92,12 +101,10 @@ let rec to_smtlib_buffer indent buff b : unit =
      Buffer.add_string buff (Expr.to_smtlib e2);
      Buffer.add_string buff ")"
   | Forall (v, t) ->
-     Buffer.add_string buff space;
      Buffer.add_string buff (Printf.sprintf "(forall (%s)\n" (Var.list_to_smtlib_quant [v]));
      to_smtlib_buffer (indent+1) buff t;
      Buffer.add_string buff ")"
   | Exists (v, t) ->
-     Buffer.add_string buff space;
      Buffer.add_string buff (Printf.sprintf "(exists (%s)\n" (Var.list_to_smtlib_quant [v]));
      to_smtlib_buffer (indent+1) buff t;
      Buffer.add_string buff ")"
@@ -105,6 +112,7 @@ let rec to_smtlib_buffer indent buff b : unit =
 
 let rec get_labelled_vars = function
   | TFalse | TTrue -> []
+  | LVar _ -> []
   | TNot (_,vs) 
     | TBin (_,_,_,vs)  
     | TComp (_,_,_,vs) -> vs
@@ -154,7 +162,7 @@ let binary_exp_vars e1 e2 =
   
 let rec fun_subst f t =
   match t with
-  | TFalse | TTrue ->
+  | TFalse | TTrue | LVar _ ->
      t
   | TNot (t, _) ->
      let t = fun_subst f t in
@@ -348,9 +356,10 @@ let varstime : float ref = ref 0.0
 
 let rec compute_vars (t : t) =
   match t with
-  | TFalse
-    | TTrue -> ([],[])
-  | TNot (t,_) -> compute_vars t
+  | TFalse | TTrue | LVar _ ->
+     ([],[])
+  | TNot (t,_) ->
+     compute_vars t
   | TBin (_, t1, t2,_) ->
      Var.(Util.pairs_app_dedup ~dedup (compute_vars t1) (compute_vars t2))
   | TComp (_, e1, e2, _) ->
@@ -376,7 +385,7 @@ let occurs_in x b =
   |> List.exists ~f:(Var.(=) x)
   
 let rec size = function
-  | TFalse | TTrue -> 1
+  | TFalse | TTrue | LVar _ -> 1
   | TComp (_,e1,e2,_) -> Expr.size e1 + 1 + Expr.size e2
   | TNot (b,_) -> size b + 1
   | TBin (_, a, b,_) -> 1 + size a + size b
@@ -387,12 +396,12 @@ let rec size = function
 let forall_one (x : Var.t) b =
   ctor2rec x b
     ~default:(fun x b ->
-      if Int.(Var.size x = 1 && (size b) < 100) then
-        let f bit y = if Var.(x = y) then Expr.bvi bit 1 else Expr.var y in
-        and_
-          (fun_subst (f 0) b)
-          (fun_subst (f 1) b)
-      else             
+      (* if Int.(Var.size x = 1 && (size b) < 100) then
+       *   let f bit y = if Var.(x = y) then Expr.bvi bit 1 else Expr.var y in
+       *   and_
+       *     (fun_subst (f 0) b)
+       *     (fun_subst (f 1) b)
+       * else              *)
         Forall(x,b))      
   (* ~smart:(Fn.const smart) *)
     ~smart:(fun self default x b ->
@@ -449,6 +458,7 @@ let exists x b = List.fold_right x ~init:b ~f:exists_one
 let rec simplify_inner = function
   | TFalse -> TFalse
   | TTrue -> TTrue
+  | LVar a -> LVar a
   | TNot (b,_) -> not_ (simplify_inner b)
   | TBin (op, b1, b2,_) ->
      get_smart op (simplify_inner b1) (simplify_inner b2)
@@ -480,8 +490,7 @@ let index_subst s_opt t : t =
 
 let rec label (ctx : Context.t) (b : t) : t =
   match b with
-  | TFalse -> TFalse
-  | TTrue -> TTrue
+  | TFalse | TTrue | LVar _ -> b
   | TNot (b, vars) -> TNot (label ctx b, vars)
   | TBin (bop, b1, b2, vars) ->
      TBin (bop, label ctx b1, label ctx b2, vars)
@@ -492,7 +501,7 @@ let rec label (ctx : Context.t) (b : t) : t =
 
 let rec nnf (b : t) : t = 
   match b with
-  | TFalse | TTrue -> b
+  | TFalse | TTrue | LVar _ -> b
   | TComp _ -> b
   | Forall (x, e) -> forall_one x (nnf e)
   | Exists (vs, e) -> exists_one vs (nnf e) 
@@ -509,6 +518,7 @@ let rec nnf (b : t) : t =
      match b with
      | TFalse -> TTrue
      | TTrue -> TFalse
+     | LVar _ -> TNot (b, [])
      | TNot (b,_) -> nnf b
      | TComp _ -> not_ b
      | Forall (vs, b) -> exists_one vs (nnf (not_ b))
@@ -521,7 +531,7 @@ let rec nnf (b : t) : t =
                        
 let rec cnf_inner (b : t) : t list list=
   match b with
-  | TFalse | TTrue | TComp _ ->
+  | TFalse | TTrue | LVar _ | TComp _ ->
      [[b]]
   | Forall _ ->
      failwith "I swear, you shouldnt use me"
@@ -642,14 +652,14 @@ let quickcheck_shrinker : t Shrinker.t = Shrinker.atomic
   
 let rec well_formed b =
   match b with
-  | TTrue | TFalse -> true
+  | TTrue | TFalse | LVar _ -> true
   | TComp (_,e1,e2,_) -> Expr.well_formed e1 && Expr.well_formed e2
   | TBin(_,b1,b2,_) -> well_formed b1 && well_formed b2
   | TNot (b,_) | Forall (_,b) | Exists(_,b) -> well_formed b
 
 let rec normalize_names b =
   match b with
-  | TTrue | TFalse -> b
+  | TTrue | TFalse | LVar _ -> b
   | TComp (comp,e1,e2,_) ->
      let e1' = Expr.normalize_names e1 in
      let e2' = Expr.normalize_names e2 in
@@ -666,8 +676,6 @@ let rec normalize_names b =
   | Exists(x,b) ->
      Exists (Var.normalize_name x, normalize_names b)
   
-                                         
-
 let equivalence a b =
   let avars = vars a |> Util.uncurry (@) in
   let bvars = vars b |> Util.uncurry (@) in
@@ -678,9 +686,57 @@ let rec qf = function
   | TFalse
     | TTrue
     | TComp _ -> true
+  | LVar _ -> false
   | TNot (b,_) -> qf b
   | TBin (_,a,b,_) -> qf a && qf b
   | Forall (_,_) ->
      false
   | Exists (_,_) ->
-     false       
+     false
+
+let rec predicate_abstraction_inner abs b : (PredAbs.t * t) =
+  match b with
+  | TFalse | TTrue | LVar _ -> (abs, b)
+  | TComp (_, _, _, vars) ->
+     if List.exists vars ~f:(Fn.non Var.is_symbRow) then
+       let (x, abs) = PredAbs.abs abs b in
+       (abs, LVar x)
+     else
+       (abs, b)
+  | TNot (b,_) ->
+     let (abs, b) = predicate_abstraction_inner abs b in
+     (abs, not_ b)
+  | TBin (op, a, b, _) ->
+     let (abs, a) = predicate_abstraction_inner abs a in
+     let (abs, b) = predicate_abstraction_inner abs b in
+     (abs, (get_smart op) a b)
+  | Forall (x, b) ->
+     let (abs, b) = predicate_abstraction_inner abs b in
+     (abs, forall [x] b)
+  | Exists (x, b) ->
+     let (abs, b) = predicate_abstraction_inner abs b in
+     (abs, exists [x] b)
+    
+
+let predicate_abstraction (b : t) =
+  let abs = PredAbs.create () in
+  let (_, b) = predicate_abstraction_inner abs b in
+  b
+
+let rec get_abstract_predicates b =
+  match b with
+  | TFalse | TTrue | TComp _ -> []
+  | LVar x -> [x]
+  | TNot (b,_) ->
+     get_abstract_predicates b
+  | TBin (_, a, b, _) ->
+     get_abstract_predicates a
+     @ get_abstract_predicates b
+     |> List.dedup_and_sort ~compare:String.compare
+  | Forall (_, b) | Exists (_, b)->
+     get_abstract_predicates b
+    
+let abstract_qvars  b =
+  let bs = get_abstract_predicates b in
+  List.map bs ~f:(Printf.sprintf "(%s Bool)")
+  |> String.concat ~sep:" " 

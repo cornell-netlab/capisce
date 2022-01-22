@@ -423,7 +423,7 @@ let vc (c : t) : BExpr.t =
   |> BExpr.not_
   |> BExpr.nnf
   (* |> BExpr.cnf *)
-  |> BExpr.simplify 
+  (* |> BExpr.simplify  *)
   
   (* let o = optimize c in
    * let p = passify o in
