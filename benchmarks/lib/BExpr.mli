@@ -3,6 +3,10 @@ open Base_quickcheck
    
 type t [@@deriving eq, sexp, compare, quickcheck]
 
+val to_smtlib : t -> string
+val of_smtlib : ?cvs:Var.t list -> string -> t
+val of_smtast : ?cvs:Var.t list -> SmtAst.t list -> t  
+
 val enable_smart_constructors : [`On | `Off] ref
    
 val (=) : t -> t -> bool
@@ -38,7 +42,6 @@ val sge_ : Expr.t -> Expr.t -> t
 val forall : Var.t list -> t -> t
 val exists : Var.t list -> t -> t
 
-val to_smtlib : t -> string
 val subst : Var.t -> Expr.t -> t -> t
 val fun_subst : (Var.t -> Expr.t) -> t -> t
 (** [fun_subst f b] substitutes b according to function [f] *)  
@@ -63,10 +66,17 @@ val label : Context.t -> t -> t
 
 val equivalence : t -> t -> t
 
-val qf_quickcheck_generator : t Generator.t
+(* Solver-Aided functions *)
+val check_iff : t -> t -> bool
+val check_iff_str : ?timeout : int option -> t -> t -> string  
+val check_sat : ?timeout : int option -> Var.t list -> t -> bool
+val z3_simplify : Var.t list -> t -> t  
 
 val predicate_abstraction : t -> t
 val abstract_qvars : t -> string
+
+  
+val qf_quickcheck_generator : t Generator.t
   
   
 (* FOR TESTING PURPOSES ONLY *)

@@ -1,6 +1,6 @@
 open Core
 module Bench = Pbench.Bench
-module Nat = Pbench.Nat             
+module Qe = Pbench.Qe             
 
 let run_and_print_exp f smart one n =
   f smart one n
@@ -115,7 +115,7 @@ let infer : Command.t =
              (Time.Span.zero, "sat", 0, false)
            else begin 
                Pbench.Log.print @@ lazy "checking satisfiability\n";
-               Bench.z3_check false (cmd, Pbench.BExpr.true_)
+               Qe.z3_check false (cmd, Pbench.BExpr.true_)
              end
          in
          Printf.printf "%s\n%!" res;
@@ -135,9 +135,9 @@ let infer : Command.t =
              let (inf_dur, inf_res, _, inf_called_solver) =
                (* Bench.z3_infer false (cmd, Pbench.BExpr.true_) *)
                if iter then
-                 Bench.cnf_fix_infer fix solvers false (cmd, Pbench.BExpr.true_)
+                 Qe.cnf_fix_infer fix solvers false (cmd, Pbench.BExpr.true_)
                else
-                 Bench.cvc4_z3_fix fix solvers false (cmd, Pbench.BExpr.true_)
+                 Qe.cvc4_z3_fix fix solvers false (cmd, Pbench.BExpr.true_)
              in
              Printf.printf "Done in %fms with%s calling the solver in inference phase. Got: \n%s\n%!"
                (Time.Span.(to_ms (inf_dur + dur)))
@@ -152,7 +152,7 @@ let smtlib : Command.t =
      let source = anon ("smtlib source file" %: string) in
          fun () ->
          let open Pbench in
-         let smtast = Solver.parse source () |> SmtAst.to_bexpr in
+         let smtast = SmtParser.parse source () |> BExpr.of_smtast in
          Printf.printf "%s\n%!" (BExpr.to_smtlib smtast);
     ]
 
