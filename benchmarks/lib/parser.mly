@@ -1,38 +1,12 @@
-%token <int> INT
 %token <string> ID
 %token LPAREN
 %token RPAREN
 %token LET
-%token EQ
 %token FORALL
 %token EXISTS
-%token UNDERSCORE
-%token BVULE
-%token BVULT
-%token BVSUB
-%token BVUGE
-%token BVUGT
-%token BVSLT
-%token BVSLE
-%token BVSGT
-%token BVSGE  
-%token BVAND  
-%token BVOR  
-%token BVXOR
-%token BVADD
-%token BVMUL
-%token CONCAT
-%token BVSHL
-%token BVASHR
-%token BVLSHR
-%token BVNOT
 %token DECLIT
 %token BITLIT
 %token HEXLIT
-%token AND
-%token NOT
-%token OR
-%token ARR
 %token EOF
 
 %start <SmtAst.t list> program
@@ -53,7 +27,7 @@ term :
   | BITLIT; n = ID; 
     { SmtAst.BV (Bigint.of_string ("0b" ^ n), String.length n) }
   | HEXLIT; n = ID; 
-    { SmtAst.BV (Bigint.of_string ("0b" ^ n), String.length n) }
+    { SmtAst.BV (Bigint.of_string ("0x" ^ n), (String.length n) * 4) }
   
 term_list : ts = rev_term_list { List.rev ts }
 
@@ -66,3 +40,4 @@ program :
   | EOF { [] }
   | c = term; cs = program
     { c::cs  }
+

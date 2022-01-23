@@ -471,11 +471,15 @@ let forall_one (x : Var.t) b =
              | LIff -> default x (iff_ b1 b2)
              end
           | Forall(y, b') ->
-             begin match self y b' with
-             | Forall (y,bb) ->
-                default y (self x bb) 
-             | bb -> self x bb
-            end
+             (* Log.print @@ lazy (Printf.sprintf "eliminating %s under %s" (Var.str y) (Var.str x));
+              * begin match self y b' with
+              * | Forall (y,bb) ->
+              *    Log.print @@ lazy (Printf.sprintf "couldn't. moving %s out, and %s in" (Var.str y) (Var.str x)); *)
+             default y (self x b') 
+            (*  | bb ->
+             *     Log.print @@ lazy (Printf.sprintf "yes! %s is gone. eliminating %s" (Var.str y) (Var.str x));
+             *     self x bb
+             * end *)
           | _ ->
              default x b 
     )
@@ -565,7 +569,7 @@ let rec cnf_inner (b : t) : t list list=
   | TFalse | TTrue | LVar _ | TComp _ ->
      [[b]]
   | Forall _ ->
-     failwith "I swear, you shouldnt use me"
+     failwith "i swear you shouldn't use me"
   | Exists _ ->
      failwith "what in the world is my purpose"
   | TBin (op, b1, b2, _) ->
@@ -799,22 +803,28 @@ let rec to_vars (gamma : Var.t Ctx.t) (bound : SmtAst.t list) =
   | _ ->
      failwith "malformed sort"
 
-let rec to_expr gamma b : Expr.t =
+let rec to_expr gamma expr_bindings b : Expr.t =
   let open SmtAst in
   match b with
   | Id x ->
      begin match Ctx.find gamma x with
-     | None -> failwith (x ^ " was missing from expression context")
+     | None ->
+        begin match Ctx.find expr_bindings x with
+        | None -> 
+           failwith (x ^ " was missing from expression context and expression bindings")
+        | Some e ->
+           e
+        end
      | Some x ->
         Expr.var x
      end
   | Fun (Id "bvnot", [e]) ->
-     Expr.bnot (to_expr gamma e)
+     Expr.bnot (to_expr gamma expr_bindings e)
   | Fun (Id "_", [Id bv; Id size]) ->
      Expr.bv (Bigint.of_string (String.chop_prefix_exn bv ~prefix:"bv")) (Bigint.of_string size |> Bigint.to_int_exn)
   | Fun (Id f, [e1; e2]) ->
-     let e1 = to_expr gamma e1 in
-     let e2 = to_expr gamma e2 in
+     let e1 = to_expr gamma expr_bindings e1 in
+     let e2 = to_expr gamma expr_bindings e2 in
      begin match f with
      | "bvor"  -> Expr.bor e1 e2
      | "bvand" -> Expr.band e1 e2
@@ -840,24 +850,32 @@ let rec to_expr gamma b : Expr.t =
      failwith "let bindings are not expressions"
      
     
-let rec translate_assignments gamma (bindings : t Ctx.t) assignments : (t Ctx.t) =
+let rec translate_assignments gamma (bool_bindings : t Ctx.t) (expr_bindings : Expr.t Ctx.t) assignments : (t Ctx.t * Expr.t Ctx.t) =
   let open SmtAst in
   match assignments with
-  | [] -> bindings        
+  | [] -> (bool_bindings, expr_bindings)
   | Fun (Id var, [bexpr_smt])::rst ->
-     let bexpr = to_bexpr_inner gamma bindings bexpr_smt in
-     let bindings =  Ctx.set bindings ~key:var ~data:bexpr in
-     translate_assignments gamma bindings rst
+     begin try
+       let bexpr = to_bexpr_inner gamma bool_bindings expr_bindings bexpr_smt in
+       let bool_bindings =  Ctx.set bool_bindings ~key:var ~data:bexpr in
+       translate_assignments gamma bool_bindings expr_bindings rst
+     with
+     | Failure _ ->
+        (* Log.print @@ lazy (Printf.sprintf "warning: %s" msg); *)
+        let expr = to_expr gamma expr_bindings bexpr_smt in
+        let expr_bindings = Ctx.set expr_bindings ~key:var ~data:expr in
+        translate_assignments gamma bool_bindings expr_bindings rst
+     end
   | _ ->
     failwith "malformed let-binding"
-and to_bexpr_inner (gamma : Var.t Ctx.t) (bindings : t Ctx.t) (b : SmtAst.t) : t =
+and to_bexpr_inner (gamma : Var.t Ctx.t) (bool_bindings : t Ctx.t) (expr_bindings : Expr.t Ctx.t) (b : SmtAst.t) : t =
   match b with
   | Id "false" ->
      false_
   | Id "true" ->
      true_
   | Id x ->
-     begin match Ctx.find bindings x with
+     begin match Ctx.find bool_bindings x with
      | None ->
         failwith ("tried to look up " ^ x ^ " in boolean context, but couldn't find it")
      | Some b ->
@@ -865,76 +883,77 @@ and to_bexpr_inner (gamma : Var.t Ctx.t) (bindings : t Ctx.t) (b : SmtAst.t) : t
      end
   | Forall (bound_ids, exp) ->
      let gamma, vars = to_vars gamma bound_ids in
-     forall vars (to_bexpr_inner gamma bindings exp)
+     forall vars (to_bexpr_inner gamma bool_bindings expr_bindings exp)
   | Exists (bound_ids, exp) ->
      let gamma, vars = to_vars gamma bound_ids in
-     exists vars (to_bexpr_inner gamma bindings exp )
+     exists vars (to_bexpr_inner gamma bool_bindings expr_bindings exp)
   | Let (assignments, body) ->
-     let bindings = translate_assignments gamma bindings assignments in
-     to_bexpr_inner gamma bindings body
-  | Fun (Id f, args) ->
-     begin match f, args with
+     let bool_bindings, expr_bindings = translate_assignments gamma bool_bindings expr_bindings assignments in
+     to_bexpr_inner gamma bool_bindings expr_bindings body
+  | Fun (Id x, args) ->
+     let f = to_bexpr_inner gamma bool_bindings expr_bindings in
+     begin match x, args with
      | "goals", [Fun (Id "goal", goals) ] ->
         let goals = List.sub goals ~pos:0 ~len:(List.length goals -4) in
-        List.map goals ~f:(to_bexpr_inner gamma bindings) |> ands_
+        List.map goals ~f |> ands_
      | "not", [a] ->
-        not_ (to_bexpr_inner gamma bindings a)
+        not_ (f a)
      | "and",_ ->
-        List.map args ~f:(to_bexpr_inner gamma bindings) |> ands_
+        List.map args ~f |> ands_
      | "or", _->
-        List.map args ~f:(to_bexpr_inner gamma bindings)  |> ors_
+        List.map args ~f |> ors_
      | "=>", _->
-        List.map args ~f:(to_bexpr_inner gamma bindings) |> imps_
+        List.map args ~f |> imps_
      | "=", [a; b] ->
         begin try
-            let a_bool = to_bexpr_inner gamma bindings a in
-            let b_bool = to_bexpr_inner gamma bindings b in
+            let a_bool = to_bexpr_inner gamma bool_bindings expr_bindings a in
+            let b_bool = to_bexpr_inner gamma bool_bindings expr_bindings b in
             iff_ a_bool b_bool
           with
-          | Failure msg ->
-             Log.print @@ lazy (Printf.sprintf "Warning: %s" msg);
-             let a_expr = to_expr gamma a in
-             let b_expr = to_expr gamma b in
+          | Failure _ ->
+             (* Log.print @@ lazy (Printf.sprintf "Warning: %s" msg); *)
+             let a_expr = to_expr gamma expr_bindings a in
+             let b_expr = to_expr gamma expr_bindings b in
              eq_ a_expr b_expr
         end        
      | "bvule", [e1; e2] ->
-        let e1 = to_expr gamma e1 in
-        let e2 = to_expr gamma e2 in
+        let e1 = to_expr gamma expr_bindings e1 in
+        let e2 = to_expr gamma expr_bindings e2 in
         ule_ e1 e2
      | "bvult", [e1; e2] ->
-        let e1 = to_expr gamma e1 in
-        let e2 = to_expr gamma e2 in
+        let e1 = to_expr gamma expr_bindings e1 in
+        let e2 = to_expr gamma expr_bindings e2 in
         ult_ e1 e2
      | "bvugt", [e1; e2] ->
-        let e1 = to_expr gamma e1 in
-        let e2 = to_expr gamma e2 in
+        let e1 = to_expr gamma expr_bindings e1 in
+        let e2 = to_expr gamma expr_bindings e2 in
         ugt_ e1 e2
      | "bvuge", [e1; e2] ->
-        let e1 = to_expr gamma e1 in
-        let e2 = to_expr gamma e2 in
+        let e1 = to_expr gamma expr_bindings e1 in
+        let e2 = to_expr gamma expr_bindings e2 in
         uge_ e1 e2
      | "bvsle", [e1; e2] ->
-        let e1 = to_expr gamma e1 in
-        let e2 = to_expr gamma e2 in
+        let e1 = to_expr gamma expr_bindings e1 in
+        let e2 = to_expr gamma expr_bindings e2 in
         sle_ e1 e2
      | "bvslt", [e1; e2] ->
-        let e1 = to_expr gamma e1 in
-        let e2 = to_expr gamma e2 in
+        let e1 = to_expr gamma expr_bindings e1 in
+        let e2 = to_expr gamma expr_bindings e2 in
         slt_ e1 e2
      | "bvsgt", [e1; e2] ->
-        let e1 = to_expr gamma e1 in
-        let e2 = to_expr gamma e2 in
+        let e1 = to_expr gamma expr_bindings e1 in
+        let e2 = to_expr gamma expr_bindings e2 in
         sgt_ e1 e2
      | "bvsge", [e1; e2] ->
-        let e1 = to_expr gamma e1 in
-        let e2 = to_expr gamma e2 in
+        let e1 = to_expr gamma expr_bindings e1 in
+        let e2 = to_expr gamma expr_bindings e2 in
         sge_ e1 e2
      | "=", _ | "bvule", _ | "bvult", _ | "bvuge", _ | "bvsle", _ |
        "bvslt", _ | "bvsgt", _ | "bvsge", _ ->
-        failwith (Printf.sprintf "Gotta support %s over %d terms" f (List.length args))
+        failwith (Printf.sprintf "Gotta support %s over %d terms" x (List.length args))
         
      | _,_ ->
-        failwith ("unrecognized boolean function: " ^ f)
+        failwith ("unrecognized boolean function: " ^ x)
      end
   | BV (_, _) ->
      failwith "got bitvector when converting to boolean expression:("
@@ -947,7 +966,7 @@ let rec to_bexpr_aggregate gamma smts : t =
   match smts with
   | [] -> failwith "need at least one"
   | [smt] ->
-     begin try to_bexpr_inner gamma Ctx.empty smt with
+     begin try to_bexpr_inner gamma Ctx.empty Ctx.empty smt with
      | Failure msg ->
         failwith msg (*(Printf.sprintf "Example:\n%s\nTriggered failure: %s%!" ([%sexp_of: t] smt |> Sexp.to_string) msg)*)
      end
@@ -955,6 +974,7 @@ let rec to_bexpr_aggregate gamma smts : t =
      let gamma,_ = to_vars gamma [Fun (Id x, sort)] in
      to_bexpr_aggregate gamma smts
   | _ ->
+     Printf.eprintf "%s" (SmtAst.to_sexp_string smts);
      failwith "unrecognized bexpr"
 
 let of_smtast ?(cvs=[]) smts =
@@ -976,7 +996,13 @@ let check_sat ?(timeout=None) consts phi =
   to_smtlib phi
   |> Smt.check_sat ~timeout consts
   |> Solver.run_z3 
-  |> Smt.is_sat 
+  |> Smt.is_sat
+
+let check_unsat ?(timeout=None) consts phi =
+  to_smtlib phi
+  |> Smt.check_sat ~timeout consts
+  |> Solver.run_z3 
+  |> Smt.is_unsat 
   
   
 let check_iff (b1 : t) (b2 : t) : bool =
@@ -989,8 +1015,51 @@ let check_iff_str ?(timeout=None)  (b1 : t) (b2 : t) : string =
   Solver.run_z3 smtlib_exp
   
 
-
-    
-       
-
+let rec order_all_quantifiers b =
+  match b with
+  | TTrue | TFalse | TComp _ | LVar _ -> b
+  | TNot (b, _) ->
+     not_ (order_all_quantifiers b)
+  | TBin (o, b1, b2, _) ->
+     (get_smart o) (order_all_quantifiers b1) (order_all_quantifiers b2)
+  | Exists _ ->
+     failwith "WHY IS THERE AN EXISTENTAL HERE?"
+  | Forall (x, b) ->
+     match order_all_quantifiers b with
+     | Forall (y, b) ->
+        if Var.size x > Var.size y then
+          Forall (x, Forall (y, b))
+        else
+          Forall (y, Forall (x, b))
+     | b -> forall_one x b 
+  
+let rec bottom_up_qe solver b =
+  match b with
+  | TTrue | TFalse | TComp _ | LVar _ -> b
+  | TNot (b, _) ->
+     not_ (bottom_up_qe solver b)
+  | TBin (o, b1, b2, _) ->
+     (get_smart o) (bottom_up_qe solver b1) (bottom_up_qe solver b2)
+  | Forall (x, b) ->
+     let b' = bottom_up_qe solver b in
+     begin match forall_one x (nnf b') with
+     | Forall (x', body) as b' when Var.equal x x' ->
+        let vars = vars b' |> Util.uncurry (@) in
+        let body = if qf body && size body < 500 then cnf (body) else body in
+        begin match forall_one x' body with
+        | Forall (x'', _) as phi when Var.equal x' x'' ->
+           if check_unsat vars phi then
+             false_
+           else
+             let res = solver vars (to_smtlib phi) in
+             Log.print @@ lazy res;
+             of_smtlib ~cvs:vars res
+        | b'' ->
+           bottom_up_qe solver b''
+        end
+     | b' ->
+        bottom_up_qe solver b'
+     end
+  | Exists _ ->
+     failwith "not sure how to handle exists"
        

@@ -138,4 +138,12 @@ let cnf_fix_infer gas solvers simpl (prog, asst) =
   (Clock.stop c,
    Printf.sprintf "(and %s)" qe_bodies,
    -1,
-   true) 
+   true)
+
+let subsolving (prog, asst) =
+  let c = Clock.start () in
+  let phi = vc prog asst in
+  let (dvs, _) = BExpr.vars phi in
+  let qphi = BExpr.(forall dvs phi |> order_all_quantifiers) in
+  let qf_phi = BExpr.bottom_up_qe (solve `Z3) qphi in
+  (Clock.stop c, BExpr.to_smtlib qf_phi, -1, true)

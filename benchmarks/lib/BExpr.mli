@@ -66,12 +66,16 @@ val label : Context.t -> t -> t
 
 val equivalence : t -> t -> t
 
+val order_all_quantifiers : t -> t
+  
 (* Solver-Aided functions *)
 val check_iff : t -> t -> bool
 val check_iff_str : ?timeout : int option -> t -> t -> string  
 val check_sat : ?timeout : int option -> Var.t list -> t -> bool
 val z3_simplify : Var.t list -> t -> t  
+val bottom_up_qe : (Var.t list -> string -> string) -> t -> t
 
+(* Predicate Abstraction *)  
 val predicate_abstraction : t -> t
 val abstract_qvars : t -> string
 

@@ -107,9 +107,12 @@ let infer : Command.t =
          let gas = Option.value gas_opt ~default:1000 in
          let unroll = Option.value unroll_opt ~default:10 in
          let fix = Option.value fix_opt ~default:4 in
-         let cmd = Pbench.P4Parse.as_cmd_from_file includes source gas unroll debug in
+         Pbench.Log.print @@ lazy (Printf.sprintf "compiling...");
+         let cmd = Pbench.P4Parse.as_cmd_from_file includes source gas unroll false in
+         Pbench.Log.print @@ lazy (Printf.sprintf "done\noptimizing...");         
          let cmd = Pbench.Cmd.optimize cmd in
-         Pbench.Log.print @@ lazy (Pbench.Cmd.to_string cmd);
+         Pbench.Log.print @@ lazy (Printf.sprintf "done\nserializing....");                  
+         Pbench.Log.print @@ lazy (Pbench.Cmd.to_string cmd);         
          let (dur, res, _, called_solver) =
            if skip_check then
              (Time.Span.zero, "sat", 0, false)
@@ -137,7 +140,8 @@ let infer : Command.t =
                if iter then
                  Qe.cnf_fix_infer fix solvers false (cmd, Pbench.BExpr.true_)
                else
-                 Qe.cvc4_z3_fix fix solvers false (cmd, Pbench.BExpr.true_)
+                 (* Qe.cvc4_z3_fix fix solvers false (cmd, Pbench.BExpr.true_) *)
+                 Qe.subsolving (cmd, Pbench.BExpr.true_)
              in
              Printf.printf "Done in %fms with%s calling the solver in inference phase. Got: \n%s\n%!"
                (Time.Span.(to_ms (inf_dur + dur)))
