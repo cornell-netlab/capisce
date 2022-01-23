@@ -1044,7 +1044,7 @@ let rec bottom_up_qe solver b =
      let b' = bottom_up_qe solver b in
      begin match forall_one x (nnf b') with
      | Forall (x', body) as b' when Var.equal x x' ->
-        let vars = vars b' |> Util.uncurry (@) in
+        let vars = vars b' |> Util.uncurry (@) in   
         let body = if qf body && size body < 500 then cnf (body) else body in
         begin match forall_one x' body with
         | Forall (x'', _) as phi when Var.equal x' x'' ->

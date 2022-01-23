@@ -325,7 +325,7 @@ let rec const_prop_aux (f : Facts.t) (c : t) =
   | Havoc x ->
      (Facts.remove f x, c)
   | Assign (x,e) ->
-     let e = Expr.fun_subst (Facts.lookup f) e in 
+     let e = Expr.fun_subst (Facts.lookup f) e in
      (Facts.update f x e, assign x e)
   | Assert (b, id) ->
      (* Log.print @@ lazy (Printf.sprintf "substitute %s using: %s\n" (to_string c) (Facts.to_string f)); *)
@@ -383,16 +383,18 @@ let rec dead_code_elim_aux c (reads : VarSet.t) : (t * VarSet.t) =
 
 let dead_code_elim c = fst (dead_code_elim_aux c VarSet.empty)  
 
-let rec fix f x =
+let rec fix g f x =  
   let x' = f x in
   if equal x' x then
     x
+  else if g <= 0 then
+    x
   else
-    fix f x'
+    fix (g - 1) f x'
                      
 let optimize c =
   let o c = dead_code_elim (const_prop c) in 
-  fix o c
+  fix 100 o c
 
 
 let rec pathify_inner (c : t) : t list list =
@@ -423,7 +425,7 @@ let vc (c : t) : BExpr.t =
   |> BExpr.not_
   |> BExpr.nnf
   (* |> BExpr.cnf *)
-  (* |> BExpr.simplify  *)
+  |> BExpr.simplify
   
   (* let o = optimize c in
    * let p = passify o in

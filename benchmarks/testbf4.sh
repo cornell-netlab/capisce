@@ -4,6 +4,7 @@ test_dir="./examples/bf4_failing"
 includes_dir="./examples/includes"
 success_dir="./examples/bf4_passing"
 nocomp_dir="./examples/bf4_nocompile"
+evoke_dir="./examples/evoke"
 dup_dir="./examples/bf4_dups"
 log_dir="./examples/logs"
 
@@ -16,6 +17,7 @@ NC='\033[0m' # No Color
 PASS="${GRN}[PASS]${NC}"
 FAIL="${RED}[FAIL]${NC}"
 BUNK="${YLW}[BUNK]${NC}"
+SKIP="${YLW}[SKIP]${NC}"
 
 # mkdirs if they dont exist
 if [ ! -d $success_dir ]; then
@@ -49,6 +51,9 @@ fi
 if [ ! -z "$(ls $nocomp_dir)" ]; then
     mv $nocomp_dir/* $test_dir
 fi
+# if [ ! -z "$(ls $evoke_dir)" ]; then
+#     cp $evoke_dir/* $test_dir
+# fi
 
 
 # make capisce
@@ -83,6 +88,11 @@ if [ $? -eq 0 ]; then
             fi
         fi
     done
+    for f in $test_dir/*.skip; do
+        b=$(basename $f)
+        echo -e "$SKIP ${BLU}${b}${NC}"
+    done
+
 fi
 
 echo
