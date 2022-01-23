@@ -57,13 +57,15 @@ let run_princess = run_proc princess_exe
 let run_z3 = run_proc z3_exe
 let run_cvc4 = run_proc cvc4_exe               
 
-
+let parse_string smtstring =
+  let file = tmp_write smtstring in
+  parse file ()
+             
 let extract_z3_goals smtstring =
   let open SmtAst in
-  let file = tmp_write smtstring in
-  let ast = parse file () in
+    let ast = parse_string smtstring in
   match ast with
-  | [App (Id "goals" :: (App (Id "goal" :: goal :: _)) :: _)] ->
+  | [Fun (Id "goals", Fun (Id "goal", (goal :: _)) :: _)] ->
      to_string goal
   | t ->
      Printf.eprintf "WARNING:: expected z3 goals, but got the following:\n%s\n%!" (to_sexp_string ast);

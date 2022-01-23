@@ -19,6 +19,10 @@ val or_ : t -> t -> t
 val imp_ : t -> t -> t
 val iff_ : t -> t -> t
 
+val ands_ : t list -> t
+val ors_ : t list -> t
+val imps_ : t list -> t
+  
 (* Comparisons *)
 val eq_ : Expr.t -> Expr.t -> t
 val ult_ : Expr.t -> Expr.t -> t

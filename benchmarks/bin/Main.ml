@@ -137,7 +137,7 @@ let infer : Command.t =
                if iter then
                  Bench.cnf_fix_infer fix solvers false (cmd, Pbench.BExpr.true_)
                else
-                 Bench.cvc4_z3_fix fix solvers true (cmd, Pbench.BExpr.true_)
+                 Bench.cvc4_z3_fix fix solvers false (cmd, Pbench.BExpr.true_)
              in
              Printf.printf "Done in %fms with%s calling the solver in inference phase. Got: \n%s\n%!"
                (Time.Span.(to_ms (inf_dur + dur)))
@@ -145,13 +145,25 @@ let infer : Command.t =
                inf_res
     ]
 
-  
+let smtlib : Command.t =
+  let open Command.Let_syntax in
+  Command.basic ~summary:"Debugging frontend for smtlib parser"
+    [%map_open
+     let source = anon ("smtlib source file" %: string) in
+         fun () ->
+         let open Pbench in
+         let smtast = Solver.parse source () |> SmtAst.to_bexpr in
+         Printf.printf "%s\n%!" (BExpr.to_smtlib smtast);
+    ]
+
+    
 let main =
   Command.group ~summary:"research toy for exploring verification & synthesis of p4 programs"
     [("bench", bench);
      ("beastiary", beastiary);
      ("infer", infer);
-     ("compile", compile)
+     ("compile", compile);
+     ("smtlib", smtlib);
     ]
 
 let () = Command.run main    

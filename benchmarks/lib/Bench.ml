@@ -172,7 +172,7 @@ let rec solver_fixpoint_str gas solvers dvs cvs (smt : string) : string =
 
 let solver_fixpoint gas solvers dvs cvs phi =
   let () = Log.print @@ lazy "serializing to smt" in
-  if true then  
+  if false then  
     let phi = BExpr.predicate_abstraction phi in
     let str = Printf.sprintf "(forall (%s) %s)" (BExpr.abstract_qvars phi) (BExpr.to_smtlib phi) in
     solver_fixpoint_str gas solvers [] cvs str

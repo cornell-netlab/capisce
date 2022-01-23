@@ -47,7 +47,7 @@ type t =
 
 let rec to_smtlib = function
   | BV (n,w) ->
-     Printf.sprintf "(_ bv%s %d)" (Bigint.to_string n) w
+  Printf.sprintf "(_ bv%s %d)" (Bigint.to_string n) w
   | Var v ->
      Var.str v
   | BinOp (op, e1, e2) ->

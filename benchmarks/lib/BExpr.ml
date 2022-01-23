@@ -110,14 +110,67 @@ let rec to_smtlib_buffer indent buff b : unit =
      Buffer.add_string buff ")"
      
 
-let rec get_labelled_vars = function
+let rec get_labelled_vars_aux = function
   | TFalse | TTrue -> []
   | LVar _ -> []
   | TNot (_,vs) 
     | TBin (_,_,_,vs)  
     | TComp (_,_,_,vs) -> vs
   | Forall (x, t) | Exists (x, t) ->
-     Var.(Util.ldiff ~equal (get_labelled_vars t) [x])
+     Var.(Util.ldiff ~equal (get_labelled_vars_aux t) [x])
+
+let varstime : float ref = ref 0.0
+
+let rec compute_vars (t : t) =
+  match t with
+  | TFalse | TTrue | LVar _ ->
+     ([],[])
+  | TNot (t,_) ->
+     compute_vars t
+  | TBin (_, t1, t2,_) ->
+     Var.(Util.pairs_app_dedup ~dedup (compute_vars t1) (compute_vars t2))
+  | TComp (_, e1, e2, _) ->
+     Var.(Util.pairs_app_dedup ~dedup (Expr.vars e1) (Expr.vars e2))     
+  | Forall (x, b) | Exists (x, b) ->
+     let dvs, cvs = compute_vars b in
+     Var.(Util.ldiff ~equal dvs [x], Util.ldiff ~equal cvs [x])                    
+    
+let _compute_label_equal b =
+  let setify = List.dedup_and_sort ~compare:Var.compare in
+  List.equal Var.equal
+    (get_labelled_vars_aux b |> setify)
+    (compute_vars b |> Util.uncurry (@) |> setify)
+
+
+let get_labelled_vars b =
+  if !Log.debug && not (_compute_label_equal b) then begin
+      Printf.printf "------formula------\n%s\n%!" (([%sexp_of: t] b) |> Sexp.to_string);
+      Printf.printf "------compute------\n%s\n%!" (compute_vars b |> Util.uncurry (@) |> Var.list_to_smtlib_quant);
+      Printf.printf "------labeled------\n%s\n%!" (get_labelled_vars_aux b|> Var.list_to_smtlib_quant);
+            
+      assert false
+    end
+  else
+    get_labelled_vars_aux b
+  
+let vars t : Var.t list * Var.t list =
+  let c = Clock.start () in
+  let vars = get_labelled_vars t in
+  let res = List.partition_tf vars ~f:(Fn.non Var.is_symbRow) in
+  let dur = Clock.stop c |> Time.Span.to_ms in
+  varstime := Float.(!varstime + dur);
+  (* Log.print @@ lazy (Printf.sprintf "Vars has taken %fms" !varstime);  *)
+  res
+
+let occurs_in x b =
+  get_labelled_vars b
+  (* compute_vars b
+   * |> Util.uncurry (@)  *)
+  |> List.exists ~f:(Var.(=) x)
+
+  
+    
+  
     
 let to_smtlib c =
   let b = Buffer.create 8000 in
@@ -229,6 +282,8 @@ let and_ =
            else
              default b1 b2
         | _ -> default b1 b2)
+
+let ands_ = List.fold ~init:true_ ~f:and_
   
 let imp_ =
   ctor2
@@ -248,6 +303,12 @@ let imp_ =
         | _ ->
            default b1 b2)
 
+let rec imps_ bs =
+  match bs with
+  | [] -> failwith "imps_ needs a nonempty list"
+  | [b] -> b
+  | b::bs -> imp_ b (imps_ bs)
+  
 let or_ =
     ctor2
     ~default:(fun b1 b2 -> TBin(LOr, b1, b2, binary_vars b1 b2))
@@ -268,6 +329,8 @@ let or_ =
            |> default asm 
         | _,_->
         default b1 b2)
+
+let ors_ = List.fold ~init:false_ ~f:or_ 
   
 let iff_ =
   ctor2
@@ -351,38 +414,6 @@ let get_smart_comp = function
   | Sle -> sle_
   | Sgt -> sgt_
   | Sge -> sge_
-
-let varstime : float ref = ref 0.0
-
-let rec compute_vars (t : t) =
-  match t with
-  | TFalse | TTrue | LVar _ ->
-     ([],[])
-  | TNot (t,_) ->
-     compute_vars t
-  | TBin (_, t1, t2,_) ->
-     Var.(Util.pairs_app_dedup ~dedup (compute_vars t1) (compute_vars t2))
-  | TComp (_, e1, e2, _) ->
-     Var.(Util.pairs_app_dedup ~dedup (Expr.vars e1) (Expr.vars e2))     
-  | Forall (x, b) | Exists (x, b) ->
-     let dvs, cvs = compute_vars b in
-     Var.(Util.ldiff ~equal dvs [x], Util.ldiff ~equal cvs [x])
-
-                         
-let vars t : Var.t list * Var.t list =
-  let c = Clock.start () in
-  let vars = get_labelled_vars t in
-  let res = List.partition_tf vars ~f:(Fn.non Var.is_symbRow) in
-  let dur = Clock.stop c |> Time.Span.to_ms in
-  varstime := Float.(!varstime + dur);
-  (* Log.print @@ lazy (Printf.sprintf "Vars has taken %fms" !varstime);  *)
-  res
-
-let occurs_in x b =
-  get_labelled_vars b
-  (* compute_vars b
-   * |> Util.uncurry (@)  *)
-  |> List.exists ~f:(Var.(=) x)
   
 let rec size = function
   | TFalse | TTrue | LVar _ -> 1
@@ -491,11 +522,11 @@ let index_subst s_opt t : t =
 let rec label (ctx : Context.t) (b : t) : t =
   match b with
   | TFalse | TTrue | LVar _ -> b
-  | TNot (b, vars) -> TNot (label ctx b, vars)
-  | TBin (bop, b1, b2, vars) ->
-     TBin (bop, label ctx b1, label ctx b2, vars)
-  | TComp (comp, e1, e2, vars) ->
-     TComp (comp, Expr.label ctx e1, Expr.label ctx e2, vars) 
+  | TNot (b, _) -> not_ (label ctx b)
+  | TBin (bop, b1, b2, _) ->
+     (get_smart bop) (label ctx b1) (label ctx b2)
+  | TComp (comp, e1, e2, _) ->
+     (get_smart_comp comp) (Expr.label ctx e1) (Expr.label ctx e2)
   | Forall _ | Exists _ ->
      failwith "Not sure how to label quantifiers"
 
