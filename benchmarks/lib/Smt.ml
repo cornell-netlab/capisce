@@ -9,10 +9,15 @@ let simplify consts str =
     (Var.list_to_smtlib_decls consts)
     str
 
-let assert_apply consts phi_str =
-  Printf.sprintf "%s\n\n(assert %s)\n\n(apply qe)%!"
+let assert_apply ?timeout consts phi_str =
+  let open Printf in
+  let cmd = match timeout with
+    | None -> "(apply qe)"
+    | Some ms -> sprintf "(apply (try-for qe %i))" ms in  
+  sprintf "%s\n\n(assert %s)\n\n%s%!"
     (Var.list_to_smtlib_decls consts)
-    phi_str 
+    phi_str
+    cmd
 
 let assert_apply_light consts phi_str =
   Printf.sprintf "%s\n\n(assert %s)\n\n(apply qe-light)%!"

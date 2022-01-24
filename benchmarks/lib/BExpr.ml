@@ -1032,8 +1032,8 @@ let rec order_all_quantifiers b =
         else
           Forall (y, Forall (x, b))
      | b -> forall_one x b 
-  
-let rec bottom_up_qe solver b =
+
+let rec bottom_up_qe (solver : ?with_timeout:int -> Var.t list -> string -> string) b : t =
   match b with
   | TTrue | TFalse | TComp _ | LVar _ -> b
   | TNot (b, _) ->
@@ -1042,21 +1042,38 @@ let rec bottom_up_qe solver b =
      (get_smart o) (bottom_up_qe solver b1) (bottom_up_qe solver b2)
   | Forall (x, b) ->
      let b' = bottom_up_qe solver b in
+     (* try smart constructor over result of recursive call*)
      begin match forall_one x (nnf b') with
      | Forall (x', body) as b' when Var.equal x x' ->
-        let vars = vars b' |> Util.uncurry (@) in   
-        let body = if qf body && size body < 500 then cnf (body) else body in
-        begin match forall_one x' body with
-        | Forall (x'', _) as phi when Var.equal x' x'' ->
-           if check_unsat vars phi then
-             false_
-           else
-             let res = solver vars (to_smtlib phi) in
-             Log.print @@ lazy res;
-             of_smtlib ~cvs:vars res
-        | b'' ->
-           bottom_up_qe solver b''
-        end
+        (* in this case, the smart constructor had no effect*)
+        (* optimistically try the solver with a 2s timeout *)
+        (* this threshold should void bitblasting *)
+        let vars = vars b' |> Util.uncurry (@) in
+        let res = solver ~with_timeout:2000 vars (to_smtlib b') in
+        if Smt.success res && Smt.qf res then begin
+            Log.print @@ lazy res;
+            of_smtlib ~cvs:vars res
+          end
+        else
+           (* In this case, the solver timed out, so lets try to do something smarter *)
+          let body = if qf body (*&& size body < 500 *)
+                      then cnf (body) (* if the formula isn't too big, cnf it*)
+                      else body in
+           (* now run the smart constructors again *)
+           begin match forall_one x' body |> simplify with
+           | Forall (x'', _) as phi when Var.equal x' x'' ->
+              (*If it had no effect, we are out of things to try*)
+              if check_unsat vars phi then
+                (* unsat formulae are = to false *)
+                false_
+              else
+                (* finally, as a last resort, run the solver with no timeout *)
+                let res = solver vars (to_smtlib phi) in
+                Log.print @@ lazy res;
+                of_smtlib ~cvs:vars res
+           | b'' ->
+              bottom_up_qe solver b''
+           end
      | b' ->
         bottom_up_qe solver b'
      end
