@@ -27,6 +27,8 @@ val wp : t -> BExpr.t -> BExpr.t
 val wrong : t -> BExpr.t
 val vc : t -> BExpr.t
 val optimize : t -> t
+val const_prop : t -> t
+val dead_code_elim : t -> t
 val passify : t -> t  
 val pathify : t -> t list  
   

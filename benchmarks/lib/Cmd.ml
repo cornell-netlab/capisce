@@ -326,15 +326,19 @@ let rec const_prop_aux (f : Facts.t) (c : t) =
      (Facts.remove f x, c)
   | Assign (x,e) ->
      let e = Expr.fun_subst (Facts.lookup f) e in
-     (Facts.update f x e, assign x e)
+     let f = Facts.update f x e in
+     (* Log.print @@ lazy (Printf.sprintf "assignment %s produced: %s\n" (to_string c) (Facts.to_string f));      *)
+     (f, assign x e)
   | Assert (b, id) ->
      (* Log.print @@ lazy (Printf.sprintf "substitute %s using: %s\n" (to_string c) (Facts.to_string f)); *)
-     let b = BExpr.fun_subst (Facts.lookup f) b in
+     let b = BExpr.fun_subst (Facts.lookup f) b |> BExpr.simplify in
      (* Log.print @@ lazy (Printf.sprintf "Got assert(%s)\n" (BExpr.to_smtlib b)); *)
      (f, Assert (b,id))
   | Assume b ->
-     let b = BExpr.fun_subst (Facts.lookup f) b in
-     (f, Assume b)
+     (* Log.print @@ lazy (Printf.sprintf "substitute %s using: %s\n" (to_string c) (Facts.to_string f));      *)
+     let b = BExpr.fun_subst (Facts.lookup f) b |> BExpr.simplify in
+     (* Log.print @@ lazy (Printf.sprintf "Got assume(%s)\n" (BExpr.to_smtlib b)); *)
+     (f, assume b)
   | Seq (c1, c2) ->
      let f, c1 = const_prop_aux f c1 in
      let f, c2 = const_prop_aux f c2 in

@@ -72,13 +72,74 @@ let vc_egress_spec () =
         assert_ (not_ (eq_ (var out) (bvi 0 9)))] in
   (* let dvs, _ = BExpr.vars (vc cmd) in *)
   Alcotest.(check cmd) "literal equivalence" skip c
-                  
+
+let const_prop_for_parser () =
+  let open BExpr in
+  let open Expr in
+  let open Cmd in
+  let _start_next = Var.make "_state$start$next" 1 in
+  let _parse_ipv4_next = Var.make "_state$parse_ipv4$next" 1 in
+  let _accept_next = Var.make "_state$accept$next" 1 in
+  let ethernet_is_valid = Var.make "hdr.ethernet.is_valid" 1 in
+  let ipv4_is_valid = Var.make "hdr.ipv4.is_valid" 1 in
+  let ethertype = Var.make "hdr.ethernet.etherType" 16 in
+  let c =
+    sequence [ assign _start_next (bvi 1 1);
+               choice_seqs [ [ assume (eq_ (var _start_next) (bvi 1 1));
+                               assign _start_next (bvi 0 1);
+                               assign ethernet_is_valid (bvi 1 1);
+                               assert_ (eq_ (var ethernet_is_valid) (bvi 1 1));
+                               choice_seqs [ [ assume (eq_ (var ethertype) (bvi 2048 16));
+                                               assign _parse_ipv4_next (bvi 1 1);
+                                             ];
+                                             [assume (not_ (eq_ (var ethertype) (bvi 2048 16)))]]
+                             ];
+                             [ assume (not_ (eq_ (var _start_next) (bvi 1 1)))]];
+               choice_seqs [ [ assume (eq_ (var _parse_ipv4_next) (bvi 1 1));
+                               assign _parse_ipv4_next (bvi 0 1);
+                               assign ipv4_is_valid (bvi 1 1);
+                               assign _accept_next (bvi 1 1);
+                             ];
+                             [assume (not_ (eq_ (var _parse_ipv4_next) (bvi 1 1)))]]
+    ] in
+  Alcotest.(check cmd) "literal equivalence" skip (const_prop c)
+  
+
+(* _state$start$next := (_ bv1 1);
+ * {
+ *   assume (= _state$start$next (_ bv1 1));
+ *   _state$start$next := (_ bv0 1);
+ *   hdr.ethernet.is_valid := (_ bv1 1);
+ *   assert (= hdr.ethernet.is_valid (_ bv1 1));
+ *   {
+ *     assume (= hdr.ethernet.etherType (_ bv2048 16));
+ *     _state$parse_ipv4$next := (_ bv1 1)
+ *   } [] {
+ *     assume (not
+ *   (= hdr.ethernet.etherType (_ bv2048 16)));
+ *     _state$reject$next := (_ bv1 1)
+ *   }
+ * } [] {
+ *   assume (not
+ *   (= _state$start$next (_ bv1 1)))
+ * };
+ * {
+ *   assume (= _state$parse_ipv4$next (_ bv1 1));
+ *   _state$parse_ipv4$next := (_ bv0 1);
+ *   hdr.ipv4.is_valid := (_ bv1 1);
+ *   _state$accept$next := (_ bv1 1)
+ * } [] {
+ *   assume (not
+ *   (= _state$parse_ipv4$next (_ bv1 1)))
+ * }; *)
+
   
 let tests =
   [
     Alcotest.test_case "cnf foils" `Quick cnf_foils;
     Alcotest.test_case "qc cnf_equiv" `Slow cnf_equiv;
-    Alcotest.test_case "egress_spec vc" `Quick vc_egress_spec;   
+    Alcotest.test_case "egress_spec vc" `Quick vc_egress_spec;
+    Alcotest.test_case "const prop" `Quick const_prop_for_parser;
   ]
 
   
