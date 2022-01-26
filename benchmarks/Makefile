@@ -14,6 +14,9 @@ clean:
 test: all
 	bash ./testbf4.sh
 
+time: all
+	bash ./timebf4.sh
+
 check: all
 	dune build ./test/tests.exe && ./_build/default/test/tests.exe
 
