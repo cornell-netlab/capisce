@@ -1,0 +1,46 @@
+{
+    "07-MultiProtocol_simplified.p4": {
+        "elapsed-ms": 11457.795858383179,
+        "size": "176K"
+    },
+    "arp_no_consts_sized_ints.p4": {
+        "elapsed-ms": 2113.3267879486084,
+        "size": "320K"
+    },
+    "ecmp_2_noselector.p4": {
+        "elapsed-ms": 320.8625316619873,
+        "size": "4.0K"
+    },
+    "flowlet_sized_ints.p4": {
+        "elapsed-ms": 473.45590591430664,
+        "size": "8.0K"
+    },
+    "heavy_hitter_1.p4": {
+        "elapsed-ms": 156.90064430236816,
+        "size": "4.0K"
+    },
+    "hula_no_consts.p4": {
+        "elapsed-ms": 32.95302391052246,
+        "size": "4.0K"
+    },
+    "mc_nat_16.p4": {
+        "elapsed-ms": 261.95573806762695,
+        "size": "4.0K"
+    },
+    "ndp_router_16.p4": {
+        "elapsed-ms": 91.96591377258301,
+        "size": "4.0K"
+    },
+    "netchain_16.p4": {
+        "elapsed-ms": 56.53500556945801,
+        "size": "4.0K"
+    },
+    "simple_nat.p4": {
+        "elapsed-ms": 40.40956497192383,
+        "size": "4.0K"
+    },
+    "ts_switching_16_no_range.p4": {
+        "elapsed-ms": 807.1773052215576,
+        "size": "4.0K"
+    }
+}

@@ -22,7 +22,6 @@ else:
         results = {}
         
 
-    # label = sys.argv[1]
     label = sys.argv[1].split("/")[-1:][0]
     field = sys.argv[2]
     value = sys.argv[3]
