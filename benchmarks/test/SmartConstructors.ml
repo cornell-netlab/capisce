@@ -494,6 +494,17 @@ let and_not_example () =
   let simplified = BExpr.simplify init in
   [%test_pred: BExpr.t] (log_eq init) simplified
 
+let and_not_eq__false_example () =
+  let open BExpr in
+  let open Expr in
+  let x = Var.make "x" 1 |> var in  
+  let phi = (and_
+                (not_
+                  (eq_ x (bvi 0 1)))
+                (not_
+                  (eq_ x (bvi 1 1)))) in
+  Alcotest.(check bexpr) "literal equivalence" false_ phi
+
 let and_not_example_literal () =
   let open BExpr in
   let open Expr in
@@ -653,6 +664,7 @@ let tests =
     Alcotest.test_case "∀ x. (x & ρ.m) ≠ (ρ.x & ρ.m) reduces to ⊥" `Quick rewrite_unused_mask;
     Alcotest.test_case "∀ x. (x & ρ.m) ≠ (ρ.x & ρ.m) ⇔ ⊥" `Quick rewrite_unused_mask_equivalent;
     Alcotest.test_case "∀ xy. (⊥ ⇒ ⊤) ∨ (x = y) ⇔ ⊤" `Quick eliminate_trivial_vars;
+    Alcotest.test_case "(x ≠ [1]₁) ∧ (x ≠ [0]₁) ⇔ ⊥" `Quick and_not_eq__false_example;
     Alcotest.test_case "rsl bug left" `Quick rsl_bug_left;
     Alcotest.test_case "rsl bug right" `Quick rsl_bug_right;
     Alcotest.test_case "rsl bug dumb equivalent" `Quick rsl_bug_dumbeq;

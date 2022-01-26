@@ -2,14 +2,10 @@
 #define V1MODEL_VERSION 20200408
 #include <v1model.p4>
 
-struct ingress_metadata_t {
-    bit<16> router_interface_value;
-}
-
 struct ghost_t {
-    bit<1>  iface_set;
-    bit<1>  allocated;
-    bit<1>  forwarded;
+    bit<1>  assign;
+    bit<1>  alloc;
+    bit<1>  deref;
 }
 
 header ethernet_t {
@@ -77,8 +73,8 @@ header vlan_tag_t {
 }
 
 struct metadata {
-    ingress_metadata_t meta;
-    ghost_t            ghost;
+    bit<16> ptr;
+    ghost_t spec;
 }
 
 struct headers {
@@ -94,47 +90,50 @@ struct headers {
 parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
     @name(".start") state start {
         packet.extract(hdr.ethernet);
+        transition accept;
     }
 }
 
 control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    action allocated () {
-        meta.ghost.allocated = 1w1;
+    action alloc () {
+        meta.spec.alloc = 1w1;
     }
-    action unallocated () {}
+    action unalloc () {
+        meta.spec.alloc = 1w0;
+    }
     action drop_ () {
         mark_to_drop(standard_metadata);
     }
     action fwd (bit<9> port) {
         standard_metadata.egress_spec = port;
-        meta.ghost.forwarded = 1w1;
+        meta.spec.deref = 1w1;
     }
-    action set_iface(bit<16> router_interface_value){
-        meta.meta.router_interface_value = router_interface_value;
-        meta.ghost.iface_set = 1w1;
+    action assign_(bit<16> ptr){
+        meta.ptr = ptr;
+        meta.spec.assign = 1w1;
     }
-    table setter {
+    table assign {
         key = {
             hdr.ethernet.dstAddr : exact;
         }
         actions = {
-           set_iface;
+           assign_;
            drop_;
         }
     }
     table allocator {
         key = {
-            meta.meta.router_interface_value : exact;
+            meta.ptr : exact;
         }
         actions = {
-          allocated;
-          @defaultonly unallocated;
+          alloc;
+          @defaultonly unalloc;
         }
-        const default_action = unallocated;
+        const default_action = unalloc;
     }
-    table getter {
+    table deref {
         key = {
-            meta.meta.router_interface_value : exact;
+            meta.ptr : exact;
         }
         actions = {
             fwd;
@@ -144,14 +143,15 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
     }
 
     apply {
-      meta.ghost.iface_set = 1w0;
-      meta.ghost.allocated = 1w0;
-      meta.ghost.forwarded = 1w0;
-      setter.apply();
+      meta.spec.assign = 1w0;
+      meta.spec.alloc = 1w0;
+      meta.spec.deref = 1w0;
+      // meta.ptr = 16w0;
+      assign.apply();
       allocator.apply();
-      getter.apply();
-      assert(meta.ghost.iface_set == 1w0 || meta.ghost.allocated == 1w1);
-      assert(meta.ghost.forwarded == 1w0 || meta.ghost.allocated == 1w1);
+      deref.apply();
+      assert(meta.spec.assign == 1w0 || meta.spec.alloc == 1w1);
+      assert(meta.spec.deref == 1w0 || meta.spec.alloc == 1w1);
       standard_metadata.egress_spec = 9w511;
     }
 }

@@ -276,6 +276,12 @@ let and_ =
         false_
       else
         match b1, b2 with
+        | TNot (TComp(Eq, e11, e12, _), _),
+          TNot (TComp(Eq, e21, e22, _), _) ->
+           if Expr.neq_contra (e11, e12) (e21, e22) then
+             false_
+           else
+             default b1 b2
         | TNot (bneg,_), b0 | b0, TNot (bneg,_) ->
            if bneg = b0 then
              false_

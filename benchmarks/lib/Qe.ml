@@ -153,5 +153,5 @@ let subsolving (prog, asst) =
   let qf_phi = BExpr.bottom_up_qe (solve_wto `Z3) qphi in
   let dvs, cvs = BExpr.vars qf_phi in
   assert (List.is_empty dvs); 
-  let qf_phi_str = Solver.run_z3 (Smt.simplify cvs (BExpr.to_smtlib qf_phi)) in
+  let qf_phi_str = Solver.run_z3 (Smt.simplify cvs (BExpr.to_smtlib (BExpr.simplify qf_phi))) in
   (Clock.stop c, qf_phi_str, -1, true)

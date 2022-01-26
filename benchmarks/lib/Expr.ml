@@ -137,6 +137,19 @@ let static_eq e1 e2 =
           Some Bigint.(v1 = v2)
        | _, _ -> None
 
+(* returns true if (e11 != e12) /\ (e21 != e22) is contradictory *)               
+let neq_contra (e11,e12) (e21, e22) =
+  match e11, e12, e21, e22 with
+  | Var x, BV (v,_), Var y, BV (u,_)
+    | BV (v,_), Var x, Var y, BV (u,_)
+    | BV (v,_), Var x, BV (u,_), Var y
+    | Var x, BV (v,_), BV (u,_), Var y ->
+     
+     Var.equal x y && Var.size x = 1 && not (Bigint.(u = v))
+  | _ ->
+     Printf.printf "Skipping\n%!";
+     false
+               
 let rec fun_subst f e =
   match e with
   | BV _ -> e

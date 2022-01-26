@@ -26,7 +26,8 @@ val bnot : t -> t
 val bcast : int -> t -> t
 val bslice : int -> int -> t -> t
 
-val static_eq : t -> t -> bool option  
+val static_eq : t -> t -> bool option
+val neq_contra : (t * t) -> (t * t) -> bool  
 val subst : Var.t -> t -> t -> t
 val vars : t -> Var.t list * Var.t list
 val to_smtlib : t -> string
