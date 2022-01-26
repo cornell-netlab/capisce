@@ -1,0 +1,3 @@
+#! /usr/bin/bash
+
+./icecap infer examples/bf4_failing/$1 -I examples/includes -D

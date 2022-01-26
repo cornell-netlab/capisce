@@ -54,17 +54,22 @@ let cvc4_z3_infer simpl (prog, asst) =
 let var_still_used smtstring var =
   String.is_substring smtstring ~substring:(Var.str var)
 
-let solve solver cvs smt =
-  match solver with
-  | `Z3 ->
-     Log.print @@ lazy "Z3";
-     Solver.run_z3 (Smt.assert_apply cvs smt)
-  | `Z3Light ->
+let solve_wto solver ?(with_timeout:int option) cvs smt =
+  match solver, with_timeout with
+  | `Z3, Some timeout ->
+     Log.print @@ lazy (Printf.sprintf "Z3 with timeout %d" timeout);
+     Solver.run_z3 (Smt.assert_apply ~timeout cvs smt)
+  | `Z3, None ->
+    Log.print @@ lazy "Z3";
+    Solver.run_z3 (Smt.assert_apply cvs smt)
+  | `Z3Light,_ ->
      Log.print @@ lazy "Z3";
      Solver.run_z3 (Smt.assert_apply_light cvs smt)
-  | `CVC4 ->
+  | `CVC4,_ ->
      Log.print @@ lazy "CVC4";
      Solver.run_cvc4 (Smt.simplify cvs smt)
+
+let solve solver cvs smt = solve_wto solver cvs smt     
 
 let normalize solver dvs cvs res =
   if Smt.success res then
@@ -139,11 +144,14 @@ let cnf_fix_infer gas solvers simpl (prog, asst) =
    Printf.sprintf "(and %s)" qe_bodies,
    -1,
    true)
-
+  
 let subsolving (prog, asst) =
   let c = Clock.start () in
   let phi = vc prog asst in
   let (dvs, _) = BExpr.vars phi in
   let qphi = BExpr.(forall dvs phi |> order_all_quantifiers) in
-  let qf_phi = BExpr.bottom_up_qe (solve `Z3) qphi in
-  (Clock.stop c, BExpr.to_smtlib qf_phi, -1, true)
+  let qf_phi = BExpr.bottom_up_qe (solve_wto `Z3) qphi in
+  let dvs, cvs = BExpr.vars qf_phi in
+  assert (List.is_empty dvs); 
+  let qf_phi_str = Solver.run_z3 (Smt.simplify cvs (BExpr.to_smtlib qf_phi)) in
+  (Clock.stop c, qf_phi_str, -1, true)

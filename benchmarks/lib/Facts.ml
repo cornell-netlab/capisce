@@ -20,6 +20,9 @@ let remove = VarMap.remove
 
 let update f x e =
   VarMap.set f ~key:x ~data:e
+  |> VarMap.filter ~f:(fun e ->
+         List.exists ~f:(Var.(=) x) (Expr.vars e |> Util.uncurry (@))
+       )
 
 let lookup f x =
   match VarMap.find f x with
