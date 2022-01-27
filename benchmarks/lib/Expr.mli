@@ -19,8 +19,12 @@ val bxor : t -> t -> t
 val bconcat : t -> t -> t
 val shl_ : t -> t -> t
 val lshr_ : t -> t -> t
-val ashr_ : t -> t -> t  
+val ashr_ : t -> t -> t
 
+(* n-ary operators *)
+val bors : t list -> t
+val bconcats : t list -> t  
+  
 (* Unary-ish Operators *)
 val bnot : t -> t
 val bcast : int -> t -> t

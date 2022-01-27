@@ -73,7 +73,7 @@ let rec get_width = function
      | UNot -> get_width e
      | USlice (lo,hi) -> hi - lo
           
-let bv n w = BV(n,w)
+let bv n w = BV(Bigint.(n % pow (succ one) (of_int w)), w)
 let bvi n w = bv (Bigint.of_int n) w
 let var v = Var v
 let is_var = function
@@ -94,11 +94,19 @@ let band e1 e2 =
      BinOp(BAnd, e1, e2)
      
 let bor e1 e2 = BinOp(BOr, e1, e2)
+let rec bors : t list -> t = function
+  | [] -> failwith "cannot bvor 0 bvs, need at least one"
+  | [e] -> e
+  | e::es -> bor e (bors es)
 let badd e1 e2 = BinOp(BAdd, e1, e2)              
 let bmul e1 e2 = BinOp(BMul, e1, e2)
 let bsub e1 e2 = BinOp(BSub, e1, e2)
 let bxor e1 e2 = BinOp(BXor, e1, e2)
 let bconcat e1 e2 = BinOp (BConcat, e1, e2)
+let rec bconcats : t list -> t = function
+  | [] -> failwith "cannot concat an empty list"
+  | [e] -> e
+  | e::es -> bconcat e (bconcats es)
 let shl_ e1 e2 = BinOp(BShl, e1, e2)
 let ashr_ e1 e2 = BinOp(BAshr, e1, e2)
 let lshr_ e1 e2 = BinOp(BLshr, e1, e2)             

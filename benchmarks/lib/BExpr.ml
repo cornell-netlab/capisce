@@ -431,6 +431,7 @@ let rec size = function
 
             
 let forall_one (x : Var.t) b =
+  Log.print @@ lazy (Printf.sprintf "smart constructor for %s (_ BitVec %d) " (Var.str x) (Var.size x));
   ctor2rec x b
     ~default:(fun x b ->
       (* if Int.(Var.size x = 1 && (size b) < 100) then
@@ -450,6 +451,29 @@ let forall_one (x : Var.t) b =
           | TFalse -> false_
           | TTrue -> true_
           | TNot (TComp(Eq,e1,e2,_),_) when Expr.uelim `Neq [x] e1 e2 -> false_
+          | TNot (TComp(Ugt,e1,e2,_),_) ->
+             if Expr.is_var e1 then
+               let v1 = Expr.get_var e1 in
+               if Var.equal x v1 then
+                 not_ (ugt_ e2 (Expr.bvi (-1) (Var.size v1)))
+               else if Expr.is_var e2 then
+                 let v2 = Expr.get_var e2 in
+                 if Var.equal x v2 then
+                   (eq_ e1 (Expr.bvi 0 (Var.size v2)))
+                 else
+                   default x b
+               else
+                 default x b
+             else if Expr.is_var e2 then
+               let v2 = Expr.get_var e2 in
+               if Var.equal x v2 then
+                 (eq_ e1 (Expr.bvi 0 (Var.size v2)))
+               else
+                 default x b
+             else
+               default x b
+               
+               
           | TNot (TBin(LOr,b1,b2,_),_) ->
              self x (and_ (not_ b1) (not_ b2))
           | TComp(Eq, e1, e2,_) when Expr.uelim `Eq [x] e1 e2 -> false_
@@ -845,10 +869,17 @@ let rec to_expr gamma expr_bindings b : Expr.t =
      | _ ->
         failwith ("unrecognized binary function " ^ f)
      end
+  | Fun (Id "bvor", args) -> List.map args ~f:(to_expr gamma expr_bindings) |> Expr.bors
+  | Fun (Id "concat", args) -> List.map args ~f:(to_expr gamma expr_bindings) |> Expr.bconcats
+  | Fun (Fun (Id "_", [Id "extract"; Id hi; Id lo]), [arg]) ->
+     Expr.bslice (int_of_string lo) (int_of_string hi) (to_expr gamma expr_bindings arg)
+  | Fun (Fun (Id "_", [Id "extract"; Id hi; Id lo]),  args)->
+     failwith (Printf.sprintf "How do I (_ extract %s %s) %d arguments" hi lo (List.length args)) 
+    
   | Fun (Id f, args) ->
      failwith (Printf.sprintf "[expr] gotta support %s over %d args" f (List.length args))
   | Fun _ ->
-     failwith ("unrecognized function")
+     failwith ("unrecognized function " ^ to_sexp_string [b])
   | BV (v, w) -> Expr.bv v w
   | Forall _ | Exists _ ->
      failwith "quantifier are not expressions"
@@ -902,6 +933,8 @@ and to_bexpr_inner (gamma : Var.t Ctx.t) (bool_bindings : t Ctx.t) (expr_binding
      | "goals", [Fun (Id "goal", goals) ] ->
         let goals = List.sub goals ~pos:0 ~len:(List.length goals -4) in
         List.map goals ~f |> ands_
+     | "assert", [phi] ->
+        f phi
      | "not", [a] ->
         not_ (f a)
      | "and",_ ->
@@ -988,10 +1021,17 @@ let of_smtast ?(cvs=[]) smts =
     List.fold_right cvs ~init:Ctx.empty
       ~f:(fun data -> Ctx.set ~key:(Var.str data) ~data)
   in
-  to_bexpr_aggregate ctx smts
+  let b = to_bexpr_aggregate ctx smts in
+  b
 
-let of_smtlib ?(cvs=[]) : string -> t =
-  Fn.compose (of_smtast ~cvs) SmtParser.parse_string 
+let of_smtlib ?(cvs=[]) smt : t =
+  Log.print @@ lazy "parsing";
+  let ast = SmtParser.parse_string smt in
+  Log.print @@ lazy "translating";
+  let b = of_smtast ~cvs ast in
+  Log.print @@ lazy "done parsing";
+  b
+  
                                   
 let z3_simplify consts phi =
   Smt.simplify consts (to_smtlib phi)
@@ -1040,6 +1080,7 @@ let rec order_all_quantifiers b =
      | b -> forall_one x b 
 
 let rec bottom_up_qe (solver : ?with_timeout:int -> Var.t list -> string -> string) b : t =
+  (* Log.print @@ lazy "bottom_up_qe"; *)
   match b with
   | TTrue | TFalse | TComp _ | LVar _ -> b
   | TNot (b, _) ->
@@ -1055,12 +1096,21 @@ let rec bottom_up_qe (solver : ?with_timeout:int -> Var.t list -> string -> stri
         (* optimistically try the solver with a 2s timeout *)
         (* this threshold should void bitblasting *)
         let vars = vars b' |> Util.uncurry (@) in
-        let res = solver ~with_timeout:2000 vars (to_smtlib b') in
-        if Smt.success res && Smt.qf res then begin
-            Log.print @@ lazy res;
-            of_smtlib ~cvs:vars res
-          end
+        let res = solver ~with_timeout:(max (size b') 1000) vars (to_smtlib b') in
+        Log.print @@ lazy "checkin success";
+        let b'', good_enough =
+          if Smt.success res && Smt.qf res then begin
+              Log.print @@ lazy res;
+              let b'' = of_smtlib ~cvs:vars res in
+              (b'', (size b'') < 10 * (size b'))
+            end
+          else
+            b', false in
+        if good_enough then
+          let () = Log.print @@ lazy "form small enough" in
+          b''
         else
+          let () = Log.print @@ lazy "form too big" in
            (* In this case, the solver timed out, so lets try to do something smarter *)
           let body = if qf body (*&& size body < 500 *)
                       then cnf (body) (* if the formula isn't too big, cnf it*)

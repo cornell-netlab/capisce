@@ -157,7 +157,8 @@ let smtlib : Command.t =
          fun () ->
          let open Pbench in
          let smtast = SmtParser.parse source () |> BExpr.of_smtast in
-         Printf.printf "%s\n%!" (BExpr.to_smtlib smtast);
+         let b = BExpr.simplify smtast in
+         Printf.printf "%s\n%!" (BExpr.to_smtlib b);
     ]
 
     

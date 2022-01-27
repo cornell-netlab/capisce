@@ -147,11 +147,19 @@ let cnf_fix_infer gas solvers simpl (prog, asst) =
   
 let subsolving (prog, asst) =
   let c = Clock.start () in
+  Log.print @@ lazy "computing vc";
   let phi = vc prog asst in
+  Log.print @@ lazy "getting vars";
   let (dvs, _) = BExpr.vars phi in
+  Log.print @@ lazy "smart constructors";
   let qphi = BExpr.(forall dvs phi |> order_all_quantifiers) in
+  Log.print @@ lazy "running the bottom up solver";
   let qf_phi = BExpr.bottom_up_qe (solve_wto `Z3) qphi in
+  Log.print @@ lazy "getting the vars of the result";  
   let dvs, cvs = BExpr.vars qf_phi in
-  assert (List.is_empty dvs); 
+  Log.print @@ lazy "checking all dataplane variables have been eliminated";    
+  assert (List.is_empty dvs);
+  Log.print @@ lazy "using z3 to simplify";    
   let qf_phi_str = Solver.run_z3 (Smt.simplify cvs (BExpr.to_smtlib (BExpr.simplify qf_phi))) in
+  Log.print @@ lazy "done";    
   (Clock.stop c, qf_phi_str, -1, true)

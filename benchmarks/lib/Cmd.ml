@@ -46,7 +46,7 @@ let abort = assert_ BExpr.false_
 let dead = assume BExpr.false_          
 let havoc x = Havoc x
 let assign x e = Assign (x,e)
-let seq c1 c2 =
+let rec seq c1 c2 =
   if equal c2 skip || equal c2 pass then
     c1
   else if equal c1 skip || equal c1 pass then
@@ -55,8 +55,23 @@ let seq c1 c2 =
     abort
   else if equal c1 dead || equal c2 dead then
     dead
-  else
-    Seq(c1,c2)
+  else match c1,c2 with
+       | Assert (b1,_), Assert (b2,_) ->
+          if BExpr.equal b1 b2 then
+            c1
+          else
+            Seq (c1,c2)
+       | Assert (b1,_), Seq(Assert (b2,_), c2') 
+         | Seq(_, Assert (b1,_)), Seq(Assert (b2,_), c2') ->
+          if BExpr.equal b1 b2
+          then seq c1 c2'
+          else Seq (c1, c2)
+       | Seq(_, Assert (b1,_)), Assert (b2,_) ->
+          if BExpr.equal b1 b2
+          then c1
+          else Seq (c1, c2)
+       | _ ->
+          Seq (c1, c2)
 
 let choice c1 c2 =
   if equal c1 dead then
