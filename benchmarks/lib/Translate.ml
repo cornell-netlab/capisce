@@ -40,7 +40,7 @@ let bv_unop (unop : BitVec.uop) : Expr.t -> Expr.t =
      Expr.bnot
   | BVCast w ->
      Expr.bcast w
-  | BVSlice (lo,hi) ->
+  | BVSlice (hi, lo) ->
      Expr.bslice lo hi
     
 (* Coq BitVec -> Expr *)
