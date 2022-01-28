@@ -73,17 +73,20 @@ if [ $? -eq 0 ]; then
             echo -e -n "[..] ${BLU}${b}${NC}\r"
             python3 ./time.py $f ./icecap infer $f -I $includes_dir --skip-check > ${log} 2>&1
             python3 ./store.py $f "size" `grep -e "(" -o ${log} | wc -l`
-            
+            if [ -z `grep -e "false" ${log}` ]; then
+                python3 ./store.py $f "satisfiable" "x"
+            else
+                python3 ./store.py $f "satisfiable" "-"
+            fi
+
             if [ $? -eq 0 ]; then
                 echo -e "$PASS ${BLU}${b}${NC}"
                 echo -e "\tcat ${log}"
                 mv $f $success_dir/
-                python3 ./store.py $f "valid" "x"
             else
                 echo -e "$FAIL ${BLU}${b}${NC}"
                 echo -e "\tcat ${log}"
                 echo -e "\t./icecap infer ${f} -I ${includes_dir} -D"
-                python3 ./store.py $f "valid" "-"
             fi
         fi
     done

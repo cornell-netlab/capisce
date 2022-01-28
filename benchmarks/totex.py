@@ -34,23 +34,27 @@ for experiment in results:
 
 rows = [fields]
 for experiment in experiments:
-    row = [experiment.replace("_","\_")[:-3]]
+    row = ["\\tt{" + experiment.replace("_","\_")[:-3] + "}"] # removes .p4 from files, adds '\' before '_', adds \tt{}
     for value in results[experiment].values():
         if value == "x":
-            row += ['\\times']
+            row += ['$\\times$']
         elif value == "-":
-            row += ["-"]
+            row += ["$\\bot$"]
         else:
-            row += [f'${value}$']
+            row += [f'${float(value):.2f}$']
     rows.append(row)
+
+rows[0][1] = "Elapsed time (ms)"
+rows[0][2] = "Size (# AST nodes)"
+rows[0][3] = "Satisfiable"
 
 table = texttable.Texttable()
 table.set_cols_align(["l", "l", "l", "l"])
 table.set_cols_valign(["t", "t", "t", "t"])
 table.add_rows(rows)
 
-latex_table = latextable.draw_latex(table, caption="An example table.", label="table:example_table")
-latex_table = latex_table[30:-83]
+latex_table = latextable.draw_latex(table, caption="An example table.", label="table:example_table", use_booktabs=True)
+latex_table = latex_table[30:-83] # removes label,caption, table, 
 with open(output_file, "w") as outfile:
     outfile.write(latex_table)
 print (len(rows)-1,"entries written to latex table.")
