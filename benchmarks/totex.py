@@ -1,4 +1,4 @@
-# stores [label][field] = value in possibly existing json file containing experiment results
+# reads out.json, outputs latex table as out.tex
 
 import argparse
 import subprocess
@@ -34,24 +34,23 @@ for experiment in results:
 
 rows = [fields]
 for experiment in experiments:
-    row = [experiment]
+    row = [experiment.replace("_","\_")[:-3]]
     for value in results[experiment].values():
-        row += [value]
+        if value == "x":
+            row += ['\\times']
+        elif value == "-":
+            row += ["-"]
+        else:
+            row += [f'${value}$']
     rows.append(row)
 
 table = texttable.Texttable()
-table.set_cols_align(["l", "l", "l"])
-table.set_cols_valign(["t", "t", "t"])
+table.set_cols_align(["l", "l", "l", "l"])
+table.set_cols_valign(["t", "t", "t", "t"])
 table.add_rows(rows)
 
 latex_table = latextable.draw_latex(table, caption="An example table.", label="table:example_table")
+latex_table = latex_table[30:-83]
 with open(output_file, "w") as outfile:
     outfile.write(latex_table)
 print (len(rows)-1,"entries written to latex table.")
-
-# print('Texttable Output:')
-# print(table.draw())
-
-# print('\nLatextable Output:')
-# print(latex_table)
-
