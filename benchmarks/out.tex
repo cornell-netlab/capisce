@@ -1,43 +1,25 @@
-		\begin{tabular}{|l|l|l|l|}
-			\hline
-			Source P4 File & elapsed-ms & size & valid \\
-			\hline
-			07-MultiProtocol & $118021.93927764893$ & $5221$ & \times \\
-			\hline
-			07-MultiProtocol\_simplified & $3891.1502361297607$ & $108$ & \times \\
-			\hline
-			actions & $50.861358642578125$ & $5$ & \times \\
-			\hline
-			allocate & $76.43795013427734$ & $20$ & \times \\
-			\hline
-			arp\_no\_consts\_sized\_ints & $1748.220443725586$ & $0$ & \times \\
-			\hline
-			ecmp\_2\_noselector & $756.7191123962402$ & $0$ & \times \\
-			\hline
-			flowlet\_sized\_ints & $4950.263738632202$ & $16$ & \times \\
-			\hline
-			flowlet\_switching\_16\_sized\_ints & $4910.249710083008$ & $16$ & \times \\
-			\hline
-			heavy\_hitter\_1 & $692.8479671478271$ & $0$ & \times \\
-			\hline
-			heavy\_hitter\_2\_sized\_ints & $704.2396068572998$ & $2$ & \times \\
-			\hline
-			issue894\_16\_sized\_ints & $715.4808044433594$ & $2$ & \times \\
-			\hline
-			join & $78.3236026763916$ & $24$ & \times \\
-			\hline
-			mc\_nat\_16 & $74.1727352142334$ & $0$ & \times \\
-			\hline
-			ndp\_router\_16 & $148.19955825805664$ & $0$ & \times \\
-			\hline
-			netpaxos\_acceptor\_16\_sized\_ints & $2184.7381591796875$ & $0$ & \times \\
-			\hline
-			single\_fall & $74.59139823913574$ & $5$ & \times \\
-			\hline
-			single & $44.42119598388672$ & $2$ & \times \\
-			\hline
-			trifecta & $95.40176391601562$ & $53$ & \times \\
-			\hline
-			ts\_switching\_16\_no\_range & $100.24070739746094$ & $0$ & \times \\
-			\hline
+		\begin{tabular}{l l l l}
+			\toprule
+			Source P4 File & Elapsed time (ms) & Size (# AST nodes) & Satisfiable \\
+			\midrule
+			\tt{07-MultiProtocol} & $65012.27641105652$ & $4298$ & $\times$ \\
+			\tt{07-MultiProtocol\_simplified} & $3984.4460487365723$ & $117$ & $\times$ \\
+			\tt{actions} & $58.126211166381836$ & $6$ & $\times$ \\
+			\tt{allocate} & $27.250051498413086$ & $0$ & $\times$ \\
+			\tt{arp\_no\_consts\_sized\_ints} & $1882.3320865631104$ & $541$ & $\times$ \\
+			\tt{ecmp\_2\_noselector} & $815.6814575195312$ & $0$ & $\bot$ \\
+			\tt{flowlet\_sized\_ints} & $4968.96767616272$ & $16$ & $\times$ \\
+			\tt{flowlet\_switching\_16\_sized\_ints} & $4941.671133041382$ & $16$ & $\times$ \\
+			\tt{heavy\_hitter\_1} & $711.111307144165$ & $33$ & $\times$ \\
+			\tt{heavy\_hitter\_2\_sized\_ints} & $810.9335899353027$ & $2$ & $\times$ \\
+			\tt{issue894\_16\_sized\_ints} & $738.2333278656006$ & $2$ & $\times$ \\
+			\tt{join} & $105.98039627075195$ & $26$ & $\times$ \\
+			\tt{mc\_nat\_16} & $104.88224029541016$ & $0$ & $\bot$ \\
+			\tt{ndp\_router\_16} & $1178.6649227142334$ & $0$ & $\bot$ \\
+			\tt{netpaxos\_acceptor\_16\_sized\_ints} & $2218.593120574951$ & $0$ & $\bot$ \\
+			\tt{single\_fall} & $78.44996452331543$ & $5$ & $\times$ \\
+			\tt{single} & $57.15537071228027$ & $5$ & $\times$ \\
+			\tt{trifecta} & $26.48019790649414$ & $0$ & $\times$ \\
+			\tt{ts\_switching\_16\_no\_range} & $134.36627388000488$ & $0$ & $\bot$ \\
+			\bottomrule
 		\end{tabular}
