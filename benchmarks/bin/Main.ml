@@ -76,13 +76,15 @@ let compile : Command.t =
        let cmd = Pbench.P4Parse.as_cmd_from_file includes source gas unroll false in
        let cmd_o = Pbench.Cmd.optimize cmd in 
        let cmd_p = Pbench.Cmd.passify cmd_o in
+       let vc = Pbench.Cmd.vc cmd in
+       let (dvs, cvs) = Pbench.BExpr.vars vc in
        Printf.printf "GCL program:\n%s\n\n%!" @@ Pbench.Cmd.to_string cmd;
        Printf.printf "ConstProp'd:\n%s\n\n%!" @@ Pbench.Cmd.to_string cmd_o;
        Printf.printf "Passified:\n%s \n%!" @@ Pbench.Cmd.to_string cmd_p;
-       Printf.printf "\n And its VC: \n %s\n"
-       @@ Pbench.BExpr.to_smtlib
-       (* @@ Pbench.Cmd.wp cmd Pbench.BExpr.true_ *)
-       @@ Pbench.Cmd.vc cmd
+       Printf.printf "\n And its VC: %s \n (forall (%s) \n %s) \n\n%!"
+         (Pbench.Var.list_to_smtlib_decls cvs)
+         (Pbench.Var.list_to_smtlib_quant dvs)         
+         (Pbench.BExpr.to_smtlib vc)
     ]
        
 let infer : Command.t =
@@ -101,7 +103,8 @@ let infer : Command.t =
          fix_opt = flag "--fix" (optional int) ~doc:"the number of iterations before finishing" and
          solvers = flag "-s" (listed string) ~doc:"solving order"
          in
-         fun () ->         
+         fun () ->
+         Printexc.record_backtrace true;
          Pbench.Log.debug := debug;
          Pbench.BExpr.enable_smart_constructors := if no_smart then `Off else `On;
          let gas = Option.value gas_opt ~default:1000 in

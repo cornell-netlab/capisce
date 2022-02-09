@@ -151,6 +151,10 @@ let subsolving (prog, asst) =
   let phi = vc prog asst in
   Log.print @@ lazy "getting vars";
   let (dvs, _) = BExpr.vars phi in
+  (* let dvs = List.dedup_and_sort dvs ~compare:(fun a b -> Int.compare (Var.size b) (Var.size a)) in *)
+  Log.print @@ lazy "Counting Vars";
+  Log.enable_measurement ();  
+  List.iter dvs ~f:BExpr.incr_q;
   Log.print @@ lazy "smart constructors";
   let qphi = BExpr.(forall dvs phi |> order_all_quantifiers) in
   Log.print @@ lazy "running the bottom up solver";

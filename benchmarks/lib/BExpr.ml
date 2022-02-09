@@ -2,6 +2,17 @@ open Base_quickcheck
 open Core
 
 let enable_smart_constructors = ref `Off
+
+let q_count = ref 0
+let measure s : unit = Log.measure (Printf.sprintf "%f,%d,%s" (Clock.now()) (!q_count) s)  
+let incr_q x : unit =
+  q_count := !q_count + 1;
+  measure (Printf.sprintf "+,%s" (Var.str x))
+let decr_q x why : unit =
+  q_count := !q_count - 1;
+  measure (Printf.sprintf "-,%s,%s" (Var.str x) why) 
+
+let log_size d = Log.measure (Printf.sprintf "size,%f,%d" (Clock.now()) d)
    
 type bop =
   | LAnd
@@ -168,10 +179,6 @@ let occurs_in x b =
    * |> Util.uncurry (@)  *)
   |> List.exists ~f:(Var.(=) x)
 
-  
-    
-  
-    
 let to_smtlib c =
   let b = Buffer.create 8000 in
   to_smtlib_buffer 0 b c;
@@ -420,18 +427,34 @@ let get_smart_comp = function
   | Sle -> sle_
   | Sgt -> sgt_
   | Sge -> sge_
-  
-let rec size = function
-  | TFalse | TTrue | LVar _ -> 1
-  | TComp (_,e1,e2,_) -> Expr.size e1 + 1 + Expr.size e2
-  | TNot (b,_) -> size b + 1
-  | TBin (_, a, b,_) -> 1 + size a + size b
+
+let size_ = ref 0
+         
+let rec size_aux = function
+  | TFalse | TTrue | LVar _ ->
+     size_ := !size_ + 1  
+  | TComp (_,e1,e2,_) ->
+     size_ := !size_ + 1 + Expr.size e1 + Expr.size e2;
+  | TNot (b,_) ->
+     size_ := !size_ + 1;
+     size_aux b
+  | TBin (_, a, b,_) ->
+     size_ := !size_ + 1;
+     size_aux a;
+     size_aux b
   | Forall (_, b) | Exists (_, b) ->
-     1 + size b
+     size_ := !size_ + 1;
+     size_aux b
+
+let size b =
+  size_ := 0;
+  size_aux b;
+  !size_
 
             
-let forall_one (x : Var.t) b =
+let forall_one (x : Var.t) b =  
   Log.print @@ lazy (Printf.sprintf "smart constructor for %s (_ BitVec %d) " (Var.str x) (Var.size x));
+  log_size (size b);
   ctor2rec x b
     ~default:(fun x b ->
       (* if Int.(Var.size x = 1 && (size b) < 100) then
@@ -443,31 +466,44 @@ let forall_one (x : Var.t) b =
         Forall(x,b))      
   (* ~smart:(Fn.const smart) *)
     ~smart:(fun self default x b ->
+        log_size (size b);      
         let bvs = get_labelled_vars b in
-        if not (List.exists bvs ~f:(Var.(=) x)) then
-          b
-        else 
+        if not (List.exists bvs ~f:(Var.(=) x)) then begin
+            decr_q x "not free";
+            b
+        end else 
           match b with
-          | TFalse -> false_
-          | TTrue -> true_
-          | TNot (TComp(Eq,e1,e2,_),_) when Expr.uelim `Neq [x] e1 e2 -> false_
+          | TFalse ->
+             decr_q x "false";
+             false_
+          | TTrue ->
+             decr_q x "true";
+             true_
+          | TNot (TComp(Eq,e1,e2,_),_) when Expr.uelim `Neq [x] e1 e2 ->
+             decr_q x "neq_false";
+             false_
           | TNot (TComp(Ugt,e1,e2,_),_) ->
              if Expr.is_var e1 then
                let v1 = Expr.get_var e1 in
-               if Var.equal x v1 then
-                 not_ (ugt_ e2 (Expr.bvi (-1) (Var.size v1)))
-               else if Expr.is_var e2 then
+               if Var.equal x v1 then begin
+                   decr_q x "Ic-ugt1";
+                   not_ (ugt_ e2 (Expr.bvi (-1) (Var.size v1)))
+               end else if Expr.is_var e2 then
                  let v2 = Expr.get_var e2 in
-                 if Var.equal x v2 then
-                   (eq_ e1 (Expr.bvi 0 (Var.size v2)))
+                 if Var.equal x v2 then begin
+                     decr_q x "IC-ugt2";
+                     (eq_ e1 (Expr.bvi 0 (Var.size v2)))
+                   end
                  else
                    default x b
                else
                  default x b
              else if Expr.is_var e2 then
                let v2 = Expr.get_var e2 in
-               if Var.equal x v2 then
-                 (eq_ e1 (Expr.bvi 0 (Var.size v2)))
+               if Var.equal x v2 then begin
+                   decr_q x "ic-ugt3";
+                   (eq_ e1 (Expr.bvi 0 (Var.size v2)))
+                 end
                else
                  default x b
              else
@@ -476,7 +512,9 @@ let forall_one (x : Var.t) b =
                
           | TNot (TBin(LOr,b1,b2,_),_) ->
              self x (and_ (not_ b1) (not_ b2))
-          | TComp(Eq, e1, e2,_) when Expr.uelim `Eq [x] e1 e2 -> false_
+          | TComp(Eq, e1, e2,_) when Expr.uelim `Eq [x] e1 e2 ->
+             decr_q x "eq_false";
+             false_
           | TBin (op, b1, b2,_) ->
              begin match op with
              | LArr ->
@@ -486,8 +524,10 @@ let forall_one (x : Var.t) b =
                   or_ (self x (not_ b1)) b2
                 else if occurs_in x b2 then
                   imp_ b1 (self x b2)
-                else
-                  imp_ b1 b2
+                else begin
+                    decr_q x "not_free_imp_";
+                    imp_ b1 b2
+                  end
              | LOr ->
                 if occurs_in x b1 && occurs_in x b2 then
                   default x (or_ b1 b2)
@@ -495,9 +535,13 @@ let forall_one (x : Var.t) b =
                   or_ (self x b1) b2
                 else if occurs_in x b2 then
                   or_ b1 (self x b2)
-                else
-                  or_ b1 b2                
-             | LAnd -> and_ (self x b1) (self x b2)
+                else begin
+                    decr_q x "not_free_or_";
+                    or_ b1 b2
+                  end
+             | LAnd ->
+                incr_q x;
+                and_ (self x b1) (self x b2)
              | LIff -> default x (iff_ b1 b2)
              end
           | Forall(y, b') ->
@@ -533,6 +577,8 @@ let rec simplify_inner = function
   | Exists (x, b) -> simplify_inner b |> exists_one x
 
 let simplify b =
+  log_size (size b);
+  Log.print @@ lazy "simplify";
   let tmp = !enable_smart_constructors in
   enable_smart_constructors := `On;
   let b' = simplify_inner b in
@@ -1060,7 +1106,18 @@ let check_iff_str ?(timeout=None)  (b1 : t) (b2 : t) : string =
   let smtlib_exp = equivalence b1 b2 |> to_smtlib |> Smt.check_sat ~timeout [] in
   Solver.run_z3 smtlib_exp
   
-
+(* let rec num_quantifiers b =
+ *   match b with
+ *   | TTrue | TFalse | TComp _ | LVar _ -> 0
+ *   | TNot (b, _) ->
+ *      num_quantifiers b
+ *   | TBin (_, b1, b2, _) ->
+ *      (num_quantifiers b1) + (num_quantifiers b2)
+ *   | Exists _ ->
+ *      failwith "WHY IS THERE AN EXISTENTAL HERE?"
+ *   | Forall (_, b) ->
+ *      1 + num_quantifiers b  *)
+    
 let rec order_all_quantifiers b =
   match b with
   | TTrue | TFalse | TComp _ | LVar _ -> b
@@ -1073,14 +1130,14 @@ let rec order_all_quantifiers b =
   | Forall (x, b) ->
      match order_all_quantifiers b with
      | Forall (y, b) ->
-        if Var.size x > Var.size y then
+        if Var.size x < Var.size y then
           Forall (x, Forall (y, b))
         else
           Forall (y, Forall (x, b))
      | b -> forall_one x b 
 
 let rec bottom_up_qe (solver : ?with_timeout:int -> Var.t list -> string -> string) b : t =
-  (* Log.print @@ lazy "bottom_up_qe"; *)
+  log_size (size b);
   match b with
   | TTrue | TFalse | TComp _ | LVar _ -> b
   | TNot (b, _) ->
@@ -1092,11 +1149,12 @@ let rec bottom_up_qe (solver : ?with_timeout:int -> Var.t list -> string -> stri
      (* try smart constructor over result of recursive call*)
      begin match forall_one x (nnf b') with
      | Forall (x', body) as b' when Var.equal x x' ->
+        log_size (size body);
         (* in this case, the smart constructor had no effect*)
         (* optimistically try the solver with a 2s timeout *)
         (* this threshold should void bitblasting *)
         let vars = vars b' |> Util.uncurry (@) in
-        let res = solver ~with_timeout:(max (size b') 1000) vars (to_smtlib b') in
+        let res = solver ~with_timeout:(min (max (size b') 1000) 10000) vars (to_smtlib b') in
         Log.print @@ lazy "checkin success";
         let b'', good_enough =
           if Smt.success res && Smt.qf res then begin
@@ -1106,32 +1164,44 @@ let rec bottom_up_qe (solver : ?with_timeout:int -> Var.t list -> string -> stri
             end
           else
             b', false in
-        if good_enough then
-          let () = Log.print @@ lazy "form small enough" in
-          b''
-        else
-          let () = Log.print @@ lazy "form too big" in
+        if good_enough then begin
+            Log.print @@ lazy "form small enough";
+            decr_q x "z3";
+            b''
+        end else
+          let () = Log.print @@ lazy (Printf.sprintf "form too big: %d" (size b''))  in
            (* In this case, the solver timed out, so lets try to do something smarter *)
           let body = if qf body (*&& size body < 500 *)
                       then cnf (body) (* if the formula isn't too big, cnf it*)
                       else body in
            (* now run the smart constructors again *)
            begin match forall_one x' body |> simplify with
-           | Forall (x'', _) as phi when Var.equal x' x'' ->
+           | Forall (x'', body) as phi when Var.equal x' x'' ->
+              log_size (size body);
               (*If it had no effect, we are out of things to try*)
-              if check_unsat vars phi then
+              if check_unsat vars phi then begin
                 (* unsat formulae are = to false *)
+                decr_q x "z3";
                 false_
-              else
+              end else
                 (* finally, as a last resort, run the solver with no timeout *)
                 let res = solver vars (to_smtlib phi) in
+                decr_q x "z3";
                 Log.print @@ lazy res;
                 of_smtlib ~cvs:vars res
            | b'' ->
-              bottom_up_qe solver b''
+              log_size (size b'');
+              if qf b'' then begin
+                  b''
+                end
+              else bottom_up_qe solver b''
            end
      | b' ->
-        bottom_up_qe solver b'
+        log_size (size b');
+        if qf b' then begin
+            b'
+          end
+        else bottom_up_qe solver b'
      end
   | Exists _ ->
      failwith "not sure how to handle exists"

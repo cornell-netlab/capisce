@@ -8,6 +8,9 @@ val of_smtlib : ?cvs:Var.t list -> string -> t
 val of_smtast : ?cvs:Var.t list -> SmtAst.t list -> t  
 
 val enable_smart_constructors : [`On | `Off] ref
+val q_count : int ref
+val incr_q : Var.t -> unit
+val decr_q : Var.t -> string -> unit  
    
 val (=) : t -> t -> bool
    

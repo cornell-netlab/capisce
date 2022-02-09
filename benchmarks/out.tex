@@ -1,25 +1,29 @@
-		\begin{tabular}{l l l l}
+		\begin{tabular}{l l l c}
 			\toprule
-			Source P4 File & Elapsed time (ms) & Size (# AST nodes) & Satisfiable \\
+			\textsc{P4 Program} & Time (ms) & NT AST Size & (= \texttt{false}) \\
 			\midrule
-			\tt{07-MultiProtocol} & $65012.28$ & $4298.00$ & $\times$ \\
-			\tt{07-MultiProtocol\_simplified} & $3984.45$ & $117.00$ & $\times$ \\
-			\tt{actions} & $58.13$ & $6.00$ & $\times$ \\
-			\tt{allocate} & $27.25$ & $0.00$ & $\times$ \\
-			\tt{arp\_no\_consts\_sized\_ints} & $1882.33$ & $541.00$ & $\times$ \\
-			\tt{ecmp\_2\_noselector} & $815.68$ & $0.00$ & $\bot$ \\
-			\tt{flowlet\_sized\_ints} & $4968.97$ & $16.00$ & $\times$ \\
-			\tt{flowlet\_switching\_16\_sized\_ints} & $4941.67$ & $16.00$ & $\times$ \\
-			\tt{heavy\_hitter\_1} & $711.11$ & $33.00$ & $\times$ \\
-			\tt{heavy\_hitter\_2\_sized\_ints} & $810.93$ & $2.00$ & $\times$ \\
-			\tt{issue894\_16\_sized\_ints} & $738.23$ & $2.00$ & $\times$ \\
-			\tt{join} & $105.98$ & $26.00$ & $\times$ \\
-			\tt{mc\_nat\_16} & $104.88$ & $0.00$ & $\bot$ \\
-			\tt{ndp\_router\_16} & $1178.66$ & $0.00$ & $\bot$ \\
-			\tt{netpaxos\_acceptor\_16\_sized\_ints} & $2218.59$ & $0.00$ & $\bot$ \\
-			\tt{single\_fall} & $78.45$ & $5.00$ & $\times$ \\
-			\tt{single} & $57.16$ & $5.00$ & $\times$ \\
-			\tt{trifecta} & $26.48$ & $0.00$ & $\times$ \\
-			\tt{ts\_switching\_16\_no\_range} & $134.37$ & $0.00$ & $\bot$ \\
+			\texttt{trifecta} & $20.70$ & $0.00$ &  \\
+			\texttt{actions} & $40.26$ & $6.00$ &  \\
+			\texttt{single} & $41.32$ & $5.00$ &  \\
+			\texttt{allocate} & $51.56$ & $20.00$ &  \\
+			\texttt{single\_fall} & $52.37$ & $5.00$ &  \\
+			\texttt{join} & $62.87$ & $26.00$ &  \\
+			\texttt{mc\_nat\_16} & $82.17$ & $0.00$ & $\bot$ \\
+			\texttt{ts\_switching\_16\_no\_range} & $101.35$ & $0.00$ & $\bot$ \\
+			\texttt{heavy\_hitter\_1} & $612.51$ & $33.00$ &  \\
+			\texttt{issue894\_16\_sized\_ints} & $634.52$ & $2.00$ &  \\
+			\texttt{heavy\_hitter\_2\_sized\_ints} & $640.37$ & $2.00$ &  \\
+			\texttt{ecmp\_2\_noselector} & $659.19$ & $0.00$ & $\bot$ \\
+			\texttt{ndp\_router\_16} & $1124.09$ & $0.00$ & $\bot$ \\
+			\texttt{arp\_no\_consts\_sized\_ints} & $1736.15$ & $541.00$ &  \\
+			\texttt{netpaxos\_acceptor\_16\_sized\_ints} & $2157.76$ & $0.00$ & $\bot$ \\
+			\texttt{07-MultiProtocol\_simplified} & $3984.45$ & $117.00$ &  \\
+			\texttt{flowlet\_switching\_16\_sized\_ints} & $7119.47$ & $16.00$ &  \\
+			\texttt{simple\_nat} & $9866.81$ & $1361.00$ &  \\
+			\texttt{flowlet\_sized\_ints} & $14439.60$ & $16.00$ &  \\
+			\texttt{07-MultiProtocol} & $57634.96$ & $4298.00$ &  \\
+			\texttt{hula\_no\_consts} & $324990.79$ & $0.00$ & $\bot$ \\
+			\texttt{linearroad\_16\_sized\_ints\_no\_range} & $367641.70$ & $0.00$ & $\bot$ \\
+			\texttt{netchain\_16} & $1161475.33$ & $0.00$ &  \\
 			\bottomrule
 		\end{tabular}

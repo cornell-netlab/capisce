@@ -135,6 +135,7 @@ control MyIngress(inout headers hdr,
     }
 
     apply {
+        standard_metadata.egress_spec = 9w0;
         l2.apply();
         l3.apply();
         punt.apply();

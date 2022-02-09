@@ -24,7 +24,7 @@ else:
     except:
         results = {}
         
-fields = ["Source P4 File"]
+fields = ["\\textsc{P4 Program}"]
 first_experiment = list(results)[0]
 fields += list(results[first_experiment])
 
@@ -34,22 +34,30 @@ for experiment in results:
 
 rows = [fields]
 for experiment in experiments:
-    row = ["\\tt{" + experiment.replace("_","\_")[:-3] + "}"] # removes .p4 from files, adds '\' before '_', adds \tt{}
+    row = ["\\texttt{" + experiment.replace("_","\_")[:-3] + "}"] # removes .p4 from files, adds '\' before '_', adds \tt{}
     for value in results[experiment].values():
         if value == "x":
-            row += ['$\\times$']
+            row += ['']
         elif value == "-":
             row += ["$\\bot$"]
         else:
-            row += [f'${float(value):.2f}$']
+            # row += [f'${float(value):.2f}$']
+            row += [float(value)]
     rows.append(row)
 
-rows[0][1] = "Elapsed time (ms)"
-rows[0][2] = "Size (# AST nodes)"
-rows[0][3] = "Satisfiable"
+rows[0][1] = "Time (ms)"
+rows[0][2] = "NT AST Size"
+rows[0][3] = "(= \\texttt{false})"
+
+rows = [rows[0]] + sorted(rows[1:], key=lambda r: r[1])
+rows = [ [ v if isinstance(v, str) else f'${v:.2f}$'
+           for v in row]
+         for row in rows]
+
+
 
 table = texttable.Texttable()
-table.set_cols_align(["l", "l", "l", "l"])
+table.set_cols_align(["l", "l", "l", "c"])
 table.set_cols_valign(["t", "t", "t", "t"])
 table.add_rows(rows)
 
