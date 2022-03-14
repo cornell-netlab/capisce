@@ -1,6 +1,7 @@
 open Base_quickcheck
 open Core
 
+
 let enable_smart_constructors = ref `Off
 
 let q_count = ref 0
@@ -49,8 +50,8 @@ let comp_to_smtlib = function
   | Sle -> "bvsle"
   | Sgt -> "bvsgt"
   | Sge -> "bvsge"
-  
-type t =
+
+type t = 
   | TFalse
   | TTrue
   | LVar of string
@@ -1130,7 +1131,7 @@ let rec order_all_quantifiers b =
   | Forall (x, b) ->
      match order_all_quantifiers b with
      | Forall (y, b) ->
-        if Var.size x < Var.size y then
+        if Var.size x > Var.size y then
           Forall (x, Forall (y, b))
         else
           Forall (y, Forall (x, b))

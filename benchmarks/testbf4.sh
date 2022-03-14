@@ -51,9 +51,9 @@ fi
 if [ ! -z "$(ls $nocomp_dir)" ]; then
     mv $nocomp_dir/* $test_dir
 fi
-# if [ ! -z "$(ls $evoke_dir)" ]; then
-#     cp $evoke_dir/* $test_dir
-# fi
+if [ ! -z "$(ls $evoke_dir)" ]; then
+    cp $evoke_dir/* $test_dir
+fi
 
 
 # make capisce
