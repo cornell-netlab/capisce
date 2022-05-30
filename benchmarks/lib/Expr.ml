@@ -94,19 +94,17 @@ let band e1 e2 =
      BinOp(BAnd, e1, e2)
      
 let bor e1 e2 = BinOp(BOr, e1, e2)
-let rec bors : t list -> t = function
-  | [] -> failwith "cannot bvor 0 bvs, need at least one"
-  | [e] -> e
-  | e::es -> bor e (bors es)
 let badd e1 e2 = BinOp(BAdd, e1, e2)              
 let bmul e1 e2 = BinOp(BMul, e1, e2)
 let bsub e1 e2 = BinOp(BSub, e1, e2)
 let bxor e1 e2 = BinOp(BXor, e1, e2)
 let bconcat e1 e2 = BinOp (BConcat, e1, e2)
-let rec bconcats : t list -> t = function
-  | [] -> failwith "cannot concat an empty list"
+
+let rec nary op : t list -> t = function
+  | [] -> failwith "cannot bvor 0 bvs, need at least one"
   | [e] -> e
-  | e::es -> bconcat e (bconcats es)
+  | e::es -> op e (nary op es)
+ 
 let shl_ e1 e2 = BinOp(BShl, e1, e2)
 let ashr_ e1 e2 = BinOp(BAshr, e1, e2)
 let lshr_ e1 e2 = BinOp(BLshr, e1, e2)             
@@ -225,7 +223,22 @@ let rec label (ctx : Context.t) (e : t) =
      BinOp (bop, label ctx e1, label ctx e2)
   | UnOp (uop, e) ->
      UnOp (uop, label ctx e)
-               
+
+
+let rec coerce_types gamma e =
+  match e with
+  | BV _ -> e
+  | Var x ->
+     begin match TypeContext.get x gamma with
+     | Some y -> Var y
+     | None -> Var x
+     end
+  | BinOp (bop, e1, e2) ->
+     BinOp (bop, coerce_types gamma e1, coerce_types gamma e2)
+  | UnOp (uop, e) ->
+     UnOp (uop, coerce_types gamma e)
+     
+       
 
 let quickcheck_generator_uop : uop Generator.t =
   let open Quickcheck.Generator in

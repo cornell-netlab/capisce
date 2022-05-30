@@ -57,8 +57,4 @@ let is_unknown s =
   
 
 let qf s = doesnt_contain_any s ["forall"; "exists"]
-  
-
-
-
-    
+      

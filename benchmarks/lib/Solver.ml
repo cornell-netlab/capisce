@@ -21,4 +21,41 @@ let run_princess = run_proc princess_exe
 let run_z3 = run_proc z3_exe
 let run_cvc4 = run_proc cvc4_exe               
 
+let of_smtlib smt : BExpr.t =
+  Log.print @@ lazy "parsing";
+  let ast = SmtParser.parse_string smt in
+  Log.print @@ lazy "translating";
+  let b = BExpr.ands_ ast in
+  Log.print @@ lazy "done parsing";
+  b
+  
+let z3_simplify consts phi =
+  Smt.simplify consts (BExpr.to_smtlib phi)
+  |> run_z3 
+  |> of_smtlib
+  
+let check_sat ?(timeout=None) consts phi =
+  BExpr.to_smtlib phi
+  |> Smt.check_sat ~timeout consts
+  |> run_z3 
+  |> Smt.is_sat
 
+let check_unsat ?(timeout=None) consts phi =
+  BExpr.to_smtlib phi
+  |> Smt.check_sat ~timeout consts
+  |> run_z3 
+  |> Smt.is_unsat 
+  
+  
+let check_iff (b1 : BExpr.t) (b2 : BExpr.t) : bool =
+  let smtlib_exp = BExpr.equivalence b1 b2
+                   |> BExpr.to_smtlib
+                   |> Smt.check_sat ~timeout:(Some 1000) [] in
+  let res = run_z3 smtlib_exp in
+  Smt.is_unsat res
+
+let check_iff_str ?(timeout=None)  (b1 : BExpr.t) (b2 : BExpr.t) : string =
+  let smtlib_exp = BExpr.equivalence b1 b2
+                   |> BExpr.to_smtlib
+                   |> Smt.check_sat ~timeout [] in
+  run_z3 smtlib_exp                 

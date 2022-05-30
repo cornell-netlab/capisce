@@ -71,11 +71,11 @@ let solve_wto solver ?(with_timeout:int option) cvs smt =
 
 let solve solver cvs smt = solve_wto solver cvs smt     
 
-let normalize solver dvs cvs res =
+let normalize solver dvs _ (*cvs*) res =
   if Smt.success res then
       match solver with
       | `Z3 | `Z3Light ->
-         let goals = BExpr.to_smtlib (BExpr.of_smtlib ~cvs res) in
+         let goals = BExpr.to_smtlib (Solver.of_smtlib (*~cvs*) res) in
          if String.is_substring goals ~substring:":precision" then
            "true"
          else
@@ -158,7 +158,7 @@ let subsolving (prog, asst) =
   Log.print @@ lazy "smart constructors";
   let qphi = BExpr.(forall dvs phi |> order_all_quantifiers) in
   Log.print @@ lazy "running the bottom up solver";
-  let qf_phi = BExpr.bottom_up_qe (solve_wto `Z3) qphi in
+  let qf_phi = BottomUpQe.qe (solve_wto `Z3) qphi in
   Log.print @@ lazy "getting the vars of the result";  
   let dvs, cvs = BExpr.vars qf_phi in
   Log.print @@ lazy "checking all dataplane variables have been eliminated";    

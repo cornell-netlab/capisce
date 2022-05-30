@@ -24,10 +24,42 @@ rule read =
   | newline { next_line lexbuf; read lexbuf }
   | "(" { LPAREN }
   | ")" { RPAREN }
+  | "assert" { ASSERT }
+  | "goals" { GOALS }
+  | "goal"  { GOAL }
+  | ":precision" { PRECISION }
+  | ":depth" { DEPTH }
+  | "true" { TRUE }
+  | "false" { FALSE }
+  | "not" { NOT } 
   | "let" { LET }
   | "forall" { FORALL }
   | "exists" { EXISTS }
+  | "=>" { IMP }
+  | "or" { OR }
+  | "and" { AND }
+  | "="  { EQ }
+  | "_" { UNDERSCORE }
+  | "BitVec" { BITVEC }
   | "#b" { BITLIT }
   | "#x" { HEXLIT }
+  | "bvand" { BVAND }
+  | "bvor" { BVOR }
+  | "bvxor" { BVXOR }
+  | "bvadd" { BVADD }
+  | "bvmul" { BVMUL }
+  | "bvsub" { BVSUB }  
+  | "concat" { BVCONCAT }
+  | "bvshl" { SHL }
+  | "bvashr" { ASHR }
+  | "bvlshr" { LSHR }
+  | "bvult" { ULT }
+  | "bvule" { ULE }
+  | "bvugt" { UGT }
+  | "bvuge" { UGE }
+  | "bvslt" { SLT }
+  | "bvsle" { SLE }
+  | "bvsgt" { SGT }
+  | "bvsge" { SGE }
   | ident as x { ID x }
   | eof { EOF }

@@ -10,3 +10,5 @@ let enable_measurement () =
   print @@ lazy "Enabling measurement";
   measure := true
 let measure s = if !measure then  Printf.eprintf "%s\n%!" s              
+
+let size d = measure (Printf.sprintf "size,%f,%d" (Clock.now()) d)

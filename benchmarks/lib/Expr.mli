@@ -22,8 +22,7 @@ val lshr_ : t -> t -> t
 val ashr_ : t -> t -> t
 
 (* n-ary operators *)
-val bors : t list -> t
-val bconcats : t list -> t  
+val nary : (t -> t -> t) -> t list -> t
   
 (* Unary-ish Operators *)
 val bnot : t -> t
@@ -35,6 +34,7 @@ val neq_contra : (t * t) -> (t * t) -> bool
 val subst : Var.t -> t -> t -> t
 val vars : t -> Var.t list * Var.t list
 val to_smtlib : t -> string
+val coerce_types : TypeContext.t -> t -> t  
 
 val index_subst : Subst.t option -> t -> t
 

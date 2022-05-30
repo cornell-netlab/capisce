@@ -82,4 +82,3 @@ let quickcheck_observer =
   tuple2 String.quickcheck_observer Int.quickcheck_observer
 
 let quickcheck_shrinker = Base_quickcheck.Shrinker.atomic
-  

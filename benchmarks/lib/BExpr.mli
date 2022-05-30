@@ -1,11 +1,39 @@
 open Core
 open Base_quickcheck
    
-type t [@@deriving eq, sexp, compare, quickcheck]
+type bop =
+  | LAnd
+  | LOr
+  | LArr
+  | LIff
+  [@@deriving eq, sexp, compare, quickcheck]
+
+type comp =
+  | Eq
+  | Ult
+  | Ule
+  | Uge
+  | Ugt
+  | Slt
+  | Sle
+  | Sgt
+  | Sge
+  [@@deriving eq, sexp, compare, quickcheck]
+
+type t = 
+  | TFalse
+  | TTrue
+  | LVar of string
+  | TNot of t * Var.t list
+  | TBin of bop * t * t * Var.t list
+  | TComp of comp * Expr.t * Expr.t * Var.t list
+  | Forall of Var.t * t
+  | Exists of Var.t * t
+  [@@deriving eq, sexp, compare, quickcheck]
 
 val to_smtlib : t -> string
-val of_smtlib : ?cvs:Var.t list -> string -> t
-val of_smtast : ?cvs:Var.t list -> SmtAst.t list -> t  
+(* val of_smtlib : ?cvs:Var.t list -> string -> t
+ * val of_smtast : ?cvs:Var.t list -> SmtAst.t list -> t   *)
 
 val enable_smart_constructors : [`On | `Off] ref
 val q_count : int ref
@@ -19,16 +47,19 @@ val true_ : t
 
 (*Unary Operations*)
 val not_ : t -> t
+val lvar : string -> t  
 
 (* Binary Operations *)  
 val and_ : t -> t -> t
 val or_ : t -> t -> t
 val imp_ : t -> t -> t
 val iff_ : t -> t -> t
+val get_smart : bop -> t -> t -> t
 
 val ands_ : t list -> t
 val ors_ : t list -> t
 val imps_ : t list -> t
+val iffs_ : t list -> t  
   
 (* Comparisons *)
 val eq_ : Expr.t -> Expr.t -> t
@@ -47,6 +78,8 @@ val exists : Var.t list -> t -> t
 
 val subst : Var.t -> Expr.t -> t -> t
 val fun_subst : (Var.t -> Expr.t) -> t -> t
+val subst_lvar : string -> t -> t -> t
+val fun_subst_lvar : (string -> t) -> t -> t    
 (** [fun_subst f b] substitutes b according to function [f] *)  
 
 val one_point_rule : Expr.t -> Expr.t -> t -> t
@@ -64,6 +97,7 @@ val size : t -> int
 val qf : t -> bool
 val well_formed : t -> bool
 val get_conjuncts : t -> t list
+val coerce_types : TypeContext.t -> t -> t
   
 val label : Context.t -> t -> t
 
@@ -72,11 +106,10 @@ val equivalence : t -> t -> t
 val order_all_quantifiers : t -> t
   
 (* Solver-Aided functions *)
-val check_iff : t -> t -> bool
-val check_iff_str : ?timeout : int option -> t -> t -> string  
-val check_sat : ?timeout : int option -> Var.t list -> t -> bool
-val z3_simplify : Var.t list -> t -> t  
-val bottom_up_qe : (?with_timeout:int -> Var.t list -> string -> string) -> t -> t
+(* val check_iff : t -> t -> bool
+ * val check_iff_str : ?timeout : int option -> t -> t -> string  
+ * val check_sat : ?timeout : int option -> Var.t list -> t -> bool
+ * val z3_simplify : Var.t list -> t -> t   *)
 
 (* Predicate Abstraction *)  
 val predicate_abstraction : t -> t

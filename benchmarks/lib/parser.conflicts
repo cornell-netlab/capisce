@@ -1,0 +1,30 @@
+
+** Conflict (shift/reduce) in state 19.
+** Token involved: RPAREN
+** This state is reached from program after reading:
+
+LPAREN ULT LPAREN BVSUB expr
+
+** The derivations that appear below have the following common factor:
+** (The question mark symbol (?) represents the spot where the derivations begin to differ.)
+
+program 
+term program 
+bexpr 
+LPAREN ULT expr expr RPAREN 
+           (?)
+
+** In state 19, looking ahead at RPAREN, shifting is permitted
+** because of the following sub-derivation:
+
+LPAREN BVSUB exprs RPAREN 
+             expr exprs 
+                  expr 
+                  . RPAREN LSHR expr expr RPAREN 
+
+** In state 19, looking ahead at RPAREN, reducing production
+** exprs -> expr
+** is permitted because of the following sub-derivation:
+
+LPAREN BVSUB exprs RPAREN // lookahead token appears
+             expr . 

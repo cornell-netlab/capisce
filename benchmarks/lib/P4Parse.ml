@@ -37,14 +37,13 @@ let as_cmd_from_file (includes : string list) p4file gas unroll verbose =
      let typed, renamer = Elaborate.elab typed in
      let _, prog = Checker.check_program renamer typed in
      Log.print @@ lazy "got p4light";
-     let p4cub = ToP4cub.translate_program (P4Info.dummy) prog in
+     let p4cub = ToP4cub.translate_program (P4info.dummy) prog in
      Log.print @@ lazy "Got p4cub";
      match p4cub with
      | Error s ->
         failwith (Printf.sprintf "Compilation Error in stage [P4light->P4cub]: %s" s)
      | Ok p4cub ->
-        let instr s (_) keys acts = TableInstr.instr s keys acts in
-        let coq_gcl = V1model.gcl_from_p4cub (P4Info.dummy) instr gas unroll p4cub in
+        let coq_gcl = V1model.gcl_from_p4cub (P4info.dummy) TableInstr.instr gas unroll p4cub in
         Log.print @@ lazy "Got coq_gcl";
         match coq_gcl with
         | Error s ->
