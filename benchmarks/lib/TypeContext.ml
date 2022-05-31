@@ -21,10 +21,12 @@ let get (x : Var.t) (m : t) =
   
 let singleton (x : Var.t) = set x VarMap.empty
 
-let to_list m =
-  VarMap.fold m
+let to_list =
+  VarMap.fold
     ~init:[]
     ~f:(fun ~key ~data acc ->
       Var.make key data :: acc
     )
 
+let of_list = List.fold ~init:empty ~f:(Fn.flip set)
+    

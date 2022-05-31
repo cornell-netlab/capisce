@@ -25,7 +25,7 @@ let rec qe (solver : ?with_timeout:int -> Var.t list -> string -> string) b : BE
         let b'', good_enough =
           if Smt.success res && Smt.qf res then begin
               Log.print @@ lazy res;
-              let b'' = Solver.of_smtlib (* ~cvs:vars *) res in
+              let b'' = Solver.of_smtlib vars res in
               (b'', (size b'') < 10 * (BExpr.size b'))
             end
           else
@@ -54,7 +54,7 @@ let rec qe (solver : ?with_timeout:int -> Var.t list -> string -> string) b : BE
                 let res = solver vars (to_smtlib phi) in
                 decr_q x "z3";
                 Log.print @@ lazy res;
-                Solver.of_smtlib (*~cvs:vars*) res
+                Solver.of_smtlib vars res
            | b'' ->
               Log.size (size b'');
               if qf b'' then begin

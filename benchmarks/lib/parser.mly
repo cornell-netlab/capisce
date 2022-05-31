@@ -27,6 +27,7 @@
 %token BVSUB
 %token BVXOR
 %token BVCONCAT
+%token BVEXTRACT 
 %token SHL
 %token LSHR
 %token ASHR
@@ -59,7 +60,11 @@ expr_bop :
   | BVSUB    { Expr.bsub }
   | BVXOR    { Expr.bxor }
   | BVCONCAT { Expr.bconcat }
-     
+
+extract :
+  | LPAREN; UNDERSCORE; BVEXTRACT; hi=ID; lo=ID; RPAREN;
+    { Bigint.(of_string lo |> to_int_exn, of_string hi |> to_int_exn) }
+
 expr :
   | x = ID;
     { Expr.var (Var.make x (-1)) }
@@ -71,10 +76,12 @@ expr :
     { Expr.nary bop es }
   | LPAREN; SHL; e1 = expr; e2 = expr; RPAREN;
     { Expr.shl_ e1 e2  }
-  | RPAREN; LSHR; e1 = expr; e2 = expr; RPAREN;
+  | LPAREN; LSHR; e1 = expr; e2 = expr; RPAREN;
     { Expr.lshr_ e1 e2 }
-  | RPAREN; ASHR; e1 = expr; e2 = expr; RPAREN;
+  | LPAREN; ASHR; e1 = expr; e2 = expr; RPAREN;
     { Expr.ashr_ e1 e2 }
+  | LPAREN; idxs=extract; e=expr; RPAREN;
+    { Expr.bslice (fst idxs) (snd idxs) e }
 
 bindings :
   | (*empty*)
@@ -137,8 +144,8 @@ bexpr :
     { BExpr.sge_ e1 e2 }
 
 term :
-  | LPAREN; GOALS; LPAREN; GOAL; b = bexpr; PRECISION; p=ID; DEPTH; d=ID; RPAREN; RPAREN;
-    { Printf.printf ":precision %s :depth %s\n%!" p d;  b }
+  | LPAREN; GOALS; LPAREN; GOAL; bs = list(bexpr); PRECISION; p=ID; DEPTH; d=ID; RPAREN; RPAREN;
+    { Printf.printf ":precision %s :depth %s\n%!" p d;  BExpr.ands_ bs }
   | b = bexpr;
     { b }
   | LPAREN; ASSERT; b = bexpr; RPAREN;

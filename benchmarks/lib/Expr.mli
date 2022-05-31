@@ -30,6 +30,7 @@ val bcast : int -> t -> t
 val bslice : int -> int -> t -> t
 
 val static_eq : t -> t -> bool option
+val reassociate_bors : Var.t -> t -> (Var.t * t ) option  
 val neq_contra : (t * t) -> (t * t) -> bool  
 val subst : Var.t -> t -> t -> t
 val vars : t -> Var.t list * Var.t list
@@ -46,7 +47,8 @@ val uelim : [`Neq | `Eq] -> Var.t list -> t -> t -> bool
 val well_formed : t -> bool
 (** [well_formed e] returns true iff the variables are well-formed and no bitvector has negative length *)
 
-val size : t -> int
+val size : t -> int (* the ast size *)
+val width : t -> int (* the bitwidth of the expr*)   
 (** [size e] is the size of e's AST *)
 
 val label : Context.t -> t -> t

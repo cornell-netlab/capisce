@@ -142,6 +142,43 @@ let static_eq e1 e2 =
        | BV (v1,_), BV(v2,_) ->
           Some Bigint.(v1 = v2)
        | _, _ -> None
+ 
+let rec reassociate_bors_aux x e =
+  match e with
+  | Var x' when Var.(x' = x) ->
+     (Some x, [])
+  | Var y ->
+     (None, [var y])
+  | BinOp (BOr, e1, e2) ->
+     let (found1, bors1) = reassociate_bors_aux x e1 in
+     let (found2, bors2) = reassociate_bors_aux x e2 in
+     let bors = (bors1 @ bors2) |> List.dedup_and_sort ~compare in 
+     begin match found1, found2 with
+     | None, None -> (None, bors)
+     | Some x', Some x'' when Var.(x = x' && x = x'') ->
+        (Some x, bors)
+     | Some x', None when Var.(x = x') ->
+        (Some x, bors)
+     | None, Some x' when Var.(x = x')->
+        (Some x, bors)
+     | _,  _ ->
+        failwith "bor-reassociate failed. Got the wrong variable name"
+     end
+  | _ ->
+     (None, [e])
+
+let reassociate_bors x e =
+  match reassociate_bors_aux x e with
+  | (None, _) -> None
+  | (Some x', bor_list) when Var.(x' = x) ->
+     if List.is_empty bor_list then
+       None
+     else
+       Some (x', nary bor bor_list)
+  | (Some _, _) ->
+     failwith "bor-reassociate failed. got the wrong variable name"
+  
+     
 
 (* returns true if (e11 != e12) /\ (e21 != e22) is contradictory *)               
 let neq_contra (e11,e12) (e21, e22) =
@@ -213,6 +250,22 @@ let rec size = function
   | BV (_, _) | Var _ -> 1
   | BinOp (_, e1, e2) -> size e1 + 1 + size e2
   | UnOp(_,e) -> 1 + size e
+
+let rec width = function
+  | BV(_, w) -> w
+  | Var x -> Var.size x
+  | UnOp(USlice (lo, hi), _) -> hi - lo 
+  | UnOp(UNot, e) -> width e
+  | BinOp(BConcat, e1, e2) -> width e1 + width e2
+  | BinOp(_ , e1, e2) ->
+     let w1 = width e1 in
+     let w2 = width e2 in
+     if w1 = w2 then
+       w1
+     else
+       failwith "Type Error. sub expressions had different widths"
+     
+     
 
 
 let rec label (ctx : Context.t) (e : t) =

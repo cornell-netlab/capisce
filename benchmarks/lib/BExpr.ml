@@ -482,6 +482,46 @@ let ic_ugt default x b e1 e2 =
   else
     default x b
 
+let process_bors e1 e2 e1_reassoc e2_reassoc =
+  match e1_reassoc, e2_reassoc with
+  | Some(x, s), _ ->
+     let t = e2 in
+     Some (x, s, t)
+  | None, Some(x,s) ->
+     let t = e1 in
+     Some (x, s, t)
+  | None, None ->
+     None
+     
+            
+     
+     
+  
+let ic_neq default x b e1 e2 =
+  (* attempt to apply the ic: ∀ x. x | s ≠ t  *)
+  (* which becomes ¬ ∃ x. x | s = t   *)
+  (* we return either b or ¬ (s | t = t) *)
+  let e1_reassoc = Expr.reassociate_bors x e1 in
+  let e2_reassoc = Expr.reassociate_bors x e2 in
+  match process_bors e1 e2 e1_reassoc e2_reassoc with
+  | Some (x',s,t) when Var.(x = x') -> 
+     not_ (eq_ (Expr.bor s t) t)
+  | _ -> 
+     default x b
+
+let ic_eq default x b e1 e2 =
+  (* attempt to apply the ic: ∀ x. x | s = t  *)
+  (* which becomes ¬ ∃ x. x | s ≠ t *)
+  (* we return either b or ¬ (s = !0 ∨ t = !0) *)  
+  let e1_reassoc = Expr.reassociate_bors x e1 in
+  let e2_reassoc = Expr.reassociate_bors x e2 in
+  match process_bors e1 e2 e1_reassoc e2_reassoc with
+  | Some (x',s,t) when Var.(x = x') ->
+     and_ (eq_ s Expr.(bnot (bvi 0 (width s))))
+          (eq_ t Expr.(bnot (bvi 0 (width t))))
+  | _ -> 
+     default x b
+  
 
 let forall_imp self default x b1 b2 = 
   if occurs_in x b1 && occurs_in x b2 then
@@ -507,8 +547,6 @@ let forall_or self default x b1 b2 =
       decr_q x "not_free_or_";
       or_ b1 b2
     end
-  
-
   
 let forall_one (x : Var.t) b =  
   Log.print @@ lazy (Printf.sprintf "smart constructor for %s (_ BitVec %d) " (Var.str x) (Var.size x));
@@ -538,11 +576,15 @@ let forall_one (x : Var.t) b =
           | TNot (TComp(Eq,e1,e2,_),_) when Expr.uelim `Neq [x] e1 e2 ->
              decr_q x "neq_false"; false_
           | TNot (TComp(Ugt,e1,e2,_),_) ->
-             ic_ugt default x b e1 e2              
+             ic_ugt default x b e1 e2
           | TNot (TBin(LOr,b1,b2,_),_) ->
              self x (and_ (not_ b1) (not_ b2))
-          | TComp(Eq, e1, e2,_) when Expr.uelim `Eq [x] e1 e2 ->
+          | TNot(TComp(Eq, e1, e2, _), _) ->
+             ic_neq default x b e1 e2
+          | TComp(Eq, e1, e2,_) when Expr.uelim `Eq [x] e1 e2 ->             
              decr_q x "eq_false"; false_
+          | TComp(Eq, e1, e2, _) ->
+             ic_eq default x b e1 e2                         
           | TBin (op, b1, b2,_) ->
              begin match op with
              | LArr ->

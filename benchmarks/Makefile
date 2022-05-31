@@ -7,6 +7,8 @@
 all:
 	rm -f icecap && dune build bin/main.exe && cp _build/default/bin/main.exe icecap
 
+install: all
+	rm -f ~/.local/bin/icecap && cp _build/default/bin/main.exe ~/.local/bin/icecap
 
 clean:
 	rm -fr _build

@@ -50,6 +50,7 @@ rule read =
   | "bvmul" { BVMUL }
   | "bvsub" { BVSUB }  
   | "concat" { BVCONCAT }
+  | "extract" { BVEXTRACT }
   | "bvshl" { SHL }
   | "bvashr" { ASHR }
   | "bvlshr" { LSHR }

@@ -44,6 +44,8 @@ let (=) ((s1,n1) : t) ((s2,n2) : t) =
   if String.(s1 = s2) then
     if n1 = n2 then
       true
+    else if n1 = -1 || n2 = -1 then
+      true
     else
       failwith (Printf.sprintf "[%s]_%d and [%s]_%d had equal string values but different width values" s1 n1 s2 n2)
   else

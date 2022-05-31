@@ -71,11 +71,11 @@ let solve_wto solver ?(with_timeout:int option) cvs smt =
 
 let solve solver cvs smt = solve_wto solver cvs smt     
 
-let normalize solver dvs _ (*cvs*) res =
+let normalize solver dvs cvs res =
   if Smt.success res then
       match solver with
       | `Z3 | `Z3Light ->
-         let goals = BExpr.to_smtlib (Solver.of_smtlib (*~cvs*) res) in
+         let goals = BExpr.to_smtlib (Solver.of_smtlib cvs res) in
          if String.is_substring goals ~substring:":precision" then
            "true"
          else
