@@ -981,6 +981,7 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
     }
     @name(".parse_ethernet") state parse_ethernet {
         packet.extract(hdr.ethernet);
+        hdr.ethernet.etherType = 16w0x800;
         transition select(hdr.ethernet.etherType) {
             16w0 &&& 16w0xfe00: parse_llc_header;
             16w0 &&& 16w0xfa00: parse_llc_header;
@@ -1174,6 +1175,7 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
     }
     @name(".parse_ipv4") state parse_ipv4 {
         packet.extract(hdr.ipv4);
+        hdr.ipv4.protocol = 8w0x6;
         transition select(hdr.ipv4.fragOffset, hdr.ipv4.ihl, hdr.ipv4.protocol) {
             (13w0x0, 4w0x5, 8w0x1): parse_icmp;
             (13w0x0, 4w0x5, 8w0x6): parse_tcp;
@@ -1337,8 +1339,8 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
         meta.l3_metadata.lkp_outer_l4_sport = hdr.tcp.srcPort;
         meta.l3_metadata.lkp_outer_l4_dport = hdr.tcp.dstPort;
         transition select(hdr.tcp.dstPort) {
-            16w179: parse_set_prio_med;
-            16w639: parse_set_prio_med;
+            // 16w179: parse_set_prio_med;
+            // 16w639: parse_set_prio_med;
             default: accept;
         }
     }

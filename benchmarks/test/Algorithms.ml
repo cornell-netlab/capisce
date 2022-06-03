@@ -31,6 +31,7 @@ let cnf_equiv () =
       [%test_pred: BExpr.t] (log_eq b) (BExpr.cnf b))
 
 let vc_egress_spec () =
+  (* EXPECTED TO FAIL *)
   let open BExpr in
   let open Expr in
   let open Cmd in
@@ -74,6 +75,7 @@ let vc_egress_spec () =
   Alcotest.(check cmd) "literal equivalence" skip c
 
 let const_prop_for_parser () =
+  (* EXPECTED TO FAIL *)
   let open BExpr in
   let open Expr in
   let open Cmd in
@@ -103,37 +105,7 @@ let const_prop_for_parser () =
                              [assume (not_ (eq_ (var _parse_ipv4_next) (bvi 1 1)))]]
     ] in
   Alcotest.(check cmd) "literal equivalence" skip (const_prop c)
-  
 
-(* _state$start$next := (_ bv1 1);
- * {
- *   assume (= _state$start$next (_ bv1 1));
- *   _state$start$next := (_ bv0 1);
- *   hdr.ethernet.is_valid := (_ bv1 1);
- *   assert (= hdr.ethernet.is_valid (_ bv1 1));
- *   {
- *     assume (= hdr.ethernet.etherType (_ bv2048 16));
- *     _state$parse_ipv4$next := (_ bv1 1)
- *   } [] {
- *     assume (not
- *   (= hdr.ethernet.etherType (_ bv2048 16)));
- *     _state$reject$next := (_ bv1 1)
- *   }
- * } [] {
- *   assume (not
- *   (= _state$start$next (_ bv1 1)))
- * };
- * {
- *   assume (= _state$parse_ipv4$next (_ bv1 1));
- *   _state$parse_ipv4$next := (_ bv0 1);
- *   hdr.ipv4.is_valid := (_ bv1 1);
- *   _state$accept$next := (_ bv1 1)
- * } [] {
- *   assume (not
- *   (= _state$parse_ipv4$next (_ bv1 1)))
- * }; *)
-
-  
 let tests =
   [
     Alcotest.test_case "cnf foils" `Quick cnf_foils;

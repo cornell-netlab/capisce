@@ -152,15 +152,16 @@ let _compute_label_equal b =
 
 
 let get_labelled_vars b =
-  if !Log.debug && not (_compute_label_equal b) then begin
-      Printf.printf "------formula------\n%s\n%!" (([%sexp_of: t] b) |> Sexp.to_string);
-      Printf.printf "------compute------\n%s\n%!" (compute_vars b |> Util.uncurry (@) |> Var.list_to_smtlib_quant);
-      Printf.printf "------labeled------\n%s\n%!" (get_labelled_vars_aux b|> Var.list_to_smtlib_quant);
-            
-      assert false
-    end
-  else
-    get_labelled_vars_aux b
+  compute_vars b |> Util.uncurry (@)
+  (* if !Log.debug && not (_compute_label_equal b) then begin
+   *     Printf.printf "------formula------\n%s\n%!" (([%sexp_of: t] b) |> Sexp.to_string);
+   *     Printf.printf "------compute------\n%s\n%!" (compute_vars b |> Util.uncurry (@) |> Var.list_to_smtlib_quant);
+   *     Printf.printf "------labeled------\n%s\n%!" (get_labelled_vars_aux b|> Var.list_to_smtlib_quant);
+   *           
+   *     assert false
+   *   end
+   * else
+   *   get_labelled_vars_aux b *)
   
 let vars t : Var.t list * Var.t list =
   let c = Clock.start () in
@@ -192,10 +193,10 @@ let ctor2 ~default ~smart a b =
   | `On -> smart default a b
   | `Off ->
     default a b
-let rec ctor2rec ~default ~smart a b =
-  match !enable_smart_constructors with
-  | `On -> smart (ctor2rec ~default ~smart) default a b
-  | `Off -> default a b
+(* let rec ctor2rec ~default ~smart a b =
+ *   match !enable_smart_constructors with
+ *   | `On -> smart (ctor2rec ~default ~smart) default a b
+ *   | `Off -> default a b *)
         
 let false_ = TFalse
 let true_ = TTrue
@@ -455,32 +456,45 @@ let size b =
   size_aux b;
   !size_
 
-let ic_ugt default x b e1 e2 =
+let ic_ugt x b e1 e2 =
+  (* ∀ x. b
+   * ≜ ∀ x. ¬(e1 >ᵤ e2)
+   * ≡ ¬∃x. e1 >ᵤ e2
+   * *)
   if Expr.is_var e1 then
     let v1 = Expr.get_var e1 in
     if Var.equal x v1 then begin
-        decr_q x "Ic-ugt1";
-        not_ (ugt_ e2 (Expr.bvi (-1) (Var.size v1)))
-      end else if Expr.is_var e2 then
+        (* ¬∃x. x >ᵤ e2  (we're in this case)
+         * ≡ ¬ ∃ x. (x | 0) >ᵤ e2
+         * ≡ ¬ (e2 <ᵤ -1) (APPLYING THE RELEVANT IC) *)
+        not_ (ult_ e2 (Expr.bvi (-1) (Var.size v1)))
+      end
+    else if Expr.is_var e2 then
       let v2 = Expr.get_var e2 in
       if Var.equal x v2 then begin
           decr_q x "IC-ugt2";
+          (* ¬∃x. e1 >ᵤ x
+           * ≡ ¬∃x. x <ᵤ e1
+           * ≡ ¬∃x. x & F..F <ᵤ e1
+           * ≡ ¬ t ≠ 0
+           * ≡ t = 0 *)          
           (eq_ e1 (Expr.bvi 0 (Var.size v2)))
         end
       else
-        default x b
+        Forall(x, b)
     else
-      default x b
+      Forall(x, b)
   else if Expr.is_var e2 then
     let v2 = Expr.get_var e2 in
     if Var.equal x v2 then begin
-        decr_q x "ic-ugt3";
+        decr_q x "IC-ugt3";
+        (* same derivation as ic-ugt2 *)
         (eq_ e1 (Expr.bvi 0 (Var.size v2)))
       end
     else
-      default x b
+      Forall(x, b)
   else
-    default x b
+    Forall(x, b)
 
 let process_bors e1 e2 e1_reassoc e2_reassoc =
   match e1_reassoc, e2_reassoc with
@@ -492,12 +506,8 @@ let process_bors e1 e2 e1_reassoc e2_reassoc =
      Some (x, s, t)
   | None, None ->
      None
-     
-            
-     
-     
   
-let ic_neq default x b e1 e2 =
+let ic_neq x b e1 e2 =
   (* attempt to apply the ic: ∀ x. x | s ≠ t  *)
   (* which becomes ¬ ∃ x. x | s = t   *)
   (* we return either b or ¬ (s | t = t) *)
@@ -507,9 +517,9 @@ let ic_neq default x b e1 e2 =
   | Some (x',s,t) when Var.(x = x') -> 
      not_ (eq_ (Expr.bor s t) t)
   | _ -> 
-     default x b
+     Forall(x, b)
 
-let ic_eq default x b e1 e2 =
+let ic_eq x b e1 e2 =
   (* attempt to apply the ic: ∀ x. x | s = t  *)
   (* which becomes ¬ ∃ x. x | s ≠ t *)
   (* we return either b or ¬ (s = !0 ∨ t = !0) *)  
@@ -520,96 +530,94 @@ let ic_eq default x b e1 e2 =
      and_ (eq_ s Expr.(bnot (bvi 0 (width s))))
           (eq_ t Expr.(bnot (bvi 0 (width t))))
   | _ -> 
-     default x b
+     Forall(x, b)
   
 
-let forall_imp self default x b1 b2 = 
+let forall_imp self return x b1 b2 = 
   if occurs_in x b1 && occurs_in x b2 then
-    default x (imp_ b1 b2)
+    return @@ Forall (x, (imp_ b1 b2))
   else if occurs_in x b1 then
-    or_ (self x (not_ b1)) b2
+    self x (not_ b1) @@ fun b1 ->
+    return @@ or_ b1 b2
   else if occurs_in x b2 then
-    imp_ b1 (self x b2)
+    self x b2 @@ fun b2' -> 
+    return @@ imp_ b1 b2'
   else begin
       decr_q x "not_free_imp_";
       imp_ b1 b2
     end
 
-
-let forall_or self default x b1 b2 = 
+let forall_or self return x b1 b2 = 
   if occurs_in x b1 && occurs_in x b2 then
-    default x (or_ b1 b2)
+    return @@ Forall(x, (or_ b1 b2))
   else if occurs_in x b1 then
-    or_ (self x b1) b2
+    self x b1 @@ fun b1' -> 
+    return @@ or_ b1' b2
   else if occurs_in x b2 then
-    or_ b1 (self x b2)
+    self x b2 @@ fun b2' -> 
+    return @@ or_ b1 b2'
   else begin
       decr_q x "not_free_or_";
-      or_ b1 b2
+      return @@ or_ b1 b2
     end
   
-let forall_one (x : Var.t) b =  
-  Log.print @@ lazy (Printf.sprintf "smart constructor for %s (_ BitVec %d) " (Var.str x) (Var.size x));
+let rec forall_one_cps (x : Var.t) b return =  
   Log.size (size b);
-  ctor2rec x b
-    ~default:(fun x b ->
-      (* if Int.(Var.size x = 1 && (size b) < 100) then
-       *   let f bit y = if Var.(x = y) then Expr.bvi bit 1 else Expr.var y in
-       *   and_
-       *     (fun_subst (f 0) b)
-       *     (fun_subst (f 1) b)
-       * else              *)
-        Forall(x,b))      
-  (* ~smart:(Fn.const smart) *)
-    ~smart:(fun self default x b ->
-        Log.size (size b);      
-        let bvs = get_labelled_vars b in
-        if not (List.exists bvs ~f:(Var.(=) x)) then begin
-            decr_q x "not free";
-            b
-        end else 
-          match b with
-          | TFalse ->
-             decr_q x "false"; false_
-          | TTrue ->
-             decr_q x "true"; true_
-          | TNot (TComp(Eq,e1,e2,_),_) when Expr.uelim `Neq [x] e1 e2 ->
-             decr_q x "neq_false"; false_
-          | TNot (TComp(Ugt,e1,e2,_),_) ->
-             ic_ugt default x b e1 e2
-          | TNot (TBin(LOr,b1,b2,_),_) ->
-             self x (and_ (not_ b1) (not_ b2))
-          | TNot(TComp(Eq, e1, e2, _), _) ->
-             ic_neq default x b e1 e2
-          | TComp(Eq, e1, e2,_) when Expr.uelim `Eq [x] e1 e2 ->             
-             decr_q x "eq_false"; false_
-          | TComp(Eq, e1, e2, _) ->
-             ic_eq default x b e1 e2                         
-          | TBin (op, b1, b2,_) ->
-             begin match op with
-             | LArr ->
-                forall_imp self default x b1 b2
-             | LOr ->
-                forall_or self default x b1 b2
-             | LAnd ->
-                incr_q x;
-                and_ (self x b1) (self x b2)
-             | LIff -> default x (iff_ b1 b2)
-             end
-          | Forall(y, b') ->
-             (* Log.print @@ lazy (Printf.sprintf "eliminating %s under %s" (Var.str y) (Var.str x));
-              * begin match self y b' with
-              * | Forall (y,bb) ->
-              *    Log.print @@ lazy (Printf.sprintf "couldn't. moving %s out, and %s in" (Var.str y) (Var.str x)); *)
-             default y (self x b') 
-            (*  | bb ->
-             *     Log.print @@ lazy (Printf.sprintf "yes! %s is gone. eliminating %s" (Var.str y) (Var.str x));
-             *     self x bb
-             * end *)
-          | _ ->
-             default x b 
-    )
+  match !enable_smart_constructors with
+  | `Off ->  Forall(x,b)
+  | `On -> 
+     Log.print @@ lazy (Printf.sprintf "smart constructor for ∀ %s (_ BitVec %d) over an ast comprising %d bits and %d nodes!" (Var.str x) (Var.size x) (Obj.(reachable_words (repr b) + 1) * 64) (size b));
+     Log.size (size b);      
+     let bvs = get_labelled_vars b in
+     if not (List.exists bvs ~f:(Var.(=) x)) then begin
+         decr_q x "not free";
+         return b
+       end else 
+       match b with
+       | TFalse ->
+          decr_q x "false";
+          return false_
+       | TTrue ->
+          decr_q x "true";
+          return true_
+       | TNot (TComp(Eq,e1,e2,_),_) when Expr.uelim `Neq [x] e1 e2 ->
+          decr_q x "neq_false";
+          return false_
+       | TNot (TComp(Ugt,e1,e2,_),_) ->
+          return (ic_ugt x b e1 e2)
+       | TNot (TBin(LOr,b1,b2,_),_) ->
+          forall_one_cps x (and_ (not_ b1) (not_ b2)) return
+       | TNot(TComp(Eq, e1, e2, _), _) ->
+          return @@ ic_neq x b e1 e2
+       | TComp(Eq, e1, e2,_) when Expr.uelim `Eq [x] e1 e2 ->             
+          decr_q x "eq_false";
+          return false_
+       | TComp(Eq, e1, e2, _) ->
+          return @@ ic_eq x b e1 e2                         
+       | TBin (op, b1, b2,_) ->
+          begin match op with
+          | LArr ->
+             forall_imp forall_one_cps return x b1 b2
+          | LOr ->
+             forall_or forall_one_cps return x b1 b2
+          | LAnd ->
+             incr_q x;
+             forall_one_cps x b1 @@ fun b1' ->
+             forall_one_cps x b2 @@ fun b2' ->
+             return @@ and_ b1' b2' 
+          | LIff ->
+             return @@ Forall(x, (iff_ b1 b2))
+          end
+       | Forall(y, b') ->
+          forall_one_cps x b' @@ fun b'' ->
+          return @@ Forall(y, b'')
+       | _ ->
+          let phi = Forall(x, b) in
+          Printf.printf "no more smartness %s \n%!" (to_smtlib phi);
+          return @@ phi
 
+let forall_one x b = forall_one_cps x b Fun.id
+         
 let forall xs b = List.fold_right xs ~init:b ~f:forall_one 
 
 let exists_one x b = Exists(x, b)
@@ -927,194 +935,6 @@ let subst_lvar x b0 =
 (** Solver interface Code*)
   
 module Ctx = Map.Make (String) 
-
-(* let add_sort x e =
- *   let open SmtAst in
- *   match e with
- *   | Fun (Id "_", [Id "BitVec"; Id n]) ->
- *      Var.make x (int_of_string n)
- *   | Id "Bool" ->
- *      failwith "Not sure how to translate boolean sorts"
- *   | _ -> failwith "unrecognized sort" 
- *      
- *   
- * let rec to_vars (gamma : Var.t Ctx.t) (bound : SmtAst.t list) =
- *   let open SmtAst in
- *   match bound with
- *   | [] -> gamma, []
- *   | Fun (Id x_name, [sort]) :: rst ->
- *      let x = add_sort x_name sort in
- *      let gamma = Ctx.set gamma ~key:x_name ~data:x in
- *      let gamma, vars = to_vars gamma rst in
- *      gamma, x::vars 
- *   | _ ->
- *      failwith "malformed sort" *)
-
-(* let rec to_expr gamma expr_bindings b : Expr.t =
- *   let open SmtAst in
- *   match b with
- *   | Id x ->
- *      begin match Ctx.find gamma x with
- *      | None ->
- *         begin match Ctx.find expr_bindings x with
- *         | None -> 
- *            failwith (x ^ " was missing from expression context and expression bindings")
- *         | Some e ->
- *            e
- *         end
- *      | Some x ->
- *         Expr.var x
- *      end
- *   | Fun (Id "bvnot", [e]) ->
- *      Expr.bnot (to_expr gamma expr_bindings e)
- *   | Fun (Id "_", [Id bv; Id size]) ->
- *      Expr.bv (Bigint.of_string (String.chop_prefix_exn bv ~prefix:"bv")) (Bigint.of_string size |> Bigint.to_int_exn)
- *   | Fun (Id f, [e1; e2]) ->
- *      let e1 = to_expr gamma expr_bindings e1 in
- *      let e2 = to_expr gamma expr_bindings e2 in
- *      begin match f with
- *      | "bvor"  -> Expr.bor e1 e2
- *      | "bvand" -> Expr.band e1 e2
- *      | "bvxor" -> Expr.bxor e1 e2
- *      | "bvadd" -> Expr.badd e1 e2
- *      | "bvmul" -> Expr.bmul e1 e2
- *      | "bvsub" -> Expr.bsub e1 e2
- *      | "concat" -> Expr.bconcat e1 e2
- *      | "bvshl" -> Expr.shl_ e1 e2
- *      | "bvashr" -> Expr.ashr_ e1 e2
- *      | "bvlshr" -> Expr.lshr_ e1 e2
- *      | _ ->
- *         failwith ("unrecognized binary function " ^ f)
- *      end
- *   | Fun (Id "bvor", args) -> List.map args ~f:(to_expr gamma expr_bindings) |> Expr.(nary bor)
- *   | Fun (Id "concat", args) -> List.map args ~f:(to_expr gamma expr_bindings) |> Expr.(nary bconcat)
- *   | Fun (Fun (Id "_", [Id "extract"; Id hi; Id lo]), [arg]) ->
- *      Expr.bslice (int_of_string lo) (int_of_string hi) (to_expr gamma expr_bindings arg)
- *   | Fun (Fun (Id "_", [Id "extract"; Id hi; Id lo]),  args)->
- *      failwith (Printf.sprintf "How do I (_ extract %s %s) %d arguments" hi lo (List.length args)) 
- *     
- *   | Fun (Id f, args) ->
- *      failwith (Printf.sprintf "[expr] gotta support %s over %d args" f (List.length args))
- *   | Fun _ ->
- *      failwith ("unrecognized function " ^ to_sexp_string [b])
- *   | BV (v, w) -> Expr.bv v w
- *   | Forall _ | Exists _ ->
- *      failwith "quantifier are not expressions"
- *   | Let _ ->
- *      failwith "let bindings are not expressions" *)
-     
-    
-(* let rec translate_assignments gamma (bool_bindings : t Ctx.t) (expr_bindings : Expr.t Ctx.t) assignments : (t Ctx.t * Expr.t Ctx.t) =
- *   let open SmtAst in
- *   match assignments with
- *   | [] -> (bool_bindings, expr_bindings)
- *   | Fun (Id var, [bexpr_smt])::rst ->
- *      begin try
- *        let bexpr = to_bexpr_inner gamma bool_bindings expr_bindings bexpr_smt in
- *        let bool_bindings =  Ctx.set bool_bindings ~key:var ~data:bexpr in
- *        translate_assignments gamma bool_bindings expr_bindings rst
- *      with
- *      | Failure _ ->
- *         (\* Log.print @@ lazy (Printf.sprintf "warning: %s" msg); *\)
- *         let expr = to_expr gamma expr_bindings bexpr_smt in
- *         let expr_bindings = Ctx.set expr_bindings ~key:var ~data:expr in
- *         translate_assignments gamma bool_bindings expr_bindings rst
- *      end
- *   | _ ->
- *     failwith "malformed let-binding"
- * and to_bexpr_inner (gamma : Var.t Ctx.t) (bool_bindings : t Ctx.t) (expr_bindings : Expr.t Ctx.t) (b : SmtAst.t) : t =
- *   match b with
- *   | Id "false" ->
- *      false_
- *   | Id "true" ->
- *      true_
- *   | Id x ->
- *      begin match Ctx.find bool_bindings x with
- *      | None ->
- *         failwith ("tried to look up " ^ x ^ " in boolean context, but couldn't find it")
- *      | Some b ->
- *         b
- *      end
- *   | Forall (bound_ids, exp) ->
- *      let gamma, vars = to_vars gamma bound_ids in
- *      forall vars (to_bexpr_inner gamma bool_bindings expr_bindings exp)
- *   | Exists (bound_ids, exp) ->
- *      let gamma, vars = to_vars gamma bound_ids in
- *      exists vars (to_bexpr_inner gamma bool_bindings expr_bindings exp)
- *   | Let (assignments, body) ->
- *      let bool_bindings, expr_bindings = translate_assignments gamma bool_bindings expr_bindings assignments in
- *      to_bexpr_inner gamma bool_bindings expr_bindings body
- *   | Fun (Id x, args) ->
- *      let f = to_bexpr_inner gamma bool_bindings expr_bindings in
- *      begin match x, args with
- *      | "goals", [Fun (Id "goal", goals) ] ->
- *         let goals = List.sub goals ~pos:0 ~len:(List.length goals -4) in
- *         List.map goals ~f |> ands_
- *      | "assert", [phi] ->
- *         f phi
- *      | "not", [a] ->
- *         not_ (f a)
- *      | "and",_ ->
- *         List.map args ~f |> ands_
- *      | "or", _->
- *         List.map args ~f |> ors_
- *      | "=>", _->
- *         List.map args ~f |> imps_
- *      | "=", [a; b] ->
- *         begin try
- *             let a_bool = to_bexpr_inner gamma bool_bindings expr_bindings a in
- *             let b_bool = to_bexpr_inner gamma bool_bindings expr_bindings b in
- *             iff_ a_bool b_bool
- *           with
- *           | Failure _ ->
- *              (\* Log.print @@ lazy (Printf.sprintf "Warning: %s" msg); *\)
- *              let a_expr = to_expr gamma expr_bindings a in
- *              let b_expr = to_expr gamma expr_bindings b in
- *              eq_ a_expr b_expr
- *         end        
- *      | "bvule", [e1; e2] ->
- *         let e1 = to_expr gamma expr_bindings e1 in
- *         let e2 = to_expr gamma expr_bindings e2 in
- *         ule_ e1 e2
- *      | "bvult", [e1; e2] ->
- *         let e1 = to_expr gamma expr_bindings e1 in
- *         let e2 = to_expr gamma expr_bindings e2 in
- *         ult_ e1 e2
- *      | "bvugt", [e1; e2] ->
- *         let e1 = to_expr gamma expr_bindings e1 in
- *         let e2 = to_expr gamma expr_bindings e2 in
- *         ugt_ e1 e2
- *      | "bvuge", [e1; e2] ->
- *         let e1 = to_expr gamma expr_bindings e1 in
- *         let e2 = to_expr gamma expr_bindings e2 in
- *         uge_ e1 e2
- *      | "bvsle", [e1; e2] ->
- *         let e1 = to_expr gamma expr_bindings e1 in
- *         let e2 = to_expr gamma expr_bindings e2 in
- *         sle_ e1 e2
- *      | "bvslt", [e1; e2] ->
- *         let e1 = to_expr gamma expr_bindings e1 in
- *         let e2 = to_expr gamma expr_bindings e2 in
- *         slt_ e1 e2
- *      | "bvsgt", [e1; e2] ->
- *         let e1 = to_expr gamma expr_bindings e1 in
- *         let e2 = to_expr gamma expr_bindings e2 in
- *         sgt_ e1 e2
- *      | "bvsge", [e1; e2] ->
- *         let e1 = to_expr gamma expr_bindings e1 in
- *         let e2 = to_expr gamma expr_bindings e2 in
- *         sge_ e1 e2
- *      | "=", _ | "bvule", _ | "bvult", _ | "bvuge", _ | "bvsle", _ |
- *        "bvslt", _ | "bvsgt", _ | "bvsge", _ ->
- *         failwith (Printf.sprintf "Gotta support %s over %d terms" x (List.length args))
- *         
- *      | _,_ ->
- *         failwith ("unrecognized boolean function: " ^ x)
- *      end
- *   | BV (_, _) ->
- *      failwith "got bitvector when converting to boolean expression:("
- *   | _ ->
- *      failwith "unrecognized expression" *)
 
 let rec coerce_types gamma (b : t) : t =
   match b with

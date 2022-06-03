@@ -4,7 +4,7 @@ open Pbench
 
    
 let log_eq b1 b2 =
-  let res = BExpr.check_iff_str ~timeout:(Some 100) b1 b2 in
+  let res = Solver.check_iff_str ~timeout:(Some 1000) b1 b2 in
   Smt.is_unsat res || Smt.is_unknown res
 
 let bexpr_sexp = Alcotest.testable
@@ -23,7 +23,7 @@ let z3_config =
   let open Sequence in
   let open Test.Config in
   { seed = Seed.Nondeterministic;
-    test_count = 100;
+    test_count = 60;
     shrink_count = 0;
     sizes = unfold ~init:5 ~f:(function n -> Some (n, n+1));
   } 

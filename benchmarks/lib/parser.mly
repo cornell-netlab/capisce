@@ -20,6 +20,7 @@
 %token EQ
 %token UNDERSCORE
 %token BITVEC
+%token BVNOT
 %token BVAND
 %token BVOR
 %token BVADD
@@ -65,13 +66,21 @@ extract :
   | LPAREN; UNDERSCORE; BVEXTRACT; hi=ID; lo=ID; RPAREN;
     { Bigint.(of_string lo |> to_int_exn, of_string hi |> to_int_exn) }
 
-expr :
-  | x = ID;
-    { Expr.var (Var.make x (-1)) }
+bitvec :
   | BITLIT; n = ID; 
     { Expr.bv (Bigint.of_string ("0b" ^ n)) (String.length n) }
   | HEXLIT; n = ID; 
     { Expr.bv (Bigint.of_string ("0x" ^ n)) ((String.length n) * 4) }
+  | LPAREN; UNDERSCORE; bv=ID; w=ID; RPAREN;
+    { Expr.bv (Core.String.chop_prefix_exn bv ~prefix:"bv" |> Bigint.of_string) Bigint.(of_string w |> to_int_exn) }
+
+expr :
+  | x = ID;
+    { Expr.var (Var.make x (-1)) }
+  | bv = bitvec;
+    { bv }
+  | LPAREN; BVNOT; e = expr; RPAREN;
+    { Expr.bnot e }
   | LPAREN; bop=expr_bop; es=exprs; RPAREN;
     { Expr.nary bop es }
   | LPAREN; SHL; e1 = expr; e2 = expr; RPAREN;

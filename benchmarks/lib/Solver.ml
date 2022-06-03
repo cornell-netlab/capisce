@@ -22,7 +22,7 @@ let run_z3 = run_proc z3_exe
 let run_cvc4 = run_proc cvc4_exe               
 
 let of_smtlib cvs smt : BExpr.t =
-  Log.print @@ lazy "parsing";
+  Log.print @@ lazy (Printf.sprintf "parsing %s" smt);
   let ast = SmtParser.parse_string smt in
   Log.print @@ lazy "translating";
   let b = BExpr.ands_ ast in

@@ -424,6 +424,41 @@ let buggy_qc_example_2 () =
                 (var j)))))
   in
   Alcotest.(check smt_equiv) "logically equivalent" (dumb phi) (phi ())
+
+let roundtrip_gen_2 () =
+  let open BExpr in
+  let open Expr in
+  let tt_var = Var.make "tt" 32 in
+  let tt = var tt_var in
+  let phi () = (forall [tt_var] (and_
+                                   (ule_ (bvi 10055514 32) tt)
+                                   (sge_ (bvi 25 32) (bnot (bvi 13 32))))) in
+  Alcotest.(check smt_equiv) "logically equivalent" (dumb phi) (phi ())
+
+let roundtrip_gen_2a () =
+  let open BExpr in
+  let open Expr in
+  let tt_var = Var.make "tt" 32 in
+  let tt = var tt_var in
+  let phi () = (forall [tt_var] (ule_ (bvi 10055514 32) tt)) in
+  Alcotest.(check smt_equiv) "logically equivalent" (dumb phi) (phi ())   
+
+let roundtrip_gen_3 () =
+  let open BExpr in
+  let open Expr in
+  let bw_var = Var.make "bw" 32 in
+  let ga_var = Var.make "ga" 32 in
+  let dq_var = Var.make "dq" 32 in
+  let bw = var bw_var in
+  let ga = var ga_var in
+  let dq = var dq_var in
+  let phi () = 
+    forall [bw_var]
+      (forall [ga_var]
+         (forall [dq_var]
+            (not_
+               (ugt_ bw (bxor dq (ashr_ (bvi 4340 32) ga)))))) in
+  Alcotest.(check smt_equiv) "logically equivalent" (dumb phi) (phi ())
   
 let symbolic () =
   let sym = Var.make "meta__ipv4_da" 32 in
@@ -665,6 +700,9 @@ let tests =
     Alcotest.test_case "∀ x. (x & ρ.m) ≠ (ρ.x & ρ.m) ⇔ ⊥" `Quick rewrite_unused_mask_equivalent;
     Alcotest.test_case "∀ xy. (⊥ ⇒ ⊤) ∨ (x = y) ⇔ ⊤" `Quick eliminate_trivial_vars;
     Alcotest.test_case "(x ≠ [1]₁) ∧ (x ≠ [0]₁) ⇔ ⊥" `Quick and_not_eq__false_example;
+    Alcotest.test_case "∀ tt. (and (bvult 10.. tt) (bvsge 25 (bnot 13)))" `Quick roundtrip_gen_2;
+    Alcotest.test_case "∀ tt. (bvult 10.. tt)" `Quick roundtrip_gen_2a;
+    Alcotest.test_case "generated from roundtripping" `Quick roundtrip_gen_3;       
     Alcotest.test_case "rsl bug left" `Quick rsl_bug_left;
     Alcotest.test_case "rsl bug right" `Quick rsl_bug_right;
     Alcotest.test_case "rsl bug dumb equivalent" `Quick rsl_bug_dumbeq;

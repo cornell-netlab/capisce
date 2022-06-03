@@ -3,6 +3,7 @@ let test_suites : unit Alcotest.test list = [
     "Smtlib Parser", Parser.tests;
     "Smarts", SmartConstructors.tests;
     "Logic Algorithms", Algorithms.tests;
+    "Traversals", Traversals.tests;
   ]
           
 (* let%test_unit "identity" = SmartConstructors.identity () *)

@@ -43,6 +43,7 @@ rule read =
   | "BitVec" { BITVEC }
   | "#b" { BITLIT }
   | "#x" { HEXLIT }
+  | "bvnot" { BVNOT }
   | "bvand" { BVAND }
   | "bvor" { BVOR }
   | "bvxor" { BVXOR }

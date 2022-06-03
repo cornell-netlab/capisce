@@ -160,9 +160,15 @@ let subsolving (prog, asst) =
   Log.print @@ lazy "running the bottom up solver";
   let qf_phi = BottomUpQe.qe (solve_wto `Z3) qphi in
   Log.print @@ lazy "getting the vars of the result";  
-  let dvs, cvs = BExpr.vars qf_phi in
-  Log.print @@ lazy "checking all dataplane variables have been eliminated";    
-  assert (List.is_empty dvs);
+  let dvs', cvs = BExpr.vars qf_phi in
+  Log.print @@ lazy (Printf.sprintf "checking all dataplane variables have been eliminated from %s" (BExpr.to_smtlib qf_phi));    
+  if not (List.is_empty dvs') then begin
+      Printf.printf "started with:\n vars: %s \n form: %s\n%!" (List.to_string dvs ~f:(Var.str)) (BExpr.to_smtlib phi);
+      Printf.printf "ERROR Not QF:\n vars: %s \n form: %s\n%!" (List.to_string dvs' ~f:(Var.str)) (BExpr.to_smtlib qf_phi);
+      failwith "QF Failed when it said it succeeded"
+    end
+  else 
+    Log.print @@ lazy (Printf.sprintf "No dataplane variables, only control vars: %s" (List.to_string cvs ~f:(Var.str)));
   Log.print @@ lazy "using z3 to simplify";    
   let qf_phi_str = Solver.run_z3 (Smt.simplify cvs (BExpr.to_smtlib (BExpr.simplify qf_phi))) in
   Log.print @@ lazy "done";    
