@@ -6,8 +6,11 @@ val bvi : int -> int -> t
 
 (* Constructor *)
 val var : Var.t -> t
-val is_var : t -> bool
+val is_var : t -> bool  
 val get_var : t -> Var.t (* throws exception when not a var *)
+
+val is_one : t -> bool
+val is_zero : t -> bool  
   
 (* Binary operators *)  
 val band : t -> t -> t

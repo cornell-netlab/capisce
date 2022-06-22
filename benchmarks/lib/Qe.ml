@@ -3,6 +3,10 @@ open Core
 let vc prog asst =
   Cmd.(vc (seq prog (assert_ asst)))
 
+let vcs prog asst =
+  Cmd.(vcs (seq prog (assert_ asst)))
+  
+
 let qe solver simpl body c =
   Log.print @@ lazy ("getting vars");
   let (dvs,cvs) = BExpr.vars body in
@@ -75,7 +79,7 @@ let normalize solver dvs cvs res =
   if Smt.success res then
       match solver with
       | `Z3 | `Z3Light ->
-         let goals = BExpr.to_smtlib (Solver.of_smtlib cvs res) in
+         let goals = BExpr.to_smtlib (Solver.of_smtlib ~dvs ~cvs res) in
          if String.is_substring goals ~substring:":precision" then
            "true"
          else
@@ -173,3 +177,33 @@ let subsolving (prog, asst) =
   let qf_phi_str = Solver.run_z3 (Smt.simplify cvs (BExpr.to_smtlib (BExpr.simplify qf_phi))) in
   Log.print @@ lazy "done";    
   (Clock.stop c, qf_phi_str, -1, true)
+
+let subsolving_list (prog, asst) =
+  let open List.Let_syntax in
+  let c = Clock.start () in
+  Log.print @@ lazy (Printf.sprintf "computing vc from %d asserts" (Cmd.count_asserts prog));
+  let%map phi = vcs prog asst in
+  Log.print @@ lazy "getting vars";
+  let (dvs, _) = BExpr.vars phi in
+  (* let dvs = List.dedup_and_sort dvs ~compare:(fun a b -> Int.compare (Var.size b) (Var.size a)) in *)
+  Log.print @@ lazy "Counting Vars";
+  Log.enable_measurement ();  
+  List.iter dvs ~f:BExpr.incr_q;
+  Log.print @@ lazy "smart constructors";
+  let qphi = BExpr.(forall dvs phi |> order_all_quantifiers) in
+  Log.print @@ lazy "running the bottom up solver";
+  let qf_phi = BottomUpQe.qe (solve_wto `Z3) qphi in
+  Log.print @@ lazy "getting the vars of the result";  
+  let dvs', cvs = BExpr.vars qf_phi in
+  Log.print @@ lazy (Printf.sprintf "checking all dataplane variables have been eliminated from %s" (BExpr.to_smtlib qf_phi));    
+  if not (List.is_empty dvs') then begin
+      Printf.printf "started with:\n vars: %s \n form: %s\n%!" (List.to_string dvs ~f:(Var.str)) (BExpr.to_smtlib phi);
+      Printf.printf "ERROR Not QF:\n vars: %s \n form: %s\n%!" (List.to_string dvs' ~f:(Var.str)) (BExpr.to_smtlib qf_phi);
+      failwith "QF Failed when it said it succeeded"
+    end
+  else 
+    Log.print @@ lazy (Printf.sprintf "No dataplane variables, only control vars: %s" (List.to_string cvs ~f:(Var.str)));
+  Log.print @@ lazy "using z3 to simplify";    
+  let qf_phi_str = Solver.run_z3 (Smt.simplify cvs (BExpr.to_smtlib (BExpr.simplify qf_phi))) in
+  Log.print @@ lazy "done";    
+  (Clock.stop c, qf_phi_str, -1, true)    

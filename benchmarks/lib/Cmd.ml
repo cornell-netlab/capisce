@@ -26,6 +26,17 @@ let rec to_string_aux indent (c : t) : string =
 
 let to_string = to_string_aux 0    
 
+let rec count_asserts_aux c n =
+  match c with
+  | Assume _ -> n
+  | Assert _ -> n + 1
+  | Assign _ -> n
+  | Havoc _ -> n
+  | Seq (c1,c2) -> count_asserts_aux c2 @@ count_asserts_aux c1 n
+  | Choice (c1,c2) -> count_asserts_aux c2 @@ count_asserts_aux c1 n
+
+let count_asserts c = count_asserts_aux c 0                    
+              
 let rec size = function
   | Assume t
   | Assert (t,_) -> 1 + BExpr.size t
@@ -347,13 +358,24 @@ let rec const_prop_aux (f : Facts.t) (c : t) =
   | Assert (b, id) ->
      (* Log.print @@ lazy (Printf.sprintf "substitute %s using: %s\n" (to_string c) (Facts.to_string f)); *)
      let b = BExpr.fun_subst (Facts.lookup f) b |> BExpr.simplify in
+     let f =
+       match BExpr.get_equality b with
+       | Some (x, e) -> Facts.update f x e
+       | None -> f
+     in     
      (* Log.print @@ lazy (Printf.sprintf "Got assert(%s)\n" (BExpr.to_smtlib b)); *)
      (f, Assert (b,id))
   | Assume b ->
      (* Log.print @@ lazy (Printf.sprintf "substitute %s using: %s\n" (to_string c) (Facts.to_string f));      *)
      let b = BExpr.fun_subst (Facts.lookup f) b |> BExpr.simplify in
      (* Log.print @@ lazy (Printf.sprintf "Got assume(%s)\n" (BExpr.to_smtlib b)); *)
-     (f, assume b)
+     let f =
+       match BExpr.get_equality b with
+       | Some (x, e) -> Facts.update f x e
+       | None -> f
+     in
+     (f, Assume b)
+        
   | Seq (c1, c2) ->
      let f, c1 = const_prop_aux f c1 in
      let f, c2 = const_prop_aux f c2 in
@@ -400,7 +422,7 @@ let rec dead_code_elim_aux c (reads : VarSet.t) : (t * VarSet.t) =
      let c1, reads = dead_code_elim_aux c1 reads in
      (seq c1 c2, reads)
 
-let dead_code_elim c = fst (dead_code_elim_aux c VarSet.empty)  
+let dead_code_elim c = fst (dead_code_elim_aux c VarSet.empty)
 
 let rec fix g f x =  
   let x' = f x in
@@ -434,8 +456,6 @@ let pathify (c : t) =
   let paths = pathify_inner c in
   Printf.printf "There are %d paths\n%!" (List.length paths);
   List.map paths ~f:sequence
-    
-  
   
 let vc (c : t) : BExpr.t =
   let o = optimize c in
@@ -445,10 +465,55 @@ let vc (c : t) : BExpr.t =
   |> BExpr.nnf
   (* |> BExpr.cnf *)
   |> BExpr.simplify
+
+let add_vars (dvs,cvs) live =
+  let xs  = dvs @ cvs in
+  let live' = List.fold xs ~init:live ~f:(fun live x -> String.Set.add live (Var.str x)) in
+  live'
+
+(* updates taint set with assignment x := e. Var x is removed and then vars in e are added *)
+let update_taint live x e =
+  Set.remove live (Var.str x)
+  |> add_vars (Expr.vars e) 
   
-  (* let o = optimize c in
-   * let p = passify o in
-   * let w = BExpr.not_ (wrong p) in
-   * let c = BExpr.cnf w in
-   * BExpr.simplify c *)
-  (* wp p BExpr.true_ *)
+let rec slice_asserts_aux (c : t) (live : String.Set.t) : (String.Set.t * t) list =
+  match c with
+  | Assign (x, e) ->
+     if Set.mem live (Var.str x) then
+       [(update_taint live x e, c)]
+     else
+       [(live, Assume BExpr.true_)]
+  | Assume phi ->
+     [(add_vars (BExpr.vars phi) live, c)]
+  | Assert (phi,_) ->
+     let vars = BExpr.vars phi |> Util.uncurry (@) in     
+     if List.exists vars ~f:(fun x -> String.Set.mem live (Var.str x)) then begin
+         [(add_vars ([],vars) live, c)]
+       end else begin
+         Log.print @@ lazy (Printf.sprintf "split phi: %s" (BExpr.to_smtlib phi));         
+         [(live, c); (String.Set.of_list (List.map vars ~f:Var.str), c)]
+       end
+  | Havoc _ -> failwith "unimplemented"
+  | Seq (c1,c2) ->
+     let open List.Let_syntax in
+     let%bind (live, slice2) = slice_asserts_aux c2 live in
+     let%map  (live, slice1) = slice_asserts_aux c1 live in
+     (live, seq slice1 slice2)
+  | Choice (c1, c2)  ->
+     let open List.Let_syntax in
+     let%bind (live1, slice2) = slice_asserts_aux c2 live in
+     let%map (live2, slice1) = slice_asserts_aux c1 live in
+     (Set.union live1 live2, choice slice1 slice2)
+
+let slice_asserts c : t list =
+  let open List.Let_syntax in
+  let%map (_, c) = slice_asserts_aux c String.Set.empty in
+  c
+
+let vcs (c : t) : BExpr.t list =
+  optimize c
+  |> slice_asserts
+  |> List.map ~f:vc 
+  |> List.sort ~compare:(fun s1 s2 -> Int.compare (BExpr.size s1) (BExpr.size s2))
+
+

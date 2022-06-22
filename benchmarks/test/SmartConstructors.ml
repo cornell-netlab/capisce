@@ -692,7 +692,7 @@ let tests =
     Alcotest.test_case "simplify(∀a. 73722014 = a) = smart(∀a.73722014=a)" `Quick single_forall;
     Alcotest.test_case "smart φ ⇔ dumb φ, φ = ∀ z. (¬ ∃ a. a = V) ⇒ (⊥ ⇔ z = N-1)" `Quick buggy_qc_example;
     Alcotest.test_case "∀ z. (¬ ∃ a. a = V) ⇒ (⊥ ⇔ z = N-1) = (¬ ∃ a. a = V) ⇒ ∀ z. (⊥ ⇔ z = N-1)" `Quick buggy_qc_example_literal;
-    Alcotest.test_case "∀m. (m = e) ⇒ ∀ c h z. z|(h-c) = ~3 simplifies correctly" `Quick buggy_qc_example_1;
+    Alcotest.test_case "∀m. (m = e) ⇒ ∀ c h z. z|(h-c) = ~3 simplifies correctly" `Slow buggy_qc_example_1;
     Alcotest.test_case "complicated formula simplifies correctly" `Quick buggy_qc_example_2;
     Alcotest.test_case "(∀x. x ≠ y) reduces to (false) via smarts" `Quick eliminate_quantified_variable_neq;
     Alcotest.test_case "(∀x. x = y) reduces to (false) via smarts" `Quick eliminate_quantified_variable_eq;
@@ -702,7 +702,7 @@ let tests =
     Alcotest.test_case "(x ≠ [1]₁) ∧ (x ≠ [0]₁) ⇔ ⊥" `Quick and_not_eq__false_example;
     Alcotest.test_case "∀ tt. (and (bvult 10.. tt) (bvsge 25 (bnot 13)))" `Quick roundtrip_gen_2;
     Alcotest.test_case "∀ tt. (bvult 10.. tt)" `Quick roundtrip_gen_2a;
-    Alcotest.test_case "generated from roundtripping" `Quick roundtrip_gen_3;       
+    Alcotest.test_case "generated from roundtripping" `Slow roundtrip_gen_3;       
     Alcotest.test_case "rsl bug left" `Quick rsl_bug_left;
     Alcotest.test_case "rsl bug right" `Quick rsl_bug_right;
     Alcotest.test_case "rsl bug dumb equivalent" `Quick rsl_bug_dumbeq;
@@ -725,7 +725,7 @@ let tests =
     Alcotest.test_case "QC unused_e_var" `Quick unused_e_var;
     Alcotest.test_case "QC univ_eq" `Quick univ_eq;
     Alcotest.test_case "QC univ_neq" `Quick univ_neq;
-    Alcotest.test_case "QC cached_vars" `Quick cached_vars;
+    Alcotest.test_case "QC cached_vars" `Slow cached_vars;
   ]
 
   

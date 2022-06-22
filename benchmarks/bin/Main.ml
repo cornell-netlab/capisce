@@ -1,6 +1,8 @@
 open Core
 module Bench = Pbench.Bench
-module Qe = Pbench.Qe             
+module Qe = Pbench.Qe
+
+let () = Memtrace.trace_if_requested ~context:"icecap" ()
 
 let run_and_print_exp f smart one n =
   f smart one n
@@ -13,7 +15,7 @@ let run_and_print_exp f smart one n =
         ok
         size
         used_solver;
-      if not ok then Printf.printf "%s\n%!" str; 
+      if not ok then Printf.printf "%s\n%!" str;
     )
              
 let bench : Command.t =
@@ -109,7 +111,7 @@ let infer : Command.t =
          Pbench.BExpr.enable_smart_constructors := if no_smart then `Off else `On;
          let gas = Option.value gas_opt ~default:1000 in
          let unroll = Option.value unroll_opt ~default:10 in
-         let fix = Option.value fix_opt ~default:4 in
+         let _ : int = Option.value fix_opt ~default:4 in
          Pbench.Log.print @@ lazy (Printf.sprintf "compiling...");
          let cmd = Pbench.P4Parse.as_cmd_from_file includes source gas unroll false in
          Pbench.Log.print @@ lazy (Printf.sprintf "done\noptimizing...");         
@@ -133,15 +135,17 @@ let infer : Command.t =
                (if called_solver then "" else "out")
                res
            else
-             let solvers = List.map solvers ~f:(function 
-                               | "CVC4" | "cvc4" | "c" -> `CVC4
-                               | "Z3" | "z3" | "z" -> `Z3
-                               | "z3-light" | "light" | "qe-light" -> `Z3Light
-                               |  _ -> failwith "unrecognized qe solver" ) in
+             let _ : [`CVC4 | `Z3 | `Z3Light ] list =
+               List.map solvers ~f:(function 
+                   | "CVC4" | "cvc4" | "c" -> `CVC4
+                   | "Z3" | "z3" | "z" -> `Z3
+                   | "z3-light" | "light" | "qe-light" -> `Z3Light
+                   |  _ -> failwith "unrecognized qe solver" ) in
              let (inf_dur, inf_res, _, inf_called_solver) =
                (* Bench.z3_infer false (cmd, Pbench.BExpr.true_) *)
                if iter then
-                 Qe.cnf_fix_infer fix solvers false (cmd, Pbench.BExpr.true_)
+                 (* Qe.cnf_fix_infer fix solvers false (cmd, Pbench.BExpr.true_) *)
+                 List.hd_exn (Qe.subsolving_list (cmd, Pbench.BExpr.true_))
                else
                  (* Qe.cvc4_z3_fix fix solvers false (cmd, Pbench.BExpr.true_) *)
                  Qe.subsolving (cmd, Pbench.BExpr.true_)
@@ -159,8 +163,9 @@ let smtlib : Command.t =
      let source = anon ("smtlib source file" %: string) in
          fun () ->
          let open Pbench in
-         let smtast = SmtParser.parse source () |> BExpr.ands_ in
-         let b = BExpr.simplify smtast in
+         let smtast = SmtParser.parse source () in
+         let b = SmtAst.translate smtast ~cvs:[] ~dvs:[] in
+         let b = BExpr.simplify b in
          Printf.printf "%s\n%!" (BExpr.to_smtlib b);
     ]
 

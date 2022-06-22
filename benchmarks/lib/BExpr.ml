@@ -533,91 +533,91 @@ let ic_eq x b e1 e2 =
      Forall(x, b)
   
 
-let forall_imp self return x b1 b2 = 
+let forall_imp self x b1 b2 = 
   if occurs_in x b1 && occurs_in x b2 then
-    return @@ Forall (x, (imp_ b1 b2))
+    Forall (x, (imp_ b1 b2))
   else if occurs_in x b1 then
-    self x (not_ b1) @@ fun b1 ->
-    return @@ or_ b1 b2
+    let b1 = self x (not_ b1) in
+    or_ b1 b2
   else if occurs_in x b2 then
-    self x b2 @@ fun b2' -> 
-    return @@ imp_ b1 b2'
+    let b2 = self x b2 in 
+    imp_ b1 b2
   else begin
       decr_q x "not_free_imp_";
       imp_ b1 b2
     end
 
-let forall_or self return x b1 b2 = 
+let forall_or self x b1 b2 = 
   if occurs_in x b1 && occurs_in x b2 then
-    return @@ Forall(x, (or_ b1 b2))
+    Forall(x, (or_ b1 b2))
   else if occurs_in x b1 then
-    self x b1 @@ fun b1' -> 
-    return @@ or_ b1' b2
+    let b1 = self x b1 in
+    or_ b1 b2
   else if occurs_in x b2 then
-    self x b2 @@ fun b2' -> 
-    return @@ or_ b1 b2'
+    let b2 = self x b2 in
+    or_ b1 b2
   else begin
       decr_q x "not_free_or_";
-      return @@ or_ b1 b2
+      or_ b1 b2
     end
   
-let rec forall_one_cps (x : Var.t) b return =  
+let rec forall_one (x : Var.t) b =  
   Log.size (size b);
+  (* Log.print @@ lazy (Printf.sprintf "smart constructor for ∀ %s (_ BitVec %d) over an ast comprising %d bits and %d nodes!" (Var.str x) (Var.size x) (Obj.(reachable_words (repr b) + 1) * 64) (size b)); *)
+  Log.print @@ lazy ("smart constructor for " ^ Var.str x);
   match !enable_smart_constructors with
   | `Off ->  Forall(x,b)
   | `On -> 
-     Log.print @@ lazy (Printf.sprintf "smart constructor for ∀ %s (_ BitVec %d) over an ast comprising %d bits and %d nodes!" (Var.str x) (Var.size x) (Obj.(reachable_words (repr b) + 1) * 64) (size b));
      Log.size (size b);      
      let bvs = get_labelled_vars b in
      if not (List.exists bvs ~f:(Var.(=) x)) then begin
          decr_q x "not free";
-         return b
+         b
        end else 
        match b with
        | TFalse ->
           decr_q x "false";
-          return false_
+          false_
        | TTrue ->
           decr_q x "true";
-          return true_
+          true_
        | TNot (TComp(Eq,e1,e2,_),_) when Expr.uelim `Neq [x] e1 e2 ->
           decr_q x "neq_false";
-          return false_
+          false_
        | TNot (TComp(Ugt,e1,e2,_),_) ->
-          return (ic_ugt x b e1 e2)
+          (ic_ugt x b e1 e2)
        | TNot (TBin(LOr,b1,b2,_),_) ->
-          forall_one_cps x (and_ (not_ b1) (not_ b2)) return
+          forall_one x (and_ (not_ b1) (not_ b2))
        | TNot(TComp(Eq, e1, e2, _), _) ->
-          return @@ ic_neq x b e1 e2
+          ic_neq x b e1 e2
        | TComp(Eq, e1, e2,_) when Expr.uelim `Eq [x] e1 e2 ->             
           decr_q x "eq_false";
-          return false_
+          false_
        | TComp(Eq, e1, e2, _) ->
-          return @@ ic_eq x b e1 e2                         
+          ic_eq x b e1 e2                         
        | TBin (op, b1, b2,_) ->
           begin match op with
           | LArr ->
-             forall_imp forall_one_cps return x b1 b2
+             forall_imp forall_one x b1 b2
           | LOr ->
-             forall_or forall_one_cps return x b1 b2
+             forall_or forall_one x b1 b2
           | LAnd ->
              incr_q x;
-             forall_one_cps x b1 @@ fun b1' ->
-             forall_one_cps x b2 @@ fun b2' ->
-             return @@ and_ b1' b2' 
+             let b1' = forall_one x b1 in
+             let b2' = forall_one x b2 in
+             and_ b1' b2' 
           | LIff ->
-             return @@ Forall(x, (iff_ b1 b2))
+             Forall(x, (iff_ b1 b2))
           end
        | Forall(y, b') ->
-          forall_one_cps x b' @@ fun b'' ->
-          return @@ Forall(y, b'')
+          let b' = forall_one x b' in
+          (* forall_one y b' *)
+          Forall(y, b')
        | _ ->
           let phi = Forall(x, b) in
           Printf.printf "no more smartness %s \n%!" (to_smtlib phi);
-          return @@ phi
+          phi
 
-let forall_one x b = forall_one_cps x b Fun.id
-         
 let forall xs b = List.fold_right xs ~init:b ~f:forall_one 
 
 let exists_one x b = Exists(x, b)
@@ -638,17 +638,12 @@ let rec simplify_inner = function
 
 let simplify b =
   Log.size (size b);
-  Log.print @@ lazy "simplify";
+  (* Log.print @@ lazy "simplify"; *)
   let tmp = !enable_smart_constructors in
   enable_smart_constructors := `On;
   let b' = simplify_inner b in
   enable_smart_constructors := tmp;
   b'
-  (* let b' = simplify_inner b in
-   * if b = b' then
-   *   b
-   * else
-   *   simplify b' *)
             
 let index_subst s_opt t : t =
   match s_opt with
@@ -894,6 +889,83 @@ let predicate_abstraction (b : t) =
   let (_, b) = predicate_abstraction_inner abs b in
   b
 
+let rec get_atoms b =
+  match b with
+  | TFalse | TTrue | LVar _ -> []
+  | TComp _ -> [b]
+  | TNot (b,_) -> get_atoms b
+  | TBin (_, a, b, _) -> get_atoms a @ get_atoms b
+  | _ -> failwith "cannot get atoms under quantifiers" 
+
+let rec get_atoms_containing x b =
+  match b with
+  | TFalse | TTrue | LVar _ -> []
+  | TComp (_, _, _, vars) ->
+     if List.mem vars x ~equal:Var.equal then
+       [b]
+     else []
+  | TNot (b,_) ->
+     get_atoms_containing x b
+  | TBin (_, a, b, _) ->
+     get_atoms_containing x a @ get_atoms_containing x b
+  | Forall (x', _) 
+  | Exists (x', _) when Var.(x' = x) ->
+     []
+  | Forall (_, b)
+   | Exists (_, b) ->
+     get_atoms_containing x b
+
+let rec abstract_atom atom var b =
+  if b = atom then
+    LVar var
+  else
+    let shadow x = List.mem (fst (vars atom)) x ~equal:Var.equal in
+    match b with
+    | TFalse | TTrue | LVar _ | TComp _ -> b
+    | TBin (op, a, b, _ ) ->
+       (get_smart op) (abstract_atom atom var a) (abstract_atom atom var b)
+    | TNot (b, _) ->
+       not_ (abstract_atom atom var b)
+    | Forall (x, _)
+      | Exists (x, _) when shadow x ->
+       b
+    | Forall (x, b) ->
+       forall_one x (abstract_atom atom var b)
+    | Exists (x, b) ->
+       exists_one x (abstract_atom atom var b)
+
+let one_or_zero atoms =
+  List.for_all atoms ~f:(fun atom ->
+      match atom with
+      | TComp(Eq, e1, e2, _) ->
+         Expr.is_var e1 && (Expr.is_one e2 || Expr.is_zero e2)
+         || Expr.is_var e2 && (Expr.is_one e1 || Expr.is_one e1)
+      | _ ->
+         failwith "not do good"
+    ) 
+      
+      
+let abstraction_is_complete x atoms =
+  let unique_atoms = List.dedup_and_sort atoms ~compare in
+  Int.(List.length unique_atoms = 1)
+  || (Int.(Var.size x = 1)
+      && one_or_zero atoms) 
+    
+let complete_predicate_abstraction x (b : t) =
+  let atoms = get_atoms_containing x b in
+  if abstraction_is_complete x atoms then
+    let atom = List.hd_exn atoms in
+    Log.print @@ lazy (Printf.sprintf "The variable %s only occurs in the single atom: %s  "
+                         (Var.str x)
+                         (to_smtlib atom)
+                   );
+    let var = "$___REMOVE___$" in
+    Some (abstract_atom atom var b)
+  else begin
+      Log.print @@ lazy (Printf.sprintf "The variable %s occurs under many atoms (%d)" (Var.str x) (List.length atoms));
+      None
+    end
+    
 let rec get_abstract_predicates b =
   match b with
   | TFalse | TTrue | TComp _ -> []
@@ -931,7 +1003,16 @@ let rec fun_subst_lvar f b =
 let subst_lvar x b0 =
   fun_subst_lvar (fun y -> if String.(x = y) then b0 else lvar y)
     
-    
+
+let get_equality b =
+  match b with
+  | TComp(Eq, e1, e2, _) when Expr.is_var e1 ->
+     Some (Expr.get_var e1, e2)
+  | TComp(Eq, e1, e2, _) when Expr.is_var e2 ->
+     Some (Expr.get_var e1, e1)
+  | _ ->
+     None
+  
 (** Solver interface Code*)
   
 module Ctx = Map.Make (String) 

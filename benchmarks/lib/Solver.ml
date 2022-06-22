@@ -21,20 +21,22 @@ let run_princess = run_proc princess_exe
 let run_z3 = run_proc z3_exe
 let run_cvc4 = run_proc cvc4_exe               
 
-let of_smtlib cvs smt : BExpr.t =
-  Log.print @@ lazy (Printf.sprintf "parsing %s" smt);
+let of_smtlib ~cvs ~dvs smt : BExpr.t =
+  (* Log.print @@ lazy (Printf.sprintf "parsing string with vars:\n control %s,\n data %s\n%!"
+   *                (List.to_string cvs ~f:Var.str) (List.to_string cvs ~f:Var.str)); *)
+  Log.print @@ lazy "printign";
   let ast = SmtParser.parse_string smt in
   Log.print @@ lazy "translating";
-  let b = BExpr.ands_ ast in
-  Log.print @@ lazy "type anotations";
+  let b = SmtAst.translate ast ~cvs ~dvs in
+  Log.print @@ lazy "type anotations (is this even necessary anymore?)";
   let b = BExpr.coerce_types (TypeContext.of_list cvs) b in
   Log.print @@ lazy "done parsing";
   b
   
-let z3_simplify consts cvs phi =
-  Smt.simplify consts (BExpr.to_smtlib phi)
+let z3_simplify dvs cvs phi =
+  Smt.simplify dvs (BExpr.to_smtlib phi)
   |> run_z3 
-  |> of_smtlib cvs
+  |> of_smtlib ~cvs ~dvs
   
 let check_sat ?(timeout=None) consts phi =
   BExpr.to_smtlib phi

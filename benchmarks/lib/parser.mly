@@ -42,25 +42,18 @@
 %token SGE
 %token EOF
 
-%start <BExpr.t list> program
+%start <SmtAst.t> program
 
 %%
 
-rev_exprs :
-  | e = expr; { [e] }
-  | es = exprs; e = expr { e::es }
-
-exprs :
-  | es = rev_exprs { List.rev es }                      
-
-expr_bop :
-  | BVAND    { Expr.band }
-  | BVOR     { Expr.bor }
-  | BVADD    { Expr.badd }
-  | BVMUL    { Expr.bmul }
-  | BVSUB    { Expr.bsub }
-  | BVXOR    { Expr.bxor }
-  | BVCONCAT { Expr.bconcat }
+expr_nary_op :
+  | BVAND    { fun ts -> SmtAst.BVAnd ts }
+  | BVOR     { fun ts -> SmtAst.BVOr ts }
+  | BVADD    { fun ts -> SmtAst.BVAdd ts }
+  | BVMUL    { fun ts -> SmtAst.BVMul ts }
+  | BVSUB    { fun ts -> SmtAst.BVSub ts }
+  | BVXOR    { fun ts -> SmtAst.BVXor ts }
+  | BVCONCAT { fun ts -> SmtAst.BVConcat ts }
 
 extract :
   | LPAREN; UNDERSCORE; BVEXTRACT; hi=ID; lo=ID; RPAREN;
@@ -68,40 +61,21 @@ extract :
 
 bitvec :
   | BITLIT; n = ID; 
-    { Expr.bv (Bigint.of_string ("0b" ^ n)) (String.length n) }
+    { SmtAst.BV (Bigint.of_string ("0b" ^ n), String.length n) }
   | HEXLIT; n = ID; 
-    { Expr.bv (Bigint.of_string ("0x" ^ n)) ((String.length n) * 4) }
+    { SmtAst.BV (Bigint.of_string ("0x" ^ n), (String.length n) * 4) }
   | LPAREN; UNDERSCORE; bv=ID; w=ID; RPAREN;
-    { Expr.bv (Core.String.chop_prefix_exn bv ~prefix:"bv" |> Bigint.of_string) Bigint.(of_string w |> to_int_exn) }
+    { SmtAst.BV (Core.String.chop_prefix_exn bv ~prefix:"bv" |> Bigint.of_string, Bigint.(of_string w |> to_int_exn)) }
 
-expr :
-  | x = ID;
-    { Expr.var (Var.make x (-1)) }
-  | bv = bitvec;
-    { bv }
-  | LPAREN; BVNOT; e = expr; RPAREN;
-    { Expr.bnot e }
-  | LPAREN; bop=expr_bop; es=exprs; RPAREN;
-    { Expr.nary bop es }
-  | LPAREN; SHL; e1 = expr; e2 = expr; RPAREN;
-    { Expr.shl_ e1 e2  }
-  | LPAREN; LSHR; e1 = expr; e2 = expr; RPAREN;
-    { Expr.lshr_ e1 e2 }
-  | LPAREN; ASHR; e1 = expr; e2 = expr; RPAREN;
-    { Expr.ashr_ e1 e2 }
-  | LPAREN; idxs=extract; e=expr; RPAREN;
-    { Expr.bslice (fst idxs) (snd idxs) e }
 
 bindings :
   | (*empty*)
-    { Expr.var, BExpr.lvar  }
-  | LPAREN; x = ID; e = expr; RPAREN; bindings = bindings;
-    { (fun y -> if Core.String.(x = Var.str y) then e else (fst bindings) y ), (snd bindings) }
-  | LPAREN; x = ID; b = bexpr; RPAREN; bindings = bindings;
-    { (fst bindings), (fun y -> if Core.String.(x = y) then b else (snd bindings) y) }
-
+    { [] }
+  | LPAREN; x = ID; t = term; RPAREN; bindings = bindings;
+    { (x, t) :: bindings }
+  
 sort :
-  | LPAREN; UNDERSCORE; BITVEC; n = ID;
+  | LPAREN; UNDERSCORE; BITVEC; n = ID; RPAREN;
     { Bigint.of_string n }
 
 qvars :
@@ -109,59 +83,75 @@ qvars :
   | LPAREN; x = ID; w = sort; RPAREN; xs = qvars
     { TypeContext.set (Var.make x (Bigint.to_int_exn w)) xs }
 
-bexpr_list :
-  | b = bexpr;  { [b] }
-  | b = bexpr; bs = bexpr_list; { b::bs }
+term_list :
+  | t = term;  { [t] }
+  | t = term; ts = term_list; { t::ts }
     
-bexpr :
-  | TRUE; { BExpr.true_ }
-  | FALSE; { BExpr.false_ }
-  | x = ID { BExpr.lvar x } 
-  | LPAREN; FORALL; LPAREN; xs = qvars; RPAREN; b = bexpr; RPAREN;
-    { BExpr.(forall (TypeContext.to_list xs) (coerce_types xs b)) }
-  | LPAREN; EXISTS; LPAREN; xs = qvars; RPAREN; b = bexpr; RPAREN;
-    { BExpr.(exists (TypeContext.to_list xs) (coerce_types xs b)) }
-  | LPAREN; LET; LPAREN; bindings = bindings; RPAREN; b = bexpr; RPAREN;
-    { BExpr.fun_subst (fst bindings) b |> BExpr.fun_subst_lvar (snd bindings) }
-  | LPAREN; NOT; b = bexpr; RPAREN;
-    { BExpr.not_ b }
-  | LPAREN; AND; bs = bexpr_list; RPAREN;
-    { BExpr.ands_ bs }
-  | LPAREN; OR; bs = list(bexpr); RPAREN;
-    { BExpr.ors_ bs }
-  | LPAREN; IMP; bs = bexpr_list; RPAREN;
-    { BExpr.imps_ bs }
-  | LPAREN; EQ; bs = bexpr_list; RPAREN;
-    { BExpr.iffs_ bs }
-  | LPAREN; EQ; e1 = expr; e2 = expr; RPAREN;
-    { BExpr.eq_ e1 e2 }
-  | LPAREN; ULT; e1 = expr; e2 = expr; RPAREN;
-    { BExpr.ult_ e1 e2 }
-  | LPAREN; ULE; e1 = expr; e2 = expr; RPAREN;
-    { BExpr.ule_ e1 e2 }
-  | LPAREN; UGT; e1 = expr; e2 = expr; RPAREN;
-    { BExpr.ugt_ e1 e2 }
-  | LPAREN; UGE; e1 = expr; e2 = expr; RPAREN;
-    { BExpr.uge_ e1 e2 }
-  | LPAREN; SLT; e1 = expr; e2 = expr; RPAREN;
-    { BExpr.slt_ e1 e2 }
-  | LPAREN; SLE; e1 = expr; e2 = expr; RPAREN;
-    { BExpr.sle_ e1 e2 }
-  | LPAREN; SGT; e1 = expr; e2 = expr; RPAREN;
-    { BExpr.sgt_ e1 e2 }
-  | LPAREN; SGE; e1 = expr; e2 = expr; RPAREN;
-    { BExpr.sge_ e1 e2 }
-
 term :
-  | LPAREN; GOALS; LPAREN; GOAL; bs = list(bexpr); PRECISION; p=ID; DEPTH; d=ID; RPAREN; RPAREN;
-    { Printf.printf ":precision %s :depth %s\n%!" p d;  BExpr.ands_ bs }
-  | b = bexpr;
-    { b }
-  | LPAREN; ASSERT; b = bexpr; RPAREN;
-    { b }
+  | TRUE;
+    { SmtAst.True }
+  | FALSE;
+    { SmtAst.False }
+  | x = ID
+    { SmtAst.(Id (x, Unknown)) } 
+  | bv = bitvec;
+    { bv }
+  | LPAREN; FORALL; LPAREN; xs = qvars; RPAREN; t = term; RPAREN;
+    { SmtAst.(Forall (TypeContext.to_list xs, t)) }
+  | LPAREN; EXISTS; LPAREN; xs = qvars; RPAREN; t = term; RPAREN;
+    { SmtAst.(Exists (TypeContext.to_list xs, t)) }
+  | LPAREN; LET; LPAREN; bindings = bindings; RPAREN; t = term; RPAREN;
+    { SmtAst.Let (bindings, t)  }
+  | LPAREN; BVNOT; t = term; RPAREN;
+    { SmtAst.BVNot t }
+  | LPAREN; op=expr_nary_op; ts = term_list; RPAREN;
+    { op ts }
+  | LPAREN; SHL; t1 = term; t2 = term; RPAREN;
+    { SmtAst.Shl(t1, t2)  }
+  | LPAREN; LSHR; t1 = term; t2 = term; RPAREN;
+    { SmtAst.Lshr (t1, t2) }
+  | LPAREN; ASHR; t1 = term; t2 = term; RPAREN;
+    { SmtAst.Ashr (t1, t2) }
+  | LPAREN; idxs=extract; t = term; RPAREN;
+    { SmtAst.BVExtract (fst idxs, snd idxs, t) }
+  | LPAREN; NOT; t = term; RPAREN;
+    { SmtAst.Not t }
+  | LPAREN; AND; ts = term_list; RPAREN;
+    { SmtAst.And ts }
+  | LPAREN; OR; ts = term_list; RPAREN;
+    { SmtAst.Or ts }
+  | LPAREN; IMP; ts = term_list; RPAREN;
+    { SmtAst.Imp ts }
+  | LPAREN; EQ; t1 = term; t2 = term; RPAREN;
+    { SmtAst.Eq (t1, t2) }
+  | LPAREN; ULT; t1 = term; t2 = term; RPAREN;
+    { SmtAst.Ult (t1, t2) }
+  | LPAREN; ULE; t1 = term; t2 = term; RPAREN;
+    { SmtAst.Ule (t1, t2) }
+  | LPAREN; UGT; t1 = term; t2 = term; RPAREN;
+    { SmtAst.Ugt (t1, t2) }
+  | LPAREN; UGE; t1 = term; t2 = term; RPAREN;
+    { SmtAst.Uge (t1, t2) }
+  | LPAREN; SLT; t1 = term; t2 = term; RPAREN;
+    { SmtAst.Slt (t1, t2) }
+  | LPAREN; SLE; t1 = term; t2 = term; RPAREN;
+    { SmtAst.Sle (t1, t2) }
+  | LPAREN; SGT; t1 = term; t2 = term; RPAREN;
+    { SmtAst.Sgt (t1, t2) }
+  | LPAREN; SGE; t1 = term; t2 = term; RPAREN;
+    { SmtAst.Sge (t1, t2) }
+
+decl :
+  | LPAREN; GOALS; LPAREN; GOAL; ts = term_list; PRECISION; ID; DEPTH; ID; RPAREN; RPAREN;
+    { SmtAst.And ts }
+  | t = term;
+    { t }
+  | LPAREN; GOALS; LPAREN; GOAL; PRECISION; ID; DEPTH; ID; RPAREN; RPAREN
+    {SmtAst.(True) }
+  | LPAREN; ASSERT; t = term; RPAREN;
+    { t }
 
 program :
-  | EOF { [] }
-  | c = term; cs = program;
-    { c::cs  }
+  | ds = list(decl); EOF
+    { SmtAst.And ds }
 

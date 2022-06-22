@@ -1,7 +1,7 @@
 
 let test_suites : unit Alcotest.test list = [
     "Smtlib Parser", Parser.tests;
-    "Smarts", SmartConstructors.tests;
+    "Smarts", SmartConstructors.tests; (*  *)
     "Logic Algorithms", Algorithms.tests;
     "Traversals", Traversals.tests;
   ]

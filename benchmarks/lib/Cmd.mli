@@ -1,7 +1,8 @@
 type t [@@deriving eq]
 
 val to_string : t -> string
-val size : t -> int  
+val size : t -> int
+val count_asserts : t -> int  
    
 val assume : BExpr.t -> t
 val assert_ : BExpr.t -> t
@@ -26,6 +27,7 @@ val full_table : string -> (int * Expr.t) list -> (string * t) list -> t
 val wp : t -> BExpr.t -> BExpr.t
 val wrong : t -> BExpr.t
 val vc : t -> BExpr.t
+val vcs : t -> BExpr.t list  
 val optimize : t -> t
 val const_prop : t -> t
 val dead_code_elim : t -> t

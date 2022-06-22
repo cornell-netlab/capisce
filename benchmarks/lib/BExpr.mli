@@ -98,6 +98,9 @@ val qf : t -> bool
 val well_formed : t -> bool
 val get_conjuncts : t -> t list
 val coerce_types : TypeContext.t -> t -> t
+val complete_predicate_abstraction : Var.t -> t -> t option
+val get_atoms : t -> t list  
+val get_equality :  t -> (Var.t * Expr.t) option
   
 val label : Context.t -> t -> t
 

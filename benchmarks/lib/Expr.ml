@@ -79,6 +79,14 @@ let var v = Var v
 let is_var = function
   | Var _ -> true
   | _ -> false
+
+let is_one = function
+  | BV (v,_) -> Bigint.(v = one)
+  | _ -> false
+let is_zero = function
+  | BV (v,_) -> Bigint.(v = zero)
+  | _ -> false
+       
 let get_var = function
   | Var x -> x
   | e -> failwith ("tried to get_var of a non-var expression " ^ to_smtlib e)
