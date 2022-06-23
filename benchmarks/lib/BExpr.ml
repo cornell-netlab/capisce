@@ -53,7 +53,7 @@ type t =
   | TTrue
   | LVar of string
   | TNot of t * Var.t list
-  | TBin of bop * t * t * Var.t list
+  | TNary of bop * t list * Var.t list
   | TComp of comp * Expr.t * Expr.t * Var.t list
   | Forall of Var.t * t
   | Exists of Var.t * t
@@ -93,13 +93,13 @@ let rec to_smtlib_buffer indent buff b : unit =
      Buffer.add_string buff "(not\n";
      to_smtlib_buffer (indent + 1) buff t;
      Buffer.add_string buff ")";
-  | TBin (b,t1,t2,_) ->
+  | TNary (b,ts,_) ->
      Buffer.add_string buff "(";
      Buffer.add_string buff (bop_to_smtlib b);
-     Buffer.add_string buff "\n";
-     to_smtlib_buffer (indent + 1) buff t1;
-     Buffer.add_string buff "\n";
-     to_smtlib_buffer (indent + 1) buff t2;
+     List.iter ts ~f:(fun t1 ->
+         Buffer.add_string buff "\n";         
+         to_smtlib_buffer (indent + 1) buff t1;
+       );
      Buffer.add_string buff ")";
   | TComp (comp, e1, e2,_) ->
      Buffer.add_string buff "(";
@@ -123,7 +123,7 @@ let rec get_labelled_vars_aux = function
   | TFalse | TTrue -> []
   | LVar _ -> []
   | TNot (_,vs) 
-    | TBin (_,_,_,vs)  
+    | TNary (_,_,vs)  
     | TComp (_,_,_,vs) -> vs
   | Forall (x, t) | Exists (x, t) ->
      Var.(Util.ldiff ~equal (get_labelled_vars_aux t) [x])
@@ -136,8 +136,12 @@ let rec compute_vars (t : t) =
      ([],[])
   | TNot (t,_) ->
      compute_vars t
-  | TBin (_, t1, t2,_) ->
-     Var.(Util.pairs_app_dedup ~dedup (compute_vars t1) (compute_vars t2))
+  | TNary (_, ts,_) ->
+     let dedup = List.dedup_and_sort ~compare:Var.compare in
+     List.fold_left ts ~init:([],[])
+       ~f:(fun (dvs,cvs) t ->
+         let dvs', cvs' = compute_vars t in
+         (dedup (dvs @ dvs'), dedup (cvs @ cvs')))
   | TComp (_, e1, e2, _) ->
      Var.(Util.pairs_app_dedup ~dedup (Expr.vars e1) (Expr.vars e2))     
   | Forall (x, b) | Exists (x, b) ->
@@ -214,6 +218,14 @@ let binary_vars b1 b2 =
   (get_labelled_vars b1 @ get_labelled_vars b2)
   |> List.dedup_and_sort ~compare:Var.compare
 
+let nary_vars bs =
+  let f t =
+    let (dvs, cvs) = vars t in
+    dvs @ cvs
+  in
+  List.bind bs ~f
+  |> List.dedup_and_sort ~compare:Var.compare
+
 let binary_exp_vars e1 e2 =
   let vs1 = Expr.vars e1 |> Util.uncurry (@) in
   let vs2 = Expr.vars e2 |> Util.uncurry (@) in
@@ -226,10 +238,9 @@ let rec fun_subst f t =
   | TNot (t, _) ->
      let t = fun_subst f t in
      TNot (t, get_labelled_vars t)
-  | TBin (op, t1, t2, _) ->
-     let t1 = fun_subst f t1 in
-     let t2 = fun_subst f t2 in
-     TBin (op, t1, t2, binary_vars t1 t2)     
+  | TNary (op, ts, _) ->
+     let ts = List.map ts ~f:(fun_subst f) in
+     TNary(op, ts, nary_vars ts)     
   | TComp (comp, e1, e2, _) ->
      let e1 = Expr.fun_subst f e1 in
      let e2 = Expr.fun_subst f e2 in
@@ -272,7 +283,7 @@ let lvar x = LVar x
 let and_ =
   ctor2
     ~default:(fun b1 b2 ->
-      TBin(LAnd, b1, b2, binary_vars b1 b2))
+      TNary(LAnd, [b1;b2], nary_vars [b1; b2]))
     ~smart:(fun default b1 b2 ->  
       if b1 = true_ then
         b2
@@ -293,6 +304,15 @@ let and_ =
              false_
            else
              default b1 b2
+        | TNary(LAnd, bs1, vs1), TNary(LAnd, bs2, vs2) ->
+           let bs = bs1@bs2 in
+           TNary(LAnd, bs, Var.dedup (vs1@vs2))
+        | TNary(LAnd, bs1, vs), b2 ->
+           TNary(LAnd, bs1@[b2],
+                 Var.dedup (vs @ Util.uncurry (@) (vars b2)))
+        | b1, TNary(LAnd, bs2, vs) ->
+           TNary(LAnd, b1::bs2,
+                 Var.dedup (Util.uncurry (@) (vars b1) @ vs))
         | _ -> default b1 b2)
 
 let ands_ = List.fold ~init:true_ ~f:and_
@@ -300,7 +320,7 @@ let ands_ = List.fold ~init:true_ ~f:and_
 let imp_ =
   ctor2
     ~default:(fun b1 b2 ->
-      TBin(LArr, b1, b2, binary_vars b1 b2))
+      TNary(LArr, [b1; b2], binary_vars b1 b2))
     ~smart:(fun default b1 b2 ->
       if b2 = true_ || b1 = false_ then
         true_
@@ -323,7 +343,7 @@ let rec imps_ bs =
 
 let or_ =
     ctor2
-    ~default:(fun b1 b2 -> TBin(LOr, b1, b2, binary_vars b1 b2))
+    ~default:(fun b1 b2 -> TNary(LOr, [b1; b2], binary_vars b1 b2))
     ~smart:(fun default b1 b2 ->
       if b2 = true_ || b1 = true_ then
         true_
@@ -338,15 +358,21 @@ let or_ =
            |> default asm 
         | body, (TNot (TComp (Eq, e1, e2, _), _) as asm) when Expr.(is_var e1 || is_var e2) ->
            one_point_rule e1 e2 body           
-           |> default asm 
-        | _,_->
-        default b1 b2)
+           |> default asm
+        | TNary(LOr, bs1, vs1), TNary(LOr, bs2, vs2) ->
+           TNary(LOr, bs1@bs2, Var.dedup (vs1 @ vs2))
+        | TNary(LOr, bs1, vs1), b2 ->
+           TNary(LOr, bs1@[b2], Var.dedup (vs1 @ Util.uncurry (@) (vars b2)))
+        | b1, TNary(LOr, bs2, vs2) ->
+           TNary(LOr, b1::bs2, Var.dedup (Util.uncurry (@) (vars b2) @ vs2))
+        | _, _->
+           default b1 b2)
 
 let ors_ = List.fold ~init:false_ ~f:or_ 
   
 let iff_ =
   ctor2
-    ~default:(fun b1 b2 -> TBin(LIff, b1, b2, binary_vars b1 b2))
+    ~default:(fun b1 b2 -> TNary(LIff, [b1; b2], binary_vars b1 b2))
     ~smart:(fun default b1 b2 ->
       if b1 = b2 then
         true_      
@@ -354,11 +380,8 @@ let iff_ =
         default b1 b2
     )
   
-let iffs_ bs =
-  match bs with
-  | [b1;b2] -> iff_ b1 b2 
-  | _ -> failwith (Printf.sprintf "iffs_ needs a list of length 2, got %d\n%!" (List.length bs))
-
+let iffs_ bs = TNary(LIff, bs, nary_vars bs)
+  
   
 let eq_ =
   ctor2
@@ -422,6 +445,12 @@ let get_smart = function
   | LArr -> imp_
   | LIff -> iff_
 
+let get_smarts = function
+  | LAnd -> ands_
+  | LOr -> ors_
+  | LArr -> imps_
+  | LIff -> iffs_
+
 let get_smart_comp = function
   | Eq -> eq_
   | Ult -> ult_
@@ -443,10 +472,9 @@ let rec size_aux = function
   | TNot (b,_) ->
      size_ := !size_ + 1;
      size_aux b
-  | TBin (_, a, b,_) ->
+  | TNary (_, bs, _) ->
      size_ := !size_ + 1;
-     size_aux a;
-     size_aux b
+     List.iter bs ~f:size_aux
   | Forall (_, b) | Exists (_, b) ->
      size_ := !size_ + 1;
      size_aux b
@@ -533,33 +561,58 @@ let ic_eq x b e1 e2 =
      Forall(x, b)
   
 
-let forall_imp self x b1 b2 = 
-  if occurs_in x b1 && occurs_in x b2 then
-    Forall (x, (imp_ b1 b2))
-  else if occurs_in x b1 then
-    let b1 = self x (not_ b1) in
-    or_ b1 b2
-  else if occurs_in x b2 then
-    let b2 = self x b2 in 
-    imp_ b1 b2
+let destruct_arr bs =
+  let rec loop bs premises conclusion = 
+    match bs with
+    | [] -> (premises, conclusion)
+    | [b] -> (premises, [b])
+    | b::bs -> loop bs (premises@[b]) conclusion
+  in
+  loop bs [] []
+
+let destruct_arr_forms bs =  
+  let premises_list, conclusion_singleton = destruct_arr bs in
+  let premises = ands_ premises_list in
+  let conclusion = List.hd_exn conclusion_singleton in
+  premises, conclusion
+    
+let forall_imp self x bs =
+  let premises, conclusion = destruct_arr_forms bs in
+  if occurs_in x premises && occurs_in x conclusion then
+    Forall (x, (imp_ premises conclusion))
+  else if occurs_in x premises then
+    let premises = self x (not_ premises) in
+    or_ premises conclusion
+  else if occurs_in x conclusion then
+    let conclusion = self x conclusion in 
+    imp_ premises conclusion
   else begin
       decr_q x "not_free_imp_";
-      imp_ b1 b2
+      imp_ premises conclusion
     end
 
-let forall_or self x b1 b2 = 
-  if occurs_in x b1 && occurs_in x b2 then
-    Forall(x, (or_ b1 b2))
-  else if occurs_in x b1 then
-    let b1 = self x b1 in
-    or_ b1 b2
-  else if occurs_in x b2 then
-    let b2 = self x b2 in
-    or_ b1 b2
-  else begin
+let forall_or self x bs =
+  let scoped, unscoped = List.partition_tf ~f:(occurs_in x) bs in
+  if List.is_empty unscoped then
+    Forall(x, ors_ bs)
+  else if List.is_empty scoped then begin
       decr_q x "not_free_or_";
-      or_ b1 b2
+      ors_ unscoped
     end
+  else
+    or_ (self x (ors_ scoped)) (ors_ unscoped)
+  (* if occurs_in x b1 && occurs_in x b2 then
+   *   Forall(x, (or_ b1 b2))
+   * else if occurs_in x b1 then
+   *   let b1 = self x b1 in
+   *   or_ b1 b2
+   * else if occurs_in x b2 then
+   *   let b2 = self x b2 in
+   *   or_ b1 b2
+   * else begin
+   *     decr_q x "not_free_or_";
+   *     or_ b1 b2
+   *   end *)
   
 let rec forall_one (x : Var.t) b =  
   Log.size (size b);
@@ -586,8 +639,8 @@ let rec forall_one (x : Var.t) b =
           false_
        | TNot (TComp(Ugt,e1,e2,_),_) ->
           (ic_ugt x b e1 e2)
-       | TNot (TBin(LOr,b1,b2,_),_) ->
-          forall_one x (and_ (not_ b1) (not_ b2))
+       | TNot (TNary (LOr,bs,_), _) ->
+          forall_one x (ands_ (List.map ~f:not_ bs))
        | TNot(TComp(Eq, e1, e2, _), _) ->
           ic_neq x b e1 e2
        | TComp(Eq, e1, e2,_) when Expr.uelim `Eq [x] e1 e2 ->             
@@ -595,19 +648,18 @@ let rec forall_one (x : Var.t) b =
           false_
        | TComp(Eq, e1, e2, _) ->
           ic_eq x b e1 e2                         
-       | TBin (op, b1, b2,_) ->
+       | TNary (op, bs,_) ->
           begin match op with
           | LArr ->
-             forall_imp forall_one x b1 b2
+             forall_imp forall_one x bs
           | LOr ->
-             forall_or forall_one x b1 b2
+             forall_or forall_one x bs 
           | LAnd ->
              incr_q x;
-             let b1' = forall_one x b1 in
-             let b2' = forall_one x b2 in
-             and_ b1' b2' 
+             let bs = List.map ~f:(forall_one x) bs in
+             ands_ bs
           | LIff ->
-             Forall(x, (iff_ b1 b2))
+             Forall(x, (iffs_ bs))
           end
        | Forall(y, b') ->
           let b' = forall_one x b' in
@@ -629,8 +681,9 @@ let rec simplify_inner = function
   | TTrue -> TTrue
   | LVar a -> LVar a
   | TNot (b,_) -> not_ (simplify_inner b)
-  | TBin (op, b1, b2,_) ->
-     get_smart op (simplify_inner b1) (simplify_inner b2)
+  | TNary (op, bs,_) ->
+     List.map bs ~f:simplify_inner
+     |> get_smarts op
   | TComp (op, e1, e2,_) ->
      get_smart_comp op e1 e2
   | Forall (x, b) -> simplify_inner b |> forall_one x
@@ -658,8 +711,9 @@ let rec label (ctx : Context.t) (b : t) : t =
   match b with
   | TFalse | TTrue | LVar _ -> b
   | TNot (b, _) -> not_ (label ctx b)
-  | TBin (bop, b1, b2, _) ->
-     (get_smart bop) (label ctx b1) (label ctx b2)
+  | TNary (bop, bs, _) ->
+     List.map bs ~f:(label ctx) 
+     |> get_smarts bop
   | TComp (comp, e1, e2, _) ->
      (get_smart_comp comp) (Expr.label ctx e1) (Expr.label ctx e2)
   | Forall _ | Exists _ ->
@@ -671,14 +725,19 @@ let rec nnf (b : t) : t =
   | TComp _ -> b
   | Forall (x, e) -> forall_one x (nnf e)
   | Exists (vs, e) -> exists_one vs (nnf e) 
-  | TBin (op, b1, b2, _) ->
+  | TNary (op, bs, _) ->
      begin match op with
-     | LAnd -> and_ (nnf b1) (nnf b2)
-     | LOr -> or_ (nnf b1) (nnf b2)
-     | LArr -> or_ (nnf (not_ b1)) (nnf b2)
-     | LIff -> and_
-                 (or_ (nnf (not_ b1)) (nnf b2))
-                 (or_ (nnf (not_ b2)) (nnf b1))
+     | LAnd -> ands_ (List.map bs ~f:nnf)
+     | LOr -> ors_ (List.map bs ~f:nnf)
+     | LArr ->
+        let premises, conclusion = destruct_arr_forms bs in
+        or_ (nnf (not_ premises)) (nnf conclusion)
+     | LIff ->
+        List.fold_left bs ~init:true_ ~f:(fun acc b1 ->
+        List.fold_left bs ~init:acc ~f:(fun acc b2 ->
+            ands_ [acc;
+                   or_ (nnf (not_ b1)) (nnf b2);
+                   or_ (nnf (not_ b2)) (nnf b1)] ))
      end
   | TNot (b,_) ->
      match b with
@@ -689,11 +748,14 @@ let rec nnf (b : t) : t =
      | TComp _ -> not_ b
      | Forall (vs, b) -> exists_one vs (nnf (not_ b))
      | Exists (vs, b) -> forall_one vs (nnf (not_ b))
-     | TBin (op, b1, b2, _) ->
+     | TNary (op, bs, _) ->
         match op with
-        | LAnd -> or_ (nnf (not_ b1)) (nnf (not_ b2))
-        | LOr -> and_ (nnf (not_ b1)) (nnf (not_ b2))
-        | LIff | LArr -> nnf (not_ (nnf b))
+        | LAnd -> ors_ (List.map bs ~f:(fun b -> nnf (not_ b)))
+        | LOr -> ands_ (List.map bs ~f:(fun b -> nnf (not_ b)))
+        | LArr | LIff ->
+           nnf b   (* normalize subterm, i.e. desugar => and <=> *)
+           |> not_ (* negate *) 
+           |> nnf  (* normalize full term*)
                        
 let rec cnf_inner (b : t) : t list list=
   match b with
@@ -703,15 +765,21 @@ let rec cnf_inner (b : t) : t list list=
      failwith "i swear you shouldn't use me"
   | Exists _ ->
      failwith "what in the world is my purpose"
-  | TBin (op, b1, b2, _) ->
+  | TNary (op, bs, _) ->
      begin match op with
      | LAnd ->
-        cnf_inner b1 @ cnf_inner b2 
+        List.bind bs ~f:cnf_inner
      | LOr ->
-        let open List.Let_syntax in
-        let%bind conj1 = cnf_inner b1 in
-        let%map conj2 = cnf_inner b2 in
-        conj1 @ conj2 |> List.dedup_and_sort ~compare
+        begin match bs with
+        | [] -> failwith "list of bs cannot be empty"
+        | [b] -> cnf_inner b
+        | b1::bs -> 
+           let open List.Let_syntax in
+           let b2 = ors_ bs in
+           let%bind conj1 = cnf_inner b1 in
+           let%map conj2 = cnf_inner b2 in
+           conj1 @ conj2 |> List.dedup_and_sort ~compare
+        end
      | LArr -> failwith "whoops! crap on a carbunckle"
      | LIff -> failwith "whangdoodle winkerdinker" 
      end
@@ -723,20 +791,13 @@ let rec cnf_inner (b : t) : t list list=
      | _ ->
         failwith (Printf.sprintf "You really shouldn't be out here this late with a (not %s) in your hands " (to_smtlib b))
 
-
 let cnf b =
   Log.print @@ lazy (Printf.sprintf "cnfing.. %i " (size b)); 
   let ands_of_ors = cnf_inner (nnf b) in
   (* let sz = SetOfSet_t.fold ands_of_ors ~init:0 ~f:(fun sum conj -> sum + 1 + (Set_t.length conj)) in *)
   Log.print @@ lazy (Printf.sprintf "un-cnfing...");
   (* enable_smart_constructors := `Off; *)
-  let cnf =
-    List.fold_left ands_of_ors ~init:true_
-      ~f:(fun ands ors ->
-        let ored = List.fold_left ors ~f:or_ ~init:false_ in
-        and_ ands ored
-      )
-  in
+  let cnf = ands_ (List.map ands_of_ors ~f:ors_) in
   (* enable_smart_constructors := `On; *)
   (* Log.print @@ lazy (Printf.sprintf "done. (size %i)" (size cnf)); *)
   cnf
@@ -744,8 +805,8 @@ let cnf b =
 
 let rec get_conjuncts b =
   match b with
-  | TBin (LAnd,b1, b2, _) ->     
-     get_conjuncts b1 @ get_conjuncts b2
+  | TNary (LAnd, bs, _) ->     
+     List.bind bs ~f:get_conjuncts
   | _ ->
      [b]
     
@@ -766,9 +827,8 @@ let quickcheck_generator : t Generator.t =
         (let%map b = self in TNot (b, get_labelled_vars b));
 
         (let%bind op = quickcheck_generator_bop in
-         let%bind b1 = self in
-         let%map b2 = self in
-         TBin (op,b1,b2, binary_vars b1 b2)
+         let%map bs = list self in
+         TNary (op, bs, nary_vars bs)
         );
 
         (let%bind b = self in
@@ -807,9 +867,8 @@ let qf_quickcheck_generator : t Generator.t =
         (let%map b = self in TNot (b, get_labelled_vars b));
 
         (let%bind op = quickcheck_generator_bop in
-         let%bind b1 = self in
-         let%map b2 = self in
-         TBin (op,b1,b2, binary_vars b1 b2)
+         let%map bs = list self in
+         TNary (op, bs, nary_vars bs)
         );
       ]
     )
@@ -820,7 +879,7 @@ let rec well_formed b =
   match b with
   | TTrue | TFalse | LVar _ -> true
   | TComp (_,e1,e2,_) -> Expr.well_formed e1 && Expr.well_formed e2
-  | TBin(_,b1,b2,_) -> well_formed b1 && well_formed b2
+  | TNary(_,bs,_) -> List.for_all bs ~f:well_formed
   | TNot (b,_) | Forall (_,b) | Exists(_,b) -> well_formed b
 
 let rec normalize_names b =
@@ -830,10 +889,9 @@ let rec normalize_names b =
      let e1' = Expr.normalize_names e1 in
      let e2' = Expr.normalize_names e2 in
      TComp(comp, e1', e2', binary_exp_vars e1' e2')
-  | TBin(op,b1,b2,_) ->
-     let b1' = normalize_names b1 in
-     let b2' = normalize_names b2 in
-     TBin(op,b1',b2', binary_vars b1' b2')
+  | TNary(op, bs,_) ->
+     let bs = List.map bs ~f:normalize_names in
+     TNary(op, bs, nary_vars bs)
   | TNot (b, _) ->
      let b' = normalize_names b in
      TNot (b', get_labelled_vars b')
@@ -854,7 +912,7 @@ let rec qf = function
     | TComp _ -> true
   | LVar _ -> false
   | TNot (b,_) -> qf b
-  | TBin (_,a,b,_) -> qf a && qf b
+  | TNary (_,bs,_) -> List.for_all bs ~f:qf
   | Forall (_,_) ->
      false
   | Exists (_,_) ->
@@ -872,10 +930,14 @@ let rec predicate_abstraction_inner abs b : (PredAbs.t * t) =
   | TNot (b,_) ->
      let (abs, b) = predicate_abstraction_inner abs b in
      (abs, not_ b)
-  | TBin (op, a, b, _) ->
-     let (abs, a) = predicate_abstraction_inner abs a in
-     let (abs, b) = predicate_abstraction_inner abs b in
-     (abs, (get_smart op) a b)
+  | TNary (op, bs, _) ->
+     let abs, bs = 
+       List.fold_left bs ~init:(abs,[]) ~f:(fun (abs, bs) b ->
+           let (abs, b) = predicate_abstraction_inner abs b in
+           (abs, b::bs) 
+         )
+     in
+     (abs, (get_smarts op) bs)
   | Forall (x, b) ->
      let (abs, b) = predicate_abstraction_inner abs b in
      (abs, forall [x] b)
@@ -894,7 +956,7 @@ let rec get_atoms b =
   | TFalse | TTrue | LVar _ -> []
   | TComp _ -> [b]
   | TNot (b,_) -> get_atoms b
-  | TBin (_, a, b, _) -> get_atoms a @ get_atoms b
+  | TNary (_, bs, _) -> List.bind bs ~f:get_atoms
   | _ -> failwith "cannot get atoms under quantifiers" 
 
 let rec get_atoms_containing x b =
@@ -906,8 +968,8 @@ let rec get_atoms_containing x b =
      else []
   | TNot (b,_) ->
      get_atoms_containing x b
-  | TBin (_, a, b, _) ->
-     get_atoms_containing x a @ get_atoms_containing x b
+  | TNary (_, bs, _) ->
+     List.bind bs  ~f:(get_atoms_containing x)
   | Forall (x', _) 
   | Exists (x', _) when Var.(x' = x) ->
      []
@@ -922,8 +984,9 @@ let rec abstract_atom atom var b =
     let shadow x = List.mem (fst (vars atom)) x ~equal:Var.equal in
     match b with
     | TFalse | TTrue | LVar _ | TComp _ -> b
-    | TBin (op, a, b, _ ) ->
-       (get_smart op) (abstract_atom atom var a) (abstract_atom atom var b)
+    | TNary (op, bs, _ ) ->
+       List.map bs ~f:(abstract_atom atom var)
+       |> get_smarts op
     | TNot (b, _) ->
        not_ (abstract_atom atom var b)
     | Forall (x, _)
@@ -972,9 +1035,8 @@ let rec get_abstract_predicates b =
   | LVar x -> [x]
   | TNot (b,_) ->
      get_abstract_predicates b
-  | TBin (_, a, b, _) ->
-     get_abstract_predicates a
-     @ get_abstract_predicates b
+  | TNary (_, bs, _) ->
+     List.bind bs ~f:(get_abstract_predicates)
      |> List.dedup_and_sort ~compare:String.compare
   | Forall (_, b) | Exists (_, b)->
      get_abstract_predicates b
@@ -991,10 +1053,9 @@ let rec fun_subst_lvar f b =
      f y
   | TNot (b,_) ->
      not_ (fun_subst_lvar f b)
-  | TBin (op, b1, b2, _) ->
-     (get_smart op)
-       (fun_subst_lvar f b1)
-       (fun_subst_lvar f b2)
+  | TNary (op, bs, _) ->
+     List.map bs ~f:(fun_subst_lvar f)  
+     |> get_smarts op
   | Forall (y, b) ->
      forall_one y (fun_subst_lvar f b)
   | Exists (y, b)->
@@ -1023,11 +1084,9 @@ let rec coerce_types gamma (b : t) : t =
   | TNot (b,_)  ->
      not_ (coerce_types gamma b) 
 
-  | TBin (bop, b1, b2, _) ->
-     let ctor = get_smart bop in
-     let b1 = coerce_types gamma b1 in
-     let b2 = coerce_types gamma b2 in
-     ctor b1 b2
+  | TNary (bop, bs, _) ->
+     List.map bs ~f:(coerce_types gamma)
+     |> get_smarts bop
   | TComp (comp, e1, e2, _) ->
      let ctor = get_smart_comp comp in
      let e1 = Expr.coerce_types gamma e1 in
@@ -1045,8 +1104,9 @@ let rec order_all_quantifiers b =
   | TTrue | TFalse | TComp _ | LVar _ -> b
   | TNot (b, _) ->
      not_ (order_all_quantifiers b)
-  | TBin (o, b1, b2, _) ->
-     (get_smart o) (order_all_quantifiers b1) (order_all_quantifiers b2)
+  | TNary (op, bs, _) ->
+     List.map bs ~f:order_all_quantifiers
+     |> get_smarts op
   | Exists _ ->
      failwith "WHY IS THERE AN EXISTENTAL HERE?"
   | Forall (x, b) ->

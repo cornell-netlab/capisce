@@ -62,8 +62,9 @@ let rec qe (solver : ?with_timeout:int -> Var.t list -> string -> string)  b : B
   | TTrue | TFalse | TComp _ | LVar _ -> b
   | TNot (b, _) ->
      not_ (qe solver b)
-  | TBin (o, b1, b2, _) ->
-     (BExpr.get_smart o) (qe solver b1) (qe solver b2)
+  | TNary (o, bs, _) ->
+     List.map bs ~f:(qe solver)
+     |> BExpr.get_smarts o
   | Forall (x, b) ->
      let b' = qe solver b in
      let vars = BExpr.vars b' |> Util.uncurry (@) in

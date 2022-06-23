@@ -25,7 +25,7 @@ type t =
   | TTrue
   | LVar of string
   | TNot of t * Var.t list
-  | TBin of bop * t * t * Var.t list
+  | TNary of bop * t list * Var.t list
   | TComp of comp * Expr.t * Expr.t * Var.t list
   | Forall of Var.t * t
   | Exists of Var.t * t
@@ -55,6 +55,7 @@ val or_ : t -> t -> t
 val imp_ : t -> t -> t
 val iff_ : t -> t -> t
 val get_smart : bop -> t -> t -> t
+val get_smarts : bop -> t list -> t  
 
 val ands_ : t list -> t
 val ors_ : t list -> t
