@@ -24,9 +24,9 @@ type t =
   | TFalse
   | TTrue
   | LVar of string
-  | TNot of t * Var.t list
-  | TNary of bop * t list * Var.t list
-  | TComp of comp * Expr.t * Expr.t * Var.t list
+  | TNot of t 
+  | TNary of bop * t list
+  | TComp of comp * Expr.t * Expr.t
   | Forall of Var.t * t
   | Exists of Var.t * t
   [@@deriving eq, sexp, compare, quickcheck]
@@ -36,7 +36,7 @@ val to_smtlib : t -> string
  * val of_smtast : ?cvs:Var.t list -> SmtAst.t list -> t   *)
 
 val enable_smart_constructors : [`On | `Off] ref
-val q_count : int ref
+val q_count : Bigint.t ref
 val incr_q : Var.t -> unit
 val decr_q : Var.t -> string -> unit  
    

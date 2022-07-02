@@ -9,6 +9,7 @@ let simplify consts str =
     (Var.list_to_smtlib_decls consts)
     str
 
+
 let assert_apply ?timeout consts phi_str =
   let open Printf in
   let cmd = match timeout with

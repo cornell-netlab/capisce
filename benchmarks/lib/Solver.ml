@@ -9,6 +9,7 @@ let cvc4_exe = "/usr/bin/cvc5 --lang smt2"
   
 let run_proc p str =
   Log.print @@ lazy (Printf.sprintf "SMT Query:\n%s\n%!" str);
+  (* Printf.printf "SMT Query:\n%s\n%!" str; *)
   let file = FileIO.tmp_write str in
   (* let chan = Unix.open_process_in (Printf.sprintf "%s %s 2> /tmp/errors.log" p file) in *)
   let chan = Unix.open_process_in (Printf.sprintf "%s %s" p file) in
@@ -18,7 +19,17 @@ let run_proc p str =
   String.concat strs ~sep:"\n"
   
 let run_princess = run_proc princess_exe
-let run_z3 = run_proc z3_exe
+let run_z3 =
+  let table = String.Table.create () in
+  fun str ->
+  match String.Table.find table str with
+  | Some res ->
+     res
+  | None ->
+     let res = run_proc z3_exe str in
+     String.Table.set table ~key:str ~data:res;
+     res
+     
 let run_cvc4 = run_proc cvc4_exe               
 
 let of_smtlib ~cvs ~dvs smt : BExpr.t =

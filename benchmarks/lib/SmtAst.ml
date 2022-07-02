@@ -250,9 +250,9 @@ let rec infer_type (gamma : ctx) (term : t) typ : (t * ctx * typ) =
      | Bool, BitVec | BitVec, Bool ->
         inference_mismatch "equality"
      | Unknown, Unknown ->
-        String.Map.to_alist gamma
-        |> List.to_string ~f:(fun (x, typ) -> Printf.sprintf "%s : %s" x (typ_to_string typ))
-        |> Printf.printf "%s\n"; 
+        (* String.Map.to_alist gamma
+         * |> List.to_string ~f:(fun (x, typ) -> Printf.sprintf "%s : %s" x (typ_to_string typ))
+         * |> Printf.printf "%s\n";  *)
         Eq(term1,term2), gamma, typ2
      end
 
@@ -623,7 +623,7 @@ let to_bexpr gamma ~cvs ~dvs term : BExpr.t =
   | Second _ -> failwith "parsed a toplevel expression, it should be a bexpr"              
 
 let translate ~cvs ~dvs term =
-  Printf.printf "%s" (to_sexp_string [term]); 
+  (* Printf.printf "%s" (to_sexp_string [term]);  *)
   let gamma = cvs @ dvs
               |> List.fold ~init:String.Map.empty ~f:(fun acc x ->
                      update acc (Var.str x) BitVec ~error:"BOGUS" ) in
