@@ -384,8 +384,6 @@ let rec const_prop_aux (f : Facts.t) (c : t) =
      let f1, c1 = const_prop_aux f c1 in
      let f2, c2 = const_prop_aux f c2 in
      let f = Facts.merge f1 f2 in
-     (* Log.print @@ lazy (Printf.sprintf "After []:\n%s \n"
-      *                      (Facts.to_string f)); *)
      (f, choice c1 c2)
   
   
@@ -424,18 +422,16 @@ let rec dead_code_elim_aux c (reads : VarSet.t) : (t * VarSet.t) =
 
 let dead_code_elim c = fst (dead_code_elim_aux c VarSet.empty)
 
-let rec fix g f x =  
+let rec fix f x =  
   let x' = f x in
   if equal x' x then
     x
-  else if g <= 0 then
-    x
-  else
-    fix (g - 1) f x'
+  else 
+    fix f x'
                      
 let optimize c =
-  let o c = dead_code_elim (const_prop c) in 
-  fix 100 o c
+  let o c = dead_code_elim (const_prop (dead_code_elim (const_prop c))) in 
+  fix o c
 
 
 let rec pathify_inner (c : t) : t list list =

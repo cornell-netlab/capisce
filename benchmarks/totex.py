@@ -16,7 +16,7 @@ output_file = 'out.tex'
 
 if len(sys.argv) != 1:
     print('Usage: python3 totex.py')
-
+    exit
 else:
     try:
         with open(input_file, "r") as f:

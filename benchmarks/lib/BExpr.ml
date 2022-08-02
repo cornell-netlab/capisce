@@ -1,7 +1,7 @@
 open Base_quickcheck
 open Core
 
-let enable_smart_constructors = ref `Off
+let enable_smart_constructors = ref `On
 
 let q_count = ref (Bigint.zero)
 let measure s : unit = Log.measure (Printf.sprintf "%f,%s,%s" (Clock.now()) (Bigint.to_string !q_count) s)  
@@ -118,16 +118,6 @@ let rec to_smtlib_buffer indent buff b : unit =
      to_smtlib_buffer (indent+1) buff t;
      Buffer.add_string buff ")"
      
-
-(* let rec get_labelled_vars_aux = function
- *   | TFalse | TTrue -> []
- *   | LVar _ -> []
- *   | TNot (_,vs) 
- *     | TNary (_,_,vs)  
- *     | TComp (_,_,_,vs) -> vs
- *   | Forall (x, t) | Exists (x, t) ->
- *      Var.(Util.ldiff ~equal (get_labelled_vars_aux t) [x]) *)
-
 let varstime : float ref = ref 0.0
 
 let rec compute_vars (t : t) =
@@ -148,24 +138,8 @@ let rec compute_vars (t : t) =
      let dvs, cvs = compute_vars b in
      Var.(Util.ldiff ~equal dvs [x], Util.ldiff ~equal cvs [x])                    
     
-(* let _compute_label_equal b =
- *   let setify = List.dedup_and_sort ~compare:Var.compare in
- *   List.equal Var.equal
- *     (get_labelled_vars_aux b |> setify)
- *     (compute_vars b |> Util.uncurry (@) |> setify) *)
-
-
 let get_labelled_vars b =
   compute_vars b |> Util.uncurry (@)
-  (* if !Log.debug && not (_compute_label_equal b) then begin
-   *     Printf.printf "------formula------\n%s\n%!" (([%sexp_of: t] b) |> Sexp.to_string);
-   *     Printf.printf "------compute------\n%s\n%!" (compute_vars b |> Util.uncurry (@) |> Var.list_to_smtlib_quant);
-   *     Printf.printf "------labeled------\n%s\n%!" (get_labelled_vars_aux b|> Var.list_to_smtlib_quant);
-   *           
-   *     assert false
-   *   end
-   * else
-   *   get_labelled_vars_aux b *)
   
 let vars t : Var.t list * Var.t list =
   let c = Clock.start () in
@@ -373,7 +347,6 @@ let iff_ =
     )
   
 let iffs_ bs = TNary(LIff, bs)
-  
   
 let eq_ =
   ctor2
@@ -787,15 +760,18 @@ let rec cnf_inner (b : t) : t list list=
         failwith (Printf.sprintf "You really shouldn't be out here this late with a (not %s) in your hands " (to_smtlib b))
 
 let cnf b =
-  Log.print @@ lazy (Printf.sprintf "cnfing.. %i " (size b)); 
-  let ands_of_ors = cnf_inner (nnf b) in
+  Log.print @@ lazy (Printf.sprintf "cnfing.. %i " (size b));
+  let nnfd = nnf b in
+  Log.print @@ lazy (Printf.sprintf "nuffy.. %i" (size nnfd));
+  let ands_of_ors = cnf_inner nnfd in
   (* let sz = SetOfSet_t.fold ands_of_ors ~init:0 ~f:(fun sum conj -> sum + 1 + (Set_t.length conj)) in *)
   Log.print @@ lazy (Printf.sprintf "un-cnfing...");
   (* enable_smart_constructors := `Off; *)
-  let cnf = TNary(LAnd, List.map ands_of_ors ~f:(fun ors -> TNary(LOr, ors))) in
+  let cnfd = TNary(LAnd, List.map ands_of_ors ~f:(fun ors -> TNary(LOr, ors))) in
   (* enable_smart_constructors := `On; *)
+  Log.print @@ lazy (Printf.sprintf "done, size %i" (size cnfd));
   (* Log.print @@ lazy (Printf.sprintf "done. (size %i)" (size cnf)); *)
-  cnf
+  cnfd
 
 
 let rec get_conjuncts b =
@@ -821,9 +797,15 @@ let quickcheck_generator : t Generator.t =
       [
         (let%map b = self in TNot b);
 
-        (let%bind op = quickcheck_generator_bop in
-         let%map bs = list self in
-         TNary (op, bs)
+        (let%bind op = quickcheck_generator_bop in 
+         match op with
+         | LIff ->
+            let%bind b1 = self in
+            let%map  b2 = self in 
+            TNary(LIff, [b1;b2])
+         | _ ->
+            let%map bs = list self |> filter ~f:(fun l -> List.length l > 1) in
+            TNary (op, bs)
         );
 
         (let%bind b = self in
@@ -1065,7 +1047,7 @@ let get_equality b =
   | TComp(Eq, e1, e2) when Expr.is_var e1 ->
      Some (Expr.get_var e1, e2)
   | TComp(Eq, e1, e2) when Expr.is_var e2 ->
-     Some (Expr.get_var e1, e1)
+     Some (Expr.get_var e2, e1)
   | _ ->
      None
   

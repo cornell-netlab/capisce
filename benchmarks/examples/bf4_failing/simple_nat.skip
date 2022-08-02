@@ -19,6 +19,7 @@ struct meta_t {
     bit<1>  is_ext_if;
     bit<16> tcpLength;
     bit<8>  if_index;
+    bit<9>  initial_egress_spec;
 }
 
 header cpu_header_t {
@@ -151,11 +152,13 @@ control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t
         }
     }
     apply {
-        // if (standard_metadata.instance_type == 32w0) {
+        if (standard_metadata.instance_type == 32w0) {
             send_frame.apply();
-        // } else {
+        } else {
             send_to_cpu.apply();
-        // }
+        }
+        assert(standard_metadata.egress_spec != meta.meta.initial_egress_spec);
+        standard_metadata.egress_spec = 9w511;
     }
 }
 
@@ -246,6 +249,7 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         size = 128;
     }
     apply {
+        meta.meta.initial_egress_spec = standard_metadata.egress_spec;
         if_info.apply();
         nat.apply();
         if (meta.meta.do_forward == 1w1 && hdr.ipv4.ttl > 8w0) {

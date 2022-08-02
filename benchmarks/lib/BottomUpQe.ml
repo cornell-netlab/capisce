@@ -28,7 +28,8 @@ let timeout_solver (solver : ?with_timeout:int -> Var.t list -> string -> string
   in
   (* optimistically try the solver with a timeout between 1s and 10s *)
   (* this threshold should void bitblasting *)
-  solver ~with_timeout:(min (max (BExpr.size phi) 1000) 10000) vars phi_str
+  (* solver ~with_timeout:(min (max (BExpr.size phi) 1000) 20000) vars phi_str *)
+  solver ~with_timeout:20000 vars phi_str
 
 let unrestricted_solver (solver : ?with_timeout:int -> Var.t list -> string -> string) cvs x phi =
   let open BExpr in
@@ -45,8 +46,7 @@ let unrestricted_solver (solver : ?with_timeout:int -> Var.t list -> string -> s
 
   
 let try_cnfing body : BExpr.t =
-  Breakpoint.set break;
-  if BExpr.qf body (*&& size body < 500 *)
+  if BExpr.qf body
   then begin
       Log.print @@ lazy "cnfing";
       Breakpoint.set break;
@@ -88,8 +88,14 @@ let rec qe (solver : ?with_timeout:int -> Var.t list -> string -> string)  b : B
             b''
           end
         else begin (* TRY CNFING *)
-            Log.print @@ lazy (Printf.sprintf "trying to cnf something of size %d" (BExpr.size body));   
+            Log.print @@ lazy (Printf.sprintf "trying to cnf something of size %d" (BExpr.size body));
+            Log.print @@ lazy (Smt.assert_apply vars (BExpr.to_smtlib b'));
+            Breakpoint.set true;
             let body = try_cnfing body in
+            if size body >= size b'' then
+              (*if cnfing only made it worse, use the original z3-provided response*)
+              b''
+            else
             begin match BExpr.forall [x'] body |> simplify with
             | Forall (x'', _) as phi when Var.equal x' x'' ->
                (* Log.size (size body); *)

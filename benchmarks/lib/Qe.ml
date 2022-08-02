@@ -160,9 +160,24 @@ let subsolving (prog, asst) =
   Log.enable_measurement ();  
   List.iter dvs ~f:BExpr.incr_q;
   Log.print @@ lazy "smart constructors";
-  let qphi = BExpr.(forall dvs phi |> order_all_quantifiers) in
-  Log.print @@ lazy "running the bottom up solver";
-  let qf_phi = BottomUpQe.qe (solve_wto `Z3) qphi in
+  (* let qphi = BExpr.(forall dvs phi |> order_all_quantifiers) in *)
+  let compare v1 v2 = Int.compare (Var.size v1) (Var.size v2) in
+  let sorted_dvs = List.sort dvs ~compare in
+  Log.print @@ lazy (Printf.sprintf "The sorted dataplane variables:%s\n" (List.to_string sorted_dvs ~f:Var.str));
+  (* sort and re-sort by number of occurences *)
+  let qf_phi = List.fold_left sorted_dvs ~init:phi
+                 ~f:(fun qf_phi x -> 
+                   Log.print @@ lazy (Printf.sprintf "running the bottom up solver for %s#%d" (Var.str x) (Var.size x));
+                   let soln = BottomUpQe.qe (solve_wto `Z3) (BExpr.forall [x] qf_phi) in
+                   if List.exists (fst (BExpr.vars soln)) ~f:(fun y -> String.(Var.str x = Var.str y)) then begin
+                       Printf.printf "Didn't elim %s from \n %s\n\n GOT \n %s\n %!" (Var.str x) (BExpr.to_smtlib qf_phi) (BExpr.to_smtlib soln);
+                       assert false
+                     end
+                   else begin
+                       Printf.printf "REMOVED %s\n%!" (Var.str x);
+                     end;
+                   soln
+                 ) in
   Log.print @@ lazy "getting the vars of the result";  
   let dvs', cvs = BExpr.vars qf_phi in
   Log.print @@ lazy (Printf.sprintf "checking all dataplane variables have been eliminated from %s" (BExpr.to_smtlib qf_phi));    

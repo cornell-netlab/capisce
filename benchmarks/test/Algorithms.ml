@@ -106,13 +106,78 @@ let const_prop_for_parser () =
     ] in
   Alcotest.(check cmd) "literal equivalence" skip (const_prop c)
 
+
+let rec ifelse cases base =
+  let open Cmd in
+  let open BExpr in
+  match cases with
+  | [] -> base
+  | (cond, cmd)::cases ->
+     choice_seq
+     [assume cond; cmd]
+     [assume (not_ cond);
+      ifelse cases base]
+  
+let cost_prop_parser () =
+  let open Cmd in 
+  let open BExpr in
+  let open Expr in
+  let ethertype = Var.make "hdr.ethernet.etherType" 16 in
+  let _state_parse_llc_header_next = Var.make "_state$parse_llc_header$next" 1 in
+  let _state_parse_fabric_header_next = Var.make "_state$parse_fabric_header$next" 1 in
+  let _state_parse_vlan_next = Var.make "_state$parse_vlan$next" 1 in
+  let _state_parse_qinq_next = Var.make "_state$parse_qinq$next" 1 in
+  let _state_parse_mpls_next = Var.make "_state$parse_mpls$next" 1 in
+  let _state_parse_ipv4_next = Var.make "_state$parse_ipv4$next" 1 in
+  let _state_parse_arp_rarp_nexta = Var.make "_state$parse_arp_rarp$next" 1 in
+  let _state_parse_ipv6_next = Var.make "_state$parse_ipv6$next" 1 in
+  let _state_parse_arp_rarp_next = Var.make "_state$parse_arp_rarp$next" 1 in
+  let _state_parse_set_prio_high_next = Var.make "_state$parse_set_prio_high$next" 1 in
+  let _state_accept_next = Var.make "_state$accept$next" 1 in
+  let c =
+    sequence [ assign ethertype (bvi 2048 16);
+               ifelse 
+               [ (eq_ (band (var ethertype) (bvi 65024 16)) (bvi 0 16))
+                 , assign _state_parse_llc_header_next (bvi 1 1)
+               ; (eq_ (band (var ethertype) (bvi 64000 16)) (bvi 0 16))
+                 , assign _state_parse_llc_header_next (bvi 1 1)
+               ; (eq_ (var ethertype) (bvi 36864 16))
+                 , assign _state_parse_fabric_header_next (bvi 1 1)
+               ; (eq_ (var ethertype) (bvi 33024 16))
+                 , assign _state_parse_vlan_next (bvi 1 1)               
+               ; (eq_ (var ethertype) (bvi 37120 16))
+                 , assign _state_parse_qinq_next (bvi 1 1)
+               ; (eq_ (var ethertype) (bvi 34887 16))
+                 , assign _state_parse_mpls_next (bvi 1 1)
+               ; (eq_ (var ethertype) (bvi 2048 16))
+                 , assign _state_parse_ipv4_next (bvi 1 1)
+               ; (eq_ (var ethertype) (bvi 34525 16))
+                 , assign _state_parse_ipv6_next (bvi 1 1)
+               ; (eq_ (var ethertype) (bvi 2054 16))
+                 , assign _state_parse_arp_rarp_next (bvi 1 1)
+               ; (eq_ (var ethertype) (bvi 35020 16))
+                 , assign _state_parse_set_prio_high_next (bvi 1 1)
+               ; (eq_ (var ethertype) (bvi 34825 16))
+                 , assign _state_parse_set_prio_high_next (bvi 1 1)]
+               (assign _state_accept_next (bvi 1 1))] in
+  Alcotest.(check cmd) "literal equivalence"
+    (sequence [assign ethertype (bvi 2048 16); assign _state_parse_ipv4_next (bvi 1 1)])
+    (const_prop c)
+
+  
+
+
+  
 let tests =
   [
     Alcotest.test_case "cnf foils" `Quick cnf_foils;
     Alcotest.test_case "qc cnf_equiv" `Slow cnf_equiv;
     Alcotest.test_case "egress_spec vc" `Quick vc_egress_spec;
-    Alcotest.test_case "const prop" `Quick const_prop_for_parser;
+    Alcotest.test_case "const prop" `Quick cost_prop_parser;
   ]
 
   
                    
+
+
+  

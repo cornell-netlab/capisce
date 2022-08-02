@@ -30,13 +30,14 @@ type uop =
   | UNot
   | USlice of int * int (* lo, hi *)
   [@@deriving eq, sexp, compare, quickcheck]
+
             
 let uop_to_smtlib = function
   | UNot ->
      "bvnot"
   | USlice (lo, hi) ->
      (* Intentionally swap the order here*)
-     Printf.sprintf "(_ extract %d %d)" hi lo
+     Printf.sprintf "(_ extract %d %d)" hi lo    
 
 type t =
   | BV of Bigint.t * int
@@ -57,7 +58,46 @@ let rec to_smtlib = function
        (to_smtlib e2)
   | UnOp (op,e) ->
      Printf.sprintf "(%s %s)" (uop_to_smtlib op) (to_smtlib e)
-          
+
+let eval2 op e1 e2 =
+  match e1, e2 with
+  | BV(v1, w1), BV (v2, w2) ->
+  begin match op with
+      | BAnd ->
+         BV (Bigint.(v1 land v2), w1)
+      | BOr ->
+         BV (Bigint.(v1 lor v2), w1)
+      | BAdd ->
+        BV (Bigint.(v1 + v2), w1)     
+      | BMul ->
+         BV (Bigint.(v1 * v2), w1)     
+      | BSub ->
+         BV (Bigint.(v1 - v2), w1)     
+      | BXor ->
+         BV (Bigint.(v1 lxor v2), w1)     
+      | BConcat ->
+         BV (Bigint.((shift_left v1 w2) + v2), w1 + w2)     
+      | BShl ->
+         BV (Bigint.(shift_left v1 (to_int_exn v2)), w1)
+      | BAshr ->
+         BV (Bigint.(v1 asr (to_int_exn v2)), w1)
+      | BLshr ->
+         (* WARNING -- is this the right shift?*)
+         BV (Bigint.(shift_right v1 (to_int_exn v2)), w1)
+  end
+  | _ -> BinOp(op, e1, e2)
+
+let eval1 op e1 =
+  match e1 with
+  | BV(v1, w1) ->
+     begin match op with
+     | UNot ->
+        BV (Bigint.(lnot v1), w1)
+     | USlice (lo,hi) ->
+        BV (Bigint.((shift_right v1 lo) % (((of_int 2) ** of_int hi) - one)), hi - lo)
+     end
+  | _ -> UnOp(op, e1)
+    
 let rec get_width = function
   | BV (_,w) -> w
   | Var x -> Var.size x
@@ -90,35 +130,60 @@ let is_zero = function
 let get_var = function
   | Var x -> x
   | e -> failwith ("tried to get_var of a non-var expression " ^ to_smtlib e)
-  
+
+let rec fold_consts_opt e =
+  let open Option.Let_syntax in
+  match e with
+  | BV _ -> Some e
+  | Var _ -> None
+  | BinOp (bop, e1, e2) ->
+     begin match fold_consts_opt e1, fold_consts_opt e2 with
+     | None, None -> None
+     | Some e1, None -> Some (BinOp(bop, e1, e2))
+     | None, Some e2 -> Some (BinOp(bop, e1, e2))
+     | Some e1, Some e2 ->
+        Some (eval2 bop e1 e2)
+     end
+  | UnOp (uop, e) ->
+     let%map e = fold_consts_opt e in
+     eval1 uop e
+    
+let fold_consts_default e =
+  match fold_consts_opt e with
+  | None -> e
+  | Some e' ->
+     (* Log.print @@ lazy( Printf.sprintf "[constant_folding] started with %s, got %s"
+      *                      (to_smtlib e) (to_smtlib e'));  *)
+     e'
+     
 let band e1 e2 =
   match e1, e2 with
   | BV(i,w), _ | _, BV(i,w)->
      if Bigint.(i = zero) then
        bv i w
      else
-       BinOp(BAnd, e1, e2)
+       BinOp(BAnd, e1, e2) |> fold_consts_default
   | _,_ ->
-     BinOp(BAnd, e1, e2)
+     BinOp(BAnd, e1, e2) |> fold_consts_default
      
-let bor e1 e2 = BinOp(BOr, e1, e2)
-let badd e1 e2 = BinOp(BAdd, e1, e2)              
-let bmul e1 e2 = BinOp(BMul, e1, e2)
-let bsub e1 e2 = BinOp(BSub, e1, e2)
-let bxor e1 e2 = BinOp(BXor, e1, e2)
-let bconcat e1 e2 = BinOp (BConcat, e1, e2)
+let bor e1 e2 = BinOp(BOr, e1, e2) |> fold_consts_default
+let badd e1 e2 = BinOp(BAdd, e1, e2) |> fold_consts_default
+let bmul e1 e2 = BinOp(BMul, e1, e2) |> fold_consts_default
+let bsub e1 e2 = BinOp(BSub, e1, e2) |> fold_consts_default
+let bxor e1 e2 = BinOp(BXor, e1, e2) |> fold_consts_default
+let bconcat e1 e2 = BinOp (BConcat, e1, e2) |> fold_consts_default
 
 let rec nary op : t list -> t = function
   | [] -> failwith "cannot bvor 0 bvs, need at least one"
   | [e] -> e
   | e::es -> op e (nary op es)
  
-let shl_ e1 e2 = BinOp(BShl, e1, e2)
-let ashr_ e1 e2 = BinOp(BAshr, e1, e2)
-let lshr_ e1 e2 = BinOp(BLshr, e1, e2)             
+let shl_ e1 e2 = BinOp(BShl, e1, e2) |> fold_consts_default
+let ashr_ e1 e2 = BinOp(BAshr, e1, e2)|> fold_consts_default
+let lshr_ e1 e2 = BinOp(BLshr, e1, e2)|> fold_consts_default             
                 
-let bnot e = UnOp(UNot, e)
-let bslice lo hi e =  UnOp(USlice(lo, hi), e)           
+let bnot e = UnOp(UNot, e)|> fold_consts_default
+let bslice lo hi e =  UnOp(USlice(lo, hi), e) |> fold_consts_default        
 let bcast width e =
   let ew = get_width e in
   if ew = width then
@@ -127,6 +192,25 @@ let bcast width e =
     bslice 0 (width - 1) e
   else
     bconcat (bvi 0 (width - ew)) e
+
+
+let get_smart1 op =
+  match op with
+  | UNot -> bnot 
+  | USlice(lo,hi) -> bslice lo hi
+
+let get_smart2 op =
+    match op with
+    | BAnd -> band
+    | BOr -> bor
+    | BAdd -> badd
+    | BMul -> bmul
+    | BSub -> bsub
+    | BXor -> bxor
+    | BConcat -> bconcat
+    | BShl -> shl_
+    | BAshr -> ashr_
+    | BLshr -> lshr_
   
 let uelim sign vs e1 e2 =
   let open Var in 
@@ -206,9 +290,9 @@ let rec fun_subst f e =
   | BV _ -> e
   | Var y -> f y
   | BinOp (op, e1, e2) ->
-     BinOp (op, fun_subst f e1, fun_subst f e2)
+     get_smart2 op (fun_subst f e1) (fun_subst f e2)
   | UnOp (op, e) ->
-     UnOp (op, fun_subst f e)
+     get_smart1 op (fun_subst f e)
 
 let subst (x : Var.t) e0 e =
   fun_subst (fun y -> if Var.(x = y) then e0 else var y) e
@@ -249,10 +333,10 @@ let rec normalize_names (e : t) : t =
   | BinOp(op, e1, e2) ->
      let e1' = normalize_names e1 in
      let e2' = normalize_names e2 in
-     BinOp(op, e1', e2')
+     get_smart2 op e1' e2'
   | UnOp (op, e) ->
      let e' = normalize_names e in
-     UnOp (op, e')
+     get_smart1 op e'
                 
 let rec size = function
   | BV (_, _) | Var _ -> 1
@@ -281,9 +365,9 @@ let rec label (ctx : Context.t) (e : t) =
   | BV _ -> e
   | Var x -> Var (Context.label ctx x)
   | BinOp (bop,e1,e2) ->
-     BinOp (bop, label ctx e1, label ctx e2)
+     get_smart2 bop (label ctx e1) (label ctx e2)
   | UnOp (uop, e) ->
-     UnOp (uop, label ctx e)
+     get_smart1 uop (label ctx e)
 
 
 let rec coerce_types gamma e =
@@ -295,9 +379,9 @@ let rec coerce_types gamma e =
      | None -> Var x
      end
   | BinOp (bop, e1, e2) ->
-     BinOp (bop, coerce_types gamma e1, coerce_types gamma e2)
+     get_smart2 bop (coerce_types gamma e1) (coerce_types gamma e2)
   | UnOp (uop, e) ->
-     UnOp (uop, coerce_types gamma e)
+     get_smart1 uop (coerce_types gamma e)
      
        
 
