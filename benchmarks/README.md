@@ -45,18 +45,19 @@ icecap is a tool to generate SMTLIB expressions that verify control plane validi
    ```
 
 ## Running ICECAP
-    Let's say you want to generate a control plane verification expression for 'actions.p4'. You should:
-    ```
-    cd benchmark
-    icecap infer examples/bf4_passing/actions.p4 -I examples/includes
-    ```
+Let's say you want to generate a control plane verification expression for 'actions.p4'. You should:
+```
+cd benchmark
+icecap infer examples/bf4_passing/actions.p4 -I examples/includes
+```
 
 ## Running ICECAP on benchmark P4 files
 
-    ```
-    cd benchmark
-    make test
-    ```
+To run the benchmarks, execute
+```
+cd benchmark
+make test
+```
 
 ## Contributing
 
