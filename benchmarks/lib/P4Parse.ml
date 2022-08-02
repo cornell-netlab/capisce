@@ -17,10 +17,10 @@ module Conf: Parse_config = struct
         (["cc"] @
          (List.map include_dirs ~f:(Printf.sprintf "-I%s") @
           ["-undef"; "-nostdinc"; "-E"; "-x"; "c"; p4file])) in
-    let in_chan = Unix.open_process_in cmd in
+    let in_chan = Core_unix.open_process_in cmd in
     let str = In_channel.input_all in_chan in
     let (_ : (unit, [ `Exit_non_zero of int | `Signal of Signal.t ]) result) =
-      Unix.close_process_in in_chan
+      Core_unix.close_process_in in_chan
     in
     str
 end
@@ -43,8 +43,7 @@ let as_cmd_from_file (includes : string list) p4file gas unroll verbose =
      | Error s ->
         failwith (Printf.sprintf "Compilation Error in stage [P4light->P4cub]: %s" s)
      | Ok p4cub ->
-        let instr s _ = TableInstr.instr s in
-        let coq_gcl = V1model.gcl_from_p4cub (P4info.dummy) instr false gas unroll p4cub in
+        let coq_gcl = V1model.gcl_from_p4cub (P4info.dummy) TableInstr.instr gas unroll p4cub in
         Log.print @@ lazy "Got coq_gcl";
         match coq_gcl with
         | Error s ->

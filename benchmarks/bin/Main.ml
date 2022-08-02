@@ -190,4 +190,4 @@ let main =
      ("smtlib", smtlib);
     ]
 
-let () = Command.run main    
+let () = Command_unix.run main    

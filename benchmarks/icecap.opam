@@ -9,6 +9,7 @@ license: "MIT"
 homepage: "https://ericthewry.github.io"
 depends: [
   "core"
+  "core_unix"
   "bignum"
   "ANSITerminal"
   "hashcons"

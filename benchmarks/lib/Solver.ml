@@ -12,7 +12,7 @@ let run_proc p str =
   (* Printf.printf "SMT Query:\n%s\n%!" str; *)
   let file = FileIO.tmp_write str in
   (* let chan = Unix.open_process_in (Printf.sprintf "%s %s 2> /tmp/errors.log" p file) in *)
-  let chan = Unix.open_process_in (Printf.sprintf "%s %s" p file) in
+  let chan = Core_unix.open_process_in (Printf.sprintf "%s %s" p file) in
     (* let chan = Unix.open_process_in (Printf.sprintf "%s %s" p file) in   *)
   let strs = In_channel.input_lines chan in
   In_channel.close chan;
