@@ -681,12 +681,15 @@ let one_point_rule_or_not_bug () =
   let open Expr in
   let bitvar s = (var (Var.make s 1)) in
   let evar s = (var (Var.make s 32)) in
-  let phi () = or_
+  let got () = or_
                   (not_ (eq (bitvar "meta.spec.deref") (bv 0 1)))
                   (not_ (eq (bitvar "meta.spec.assign") (bv 0 1)))
                   (not_ (eq (bitvar "_symb$assign$match_0") hdr.ethernet.dstAddr))
                   (not_ (eq (evar "_symb$deref$match_0") (evar "meta.ptr")))
-                  (not_ (eq (evar "_symb$allocator$match_0") (evar "_symb$deref$match_0"))) in  
+                  (not_ (eq (evar "_symb$allocator$match_0") (evar "_symb$deref$match_0"))) in
+  let exp () =
+    
+  in
   
   
   
