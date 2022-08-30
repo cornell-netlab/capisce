@@ -120,6 +120,10 @@ let is_var = function
   | Var _ -> true
   | _ -> false
 
+let get_const = function
+  | BV (v,_) -> Some v
+  | _ -> None
+
 let is_one = function
   | BV (v,_) -> Bigint.(v = one)
   | _ -> false

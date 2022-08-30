@@ -675,24 +675,48 @@ let cached_vars_ule_example () =
   Alcotest.(check (pair (list var) (list var)))
     "set-like equivalent pairs" computed_vars cached_vars
 
-
-let one_point_rule_or_not_bug () =
-  let open BExpr in
-  let open Expr in
-  let bitvar s = (var (Var.make s 1)) in
-  let evar s = (var (Var.make s 32)) in
-  let got () = or_
-                  (not_ (eq (bitvar "meta.spec.deref") (bv 0 1)))
-                  (not_ (eq (bitvar "meta.spec.assign") (bv 0 1)))
-                  (not_ (eq (bitvar "_symb$assign$match_0") hdr.ethernet.dstAddr))
-                  (not_ (eq (evar "_symb$deref$match_0") (evar "meta.ptr")))
-                  (not_ (eq (evar "_symb$allocator$match_0") (evar "_symb$deref$match_0"))) in
-  let exp () =
-    
+let test_choice_skip_elim () =
+  let open Cmd in
+  let b =
+    Sequence.repeat skip
+    |> Fn.flip Sequence.take 10
+    |> Sequence.to_list
+    |> choices
+    (* choice skip skip *)
   in
-  
-  
-  
+  Alcotest.(check cmd) "syntactic equivalence" (skip) b
+
+
+let test_choice_equiv_elim () =
+  Test.run_exn
+    (module struct
+       type t = Cmd.t * int [@@deriving quickcheck, sexp]
+       let quickcheck_generator =
+         let open Quickcheck.Generator in
+         let open Let_syntax in
+         let%bind c = Cmd.quickcheck_generator in
+         let%bind n = quickcheck_generator_int in
+         return (c,n)
+     end)
+    ~f:(fun (c,n) ->
+        let n = Int.( abs(n % 100) + 1 ) in
+        Printf.printf "%d times:\n%s\n-------\n%!" n (Cmd.to_string c);
+        let old = !BExpr.enable_smart_constructors in
+        BExpr.enable_smart_constructors := `Off;
+        let choices =
+          Sequence.repeat c (* Create an infinite list of c  *)
+          |> Fn.flip Sequence.take n (* take the first i of them *)
+          |> Sequence.to_list
+          |> Cmd.choices (* construct n-ary choice of cs (i.e. []_n c) *)
+        in
+        BExpr.enable_smart_constructors := old;
+        [%test_eq : Cmd.t] c choices)
+
+let test_skips_get_eliminated () =
+  let open Cmd in
+  Alcotest.(check (list cmd)) "syntactically equal lists of commands" [skip] (List.dedup_and_sort ~compare [skip;skip])
+
+
 let tests =
   [
     Alcotest.test_case "Variable Generator is well-formed" `Quick well_formed_var;
@@ -724,18 +748,21 @@ let tests =
     Alcotest.test_case "rsl bug right" `Quick rsl_bug_right;
     Alcotest.test_case "rsl bug dumb equivalent" `Quick rsl_bug_dumbeq;
     Alcotest.test_case "rsl failure" `Quick left_scope_failure;
+    Alcotest.test_case "[skip] == [skip;skip]" `Quick test_skips_get_eliminated;
+    Alcotest.test_case "skip [] ... [] skip == skip" `Quick test_choice_skip_elim;
+    Alcotest.test_case "c [] ... [] c == c" `Quick test_choice_equiv_elim;
     Alcotest.test_case "QC Smart QE" `Slow identity;
     Alcotest.test_case "QC ⊤ ∨ φ = ⊤" `Quick true_or_phi__true;
     Alcotest.test_case "QC ⊥ ∨ φ = φ" `Quick false_or_phi__phi;
     Alcotest.test_case "QC φ ∨ ⊤ = ⊤" `Quick phi_or_true__true;
-    Alcotest.test_case "QC φ ∨ ⊤ = φ" `Quick phi_or_false__phi;    
+    Alcotest.test_case "QC φ ∨ ⊤ = φ" `Quick phi_or_false__phi;
     Alcotest.test_case "QC φ ∧ ⊤ = φ" `Quick phi_and_true__phi;
     Alcotest.test_case "QC ⊤ ∧ φ = φ" `Quick true_and_phi__phi;
     Alcotest.test_case "QC φ ∧ ⊥ = ⊥" `Quick phi_and_false__false;
-    Alcotest.test_case "QC ⊥ ∧ φ = ⊥" `Quick false_and_phi__false;    
+    Alcotest.test_case "QC ⊥ ∧ φ = ⊥" `Quick false_and_phi__false;
     Alcotest.test_case "QC one_point_rule_imp" `Slow one_point_rule_imp;
     Alcotest.test_case "QC one_point_rule_or_not_left" `Slow one_point_rule_or_not_left;
-    Alcotest.test_case "QC one_point_rule_or_not_right" `Slow one_point_rule_or_not_right;        
+    Alcotest.test_case "QC one_point_rule_or_not_right" `Slow one_point_rule_or_not_right;
     Alcotest.test_case "QC reduce_scope_right" `Slow reduce_scope_right;
     Alcotest.test_case "QC reduce_scope_left" `Slow reduce_scope_left;
     Alcotest.test_case "QC unused_u_var" `Quick unused_u_var;

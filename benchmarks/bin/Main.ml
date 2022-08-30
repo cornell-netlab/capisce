@@ -76,19 +76,35 @@ let compile : Command.t =
        let gas = Option.value gas_opt ~default:1000 in
        let unroll = Option.value unroll_opt ~default:10 in
        let cmd = Pbench.P4Parse.as_cmd_from_file includes source gas unroll false in
-       let cmd_o = Pbench.Cmd.optimize cmd in 
-       let cmd_p = Pbench.Cmd.passify cmd_o in
-       let vc = Pbench.Cmd.vc cmd_p in
-       let (dvs, cvs) = Pbench.BExpr.vars vc in
-       Printf.printf "GCL program:\n%s\n\n%!" @@ Pbench.Cmd.to_string cmd;
+       let cmd_o = Pbench.Cmd.optimize cmd in
+       (* let cmd_a,_ = Pbench.Cmd.abstract cmd_o (Pbench.NameGen.create ()) in *)
+       (* let cmd_p = Pbench.Cmd.passify cmd_o in *)
+       (* let vc = Pbench.Cmd.vc cmd_o in *)
+       (* let (dvs, cvs) = Pbench.BExpr.vars vc in *)
+       (* Printf.printf "GCL program:\n%s\n\n%!" @@ Pbench.Cmd.to_string cmd; *)
        Printf.printf "ConstProp'd:\n%s\n\n%!" @@ Pbench.Cmd.to_string cmd_o;
        Printf.printf "cmd went from %d nodes to %d nodes\n%!" (Pbench.Cmd.size cmd) (Pbench.Cmd.size cmd_o);
         (* cmd went from 34303 nodes to 16872 nodes *)
-       Printf.printf "Passified:\n%s \n%!" @@ Pbench.Cmd.to_string cmd_p;
-       Printf.printf "\n And its VC: %s \n (forall (%s) \n %s) \n\n%!"
-         (Pbench.Var.list_to_smtlib_decls cvs)
-         (Pbench.Var.list_to_smtlib_quant dvs)         
-         (Pbench.BExpr.to_smtlib vc)
+       Printf.printf "There are %s paths in the optimized program\n%!" (Bigint.to_string (Pbench.Cmd.count_paths cmd_o))
+       (* Printf.printf "abstracted program is a homeomorphism of the OG program: %d nodes, %s paths\n %s\n%!" *)
+       (*   (Pbench.Cmd.size cmd_a) *)
+       (*   (Pbench.Cmd.count_paths cmd_o |> Bigint.to_string) *)
+       (*   (Pbench.Cmd.to_string cmd_a); *)
+       (* Printf.printf "the action variables are;\n"; *)
+       (* let total_size = ref Bigint.zero in *)
+       (* List.iter (Pbench.Cmd.collect_action_vars cmd_o) *)
+       (*   ~f:(fun x -> *)
+       (*       Printf.printf "\t%s (_ BitVec %d)\n%!" (Pbench.Var.str x) (Pbench.Var.size x); *)
+       (*       total_size := Bigint.(!total_size + of_int (Pbench.Var.size x)); *)
+       (*     ); *)
+       (* Printf.printf "which has %s alternatives\n%!" (Bigint.((of_int 2) ** !total_size |> to_string)); *)
+       (* Printf.printf "but there are only %s possibilities\n%!" (Pbench.Cmd.action_var_paths cmd_o |> Bigint.to_string); *)
+
+       (* Printf.printf "Passified:\n%s \n%!" @@ Pbench.Cmd.to_string cmd_p; *)
+       (* Printf.printf "\n And its VC: %s \n (forall (%s) \n %s) \n\n%!" *)
+       (*   (Pbench.Var.list_to_smtlib_decls cvs) *)
+       (*   (Pbench.Var.list_to_smtlib_quant dvs) *)
+       (*   (Pbench.BExpr.to_smtlib vc) *)
     ]
        
 let infer : Command.t =
@@ -155,8 +171,7 @@ let infer : Command.t =
              let (inf_dur, inf_res, _, inf_called_solver) =
                (* Bench.z3_infer false (cmd, Pbench.BExpr.true_) *)
                if iter then
-                 (* Qe.cnf_fix_infer fix solvers false (cmd, Pbench.BExpr.true_) *)
-                 List.hd_exn (Qe.subsolving_list (cmd, Pbench.BExpr.true_))
+                 (Qe.solving_all_paths (cmd, Pbench.BExpr.true_))
                else
                  (* Qe.cvc4_z3_fix fix solvers false (cmd, Pbench.BExpr.true_) *)
                  Qe.subsolving (cmd, Pbench.BExpr.true_)

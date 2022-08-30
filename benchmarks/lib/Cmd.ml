@@ -1,28 +1,34 @@
 open Core
 
 module VarSet = Set.Make (Var)
+module VarMap = Map.Make (Var)
    
 type t =
   | Assume of BExpr.t
-  | Assert of (BExpr.t * int option)
+  | Assert of BExpr.t
   | Havoc of Var.t
   | Assign of Var.t * Expr.t
-  | Seq of t * t
-  | Choice of t * t
-  [@@deriving eq]
+  | Seq of t list
+  | Choice of t list
+  [@@deriving quickcheck, eq, sexp, compare]
 
 let rec to_string_aux indent (c : t) : string =
   let open Printf in
   let space = Util.space indent in
   match c with
   | Assume t -> sprintf "%sassume %s" space (BExpr.to_smtlib t)
-  | Assert (t,_) -> sprintf "%sassert %s" space (BExpr.to_smtlib t)
+  | Assert t -> sprintf "%sassert %s" space (BExpr.to_smtlib t)
   | Assign (x,e) -> sprintf "%s%s := %s" space (Var.str x) (Expr.to_smtlib e)
-  | Havoc x -> sprintf "%shavoc %s" space (Var.str x)
-  | Seq (c1,c2) ->
-     sprintf "%s;\n%s" (to_string_aux indent c1) (to_string_aux indent c2)
-  | Choice (c1,c2) ->
-     sprintf "%s{\n%s\n%s} [] {\n%s\n%s}" space (to_string_aux (indent+2) c1) space (to_string_aux (indent+2) c2) space
+  | Havoc x -> sprintf "%s<%s>" space (Var.str x)
+  | Seq cs ->
+    List.map cs ~f:(to_string_aux indent)
+    |> String.concat ~sep:(sprintf ";\n")
+  | Choice cs ->
+    List.map cs
+      ~f:(fun c ->
+          sprintf "{\n%s\n%s}" (to_string_aux (indent+2) c) space)
+    |> String.concat ~sep:(sprintf " [] ")
+    |> Printf.sprintf "%s%s" space
 
 let to_string = to_string_aux 0    
 
@@ -32,97 +38,170 @@ let rec count_asserts_aux c n =
   | Assert _ -> n + 1
   | Assign _ -> n
   | Havoc _ -> n
-  | Seq (c1,c2) -> count_asserts_aux c2 @@ count_asserts_aux c1 n
-  | Choice (c1,c2) -> count_asserts_aux c2 @@ count_asserts_aux c1 n
+  | Seq cs
+  | Choice cs ->
+    List.fold cs ~init:n ~f:(fun n c ->
+        count_asserts_aux c n
+      )
 
-let count_asserts c = count_asserts_aux c 0                    
+let count_asserts c = count_asserts_aux c 0
               
 let rec size = function
   | Assume t
-  | Assert (t,_) -> 1 + BExpr.size t
+  | Assert t -> 1 + BExpr.size t
   | Assign (_,e) ->
      1 + Expr.size e
   | Havoc _ -> 1
-  | Seq (c1,c2) ->
-     size c1 + 1 + size c2
-  | Choice (c1,c2) ->
-     size c1 + 1 + size c2
+  | Seq cs
+  | Choice cs ->
+    List.fold cs ~init:(List.length cs - 1)
+      ~f:(fun n c -> n + size c)
 
 (** Smart Constructors *)
 let assume t = Assume t
-let assert_ t = Assert (t,None)
+let assert_ t = Assert t
 let skip = assume BExpr.true_
-let pass = assert_ BExpr.true_         
+let pass = assert_ BExpr.true_
 let abort = assert_ BExpr.false_
-let dead = assume BExpr.false_          
+let dead = assume BExpr.false_
 let havoc x = Havoc x
 let assign x e = Assign (x,e)
-let rec seq c1 c2 =
-  if equal c2 skip || equal c2 pass then
-    c1
-  else if equal c1 skip || equal c1 pass then
-    c2
-  else if equal c1 abort || equal c2 abort then
+
+let contra c1 c2 =
+  match c1, c2 with
+  | Assert b1, Assert b2 ->
+    BExpr.equal b1 (BExpr.not_ b2)
+    || BExpr.equal b2 (BExpr.not_ b1)
+  | _, _ ->
+    false
+
+
+
+let sequence cs =
+  let cs = List.filter cs ~f:(fun c -> not (equal c skip) && not (equal c pass)) in
+  let cs = List.remove_consecutive_duplicates cs ~which_to_keep:`First ~equal in
+  if List.exists cs ~f:(equal abort) then
     abort
-  else if equal c1 dead || equal c2 dead then
+  else if List.exists cs ~f:(equal dead) then
     dead
-  else match c1,c2 with
-       | Assert (b1,_), Assert (b2,_) ->
-          if BExpr.equal b1 b2 then
-            c1
-          else
-            Seq (c1,c2)
-       | Assert (b1,_), Seq(Assert (b2,_), c2') 
-         | Seq(_, Assert (b1,_)), Seq(Assert (b2,_), c2') ->
-          if BExpr.equal b1 b2
-          then seq c1 c2'
-          else Seq (c1, c2)
-       | Seq(_, Assert (b1,_)), Assert (b2,_) ->
-          if BExpr.equal b1 b2
-          then c1
-          else Seq (c1, c2)
-       | _ ->
-          Seq (c1, c2)
-
-let choice c1 c2 =
-  if equal c1 dead then
-    c2
-  else if equal c2 dead then
-    c1
-  else if equal c1 abort || equal c2 abort then
+  else if List.exists cs ~f:(fun c1 -> List.exists cs ~f:(fun c2 -> contra c1 c2)) then
     abort
-  else match c1, c2 with
-       | Assume b1, Assume b2 when BExpr.(b1 = not_ b2 || not_ b1 = b2) ->   
-          skip
-       | _ ->      
-          Choice(c1,c2)              
-
-let rec sequence cs =
+  else
   match cs with
   | [] -> skip
   | [c] -> c
-  | c::cs -> Seq(c, sequence cs)
+  | _ -> Seq cs
+
+let seq c1 c2 =
+  match c1, c2 with
+  | Seq c1s, Seq c2s ->
+    c2s
+    |> List.rev_append @@ List.rev c1s
+    |> sequence
+  | Seq c1s, _ ->
+    List.rev c1s
+    |> List.cons c2
+    |> List.rev
+    |> sequence
+  | _, Seq c2s ->
+    c1 :: c2s
+    |> sequence
+  | _, _ ->
+  sequence [c1; c2]
+
+let rec trivial_branch_comparisons cs (comps : Expr.t list VarMap.t) =
+  match cs with
+  | [] -> Some comps
+  | Assume b::cs ->
+    BExpr.comparisons b
+    |> List.fold ~init:comps
+      ~f:(fun acc (key,data) -> VarMap.add_multi acc ~key ~data)
+    |> trivial_branch_comparisons cs
+  | _ ->
+    None
+
+let can_collapse_total_trivial_branch cs =
+  match trivial_branch_comparisons cs VarMap.empty with
+  | None -> false
+  | Some comps ->
+    List.length (VarMap.keys comps) = 1
+    && VarMap.for_alli comps ~f:(fun ~key ~data ->
+        String.is_suffix (Var.str key) ~suffix:"$action"
+        && List.for_all data ~f:(fun e -> Option.is_some (Expr.get_const e)))
+
+let choices cs : t =
+  if List.is_empty cs then
+    failwith "[Cmd.choices] cannot construct 0-ary choice"
+  else
+    let cs = List.filter cs ~f:(fun c -> not (equal c dead)) in
+    if List.is_empty cs then
+      (* all paths are dead *)
+      dead
+    else if List.exists cs ~f:(equal abort) then
+      abort
+    else if can_collapse_total_trivial_branch cs then
+      skip
+    else
+      begin
+      match List.dedup_and_sort cs ~compare with
+      | [c] -> c
+      | _ -> Choice cs
+    end
+
+let choice c1 c2 =
+  match c1, c2 with
+  | Choice c1s, Choice c2s ->
+     choices (List.rev_append c1s c2s)
+  | Choice c1s, _ ->
+    choices (c1s @ [c2])
+  | _, Choice c2s ->
+    choices (c1 :: c2s)
+  | _, _ ->
+    choices [c1;c2]
 
 let negate = function
-  | Assume t -> Assume (BExpr.not_ t)
-  | Assert (t,i) -> Assert ((BExpr.not_ t), i)
+  | Assume t -> assume (BExpr.not_ t)
+  | Assert t -> assert_ (BExpr.not_ t)
   | _ -> failwith "Can only negate an assumption or assertion"
 
-let choice_seq cs1 cs2 = choice (sequence cs1) (sequence cs2)  
+let choice_seq cs1 cs2 = choice (sequence cs1) (sequence cs2)
 
-let choice_seqs cs =
-  List.fold cs ~init:(assume BExpr.false_)
-    ~f:(fun c cs -> choice c (sequence cs))
-       
-(**/ END Smart Constructors*)            
+let choice_seqs cs = List.map cs ~f:sequence |> choices
+
+(**/ END Smart Constructors*)
 
 
-            
-(* PRE: x is not an lvalue in c *)            
+let rec vars c : VarSet.t * VarSet.t =
+  match c with
+  | Assume b | Assert b ->
+    let dvs,cvs = BExpr.vars b in
+    VarSet.of_list dvs, VarSet.of_list cvs
+  | Havoc x ->
+    if Var.is_symbRow x then
+      VarSet.empty, VarSet.singleton x
+    else
+      VarSet.singleton x, VarSet.empty
+  | Assign (x, e) ->
+    let dvs, cvs = Expr.vars e in
+    let dvs = if Var.is_symbRow x then x::dvs else dvs in
+    let cvs = if Var.is_symbRow x then cvs else x::cvs in
+    VarSet.of_list dvs, VarSet.of_list cvs
+  | Seq cs ->
+    List.fold cs ~init:(VarSet.empty, VarSet.empty)
+      ~f:(fun (dvs_acc, cvs_acc) c ->
+          let dvs, cvs = vars c in
+          VarSet.union dvs_acc dvs, VarSet.union cvs_acc cvs)
+  | Choice cs ->
+    List.fold cs ~init:(VarSet.empty,VarSet.empty)
+      ~f:(fun (dvs_acc, cvs_acc) c ->
+          let dvs, cvs = vars c in
+          VarSet.union dvs_acc dvs, VarSet.union cvs_acc cvs)
+
+(* PRE: x is not an lvalue in c *)
 let rec subst x e c =
   match c with
-  | Assume t -> Assume (BExpr.subst x e t)
-  | Assert (t,i) -> Assert (BExpr.subst x e t, i)
+  | Assume t -> assume (BExpr.subst x e t)
+  | Assert t -> assert_ (BExpr.subst x e t)
   | Havoc y ->
      if Var.(x = y) then
        failwith "tried to substitute an lvalue"
@@ -132,16 +211,11 @@ let rec subst x e c =
      if Var.(x = y) then
        failwith "tried to substitute an lvalue"
      else
-       Assign (y, Expr.subst x e e')
-  | Seq (c1, c2) ->
-     Seq(subst x e c1, subst x e c2)
-  | Choice (c1, c2) ->
-     Choice (subst x e c1, subst x e c2)
-          
-(* let ghost_copy id k =
- *   let open BExpr in
- *   let open Expr in
- *   eq_ (var (Var.make_ghost id k)) (var k) *)
+       assign y (Expr.subst x e e')
+  | Seq cs ->
+     List.map cs ~f:(subst x e) |> sequence
+  | Choice cs ->
+     List.map cs ~f:(subst x e) |> choices
 
 let match_key (id : string) k =
   let open BExpr in
@@ -226,59 +300,29 @@ let full_table (tbl_name : string) (ks : (int * Expr.t) list) (acts : (string * 
   (* TODO optimization. Rather than sequencing asgns, do the substitution! *)
   sequence (asgns @ table)
 
-let rec wp c t =
+let rec wp c phi =
   let open BExpr in
   match c with
-  | Assume t1 -> imp_ t1 t
-  | Assert (t1,_) -> and_ t1 t
-  | Havoc x -> forall [x] t
-  | Assign (x,e) -> BExpr.subst x e t
-  | Seq (c1,c2) ->  wp c2 t |> wp c1
-  | Choice (c1,c2) -> and_ (wp c1 t) (wp c2 t)
-     
-let rec number_asserts c i =
-  match c with 
-  | Assert (t,_) -> Assert (t, Some i), i+1
-  | Assume _ | Havoc _ | Assign _ -> c, i
-  | Seq (c1,c2) ->
-     let c1', i' = number_asserts c1 i in
-     let c2', i'' = number_asserts c2 i' in
-     seq c1' c2', i''
-  | Choice (c1,c2) ->
-     let c1', i' = number_asserts c1 i in
-     let c2', i'' = number_asserts c2 i' in
-     choice c1' c2', i''
-
-let rec keep_assert_with_id c id =
-  match c with 
-  | Assert (t,Some i) when i = id -> Assert (t, Some id)
-  | Assert _ -> Assume BExpr.true_
-  | Assume _ | Havoc _ | Assign _ -> c
-  | Seq (c1,c2) ->
-     seq
-       (keep_assert_with_id c1 id)
-       (keep_assert_with_id c2 id)
-  | Choice (c1,c2) ->
-     choice
-       (keep_assert_with_id c1 id)
-       (keep_assert_with_id c2 id)
-     
-let assert_slices c =
-  let c', i = number_asserts c 0 in
-  List.map (Util.range (i-1)) ~f:(keep_assert_with_id c')
+  | Assume psi -> imp_ psi phi
+  | Assert psi -> and_ psi phi
+  | Havoc x -> forall [x] phi
+  | Assign (x,e) -> BExpr.subst x e phi
+  | Seq cs -> List.fold_right cs ~init:phi ~f:wp
+  | Choice cs -> ands_ (List.map cs ~f:(fun c -> wp c phi))
 
 let rec normalize_names (c : t) : t = 
   match c with
-  | Havoc x -> Havoc (Var.normalize_name x)
-  | Assign (x,e) -> Assign (Var.normalize_name x, Expr.normalize_names e)
-  | Assert (b, id) ->
-     Assert (BExpr.normalize_names b, id)
+  | Havoc x -> havoc (Var.normalize_name x)
+  | Assign (x,e) -> assign (Var.normalize_name x) (Expr.normalize_names e)
+  | Assert b ->
+     assert_ (BExpr.normalize_names b)
   | Assume b ->
      Assume (BExpr.normalize_names b)
-  | Seq (c1,c2) ->
-     seq (normalize_names c1) (normalize_names c2)
-  | Choice (c1,c2) ->
-     choice (normalize_names c1) (normalize_names c2)
+  | Seq cs ->
+     List.map cs ~f:normalize_names |> sequence
+  | Choice cs ->
+    List.map cs ~f:normalize_names
+    |> choices
 
 let rec normal (c : t) : BExpr.t =
   let open BExpr in
@@ -286,28 +330,29 @@ let rec normal (c : t) : BExpr.t =
   | Havoc x -> failwith ("not sure what to do about havoc " ^ Var.str x)
   | Assign _ -> failwith ("assignments should have been factored out "
                           ^ to_string c) 
-  | Assert (b,_) | Assume b -> b
-  | Seq (c1, c2) ->
-     and_ (normal c1) (normal c2)
-  | Choice (c1, c2) ->
-     or_ (normal c1) (normal c2)
-     
+  | Assert b | Assume b -> b
+  | Seq cs ->
+    List.map cs ~f:normal |> ands_
+  | Choice cs ->
+    List.map cs ~f:normal |> ors_
+
 let rec wrong (c : t) : BExpr.t =
   let open BExpr in 
   match c with
   | Havoc x -> failwith ("not sure what to do about havoc " ^ Var.str x)
   | Assign _ -> failwith ("assignments should have been factored out "
                           ^ to_string c) 
-  | Assert (b,_) ->
-     not_ b
+  | Assert b -> not_ b
   | Assume _ ->
      false_
-  | Seq (c1,c2) ->
-     or_
-       (wrong c1)
-       (and_ (normal c1) (wrong c2))
-  | Choice (c1,c2) ->
-     or_ (wrong c1) (wrong c2) 
+  | Seq [] -> false_
+  | Seq (c1::cs) ->
+    let c2 = sequence cs in
+    let w1 = wrong c1 in
+    let w2 = and_ (normal c1) (wrong c2) in
+    or_ w1 w2
+  | Choice cs ->
+     List.map cs ~f:wrong |> ors_
 
 let rec update_resid x curr tgt resid =
   if curr >= tgt then
@@ -324,25 +369,30 @@ let rec passify_aux (ctx : Context.t) (c : t) =
      let ctx = Context.increment ctx x in
      let x' = Context.label ctx x in
      let e' = Expr.label ctx e in
-     (ctx, Assume (BExpr.eq_ (Expr.var x') e'))
-  | Assert (b, id) ->
-     (ctx, Assert (BExpr.label ctx b, id))
+     (ctx, assume (BExpr.eq_ (Expr.var x') e'))
+  | Assert b ->
+     (ctx, assert_ (BExpr.label ctx b))
   | Assume b ->
      (ctx, Assume (BExpr.label ctx b))
-  | Seq (c1,c2) ->
-     let ctx, c1 = passify_aux ctx c1 in
-     let ctx, c2 = passify_aux ctx c2 in
-     (ctx, Seq (c1, c2))
-  | Choice (c1,c2) ->
-     let ctx1, c1 = passify_aux ctx c1 in
-     let ctx2, c2 = passify_aux ctx c2 in
-     let ctx, resid1, resid2 =
-       Context.merge ctx1 ctx2 ~init:(BExpr.true_) ~update:update_resid
-     in
-     let rc1 = Seq (c1, Assume resid1) in
-     let rc2 = Seq (c2, Assume resid2) in
-     (ctx, Choice (rc1, rc2))
-    
+  | Seq cs ->
+    List.fold cs ~init:(ctx, skip)
+      ~f:(fun (ctx, c_acc) c ->
+          let ctx, c = passify_aux ctx c in
+          (ctx, seq c_acc c))
+  | Choice [] ->
+    failwith "choice of no alternatives"
+  | Choice (c::cs) ->
+    List.fold cs ~init:(ctx, c)
+      ~f:(fun (ctx, c1) c2 ->
+          let ctx1, c1 = passify_aux ctx c1 in
+          let ctx2, c2 = passify_aux ctx c2 in
+          let ctx, resid1, resid2 =
+            Context.merge ctx1 ctx2 ~init:(BExpr.true_) ~update:update_resid
+          in
+          let rc1 = seq c1 (assume resid1) in
+          let rc2 = seq c2 (assume resid2) in
+          (ctx, choice rc1 rc2))
+
 let passify (c : t) : t =
   snd (passify_aux Context.empty c)
 
@@ -355,7 +405,7 @@ let rec const_prop_aux (f : Facts.t) (c : t) =
      let f = Facts.update f x e in
      (* Log.print @@ lazy (Printf.sprintf "assignment %s produced: %s\n" (to_string c) (Facts.to_string f));      *)
      (f, assign x e)
-  | Assert (b, id) ->
+  | Assert b ->
      (* Log.print @@ lazy (Printf.sprintf "substitute %s using: %s\n" (to_string c) (Facts.to_string f)); *)
      let b = BExpr.fun_subst (Facts.lookup f) b |> BExpr.simplify in
      let f =
@@ -364,7 +414,7 @@ let rec const_prop_aux (f : Facts.t) (c : t) =
        | None -> f
      in     
      (* Log.print @@ lazy (Printf.sprintf "Got assert(%s)\n" (BExpr.to_smtlib b)); *)
-     (f, Assert (b,id))
+     (f, assert_ b)
   | Assume b ->
      (* Log.print @@ lazy (Printf.sprintf "substitute %s using: %s\n" (to_string c) (Facts.to_string f));      *)
      let b = BExpr.fun_subst (Facts.lookup f) b |> BExpr.simplify in
@@ -374,22 +424,28 @@ let rec const_prop_aux (f : Facts.t) (c : t) =
        | Some (x, e) -> Facts.update f x e
        | None -> f
      in
-     (f, Assume b)
+     (f, assume b)
         
-  | Seq (c1, c2) ->
-     let f, c1 = const_prop_aux f c1 in
-     let f, c2 = const_prop_aux f c2 in
-     (f, seq c1 c2)
-  | Choice (c1, c2) ->
-     let f1, c1 = const_prop_aux f c1 in
-     let f2, c2 = const_prop_aux f c2 in
-     let f = Facts.merge f1 f2 in
-     (f, choice c1 c2)
-  
-  
+  | Seq cs ->
+    let fs, cs =
+      List.fold cs ~init:(f, [])
+        ~f:(fun (f, cs) c ->
+            let f, c = const_prop_aux f c in
+            (f, cs @ [c])) in
+    (fs, sequence cs)
+  | Choice [] ->
+    failwith "Choice of no alternatives"
+  | Choice (c::cs) ->
+    List.fold cs
+      ~init:(const_prop_aux f c)
+      ~f:(fun (fs, cs) c1 ->
+          let f1, c1 = const_prop_aux f c1 in
+          let fs = Facts.merge fs f1 in
+          (fs , choice c1 cs))
+
 let const_prop c = snd (const_prop_aux Facts.empty c)
 
-let rec dead_code_elim_aux c (reads : VarSet.t) : (t * VarSet.t) =
+let rec dead_code_elim_bwd c (reads : VarSet.t) : (t * VarSet.t) =
   let open VarSet in
   let concat (x,y) = x @ y in
   match c with
@@ -403,7 +459,7 @@ let rec dead_code_elim_aux c (reads : VarSet.t) : (t * VarSet.t) =
        (assign x e, reads)
      else
        (skip, reads)
-  | Assert (b,_) -> 
+  | Assert b ->
      let read_by_b = of_list (concat (BExpr.vars b)) in
      let simpl_b = BExpr.simplify b in
      (assert_ simpl_b, union reads read_by_b)
@@ -411,16 +467,60 @@ let rec dead_code_elim_aux c (reads : VarSet.t) : (t * VarSet.t) =
      let read_by_b = of_list (concat (BExpr.vars b)) in
      let simpl_b = BExpr.simplify b in
      (assume simpl_b, union reads read_by_b)
-  | Choice (c1, c2) ->
-     let c1, read_by_c1 = dead_code_elim_aux c1 reads in
-     let c2, read_by_c2 = dead_code_elim_aux c2 reads in
-     (choice c1 c2, union read_by_c1 read_by_c2)
-  | Seq (c1, c2) ->
-     let c2, reads = dead_code_elim_aux c2 reads in
-     let c1, reads = dead_code_elim_aux c1 reads in
-     (seq c1 c2, reads)
+  | Choice [] ->
+    failwith "cannot have 0-ary choice"
+  | Choice (c::cs) ->
+    List.fold cs
+      ~init:(dead_code_elim_bwd c reads)
+      ~f:(fun (cs, read_by_cs) c ->
+          let c, read_by_c = dead_code_elim_bwd c reads in
+          (choice cs c, union read_by_cs read_by_c))
+  | Seq cs ->
+    let cs, reads =
+      List.fold (List.rev cs) ~init:([], reads)
+        ~f:(fun (cs, reads) c ->
+            let c, reads = dead_code_elim_bwd c reads in
+            (c::cs, reads)) in
+    sequence cs, reads
 
-let dead_code_elim c = fst (dead_code_elim_aux c VarSet.empty)
+let rec dead_code_elim_fwd c (used : VarSet.t) : (t * VarSet.t) =
+  let open VarSet in
+  let concat (x,y) = x @ y in
+  let setify f e = f e |> concat |> of_list in
+  match c with
+  | Havoc x -> (havoc x, remove used x)
+  | Assign (x,e) ->
+    let vars_of_e = setify Expr.vars e in
+    (assign x e, union (add used x) vars_of_e)
+  | Assert b -> (assert_ b, union used (setify BExpr.vars b))
+  | Assume b ->
+    let bs_vars = setify BExpr.vars b in
+    if is_empty (inter bs_vars used)
+       && VarSet.for_all bs_vars ~f:(Fn.non Var.is_symbRow) then
+      (skip, used)
+    else
+      (assume b, union bs_vars used)
+  | Choice [] ->
+    failwith "cannot have 0-ary choice"
+  | Choice (c::cs) ->
+    List.fold cs
+      ~init:(dead_code_elim_fwd c used)
+      ~f:(fun (cs, used_by_cs) c ->
+          let c, used_by_c = dead_code_elim_fwd c used in
+          (choice cs c, union used_by_cs used_by_c))
+  | Seq cs ->
+    let rcs, used =
+      List.fold cs ~init:([], used)
+        ~f:(fun (cs, used) c ->
+            let c, used = dead_code_elim_fwd c used in
+            (c::cs, used))
+    in
+    (List.rev rcs |> sequence, used)
+
+let dead_code_elim_inner c =
+  let c, _ = dead_code_elim_bwd c VarSet.empty in
+  let c, _ = dead_code_elim_fwd c VarSet.empty in
+  c
 
 let rec fix f x =  
   let x' = f x in
@@ -428,88 +528,119 @@ let rec fix f x =
     x
   else 
     fix f x'
-                     
+
+let dead_code_elim = fix dead_code_elim_inner
+
 let optimize c =
   let o c = dead_code_elim (const_prop (dead_code_elim (const_prop c))) in 
   fix o c
 
-
-let rec pathify_inner (c : t) : t list list =
-  match c with
-  | Assign _ -> [[c]]
-  | Assume _
-    | Assert _
-    | Havoc _ -> [[c]]
-  | Seq (c1,c2) ->
-     let open List.Let_syntax in
-     let%bind seq1 = pathify_inner c1 in
-     let%map seq2 = pathify_inner c2 in
-     seq1@seq2
-  | Choice (c1,c2) ->
-     pathify_inner c1 @ pathify_inner c2
-
-let pathify (c : t) =
-  let paths = pathify_inner c in
-  Printf.printf "There are %d paths\n%!" (List.length paths);
-  List.map paths ~f:sequence
-  
 let vc (c : t) : BExpr.t =
   let o = optimize c in
   passify o
   |> wrong
   |> BExpr.not_
-  |> BExpr.nnf
-  (* |> BExpr.cnf *)
+  (* |> BExpr.nnf *)
   |> BExpr.simplify
 
-let add_vars (dvs,cvs) live =
-  let xs  = dvs @ cvs in
-  let live' = List.fold xs ~init:live ~f:(fun live x -> String.Set.add live (Var.str x)) in
-  live'
-
-(* updates taint set with assignment x := e. Var x is removed and then vars in e are added *)
-let update_taint live x e =
-  Set.remove live (Var.str x)
-  |> add_vars (Expr.vars e) 
-  
-let rec slice_asserts_aux (c : t) (live : String.Set.t) : (String.Set.t * t) list =
+let rec paths (c : t) : t Sequence.t =
+  let open Sequence in
   match c with
-  | Assign (x, e) ->
-     if Set.mem live (Var.str x) then
-       [(update_taint live x e, c)]
-     else
-       [(live, Assume BExpr.true_)]
-  | Assume phi ->
-     [(add_vars (BExpr.vars phi) live, c)]
-  | Assert (phi,_) ->
-     let vars = BExpr.vars phi |> Util.uncurry (@) in     
-     if List.exists vars ~f:(fun x -> String.Set.mem live (Var.str x)) then begin
-         [(add_vars ([],vars) live, c)]
-       end else begin
-         Log.print @@ lazy (Printf.sprintf "split phi: %s" (BExpr.to_smtlib phi));         
-         [(live, c); (String.Set.of_list (List.map vars ~f:Var.str), c)]
-       end
-  | Havoc _ -> failwith "unimplemented"
-  | Seq (c1,c2) ->
-     let open List.Let_syntax in
-     let%bind (live, slice2) = slice_asserts_aux c2 live in
-     let%map  (live, slice1) = slice_asserts_aux c1 live in
-     (live, seq slice1 slice2)
-  | Choice (c1, c2)  ->
-     let open List.Let_syntax in
-     let%bind (live1, slice2) = slice_asserts_aux c2 live in
-     let%map (live2, slice1) = slice_asserts_aux c1 live in
-     (Set.union live1 live2, choice slice1 slice2)
+  | Assume _
+  | Assert _
+  | Havoc _
+  | Assign _ ->
+    return c
+  | Seq cs ->
+    of_list cs
+    |> fold ~init:(Sequence.singleton skip)
+      ~f:(fun sequence_of_paths c ->
+          paths c
+          |> cartesian_product sequence_of_paths
+          |> map ~f:(fun (s1,s2) -> seq s1 s2))
+  | Choice cs ->
+    of_list cs
+    |> map ~f:paths
+    |> concat
 
-let slice_asserts c : t list =
-  let open List.Let_syntax in
-  let%map (_, c) = slice_asserts_aux c String.Set.empty in
-  c
+let is_primitive (c : t) =
+  match c with
+  | Choice _
+  | Seq _ -> false
+  | Assume _
+  | Assert _
+  | Havoc _
+  | Assign _ -> true
 
-let vcs (c : t) : BExpr.t list =
-  optimize c
-  |> slice_asserts
-  |> List.map ~f:vc 
-  |> List.sort ~compare:(fun s1 s2 -> Int.compare (BExpr.size s1) (BExpr.size s2))
+let rec abstract (c : t) (g : NameGen.t)  : (t * NameGen.t) =
+  match c with
+  | Assume _
+  | Assert _
+  | Havoc _
+  | Assign _ ->
+    let x, g = NameGen.get g in
+    Havoc (Var.make x 1), g
+  | Seq cs ->
+    List.fold cs ~init:(abstract skip g)
+      ~f:(fun (ca, ga) c ->
+          let c, g = abstract c ga in
+          if is_primitive c then
+            (ca, g)
+          else
+            seq ca c, g)
+  | Choice [] ->
+    failwith "[Cmd.abstract] 0-ary Choice disallowed"
+  | Choice (c::cs) ->
+    List.fold cs ~init:(abstract c g)
+      ~f:(fun (c_acc, g) c ->
+          let c, g = abstract c g in
+          choice c_acc c, g)
 
+let rec count_paths c : Bigint.t =
+  match c with
+  | Assume _ | Assert _ | Havoc _ | Assign _ ->
+    Bigint.one
+  | Seq cs ->
+    List.fold cs ~init:Bigint.one
+      ~f:(fun paths_so_far c -> Bigint.(paths_so_far * count_paths c))
+  | Choice cs ->
+    List.map cs ~f:(count_paths)
+    |> List.reduce_exn ~f:(Bigint.(+))
 
+let collect_action_vars_set (c : t) : VarSet.t =
+  let (_, cvs) = vars c in
+  VarSet.filter cvs ~f:(fun x ->
+      String.is_suffix ~suffix:"$action" (Var.str x)
+    )
+
+let collect_action_vars (c:t) =
+  collect_action_vars_set c
+  |> VarSet.to_list
+
+let action_var_paths (c : t) : Bigint.t =
+  let xs = collect_action_vars_set c in
+  let rec loop m c : Expr.t list VarMap.t =
+    match c with
+    | Assume b ->
+      List.fold (BExpr.comparisons b) ~init:m
+        ~f:(fun m (x,e) ->
+            if String.is_suffix ~suffix:"$action" (Var.str x) then
+              VarMap.add_multi m ~key:x ~data:e
+            else m
+          )
+    | Assert _ | Havoc _ | Assign _ ->
+      m
+    | Seq cs ->
+      List.fold cs ~init:m ~f:loop
+    | Choice cs ->
+      List.fold cs ~init:m ~f:loop
+  in
+  let m = VarSet.fold xs ~init:VarMap.empty
+      ~f:(fun m x ->
+          VarMap.set m ~key:x ~data:[]
+        )
+  in
+  VarMap.fold (loop m c)
+    ~init:Bigint.one
+    ~f:(fun ~key:_ ~data:exprs num_paths ->
+        Bigint.(num_paths * of_int (List.length exprs)))

@@ -1094,4 +1094,20 @@ let rec order_all_quantifiers b =
         else
           Forall (y, Forall (x, b))
      | b -> forall_one x b 
-       
+
+let rec comparisons b : (Var.t * Expr.t) list =
+  match b with
+  | TTrue | TFalse | LVar _ -> []
+  | TNot b ->
+    comparisons b
+  | TComp (_, x, e) when Expr.is_var x ->
+    [Expr.get_var x, e]
+  | TComp (_, e, x) when Expr.is_var x ->
+    [Expr.get_var x, e]
+  | TComp _ ->
+    []
+  | TNary (_, bs) ->
+    List.fold bs ~init:[]
+      ~f:(fun comps b -> comps @ comparisons b)
+  | Forall _ | Exists _ ->
+    failwith "comparisons is underfined with quantifiers"

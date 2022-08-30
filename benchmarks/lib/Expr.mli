@@ -8,6 +8,7 @@ val bvi : int -> int -> t
 val var : Var.t -> t
 val is_var : t -> bool  
 val get_var : t -> Var.t (* throws exception when not a var *)
+val get_const : t -> Bigint.t option
 
 val is_one : t -> bool
 val is_zero : t -> bool  

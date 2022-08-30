@@ -20,7 +20,7 @@ time: all
 	bash ./timebf4.sh
 
 check: all
-	dune build ./test/tests.exe && ./_build/default/test/tests.exe
+	dune build ./test/tests.exe && ./_build/default/test/tests.exe ${TEST}
 
 check-q: all
 	dune build ./test/tests.exe && ./_build/default/test/tests.exe -q

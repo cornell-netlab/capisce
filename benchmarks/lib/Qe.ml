@@ -3,10 +3,6 @@ open Core
 let vc prog asst =
   Cmd.(vc (seq prog (assert_ asst)))
 
-let vcs prog asst =
-  Cmd.(vcs (seq prog (assert_ asst)))
-  
-
 let qe solver simpl body c =
   Log.print @@ lazy ("getting vars");
   let (dvs,cvs) = BExpr.vars body in
@@ -129,26 +125,6 @@ let cvc4_z3_fix gas solvers simpl (prog, asst) =
   Log.print @@ lazy "solving";
   qe (solver_fixpoint gas solvers) simpl body c
 
-let cnf_fix_infer gas solvers simpl (prog, asst) =
-  let c = Clock.start () in
-  Log.print @@ lazy "computing wps";
-  (* let bodies = BExpr.get_conjuncts (vc prog asst) in *)
-  let bodies = List.map (Cmd.pathify prog) ~f:(fun p -> vc p asst) in 
-  let count = ref 0 in
-  let total = List.length bodies in
-  let qe_bodies =
-    List.fold bodies ~init:"" ~f:(fun acc body ->        
-        let (_,res,_,_) = qe (solver_fixpoint gas solvers) simpl body (Clock.start()) in
-        count := !count + 1;
-        Printf.printf "%d out of %d analyzed\r%!" !count total;        
-        Printf.sprintf "%s\n\t%s" acc res
-      ) in
-  Printf.printf "\n%!";
-  (Clock.stop c,
-   Printf.sprintf "(and %s)" qe_bodies,
-   -1,
-   true)
-  
 let subsolving (prog, asst) =
   let c = Clock.start () in
   Log.print @@ lazy "computing vc";
@@ -193,32 +169,42 @@ let subsolving (prog, asst) =
   Log.print @@ lazy "done";    
   (Clock.stop c, qf_phi_str, -1, true)
 
-let subsolving_list (prog, asst) =
-  let open List.Let_syntax in
-  let c = Clock.start () in
-  Log.print @@ lazy (Printf.sprintf "computing vc from %d asserts" (Cmd.count_asserts prog));
-  let%map phi = vcs prog asst in
-  Log.print @@ lazy "getting vars";
-  let (dvs, _) = BExpr.vars phi in
-  (* let dvs = List.dedup_and_sort dvs ~compare:(fun a b -> Int.compare (Var.size b) (Var.size a)) in *)
-  Log.print @@ lazy "Counting Vars";
-  Log.enable_measurement ();  
-  List.iter dvs ~f:BExpr.incr_q;
-  Log.print @@ lazy "smart constructors";
-  let qphi = BExpr.(forall dvs phi |> order_all_quantifiers) in
-  Log.print @@ lazy "running the bottom up solver";
-  let qf_phi = BottomUpQe.qe (solve_wto `Z3) qphi in
-  Log.print @@ lazy "getting the vars of the result";  
-  let dvs', cvs = BExpr.vars qf_phi in
-  Log.print @@ lazy (Printf.sprintf "checking all dataplane variables have been eliminated from %s" (BExpr.to_smtlib qf_phi));    
-  if not (List.is_empty dvs') then begin
-      Printf.printf "started with:\n vars: %s \n form: %s\n%!" (List.to_string dvs ~f:(Var.str)) (BExpr.to_smtlib phi);
-      Printf.printf "ERROR Not QF:\n vars: %s \n form: %s\n%!" (List.to_string dvs' ~f:(Var.str)) (BExpr.to_smtlib qf_phi);
-      failwith "QF Failed when it said it succeeded"
-    end
-  else 
-    Log.print @@ lazy (Printf.sprintf "No dataplane variables, only control vars: %s" (List.to_string cvs ~f:(Var.str)));
-  Log.print @@ lazy "using z3 to simplify";    
-  let qf_phi_str = Solver.run_z3 (Smt.simplify cvs (BExpr.to_smtlib (BExpr.simplify qf_phi))) in
-  Log.print @@ lazy "done";    
-  (Clock.stop c, qf_phi_str, -1, true)    
+let solving_all_paths_inner (prog, asst) =
+  Log.print @@ lazy ("counting paths");
+  let num_paths = Cmd.count_paths prog in
+  Log.print @@ lazy (Printf.sprintf "computing the %s paths" (Bigint.to_string num_paths));
+  let pis  = Cmd.paths prog in
+  let completed = ref Bigint.zero in
+  Sequence.fold pis ~init:[] ~f:(fun acc pi ->
+      Log.print @@ lazy (Printf.sprintf "Computing WP for path:\n%s \n" (Cmd.to_string pi));
+      let phi = vc pi asst in
+      Log.print @@ lazy "getting vars";
+      let (dvs, _) = BExpr.vars phi in
+      List.iter dvs ~f:BExpr.incr_q;
+      Log.print @@ lazy "smart constructors";
+      let qphi = BExpr.(forall dvs phi |> order_all_quantifiers) in
+      Log.print @@ lazy "running the bottom up solver";
+      let qf_phi = BottomUpQe.qe (solve_wto `Z3) qphi in
+      Log.print @@ lazy "getting the vars of the result";
+      let dvs', cvs = BExpr.vars qf_phi in
+      Log.print @@ lazy (Printf.sprintf "checking all dataplane variables have been eliminated from %s" (BExpr.to_smtlib qf_phi));
+      if not (List.is_empty dvs') then begin
+        Printf.printf "started with:\n vars: %s \n form: %s\n%!" (List.to_string dvs ~f:(Var.str)) (BExpr.to_smtlib phi);
+        Printf.printf "ERROR Not QF:\n vars: %s \n form: %s\n%!" (List.to_string dvs' ~f:(Var.str)) (BExpr.to_smtlib qf_phi);
+        failwith "QF Failed when it said it succeeded"
+      end
+      else
+        Log.print @@ lazy (Printf.sprintf "No dataplane variables, only control vars: %s" (List.to_string cvs ~f:(Var.str)));
+      Log.print @@ lazy "using z3 to simplify";
+      let qf_phi_str = Solver.run_z3 (Smt.simplify cvs (BExpr.to_smtlib (BExpr.simplify qf_phi))) in
+      Log.print @@ lazy "done";
+      Bigint.incr completed;
+      Printf.printf "%s of %s paths solved\n" (Bigint.to_string !completed) (Bigint.to_string num_paths);
+      acc @ [qf_phi_str])
+
+let solving_all_paths (prog,asst) =
+  let c    = Clock.start () in
+  let phis = solving_all_paths_inner (prog, asst) in
+  let time = Clock.stop c in
+  let phi_str = String.concat ~sep:"\n\n" phis in
+  (time, phi_str, -1, true)

@@ -105,6 +105,8 @@ val get_equality :  t -> (Var.t * Expr.t) option
   
 val label : Context.t -> t -> t
 
+val comparisons : t -> (Var.t * Expr.t) list
+
 val equivalence : t -> t -> t
 
 val order_all_quantifiers : t -> t
