@@ -75,8 +75,6 @@ let contra c1 c2 =
   | _, _ ->
     false
 
-
-
 let sequence cs =
   let cs = List.filter cs ~f:(fun c -> not (equal c skip) && not (equal c pass)) in
   let cs = List.remove_consecutive_duplicates cs ~which_to_keep:`First ~equal in
@@ -145,7 +143,7 @@ let choices cs : t =
       begin
       match List.dedup_and_sort cs ~compare with
       | [c] -> c
-      | _ -> Choice cs
+      | cs -> Choice cs
     end
 
 let choice c1 c2 =
@@ -168,8 +166,20 @@ let choice_seq cs1 cs2 = choice (sequence cs1) (sequence cs2)
 
 let choice_seqs cs = List.map cs ~f:sequence |> choices
 
-(**/ END Smart Constructors*)
+let rec apply_smart_constructors c =
+  match c with
+  | Assume phi -> assume (BExpr.simplify phi)
+  | Assert phi -> assert_ (BExpr.simplify phi)
+  | Assign (x,e) -> assign x e
+  | Havoc x -> havoc x
+  | Seq cs ->
+    List.map cs ~f:apply_smart_constructors
+    |> sequence
+  | Choice cs ->
+    List.map cs ~f:apply_smart_constructors
+    |> choices
 
+(**/ END Smart Constructors*)
 
 let rec vars c : VarSet.t * VarSet.t =
   match c with
@@ -361,40 +371,119 @@ let rec update_resid x curr tgt resid =
     let x_ i = Expr.var (Var.index x i) in
     BExpr.(and_ resid (eq_ (x_ curr) (x_ (curr+1))))      
     |> update_resid x (curr + 1) tgt
-    
-let rec passify_aux (ctx : Context.t) (c : t) =
-  match c with
-  | Havoc x -> failwith ("dont know what to do about havoc " ^ Var.str x)
-  | Assign (x,e) ->
-     let ctx = Context.increment ctx x in
-     let x' = Context.label ctx x in
-     let e' = Expr.label ctx e in
-     (ctx, assume (BExpr.eq_ (Expr.var x') e'))
-  | Assert b ->
-     (ctx, assert_ (BExpr.label ctx b))
-  | Assume b ->
-     (ctx, Assume (BExpr.label ctx b))
-  | Seq cs ->
-    List.fold cs ~init:(ctx, skip)
-      ~f:(fun (ctx, c_acc) c ->
-          let ctx, c = passify_aux ctx c in
-          (ctx, seq c_acc c))
-  | Choice [] ->
-    failwith "choice of no alternatives"
-  | Choice (c::cs) ->
-    List.fold cs ~init:(ctx, c)
-      ~f:(fun (ctx, c1) c2 ->
-          let ctx1, c1 = passify_aux ctx c1 in
-          let ctx2, c2 = passify_aux ctx c2 in
-          let ctx, resid1, resid2 =
-            Context.merge ctx1 ctx2 ~init:(BExpr.true_) ~update:update_resid
-          in
-          let rc1 = seq c1 (assume resid1) in
-          let rc2 = seq c2 (assume resid2) in
-          (ctx, choice rc1 rc2))
+
+
+let dnf (c : t) : t =
+  Log.print @@ lazy "DNFing cmd";
+  let rec loop c : t =
+    match c with
+    | Assume b -> assume b
+    | Assert b -> assert_ b
+    | Havoc x -> havoc x
+    | Assign (x,e) -> assign x e
+    | Choice chxs ->
+      List.fold chxs ~init:dead ~f:(fun acc c -> choice acc (loop c))
+    | Seq [] -> skip
+    | Seq (s::sqs) -> begin
+        match loop s, loop (sequence sqs) with
+        | Choice chxs, Choice chxs_rec ->
+          List.cartesian_product chxs chxs_rec
+          |> List.map ~f:(Util.uncurry seq)
+          |> choices
+        | Choice chxs, c_rec ->
+          List.map chxs ~f:(fun chx -> seq chx c_rec)
+          |> choices
+        | c, Choice chxs_rec ->
+          List.map chxs_rec ~f:(fun chx_rec -> seq c chx_rec)
+          |> choices
+        | c, c_rec ->
+          seq c c_rec
+      end
+  in
+  loop c
 
 let passify (c : t) : t =
-  snd (passify_aux Context.empty c)
+  Log.print @@ lazy "Passifying";
+  let rec loop (ctx : Context.t) (c : t) =
+    match c with
+    | Havoc x -> failwith ("dont know what to do about havoc " ^ Var.str x)
+    | Assign (x,e) ->
+      let ctx = Context.increment ctx x in
+      let x' = Context.label ctx x in
+      let e' = Expr.label ctx e in
+      (ctx, assume (BExpr.eq_ (Expr.var x') e'))
+    | Assert b ->
+      (ctx, assert_ (BExpr.label ctx b))
+    | Assume b ->
+      (ctx, Assume (BExpr.label ctx b))
+    | Seq cs ->
+      List.fold cs ~init:(ctx, skip)
+        ~f:(fun (ctx, c_acc) c ->
+            let ctx, c = loop ctx c in
+            (ctx, seq c_acc c))
+    | Choice ([]) ->
+      failwith "[passify] 0-ary choice undefined"
+    | Choice (c::cs) ->
+      List.fold cs ~init:(loop ctx c)
+        ~f:(fun (ctx_acc, c_acc) c ->
+            let ctx, c = loop ctx c in
+            let ctx, resid_acc, resid =
+              Context.merge ctx_acc ctx ~init:(BExpr.true_) ~update:update_resid
+            in
+            let rc_acc = seq c_acc (assume resid_acc) in
+            let rc = seq c (assume resid) in
+            (ctx, choice rc_acc rc))
+  in
+  snd (loop Context.empty c)
+
+let single_comparison b =
+  match BExpr.comparisons b with
+  | [x,e] -> Some (x,e)
+  | _ -> None
+
+(* Returns [Some x] if [cs] is a "switch statement" on variable [x]*)
+(* The following describes the semantics of [switch_consistency] *)
+(* Some None   indicates no switch has yet been found (the initial value) *)
+(* Some Some x indicates so far [x] is the switched var *)
+(* None        indicates we've detected a failure *)
+let rec is_switch_on cs (switch_consistency : Var.t option option) : Var.t option =
+  let open Option.Let_syntax in
+  match cs with
+  | [] -> Option.join switch_consistency
+  | (Assume b::cs)
+  | (Seq (Assume b::_)::cs) -> begin
+      let%bind (y,_) = single_comparison b in
+      let%bind found_switch_var = switch_consistency in
+      match found_switch_var with
+      (* | (Some y') when (not (Var.equal y' y)) -> None *)
+        | _ -> is_switch_on cs (Some (Some y))
+    end
+  | _ -> None
+
+let assume_disjunct ?(threshold=20) cs =
+  let c = choices cs in
+  if is_switch_on cs (Some None) |> Option.is_some then
+    if List.for_all cs ~f:(fun x -> size x < threshold) then
+      assume (normal c)
+    else
+      c
+  else
+    c
+
+(* PRECONDITION c must be in passive form*)
+let assume_disjuncts c =
+  let rec loop c =
+    match c with
+    | Assume phi -> assume phi
+    | Assert phi -> assert_ phi
+    | Assign (x,e) -> assign x e
+    | Havoc x -> havoc x
+    | Seq cs ->    List.map cs ~f:loop |> sequence
+    | Choice cs -> List.map cs ~f:loop |> assume_disjunct
+  in
+  Log.print @@ lazy "assuming disjuncts";
+  loop c
+
 
 let rec const_prop_aux (f : Facts.t) (c : t) =
   match c with
@@ -543,25 +632,41 @@ let vc (c : t) : BExpr.t =
   (* |> BExpr.nnf *)
   |> BExpr.simplify
 
-let rec paths (c : t) : t Sequence.t =
-  let open Sequence in
+
+let rec count_paths c : Bigint.t =
   match c with
-  | Assume _
-  | Assert _
-  | Havoc _
-  | Assign _ ->
-    return c
+  | Assume _ | Assert _ | Havoc _ | Assign _ ->
+    Bigint.one
   | Seq cs ->
-    of_list cs
-    |> fold ~init:(Sequence.singleton skip)
-      ~f:(fun sequence_of_paths c ->
-          paths c
-          |> cartesian_product sequence_of_paths
-          |> map ~f:(fun (s1,s2) -> seq s1 s2))
+    List.fold cs ~init:Bigint.one
+      ~f:(fun paths_so_far c -> Bigint.(paths_so_far * count_paths c))
   | Choice cs ->
-    of_list cs
-    |> map ~f:paths
-    |> concat
+    List.map cs ~f:(count_paths)
+    |> List.reduce_exn ~f:(Bigint.(+))
+
+let paths (c : t) : t Sequence.t =
+  Log.print @@ lazy (Printf.sprintf "building the squence of %s paths" (count_paths c |> Bigint.to_string));
+  let rec loop (c : t) : t Sequence.t =
+    let open Sequence in
+    match c with
+    | Assume _
+    | Assert _
+    | Havoc _
+    | Assign _ ->
+      return c
+    | Seq cs ->
+      of_list cs
+      |> fold ~init:(Sequence.singleton skip)
+        ~f:(fun sequence_of_paths c ->
+            loop c
+            |> cartesian_product sequence_of_paths
+            |> map ~f:(fun (s1,s2) -> seq s1 s2))
+    | Choice cs ->
+      of_list cs
+      |> map ~f:loop
+      |> concat
+  in
+  loop c
 
 let is_primitive (c : t) =
   match c with
@@ -596,16 +701,6 @@ let rec abstract (c : t) (g : NameGen.t)  : (t * NameGen.t) =
           let c, g = abstract c g in
           choice c_acc c, g)
 
-let rec count_paths c : Bigint.t =
-  match c with
-  | Assume _ | Assert _ | Havoc _ | Assign _ ->
-    Bigint.one
-  | Seq cs ->
-    List.fold cs ~init:Bigint.one
-      ~f:(fun paths_so_far c -> Bigint.(paths_so_far * count_paths c))
-  | Choice cs ->
-    List.map cs ~f:(count_paths)
-    |> List.reduce_exn ~f:(Bigint.(+))
 
 let collect_action_vars_set (c : t) : VarSet.t =
   let (_, cvs) = vars c in

@@ -68,7 +68,10 @@ let list_to_smtlib_decls : t list -> string =
   ~f:(fun acc v -> Printf.sprintf "%s%s" acc (to_smtlib_decl v))
 
 let index ((s,w) : t) (i : int) =
-  (Printf.sprintf "%s$_$%d" s i, w)
+  if String.is_substring s ~substring:"$_$" then
+    failwithf "Variable %s has already been indexed" s ()
+  else
+    (Printf.sprintf "%s$_$%d" s i, w)
       
   
 let quickcheck_generator =

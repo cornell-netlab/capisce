@@ -78,14 +78,18 @@ let compile : Command.t =
        let cmd = Pbench.P4Parse.as_cmd_from_file includes source gas unroll false in
        let cmd_o = Pbench.Cmd.optimize cmd in
        (* let cmd_a,_ = Pbench.Cmd.abstract cmd_o (Pbench.NameGen.create ()) in *)
-       (* let cmd_p = Pbench.Cmd.passify cmd_o in *)
+       let cmd_p = Pbench.Cmd.passify cmd_o in
+       let merged = Pbench.Cmd.assume_disjuncts cmd_p in
        (* let vc = Pbench.Cmd.vc cmd_o in *)
        (* let (dvs, cvs) = Pbench.BExpr.vars vc in *)
        (* Printf.printf "GCL program:\n%s\n\n%!" @@ Pbench.Cmd.to_string cmd; *)
        Printf.printf "ConstProp'd:\n%s\n\n%!" @@ Pbench.Cmd.to_string cmd_o;
-       Printf.printf "cmd went from %d nodes to %d nodes\n%!" (Pbench.Cmd.size cmd) (Pbench.Cmd.size cmd_o);
+       Printf.printf "cmd went from %d nodes to %d nodes\n\n%!" (Pbench.Cmd.size cmd) (Pbench.Cmd.size cmd_o);
+       (* Printf.printf "Path Merging:\n%s\n\n%!" (Pbench.Cmd.to_string merged); *)
         (* cmd went from 34303 nodes to 16872 nodes *)
-       Printf.printf "There are %s paths in the optimized program\n%!" (Bigint.to_string (Pbench.Cmd.count_paths cmd_o))
+       Printf.printf "From %s paths to %s\n%!"
+         (Bigint.to_string (Pbench.Cmd.count_paths cmd_o))
+         (Bigint.to_string (Pbench.Cmd.count_paths merged));
        (* Printf.printf "abstracted program is a homeomorphism of the OG program: %d nodes, %s paths\n %s\n%!" *)
        (*   (Pbench.Cmd.size cmd_a) *)
        (*   (Pbench.Cmd.count_paths cmd_o |> Bigint.to_string) *)
@@ -100,7 +104,7 @@ let compile : Command.t =
        (* Printf.printf "which has %s alternatives\n%!" (Bigint.((of_int 2) ** !total_size |> to_string)); *)
        (* Printf.printf "but there are only %s possibilities\n%!" (Pbench.Cmd.action_var_paths cmd_o |> Bigint.to_string); *)
 
-       (* Printf.printf "Passified:\n%s \n%!" @@ Pbench.Cmd.to_string cmd_p; *)
+       Printf.printf "Passified:\n%s \n%!" @@ Pbench.Cmd.to_string cmd_p;
        (* Printf.printf "\n And its VC: %s \n (forall (%s) \n %s) \n\n%!" *)
        (*   (Pbench.Var.list_to_smtlib_decls cvs) *)
        (*   (Pbench.Var.list_to_smtlib_quant dvs) *)

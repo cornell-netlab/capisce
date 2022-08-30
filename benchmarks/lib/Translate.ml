@@ -7,12 +7,12 @@ let bv_bop (b : BitVec.bop) : Expr.t -> Expr.t -> Expr.t =
   match b with
   | BVPlus (sat, _) ->
      if sat then
-       Printf.eprintf "[WARNING] unsoundly implementing saturating addition (|+|) as overflowing addition (+)";
+       Printf.eprintf "[WARNING] unsoundly implementing saturating addition (|+|) as overflowing addition (+)\n%!";
      (* unsigned and signed are the same ??? *)
      Expr.badd
   | BVMinus (sat, _) ->
      if sat then
-       Printf.eprintf "[WARNING] unsoundly implementing saturating subtraction (|-|) as overflowing subtraction (-)";
+       Printf.eprintf "[WARNING] unsoundly implementing saturating subtraction (|-|) as overflowing subtraction (-)\n%!";
      (* signed and unsigned are the same ??? *)
      Expr.bsub
   | BVTimes _ ->

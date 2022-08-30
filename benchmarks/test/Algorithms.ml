@@ -1,3 +1,4 @@
+open Core
 open Pbench
 open Base_quickcheck   
 open Equivalences   
@@ -164,12 +165,65 @@ let cost_prop_parser () =
     (sequence [assign ethertype (bvi 2048 16); assign _state_parse_ipv4_next (bvi 1 1)])
     (const_prop c)
 
-  
 
+let small_switch_is_assumed () =
+  let open Cmd in
+  let open BExpr in
+  let open Expr in
+  let x_eq v = eq_ (var (Var.make "x" 2)) (bvi v 2) in
+  let y_eq v = eq_ (var (Var.make "y" 2)) (bvi v 2) in
+  let asm bs = List.map bs ~f:assume |> sequence in
+  let c = choices [
+      asm [x_eq 0; y_eq 1];
+      asm [x_eq 1; y_eq 1];
+      asm [x_eq 2; y_eq 2];
+      asm [x_eq 3; y_eq 2]
+    ] |> seq (assume (y_eq 0)) in
+  Alcotest.(check cmd) "literal equivalence"
+    (assume (ors_ [ands_ [x_eq 0; y_eq 1];
+                   ands_ [x_eq 1; y_eq 1];
+                   ands_ [x_eq 2; y_eq 2];
+                   ands_ [x_eq 3; y_eq 2]
+                  ] )
+     |> seq (assume (y_eq 0)))
+    (assume_disjuncts c)
 
-  
+let passifization_indexing_disjunction () =
+  let open Cmd in
+  let open BExpr in
+  let open Expr in
+  let passign x e = assume (eq_ (var x) e) in
+  choices [
+    skip;
+    assign (Var.make "icmp" 1) (bvi 1 1);
+    assign (Var.make "tcp" 1) (bvi 1 1);
+    assign (Var.make "udp" 1) (bvi 1 1)
+  ]
+  |> passify
+  |> apply_smart_constructors
+  |> Alcotest.(check cmd) "literal equivalence"
+    (choices [
+        sequence [ passign (Var.make "tcp$_$1" 1) (bvi 1 1);
+                   passign (Var.make "icmp$_$0" 1) (var (Var.make "icmp$_$1" 1));
+                   passign (Var.make "udp$_$0" 1) (var (Var.make "udp$_$1" 1))];
+        sequence [ passign (Var.make "icmp$_$0" 1) (var (Var.make "icmp$_$1" 1));
+                   passign (Var.make "tcp$_$0" 1) (var (Var.make "tcp$_$1" 1));
+                   passign (Var.make "udp$_$0" 1) (var (Var.make "udp$_$1" 1))];
+        sequence [ passign (Var.make "icmp$_$1" 1) (bvi 1 1);
+                   passign (Var.make "tcp$_$0" 1) (var (Var.make "tcp$_$1" 1));
+                   passign (Var.make "udp$_$0" 1) (var (Var.make "udp$_$1" 1))];
+        sequence [
+          passign (Var.make "udp$_$1" 1) (bvi 1 1);
+          assume (and_ (eq_ (var (Var.make "icmp$_$0" 1))
+                            (var (Var.make "icmp$_$1" 1)))
+                       (eq_ (var (Var.make "tcp$_$0" 1))
+                            (var (Var.make "tcp$_$1" 1))))]
+      ])
+
 let tests =
   [
+    Alcotest.test_case "[assume_disjuncts] small switch is assumed" `Quick small_switch_is_assumed;
+    Alcotest.test_case "[passify] passify([]ᵢ cᵢ) is ok" `Quick passifization_indexing_disjunction;
     Alcotest.test_case "cnf foils" `Quick cnf_foils;
     Alcotest.test_case "qc cnf_equiv" `Slow cnf_equiv;
     Alcotest.test_case "egress_spec vc" `Quick vc_egress_spec;

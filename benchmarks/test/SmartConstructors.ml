@@ -716,6 +716,17 @@ let test_skips_get_eliminated () =
   let open Cmd in
   Alcotest.(check (list cmd)) "syntactically equal lists of commands" [skip] (List.dedup_and_sort ~compare [skip;skip])
 
+let test_choice_is_a_set () =
+  let open Cmd in
+  let a = assign (Var.make "hdr.ipv4.is_valid" 1) (Expr.bvi 1 1) in
+  let cs = [ skip; skip; a; skip; skip ] in
+
+  Alcotest.(check cmd) "syntactically equal commands"
+    (choice skip a) (choices cs)
+
+
+
+
 
 let tests =
   [
@@ -751,6 +762,7 @@ let tests =
     Alcotest.test_case "[skip] == [skip;skip]" `Quick test_skips_get_eliminated;
     Alcotest.test_case "skip [] ... [] skip == skip" `Quick test_choice_skip_elim;
     Alcotest.test_case "c [] ... [] c == c" `Quick test_choice_equiv_elim;
+    Alcotest.test_case "skip[]skip[]x=5[]skip == skip[]x=5" `Quick test_choice_is_a_set;
     Alcotest.test_case "QC Smart QE" `Slow identity;
     Alcotest.test_case "QC ⊤ ∨ φ = ⊤" `Quick true_or_phi__true;
     Alcotest.test_case "QC ⊥ ∨ φ = φ" `Quick false_or_phi__phi;

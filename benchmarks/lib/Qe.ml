@@ -170,20 +170,18 @@ let subsolving (prog, asst) =
   (Clock.stop c, qf_phi_str, -1, true)
 
 let solving_all_paths_inner (prog, asst) =
-  Log.print @@ lazy ("counting paths");
-  let num_paths = Cmd.count_paths prog in
-  Log.print @@ lazy (Printf.sprintf "computing the %s paths" (Bigint.to_string num_paths));
-  let pis  = Cmd.paths prog in
+  let passive = Cmd.passify prog in
+  let path_optimized = Cmd.assume_disjuncts passive in
+  Breakpoint.set true;
+  let pis  = Cmd.paths path_optimized in
   let completed = ref Bigint.zero in
   Sequence.fold pis ~init:[] ~f:(fun acc pi ->
       Log.print @@ lazy (Printf.sprintf "Computing WP for path:\n%s \n" (Cmd.to_string pi));
-      let phi = vc pi asst in
-      Log.print @@ lazy "getting vars";
+      let phi = Cmd.(wrong (seq pi (assert_ asst))) in
       let (dvs, _) = BExpr.vars phi in
       List.iter dvs ~f:BExpr.incr_q;
       Log.print @@ lazy "smart constructors";
       let qphi = BExpr.(forall dvs phi |> order_all_quantifiers) in
-      Log.print @@ lazy "running the bottom up solver";
       let qf_phi = BottomUpQe.qe (solve_wto `Z3) qphi in
       Log.print @@ lazy "getting the vars of the result";
       let dvs', cvs = BExpr.vars qf_phi in
@@ -199,7 +197,7 @@ let solving_all_paths_inner (prog, asst) =
       let qf_phi_str = Solver.run_z3 (Smt.simplify cvs (BExpr.to_smtlib (BExpr.simplify qf_phi))) in
       Log.print @@ lazy "done";
       Bigint.incr completed;
-      Printf.printf "%s of %s paths solved\n" (Bigint.to_string !completed) (Bigint.to_string num_paths);
+      Printf.printf "%s paths solved\n" (Bigint.to_string !completed);
       acc @ [qf_phi_str])
 
 let solving_all_paths (prog,asst) =
