@@ -401,11 +401,10 @@ which is way too big to check on every rule insertion.
 ### A Database Of Formulae
 
 There are a few pieces of redeeming information:
-1. We only need to compute the 10million formulae once
+1. We only need to compute the 4quadrillion formulae once
 2. When we insert an exact-match rule, we only need to check it's interaction
 with all of the other rules in the _other tables_.
-   
-   
+      
 The proposal is that we store the statically computed path-formulae in a
 database indexed by the actions taken by that path. For instance, in our running
 example, we'd have the following table (with key `(Action,Formulae)` to allow
@@ -423,6 +422,219 @@ checking time by orders of magnitude.
 We could also present an interactive tool that allows a developer to explore the
 constraints required for different collections of actions.
 
+### Tackling path explosion
+
+The problem with a database of formulae is that it needs to house all
+4quadrillion nodes, which is way too many. We need some way to reduce the number
+of formulae that we generate.
+
+One heuristic is to eliminate unfeasible paths as soon as we observe that they
+are infeasible using an SMT solver. Then we can use the UNSAT-core to eliminate
+other paths that are infeasible for the same reason. Hopefully this can tame the
+search space into the realm of the feasible. Lets look at an example.
+
+    {x:= 6} [] {x := 5};
+    {assume x = 5; y := 5} [] {assume x ≠ 5; y := 0}
+    
+In this program, we would naively explore 4 different paths:
+
+    {x := 6; assume x = 5; y := 5} []  (×)
+    {x := 6; assume x ≠ 5; y := 0 } []
+    {x := 5; assume x = 5; y := 5} [] 
+    {x := 5; assume x ≠ 5; y := 5}    (×)
+    
+Note that while in the path version we can immediately see that the branches
+marked with an `×` are infeasible because `6 = 5` is false and `5 ≠ 5`is false,
+this information is not obvious to us in the original program, because at the
+end of the branch point, all we know is that `x ∈ {5,6}`. So we need to do
+something smarter. One option is to compute the weakest precondition of each
+path, which would let us immediately observe that these paths are infeasible:
+
+    ¬ (x = 5) ∨ ... ∧
+    ...
+    ¬ (5 ≠ 5) ∨ ... 
+
+However, we want to be able to _learn_ from the infeasible paths and generalize
+so that we dont have to compute the full path again. The basic idea is to keep a
+knowledge base Ω of sub-paths that are infeasible. 
+
+The algorithm proceeds in three steps: (1) Do QE on the path constraint (2) if
+false, compute unsat-core, and (3) add paths that traverse unsat core to
+knowledge base. Then when we start to generate new paths, we can avoid
+generating the infeasible prefixes.
+
+For our sanity, lets assign each AST node a numerical value indicated between
+angle brackets, e.g. `⟨i⟩`. This will allows us to uniquely identify paths
+through the program.
+    
+    {⟨1⟩ x := 6} [] {⟨2⟩ x:= 5};
+    {⟨3⟩ assume x = 5; ⟨4⟩y := 5 } [] {⟨5⟩ assume x ≠ 5; ⟨6⟩ y := 0 }
+    
+So now we'll compute the path condition for the first path, `⟨1,3,4⟩`,
+which is
+
+    (assert (! (= x₁ 6) :named point_1))
+    (assert (! (= x₁ 5) :named point_3))
+    (assert (! (= y₁ 5) :named point_4))
+    (get-unsat-core)
+
+Which gives the unsat core of `(point_1 point_3)`. From this unsat-core, we can
+generalize and add to our knowledge base the fact that means that any path that
+traverses both `⟨1⟩` and `⟨3⟩` will be infeasible.
+
+The current example is not sufficienly large enough to realize the gains.
+However, if we add two disjunctions to the program, one between the two
+branches, and one after the two branches, then we'll see the power:
+
+    {⟨1⟩ x := 6} [] {⟨2⟩ x:= 5};
+    {⟨3⟩ z := 6} [] {⟨4⟩ z:= 5} [] {⟨5⟩ z := 99};
+    {⟨6⟩ assume x = 5; ⟨7⟩y := 5 } [] {⟨8⟩ assume x ≠ 5; ⟨9⟩ y := 0 };
+    {⟨10⟩ w := 6} [] {⟨11⟩ w := 5} [] {⟨12⟩ w := 99}
+    
+Now we have many many more paths:
+
+    ⟨1,3,6,7,10⟩ ⟨2,3,6,7,10⟩ 
+    ⟨1,3,6,7,11⟩ ⟨2,3,6,7,11⟩
+    ⟨1,3,6,7,12⟩ ⟨2,3,6,7,12⟩
+    ⟨1,3,8,9,10⟩ ⟨2,3,8,9,10⟩
+    ⟨1,3,8,9,11⟩ ⟨2,3,8,9,11⟩
+    ⟨1,3,8,9,12⟩ ⟨2,3,8,9,12⟩
+    ⟨1,4,6,7,10⟩ ⟨2,4,6,7,10⟩
+    ⟨1,4,6,7,11⟩ ⟨2,4,6,7,11⟩
+    ⟨1,4,6,7,12⟩ ⟨2,4,6,7,12⟩
+    ⟨1,4,8,9,10⟩ ⟨2,4,8,9,10⟩
+    ⟨1,4,8,9,11⟩ ⟨2,4,8,9,11⟩
+    ⟨1,4,8,9,12⟩ ⟨2,4,8,9,12⟩
+    ⟨1,5,6,7,10⟩ ⟨2,5,6,7,10⟩
+    ⟨1,5,6,7,11⟩ ⟨2,5,6,7,11⟩
+    ⟨1,5,6,7,12⟩ ⟨2,5,6,7,12⟩
+    ⟨1,5,8,9,10⟩ ⟨2,5,8,9,10⟩
+    ⟨1,5,8,9,11⟩ ⟨2,5,8,9,11⟩
+    ⟨1,5,8,9,12⟩ ⟨2,5,8,9,12⟩
+
+And the interactions betweeen 1 and 6 and 1 and 8 will greatly reduce the number
+that we have to explore.
+
+So let's assume we're lazily generating these paths in column-order. So we'll
+start with the path ⟨1,3,6,7,10⟩ which corresponds to the following trace:
+
+    x:=6; z:=6; assume x=5; y:=7; w:=6
+    
+and the following path constraint:
+
+    (assert (! (= x₁ 6) :named point_1))
+    (assert (! (= z₁ 6) :named point_3))
+    (assert (! (= x₁ 5) :named point_6))
+    (assert (! (= y₁ 7) :named point_7))
+    (assert (! (= w₁ 6) :named point_10))
+
+which we can use to get the `unsat-core`:
+
+    (check-sat)
+    (get-unsat-core)
+    
+Which is
+    
+    unsat
+    (point1 point6)
+
+Now we're cooking with gas! We can add `⟨…,1,…,6,…⟩` to our knowledge base,
+which means that any time we see a path that goes through `⟨1⟩` and through
+`⟨6⟩`, we know to stop generating paths.
+
+Now, we don't need to generate the paths, `⟨1,3,6,7,11⟩`, or `⟨1,3,6,7,12⟩`,
+because we know they'll all be infeasible. Our savings here comes from the fact
+that we are checking the feasibility of prefixes, so we dont have to generate
+the full path.
+
+We'll then backtrack to path prefix `⟨1,3⟩` and generate the feasible paths
+`⟨1,3,8,9,10⟩`, `⟨1,3,8,9,11⟩`, and `⟨1,3,8,9,12⟩`, because we must. Then we'll
+backtrack again to `⟨1,4⟩`, which is so far a feasible prefix.
+
+Now, as we explore the children of `⟨1,4⟩`, namely `⟨1,4,{6|8}⟩`, we'll observe
+that `⟨…,1,…,6,…⟩∈ Ω`, so we skip the 3 paths that begin with prefix `⟨1,4,6⟩`
+and just check the following:
+
+    ⟨1,4,8,9,10⟩
+    ⟨1,4,8,9,11⟩
+    ⟨1,4,8,9,12⟩
+
+A similar process lets us rule out the `⟨1,5,6,...⟩` paths, at which point we
+backtrack all the way back up to the root and start with `⟨2⟩`. Now, we accept
+the following paths as feasible following calls to Z3:
+
+    ⟨2,3,6,7,10⟩
+    ⟨2,3,6,7,11⟩
+    ⟨2,3,6,7,12⟩
+    
+Then we backtrack to `⟨2,3⟩` and call Z3 on path `⟨2,3,8,9,10⟩`, which is similarly infeasible:
+    
+    (assert (! (= x₁ 5) :named point_2))
+    (assert (! (= z₁ 6) :named point_3))
+    (assert (! (≠ x₁ 5) :named point_8))
+    (assert (! (= y₁ 0) :named point_9))
+    (assert (! (= w₁ 6) :named point_10))
+    (check-sat)
+    ;; unsat
+    (unsat-core)
+    ;; (point_2 point_8)
+    
+And now we update our knowledge base `Ω` to be such that `⟨…,2,…,8,…⟩ ∈ Ω`.
+Which lets us rule out the remaining infeasible paths. So rather than making
+`36` QE-calls to Z3, we're making the following `18` calls for the feasible
+paths and the `2` unsat-core Z3 calls described above.
+
+    ⟨2,3,6,7,10⟩ ⟨1,4,8,9,11⟩ 
+    ⟨2,3,6,7,11⟩ ⟨1,4,8,9,12⟩
+    ⟨2,3,6,7,12⟩ ⟨2,5,6,7,10⟩
+    ⟨1,3,8,9,10⟩ ⟨2,5,6,7,11⟩
+    ⟨1,3,8,9,11⟩ ⟨2,5,6,7,12⟩
+    ⟨1,3,8,9,12⟩ ⟨1,5,8,9,10⟩
+    ⟨2,4,6,7,10⟩ ⟨1,5,8,9,11⟩
+    ⟨2,4,6,7,11⟩ ⟨1,5,8,9,12⟩
+    ⟨2,4,6,7,12⟩ ⟨1,4,8,9,10⟩
+    
+Hopefully this will reduce the number of paths that we need to explore to solve
+a program like `switch.p4`.
+
+### Remarks
+
+__All Unsat Cores__. One way we can make this better is to collect all of the
+unsatisfiable cores from a single unsatisfiable path, then we can get more bang
+per infeasible path.
+
+__Necessity of Passivisation__. One important aspect that's elided from the
+above notes is that our programs must be in the passive form. We need the phi
+nodes for our path-elimination to be complete. For instance, consider the
+following program:
+
+    ⟨0⟩ x := 5;
+    { ⟨1⟩ x := 0 } [] { ⟨2⟩ skip };
+    { ⟨3⟩ assume x = 5} [] { ⟨4⟩ assume x ≠ 5 }
+
+So if we start with `⟨0,2,4⟩`, without passifization, we'll get the following path constraint:
+
+    x₁ = 5 ∧ true ∧ x₁ = 5
+    
+This path is definitely infeasible, and a call to Z3's unsat-core will give us
+the sub-path `⟨0, …, 4⟩` to add to the knowledge base. The problem is that there
+_are_ feasible subpaths that have `⟨0,…,4⟩` as a subpath, namely `⟨0,1,4⟩`,
+because `⟨1⟩` assigns `x` to `0`:
+
+    x₁ = 5 ∧ x₂ = 0 ∧ x₂ ≠ 5
+    
+which is feasible!
+
+The mistake that we made was in not observing the implicit phi node in the first
+disjunction. To do this we have to update the indices in both paths
+corresponding to the modifications in the other. So our original path constraint
+for `⟨0,2,4⟩` should have been 
+
+    x₁ = 5 ∧ x₂ = x₁ ∧ x₂ = 5
+    
+In which case, the unsat-core will identify the sub-path as `⟨0,2,4⟩`, which
+correctly allows `⟨0,1,4⟩` to be generated.
+
 ## Variable scoping
  
 A smaller potential optimization in generating the VCs is to do QE while we're
@@ -431,4 +643,3 @@ passive form, we can attempt QE on the formula this is by eliminating the output
 variables when the variable index changes. This analysis only works when
 traversing the tree in the backwards direction. This may only be sound at "phi
 nodes" when the indices are synchronized.
-
