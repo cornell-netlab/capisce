@@ -682,7 +682,6 @@ let test_choice_skip_elim () =
     |> Fn.flip Sequence.take 10
     |> Sequence.to_list
     |> choices
-    (* choice skip skip *)
   in
   Alcotest.(check cmd) "syntactic equivalence" (skip) b
 

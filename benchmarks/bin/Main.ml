@@ -85,8 +85,7 @@ let compile : Command.t =
        (* Printf.printf "GCL program:\n%s\n\n%!" @@ Pbench.Cmd.to_string cmd; *)
        Printf.printf "ConstProp'd:\n%s\n\n%!" @@ Pbench.Cmd.to_string cmd_o;
        Printf.printf "cmd went from %d nodes to %d nodes\n\n%!" (Pbench.Cmd.size cmd) (Pbench.Cmd.size cmd_o);
-       (* Printf.printf "Path Merging:\n%s\n\n%!" (Pbench.Cmd.to_string merged); *)
-        (* cmd went from 34303 nodes to 16872 nodes *)
+       Printf.printf "Path Merging:\n%s\n\n%!" (Pbench.Cmd.to_string merged);
        Printf.printf "From %s paths to %s\n%!"
          (Bigint.to_string (Pbench.Cmd.count_paths cmd_o))
          (Bigint.to_string (Pbench.Cmd.count_paths merged));
@@ -104,7 +103,7 @@ let compile : Command.t =
        (* Printf.printf "which has %s alternatives\n%!" (Bigint.((of_int 2) ** !total_size |> to_string)); *)
        (* Printf.printf "but there are only %s possibilities\n%!" (Pbench.Cmd.action_var_paths cmd_o |> Bigint.to_string); *)
 
-       Printf.printf "Passified:\n%s \n%!" @@ Pbench.Cmd.to_string cmd_p;
+       (* Printf.printf "Passified:\n%s \n%!" @@ Pbench.Cmd.to_string cmd_p; *)
        (* Printf.printf "\n And its VC: %s \n (forall (%s) \n %s) \n\n%!" *)
        (*   (Pbench.Var.list_to_smtlib_decls cvs) *)
        (*   (Pbench.Var.list_to_smtlib_quant dvs) *)

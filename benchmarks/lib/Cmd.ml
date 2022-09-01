@@ -436,42 +436,16 @@ let passify (c : t) : t =
   in
   snd (loop Context.empty c)
 
-let single_comparison b =
-  match BExpr.comparisons b with
-  | [x,e] -> Some (x,e)
-  | _ -> None
-
-(* Returns [Some x] if [cs] is a "switch statement" on variable [x]*)
-(* The following describes the semantics of [switch_consistency] *)
-(* Some None   indicates no switch has yet been found (the initial value) *)
-(* Some Some x indicates so far [x] is the switched var *)
-(* None        indicates we've detected a failure *)
-let rec is_switch_on cs (switch_consistency : Var.t option option) : Var.t option =
-  let open Option.Let_syntax in
-  match cs with
-  | [] -> Option.join switch_consistency
-  | (Assume b::cs)
-  | (Seq (Assume b::_)::cs) -> begin
-      let%bind (y,_) = single_comparison b in
-      let%bind found_switch_var = switch_consistency in
-      match found_switch_var with
-      (* | (Some y') when (not (Var.equal y' y)) -> None *)
-        | _ -> is_switch_on cs (Some (Some y))
-    end
-  | _ -> None
-
-let assume_disjunct ?(threshold=20) cs =
+let assume_disjunct ?(threshold=1000) cs =
   let c = choices cs in
-  if is_switch_on cs (Some None) |> Option.is_some then
-    if List.for_all cs ~f:(fun x -> size x < threshold) then
-      assume (normal c)
-    else
-      c
+  if List.for_all cs ~f:(fun x -> size x < threshold) then
+    assume (normal c)
   else
     c
 
 (* PRECONDITION c must be in passive form*)
 let assume_disjuncts c =
+  Log.print @@ lazy "assuming disjuncts";
   let rec loop c =
     match c with
     | Assume phi -> assume phi
@@ -481,7 +455,6 @@ let assume_disjuncts c =
     | Seq cs ->    List.map cs ~f:loop |> sequence
     | Choice cs -> List.map cs ~f:loop |> assume_disjunct
   in
-  Log.print @@ lazy "assuming disjuncts";
   loop c
 
 
