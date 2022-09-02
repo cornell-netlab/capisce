@@ -597,6 +597,65 @@ paths and the `2` unsat-core Z3 calls described above.
 Hopefully this will reduce the number of paths that we need to explore to solve
 a program like `switch.p4`.
 
+### Implementation
+
+In implementing this idea we have two important goals related to efficiency.
+First, since we have 4 quadrillion paths, simply avoiding the calls to Z3 will
+not be sufficient; we need to avoid _generating them in the first place_.
+Second, we want to avoid scanning the knowledge base of learned infeasible
+paths, since this will be too much overhead to do 4quadrillion times.
+
+To do this, we'll lazily generate paths guarded with membership checks for the
+knowledge base, which will be represented as a trie. This should allow us
+constant time pruning of branches with a logarithmic insertion cost for paths.
+See __Structuring Data__ for more details.
+
+To fully explore the data structures, we need to first write down the core
+algorithm.
+
+#### Algorithm
+
+    φ ← ⊤
+    S ← ⊤
+    while S ≠ ∅:
+        π ← get_next S
+        ψ₀(D,$) ← wp(π, ⊤)
+        ψ($) ← QE(∀D. ψ₀(D,$))
+        if ψ($) = ⊥ then
+           κ₁,…,κₙ ← unsat-cores(ψ₀(D,$))
+           χ₁,…,χₙ ← map path_constraint [k₁;⋯;kₙ]
+           S ← S ∖ χ₁ ∖ ⋯ ∖ χₙ
+       else:
+           φ ← φ ∧ ψ
+    return φ
+
+The algorithm proceeds as follows. Initialize `φ` to be `⊤`. This variable
+represents the CPF to compute. Initialize `S` to `⊤` as well. This variable is
+the (abstract) path generation structure. Then we'll loop untill `S` has no more
+paths to generate `S = ∅`, and return φ. Inside the body of the loop, we first
+compute the next path `π` from S. THen we compute the weakest precondition of
+that path with respect to `⊤`, calling this formula `ψ₀(D,$)` to notationally
+indicate that the free variables are the dataplane variables D and the symbolic
+control plane variables `$`. Then we run QE on this formula to compute `ψ($)`,
+which is equivalent to `∀ D. ψ₀(D,*)`. If QE returns a non-absurd formula, we
+conjoin the results to `φ`. Otherwise, we try to understand why this path is
+infeasible, so we can learn from our mistakes, by computing all of the unsat
+cores `κ₁,…, κₙ` of `ψ₀(D,$)`. Then we convert theses to path constraints `χ₁,
+…, χₙ`, and remove them from the set of things to generate. Of course this
+set-minus operation is not really set difference, but it will be semantically
+equivalent to the setminus operation. The next section discusses how we'll
+structure the data to avoid this average case `O(M₀ × … × Mₙ)` removal, where
+`Mᵢ` is the number of paths in the set denoted by `χᵢ`.
+
+#### Structuring Data
+ 
+ TODO.
+    
+
+#### Thoughts about concurrency
+
+TODO
+
 ### Remarks
 
 __All Unsat Cores__. One way we can make this better is to collect all of the
