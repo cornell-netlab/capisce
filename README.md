@@ -360,7 +360,16 @@ Flanagan & Saxe approach while employing some of these path-based simplification
 techniques. The next section explores what to do if we don't have a way to
 dramatically simplify the size of the formulae.
 
-## Path-based WP
+# Variable scoping
+ 
+A smaller potential optimization in generating the VCs is to do QE while we're
+generating the VC (though this may make things if we e.g. bitblast). In the
+passive form, we can attempt QE on the formula this is by eliminating the output
+variables when the variable index changes. This analysis only works when
+traversing the tree in the backwards direction. This may only be sound at "phi
+nodes" when the indices are synchronized.
+
+# Path-based WP
 
 Barring some way to close the gap, lets explore what would happen if we computed
 the WP as the optimized conjunction of all path-wps. This is logically
@@ -387,18 +396,18 @@ crossproduct of action choices) which will create O(Nᴹ) paths, where N is the
 number of tables and M is the max number of actions in the table this will be
 approx (10⁵ = 10,000).
 
-### The Problem (Size)
+## The Problem (Size)
 
 The problem is that for our larger programs (switch .p4), the program has too
-many different branches. For instance, switch.p4 has something like 10 million
-paths. 
+many paths. For instance, switch.p4 has something like 75 quadrillion paths (6
+quadrillion with a constant parser).
 
 Presenting this formula with 10 million conjuncts to a user is a completely
 ridiculous proposition. Even monitoring it will be challenging. if each table
 has 1024 rules in it and there are 20 tables, thats 10,000,000 × 1024 × 20,
 which is way too big to check on every rule insertion.
 
-### A Database Of Formulae
+## A Database Of Formulae
 
 There are a few pieces of redeeming information:
 1. We only need to compute the 4quadrillion formulae once
@@ -422,10 +431,12 @@ checking time by orders of magnitude.
 We could also present an interactive tool that allows a developer to explore the
 constraints required for different collections of actions.
 
-### Tackling path explosion
+## Tackling path explosion
+
+Switch.p4 has 75 quadrillion paths..
 
 The problem with a database of formulae is that it needs to house all
-4quadrillion nodes, which is way too many. We need some way to reduce the number
+75quadrillion paths, which is way too many. We need some way to reduce the number
 of formulae that we generate.
 
 One heuristic is to eliminate unfeasible paths as soon as we observe that they
@@ -597,6 +608,7 @@ paths and the `2` unsat-core Z3 calls described above.
 Hopefully this will reduce the number of paths that we need to explore to solve
 a program like `switch.p4`.
 
+
 ### Implementation
 
 In implementing this idea we have two important goals related to efficiency.
@@ -613,7 +625,7 @@ See __Structuring Data__ for more details.
 To fully explore the data structures, we need to first write down the core
 algorithm.
 
-#### Algorithm
+### Algorithm
 
     φ ← ⊤
     S ← ⊤
@@ -647,6 +659,30 @@ equivalent to the setminus operation. The next section discusses how we'll
 structure the data to avoid this average case `O(M₀ × … × Mₙ)` removal, where
 `Mᵢ` is the number of paths in the set denoted by `χᵢ`.
 
+
+#### An early termination heuristic
+
+One way that we can potentially end early is to optimistically check that we
+have explored enough paths, i.e. that `φ ⇒ vc(p,⊤)`. This would change the way
+that we explore the paths, in a way thats slightly unclear.
+
+Do we try to randomly sample paths? how do we know that we have explored a
+representative sample of paths? What heuristics can we use to increase the
+likelihood of this early termination check succeeding?
+
+#### An Abstraction Domain.
+
+One way to do abstract interpretation here is to reason about tables. Rather
+than reasoning on the granularity of paths, we can reason on the granularity of
+table-paths. That is, what are the valid sequences of tables that can occur. The
+idea here is that we can Once we have these, we can potentially abstract over
+the tables themselves.
+
+This is related to the monolithic table-abstraction idea, above, where we first
+analyze the relationship between tables and then we analyze the implementation
+of those tables. With our path-based analysis, however, we hope that by
+analyzing a few paths through the tables we can generalize to a condition that
+will handle all of the paths.
 
 #### Structuring Data
  
@@ -753,10 +789,16 @@ descending `χ` on all matching paths and marking the leaves infeasible.
             Ω ← step Ω choice
             add χ Ω ν
 
+
 #### Thoughts about concurrency
 
-TODO
+One way we could get several orders of magnitude of speedup is to use the 1k
+cores in the Pronto/Atlas servers to give us a few orders of magnitude speedup
+(assuming no-cost synchronization). 
 
+To implement this algorithm concurrently, we can use a Director/Worker paradigm,
+where a director assigns batches of paths to each worker. The challenges are
+coordinating the infeasible path constraints χ₁,…, χₙ, and 
 
 ### Remarks
 
@@ -795,12 +837,3 @@ for `⟨0,2,4⟩` should have been
     
 In which case, the unsat-core will identify the sub-path as `⟨0,2,4⟩`, which
 correctly allows `⟨0,1,4⟩` to be generated.
-
-## Variable scoping
- 
-A smaller potential optimization in generating the VCs is to do QE while we're
-generating the VC (though this may make things if we e.g. bitblast). In the
-passive form, we can attempt QE on the formula this is by eliminating the output
-variables when the variable index changes. This analysis only works when
-traversing the tree in the backwards direction. This may only be sound at "phi
-nodes" when the indices are synchronized.
