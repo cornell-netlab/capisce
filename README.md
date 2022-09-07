@@ -647,14 +647,116 @@ equivalent to the setminus operation. The next section discusses how we'll
 structure the data to avoid this average case `O(M₀ × … × Mₙ)` removal, where
 `Mᵢ` is the number of paths in the set denoted by `χᵢ`.
 
+
 #### Structuring Data
  
- TODO.
-    
+ So how should we structure `S`? We need some way to generate paths, and another
+ way to keep track of the paths that we generate. To generate paths, we'll run a
+ DFS over a CFG `Gₚ` derived from the syntax of our program in question `p`.
+ We'll also maintain a Trie `Ω` to represent the illegal paths in the knowledge
+ base. The idea is that as we generate paths in CFP the `Gₚ` we will
+ simultanously explore the corresponding path prefix in `Ω`. Then when we find a
+ path constraint `χ`, we can add it to `Ω`, which may trigger some backtracking
+ if a prefix of the current path is disallowed.
+ 
+ To instantiate our algorithm with these data structures we need to provide
+ three routines, (1) an emptiness check on `S`, a (2) `get_next` function, and
+ (3) a set-minus function.
+ 
+ Lets start easy. The emptiness check simply needs to check whether we have
+ finished exploring the `Gₚ`. Once all of the paths have been explored, we'll
+ declare the set `S` empty.
+ 
+ The `get_next S` function is a bit more complicated. Here's how it works. `S`
+ needs to maintain some search state: the current path `π`, and a worklist of
+ children to try next `c`. These search states are maintained in a (stateful)
+ stack of triples `w`. The following invariants hold:
+ 1.`∀ ⟨π,_⟩ ∈ w.  |π| > 0`
+ 2. `set(c) ⊆ Succ(ν)` --- that is, the elements in `c` are children of ν.
+ 3. `Ω.current() = fst(last(w.peek()))`
+ 
+ Its possible that between calls of `get_next`, we have invalidated our current
+ path. So the first thing we need to do is restore our search state `w` to
+ correspond to a path prefix permitted by `Ω`. To do this, we may need to
+ backtrack. The `backtrack` routine is defined below:
+ 
+    if not w.is_empty():
+        ⟨π, c⟩ ← w.peek()
+        match Ω.get_ok_prefix(π) with
+        | None → skip 
+        | Some π → w.pop(|π| - |π'|)
+
+The `Ω.get_ok_prefix(π)` returns the longest prefix of π that is not ruled out
+by `Ω`.
+ 
+ Then we can define `get_next S` as the following:
+ 
+     backtrack(w, Ω)
+     until is_empty w:
+        ⟨π, c⟩ ← w.pop() 
+        match c with
+        | [] →
+            Ω.parent()
+            if ν.is_leaf() then
+               return π
+        | ν₀::c₀ →
+            w.push(⟨π,c₀⟩)
+            if Ω.step_to_child(ν):
+                w.push(⟨π;ν, Succ(ν)⟩)
+
+The loop maintains the search state using `w`, when `w` is empty, there are no
+more paths to explore. The first thing the loop does is to pop off the top of
+the stack, which is a node `ν` and the unexplored children `c`. Because of
+invariant 2, we know that Ω is "focused" on the node `ν`. So the function
+`Ω.check_prefix()` checks the predecessor chain in the tree to see whether a new
+path-constraint has been added to the prefix. If not then we call `Ω.parent()`
+to backtrack to `ν`'s parent node. Otherwise, if the prefix has not been
+ruled-out, we try to step to the child `ν₀`. If thats successful, we push `⟨π;ν,
+Succ(ν)⟩` onto the stack again and continue looping.
+
+Note that when an invalid prefix has been discovered this algorithm will
+automatically backtrack until the syntactically left-most path-choice in χ was
+is removed. There's probably a micro-optimization here where we jump multiple
+steps at once by getting more information from the unsat core, but this suffices
+for now. Observe that checking takes time `O(d)` where is the depth of the DAG,
+whereas checking successors is constant time. There's probably some way to
+reduce some redundant `O(d)` checks here, but its not clear yet.
+
+The last piece here is removing the path constraints χ, written `S ∖ χ`. This
+operation is construed as insertion into the trie `Ω`, so to describe how it
+works we need to provide more intuition about how Ω is strcutured. Each node in
+`Ω` has two possible labels: `×` (infeasible) and `?` (unknown). If any node is
+infeasible than all of its children are infeasible. Each edge is labeled with
+the ID of a choice-point in the program. When we add a path prefix to the trie,
+we are adding an infeasible path. 
+
+The knowledge base `Ω` has an additional piece of state beyond the trie. Itself,
+and a pointer to the current node. `Ω.parent()` moves the current node to the a
+parent, and `Ω.child(c)` moves the pointer to the `c`th child.
+`Ω.get_ok_prefix(π)` starts at the root of `π` and walks forward on nodes
+labeled with `?` until either the nodes in `π` are exhausted, in which case it
+returns `None`, or until an infeasible (`×`) node `π[i]` has been found, at
+which point it returns the preceeding path of feasible nodes `π[:i]`
+(noninclusive). 
+
+Now, insertion simply adds the path constraints χ to `Ω` by recursively
+descending `χ` on all matching paths and marking the leaves infeasible.
+
+    let rec add χ Ω ν =
+        match χ with
+        | [] → mark_infeasible Ω ν
+        | None::χ →
+            Ω ← fill_unknown_succs Ω ν
+            fold (succs Ω ν) ~init:Ω ~f:(add χ)
+        | Some choice::χ →
+            Ω ← fill_unknown_succs Ω ν
+            Ω ← step Ω choice
+            add χ Ω ν
 
 #### Thoughts about concurrency
 
 TODO
+
 
 ### Remarks
 
