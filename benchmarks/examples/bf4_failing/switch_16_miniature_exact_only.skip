@@ -1043,8 +1043,8 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
         transition parse_inner_ethernet;
     }
     @name(".start") state start {
-        transition parse_ethernet;
-        // transition accept;
+        // transition parse_ethernet;
+        transition accept;
     }
 }
 

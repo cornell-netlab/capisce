@@ -2,7 +2,7 @@ open Core
 
 module VarSet = Set.Make (Var)
 module VarMap = Map.Make (Var)
-   
+
 type t =
   | Assume of BExpr.t
   | Assert of BExpr.t
@@ -712,3 +712,47 @@ let action_var_paths (c : t) : Bigint.t =
     ~init:Bigint.one
     ~f:(fun ~key:_ ~data:exprs num_paths ->
         Bigint.(num_paths * of_int (List.length exprs)))
+
+
+(* module Path : *)
+(* sig *)
+(*   type t *)
+(*   val realize_path : *)
+(*     + *)
+
+(* end = struct *)
+(*   type cmd = t *)
+(*   (\* [None] indicates a "dont care"*\) *)
+(*   (\* [Some i] indicates we should take the `i`th branch (from left to right) *\) *)
+(*   type t = int option list *)
+
+(*   let realize_path (c : cmd) (path_id : pi) : t option = *)
+(*     let open Option in *)
+(*     let open Let_syntax in *)
+(*     let rec loop (cmd : cmd) pi : (t * pi) option = *)
+(*       match cmd, pi with *)
+(*       | Assume _, (id::pi) *)
+(*       | Assert _, (id::pi) *)
+(*       | Havoc _, (id::pi) *)
+(*       | Assign _, (id::pi) -> *)
+(*         if is_none id then *)
+(*           Some (cmd, pi) *)
+(*         else if value_exn id = 0 then *)
+(*           Some (cmd, pi) *)
+(*         else *)
+(*           failwithf "Tried to realize %dth branch of primitive action: %s\n%!" (value_exn id) (to_string cmd) () *)
+(*       | Assume _, _ | Assert _, _ | Havoc _, _ | Assign _, _ -> *)
+(*         failwithf "Tried to realize empty path but had primitive action: %s\n%!" (to_string cmd) () *)
+
+(*       | Seq cs, pi -> *)
+(*         List.fold cs ~init:(skip, pi) *)
+(*           ~f:(fun (path_prec, pi_rst) c -> *)
+(*             let path_c, pi = loop cmd pi in *)
+(*           ) *)
+
+
+(*     in *)
+(*     let%bind (path, path_id) = loop cmd path in *)
+(*     Option.some_if (List.empty path_id) path *)
+
+(* end *)

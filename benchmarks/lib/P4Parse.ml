@@ -43,8 +43,8 @@ let as_cmd_from_file (includes : string list) p4file gas unroll verbose =
     | Error s ->
       failwith (Printf.sprintf "Compilation Error in stage [P4light->P4cub]: %s" s)
     | Ok p4cub ->
-      let instr tbl_name _ = TableInstr.instr tbl_name in
-      let coq_gcl = V1model.gcl_from_p4cub (P4info.dummy) instr false gas unroll p4cub in
+      let instr tbl_name = TableInstr.instr tbl_name in
+      let coq_gcl = V1model.gcl_from_p4cub (P4info.dummy) instr gas unroll p4cub in
       Log.print @@ lazy "Got coq_gcl";
       match coq_gcl with
       | Error s ->

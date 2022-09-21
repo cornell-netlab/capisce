@@ -1,48 +1,55 @@
 default = True
+count_tables = False
 
-vlan_decap__vlan_decap = 3 + int(default) #actions
-process_rewrite__rewrite = 5 + int(default) #actions
-process_egress_bd__egress_bd_map = 2 + int(default) #actions
-process_mac_rewrite__l3_rewrite = 2 + int(default) #actions
-process_mac_rewrite__smac_rewrite = 1 + int(default) #action
-process_mtu__mtu = 3 + int(default) #actions
-process_vlan_xlate__egress_vlan_xlate = 3 + int(default) #actions
-process_egress_acl__egress_acl = 4 + int(default) #actions
-egress__egress_port_mapping = 3 + int(default) #actions
-egress__mirror = 3 + int(default) #actions
-process_ingress_port_mapping__ingress_port_mapping = 1 + int(default) #action
-process_ingress_port_mapping__ingress_port_properties = 1 + int(default) #action
-validate_outer_ipv4_header__validate_outer_ipv43_packet = 1 + int(default) #action
-process_validate_outer_headervalidate_outer_ethernet = 13 + int(default) #actions
-process_global_params__switch_config_params = 1 + int(default) #action
-process_port_vlan_mapping__port_vlan_mapping = 2 + int(default) #actions
-process_spanning_tree__spanning_tree = 1 + int(default) #action
-process_ip_sourceguard__ipsg = 1 + int(default) #action
-process_ip_sourceguard__ipsg_permit_special = 1 + int(default) #action
-process_ingress_fabric__fabric_ingress_dst_lkp = 2 + int(default) #actions
-process_validate_packet__validate_packet = 7 + int(default) #actions
-process_mac__dmac = 7 + int(default) #actions
-process_mac__smac = 3 + int(default) #actions
-process_mac_acl__mac_acl = 6 + int(default) #actions
-process_ip_acl__ip_acl = 6 + int(default) #actions
-process_qos__qos = 4 + int(default) #actions
-process_ipv4_racl__ipv4_racl = 5 + int(default) #actions
-process_ipv4_urpf__ipv4_urpf = 2 + int(default) #actions
-process_ipv4_urpf__ipv4_urpf_lpm = 2 + int(default) #actions
-process_ipv4_fib__ipv4_fib = 3 + int(default) #actions
-process_ipv4_fib__ipv4_fib_lpm = 3 + int(default) #actions
-process_urpf_bd__urpf_bd = 2 + int(default) #actions
-process_hashes__compute_ipv4_hashes = 2 + int(default) #actions
-process_hashes__compute_non_ip_hashes = 2 + int(default) #actions
-process_hashes__compute_other_hashes = 2 + int(default) #actions
-process_fwd_results__fwd_results = 6 + int(default) #actions
-process_nexthop__ecmp_group = 3 + int(default) #actions
-process_nexthop__nexthop = 3 + int(default) #actions
-process_lag__lag_group = 2 + int(default) #actions
-process_mac_learning__learn_notify = 2 + int(default) #actions
-process_system_acl__drop_states_0 = 1 + int(default) #action
-process_system_acl__system_acl = 7 + int(default) #actions
-ingress__rmac = 2 + int(default) #actions
+def count(n):
+    if count_tables:
+        return 1
+    else:
+        return n + int(default)
+
+vlan_decap__vlan_decap = count(3)
+process_rewrite__rewrite = count(5)
+process_egress_bd__egress_bd_map = count(2)
+process_mac_rewrite__l3_rewrite = count(2)
+process_mac_rewrite__smac_rewrite = count(1)
+process_mtu__mtu = count(3)
+process_vlan_xlate__egress_vlan_xlate = count(3)
+process_egress_acl__egress_acl = count(4)
+egress__egress_port_mapping = count(3)
+egress__mirror = count(3)
+process_ingress_port_mapping__ingress_port_mapping = count(1)
+process_ingress_port_mapping__ingress_port_properties = count(1)
+validate_outer_ipv4_header__validate_outer_ipv43_packet = count(1)
+process_validate_outer_headervalidate_outer_ethernet = count(13)
+process_global_params__switch_config_params = count(1)
+process_port_vlan_mapping__port_vlan_mapping = count(2)
+process_spanning_tree__spanning_tree = count(1)
+process_ip_sourceguard__ipsg = count(1)
+process_ip_sourceguard__ipsg_permit_special = count(1)
+process_ingress_fabric__fabric_ingress_dst_lkp = count(2)
+process_validate_packet__validate_packet = count(7)
+process_mac__dmac = count(7)
+process_mac__smac = count(3)
+process_mac_acl__mac_acl = count(6)
+process_ip_acl__ip_acl = count(6)
+process_qos__qos = count(4)
+process_ipv4_racl__ipv4_racl = count(5)
+process_ipv4_urpf__ipv4_urpf = count(2)
+process_ipv4_urpf__ipv4_urpf_lpm = count(2)
+process_ipv4_fib__ipv4_fib = count(3)
+process_ipv4_fib__ipv4_fib_lpm = count(3)
+process_urpf_bd__urpf_bd = count(2)
+process_hashes__compute_ipv4_hashes = count(2)
+process_hashes__compute_non_ip_hashes = count(2)
+process_hashes__compute_other_hashes = count(2)
+process_fwd_results__fwd_results = count(6)
+process_nexthop__ecmp_group = count(3)
+process_nexthop__nexthop = count(3)
+process_lag__lag_group = count(2)
+process_mac_learning__learn_notify = count(2)
+process_system_acl__drop_states_0 = count(1)
+process_system_acl__system_acl = count(7)
+ingress__rmac = count(2)
 
 
 process_ingress_port_mapping =\

@@ -82,7 +82,7 @@ let compile : Command.t =
        let merged = Pbench.Cmd.assume_disjuncts cmd_p in
        (* let vc = Pbench.Cmd.vc cmd_o in *)
        (* let (dvs, cvs) = Pbench.BExpr.vars vc in *)
-       (* Printf.printf "GCL program:\n%s\n\n%!" @@ Pbench.Cmd.to_string cmd; *)
+       Printf.printf "GCL program:\n%s\n\n%!" @@ Pbench.Cmd.to_string cmd;
        Printf.printf "ConstProp'd:\n%s\n\n%!" @@ Pbench.Cmd.to_string cmd_o;
        Printf.printf "cmd went from %d nodes to %d nodes\n\n%!" (Pbench.Cmd.size cmd) (Pbench.Cmd.size cmd_o);
        Printf.printf "Path Merging:\n%s\n\n%!" (Pbench.Cmd.to_string merged);
@@ -185,6 +185,38 @@ let infer : Command.t =
                inf_res
     ]
 
+let verify : Command.t =
+  let open Command.Let_syntax in
+  Command.basic ~summary:"Program verifier"
+    [%map_open
+     let source = anon ("p4 source file" %: string) and
+         includes = flag "-I" (listed string) ~doc:"includes directories" and
+         gas_opt = flag "-g" (optional int) ~doc:"how much gas to pass the compiler" and
+         unroll_opt = flag "-u" (optional int) ~doc:"how much to unroll the parser"
+     in
+         fun () ->
+         let gas = Option.value gas_opt ~default:1000 in
+         let unroll = Option.value unroll_opt ~default:10 in
+         Pbench.Log.print @@ lazy (Printf.sprintf "compiling...");
+         let cmd = Pbench.P4Parse.as_cmd_from_file includes source gas unroll false in
+         Pbench.Log.print @@ lazy (Printf.sprintf "done\noptimizing...");
+         let cmd_o = Pbench.Cmd.optimize cmd in
+         Pbench.Log.print @@ lazy (Printf.sprintf "done\nserializing....");
+         Pbench.Log.print @@ lazy (Pbench.Cmd.to_string cmd_o);
+         let vc = Pbench.Cmd.vc cmd_o in
+         let (dvs, cvs) = Pbench.BExpr.vars vc in
+         let vc_str = Printf.sprintf "%s %s \n(assert %s)"
+                    (Pbench.Var.list_to_smtlib_decls cvs)
+                    (Pbench.Var.list_to_smtlib_decls dvs)
+                    (Pbench.BExpr.(to_smtlib (not_ vc)))
+         in
+         Printf.printf "\n And its VC: %s\n%!" vc_str;
+         if Pbench.Smt.is_unsat vc_str then
+           Printf.printf "valid\n%!"
+         else
+           Printf.printf "invalid\n%!"
+   ]
+
 let smtlib : Command.t =
   let open Command.Let_syntax in
   Command.basic ~summary:"Debugging frontend for smtlib parser"
@@ -204,6 +236,7 @@ let main =
     [("bench", bench);
      ("beastiary", beastiary);
      ("infer", infer);
+     ("verify", verify);
      ("compile", compile);
      ("smtlib", smtlib);
     ]
