@@ -205,13 +205,7 @@ let verify : Command.t =
          Pbench.Log.print @@ lazy (Pbench.Cmd.to_string cmd_o);
          let vc = Pbench.Cmd.vc cmd_o in
          let (dvs, cvs) = Pbench.BExpr.vars vc in
-         let vc_str = Printf.sprintf "%s %s \n(assert %s)"
-                    (Pbench.Var.list_to_smtlib_decls cvs)
-                    (Pbench.Var.list_to_smtlib_decls dvs)
-                    (Pbench.BExpr.(to_smtlib (not_ vc)))
-         in
-         Printf.printf "\n And its VC: %s\n%!" vc_str;
-         if Pbench.Smt.is_unsat vc_str then
+         if Pbench.(Solver.check_unsat (cvs @ dvs) (BExpr.not_ vc)) then
            Printf.printf "valid\n%!"
          else
            Printf.printf "invalid\n%!"
