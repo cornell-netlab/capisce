@@ -1,6 +1,6 @@
 (library
   (name pbench)
-  (libraries core core_unix bignum ANSITerminal petr4 poulet4 hashcons)
+  (libraries core core_unix bignum ANSITerminal petr4 poulet4 hashcons ocamlgraph)
   (preprocess (pps ppx_jane ppx_inline_test ppx_deriving_yojson ppx_deriving.std)))
 
 (menhir

@@ -54,10 +54,10 @@ let beastiary : Command.t =
   let open Command.Let_syntax in
   Command.basic ~summary:"Runs the Beastiary of Examples"
     [%map_open
-     let debug = flag "-D" no_arg ~doc:"show debugging info" in
-         fun () ->         
-         Pbench.Log.debug := debug;
-         Pbench.MicroExamples.run_all ()
+      let debug = flag "-D" no_arg ~doc:"show debugging info" in
+      fun () ->
+        Pbench.Log.debug := debug;
+        Pbench.MicroExamples.run_all ()
     ]
 
 let compile : Command.t =
@@ -211,6 +211,27 @@ let verify : Command.t =
            Printf.printf "invalid\n%!"
    ]
 
+let graph : Command.t =
+  let open Pbench in
+  let open Command.Let_syntax in
+  Command.basic ~summary:"Generate the table graph"
+    [%map_open
+     let source = anon ("p4 source file" %: string) and
+         filename = flag "--out" (optional string) ~doc: "the output .dot file " and
+         includes = flag "-I" (listed string) ~doc:"includes directories" and
+         gas_opt = flag "-g" (optional int) ~doc:"how much gas to pass the compiler" and
+         unroll_opt = flag "-u" (optional int) ~doc:"how much to unroll the parser"
+     in
+         fun () ->
+         let gas = Option.value gas_opt ~default:1000 in
+         let unroll = Option.value unroll_opt ~default:10 in
+         let gcl = P4Parse.tbl_abstraction_from_file includes source gas unroll false in
+         let tbl = Translate.gcl_to_tbl gcl in
+         let graph = Tables.construct_graph tbl in
+         Tables.print_graph filename graph;
+         Printf.printf "%s has %d table-paths\n%!" source (Tables.count_paths graph)
+   ]
+
 let smtlib : Command.t =
   let open Command.Let_syntax in
   Command.basic ~summary:"Debugging frontend for smtlib parser"
@@ -231,6 +252,7 @@ let main =
      ("beastiary", beastiary);
      ("infer", infer);
      ("verify", verify);
+     ("graph", graph);
      ("compile", compile);
      ("smtlib", smtlib);
     ]

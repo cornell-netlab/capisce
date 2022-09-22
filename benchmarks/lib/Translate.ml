@@ -130,3 +130,26 @@ let rec gcl_to_cmd (t : target) : Cmd.t =
   | GExternVoid _ | GExternAssn _ ->
      failwith "Externs should have been eliminated"
  
+(* Coq target to Cmd *)
+let rec gcl_to_tbl (t : target) : Tables.t =
+  match t with
+  | GSkip ->
+    Tables.skip
+  | GAssign _ ->
+    Tables.skip
+  | GSeq (g1,g2) ->
+    Tables.seq (gcl_to_tbl g1) (gcl_to_tbl g2)
+  | GChoice (g1,g2) ->
+     let c1 = gcl_to_tbl g1 in
+     let c2 = gcl_to_tbl g2 in
+     Tables.choice c1 c2
+  | GAssume _ ->
+    Tables.skip
+  | GAssert _ ->
+    Tables.skip
+  | GExternVoid ("assert",_) ->
+    Tables.skip
+  | GExternVoid (s,_) ->
+    Tables.table s
+  | GExternAssn _ ->
+    failwith "Externs should have been eliminated"
