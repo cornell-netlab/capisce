@@ -17,7 +17,7 @@ let count_paths () =
   let open Cmd in
   let one = Expr.bvi 1 1 in
   let var x = Var.make x 1 in
-  let c = Cmd.(sequence [
+  let c = GCL.(sequence [
       assign (var "a") one;
       choice (assign (var "b") one) (assign (var "c") one);
       assign (var "e") one;
@@ -28,7 +28,7 @@ let count_paths () =
       choice (assign (var "j") one) (assign (var "k") one);
       assign (var "l") one
     ]) in
-  Alcotest.(check bigint) "num paths is 4" (count_paths c) (Bigint.of_int 4)
+  Alcotest.(check bigint) "num paths is 4" (GCL.count_paths c) (Bigint.of_int 4)
 
 
 let tests =

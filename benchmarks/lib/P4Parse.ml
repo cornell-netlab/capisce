@@ -57,7 +57,7 @@ let as_cmd_from_file (includes : string list) p4file gas unroll verbose =
       failwith (Printf.sprintf "Compilation Error in stage [P4cub->GCL]: %s" s)
     | Ok gcl ->
       Translate.gcl_to_cmd gcl
-      |> Cmd.normalize_names
+      |> Cmd.GCL.normalize_names
 
 let tbl_abstraction_from_file (includes : string list) p4file gas unroll verbose =
   let p4cub = as_p4cub_from_file includes p4file verbose in

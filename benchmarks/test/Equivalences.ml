@@ -1,6 +1,7 @@
 open Core
 open Base_quickcheck
 open Pbench
+open Cmd
 
    
 let log_eq b1 b2 =
@@ -21,7 +22,8 @@ let bigint = Alcotest.testable
 
 
 let smt_equiv = Alcotest.testable (Fmt.of_to_string BExpr.to_smtlib) (log_eq)
-let cmd = Alcotest.testable (Fmt.of_to_string Cmd.to_string) (Cmd.equal)              
+let gcl = Alcotest.testable (Fmt.of_to_string GCL.to_string) (GCL.equal)
+let psv = Alcotest.testable (Fmt.of_to_string PassiveGCL.to_string) (PassiveGCL.equal)
 let var = Alcotest.testable (Fmt.of_to_string Var.str) (Var.equal)
         
 let z3_config =

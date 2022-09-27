@@ -36,6 +36,7 @@ let vc_egress_spec () =
   let open BExpr in
   let open Expr in
   let open Cmd in
+  let open GCL in
   let out = Var.make "standard_metadata.egress_spec" 9 in
   let port = Var.make "_symb$fwd$ipv4_fwd$arg$port$_$0" 9 in
   let ethertype = Var.make "hdr.ethernet.etherType" 16 in
@@ -73,13 +74,14 @@ let vc_egress_spec () =
            assign out (bvi 511 9)]];
         assert_ (not_ (eq_ (var out) (bvi 0 9)))] in
   (* let dvs, _ = BExpr.vars (vc cmd) in *)
-  Alcotest.(check cmd) "literal equivalence" skip c
+  Alcotest.(check gcl) "literal equivalence" skip c
 
 let const_prop_for_parser () =
   (* EXPECTED TO FAIL *)
   let open BExpr in
   let open Expr in
   let open Cmd in
+  let open GCL in
   let _start_next = Var.make "_state$start$next" 1 in
   let _parse_ipv4_next = Var.make "_state$parse_ipv4$next" 1 in
   let _accept_next = Var.make "_state$accept$next" 1 in
@@ -105,11 +107,12 @@ let const_prop_for_parser () =
                              ];
                              [assume (not_ (eq_ (var _parse_ipv4_next) (bvi 1 1)))]]
     ] in
-  Alcotest.(check cmd) "literal equivalence" skip (const_prop c)
+  Alcotest.(check gcl) "literal equivalence" skip (GCL.const_prop c)
 
 
 let rec ifelse cases base =
   let open Cmd in
+  let open GCL in
   let open BExpr in
   match cases with
   | [] -> base
@@ -123,6 +126,7 @@ let cost_prop_parser () =
   let open Cmd in 
   let open BExpr in
   let open Expr in
+  let open GCL in
   let ethertype = Var.make "hdr.ethernet.etherType" 16 in
   let _state_parse_llc_header_next = Var.make "_state$parse_llc_header$next" 1 in
   let _state_parse_fabric_header_next = Var.make "_state$parse_fabric_header$next" 1 in
@@ -161,13 +165,14 @@ let cost_prop_parser () =
                ; (eq_ (var ethertype) (bvi 34825 16))
                  , assign _state_parse_set_prio_high_next (bvi 1 1)]
                (assign _state_accept_next (bvi 1 1))] in
-  Alcotest.(check cmd) "literal equivalence"
+  Alcotest.(check gcl) "literal equivalence"
     (sequence [assign ethertype (bvi 2048 16); assign _state_parse_ipv4_next (bvi 1 1)])
     (const_prop c)
 
 
 let small_switch_is_assumed () =
   let open Cmd in
+  let open PassiveGCL in
   let open BExpr in
   let open Expr in
   let x_eq v = eq_ (var (Var.make "x" 2)) (bvi v 2) in
@@ -179,7 +184,7 @@ let small_switch_is_assumed () =
       asm [x_eq 2; y_eq 2];
       asm [x_eq 3; y_eq 2]
     ] |> seq (assume (y_eq 0)) in
-  Alcotest.(check cmd) "literal equivalence"
+  Alcotest.(check psv) "literal equivalence"
     (assume (ors_ [ands_ [x_eq 0; y_eq 1];
                    ands_ [x_eq 1; y_eq 1];
                    ands_ [x_eq 2; y_eq 2];
@@ -192,17 +197,16 @@ let passifization_indexing_disjunction () =
   let open Cmd in
   let open BExpr in
   let open Expr in
-  let passign x e = assume (eq_ (var x) e) in
-  choices [
-    skip;
-    assign (Var.make "icmp" 1) (bvi 1 1);
-    assign (Var.make "tcp" 1) (bvi 1 1);
-    assign (Var.make "udp" 1) (bvi 1 1)
-  ]
-  |> passify
-  |> apply_smart_constructors
-  |> Alcotest.(check cmd) "literal equivalence"
-    (choices [
+  let passign x e = PassiveGCL.(assume (eq_ (var x) e)) in
+  GCL.(
+    choices [
+      skip;
+      assign (Var.make "icmp" 1) (bvi 1 1);
+      assign (Var.make "tcp" 1) (bvi 1 1);
+      assign (Var.make "udp" 1) (bvi 1 1) ])
+  |> PassiveGCL.passify
+  |> Alcotest.(check psv) "literal equivalence"
+    PassiveGCL.(choices [
         sequence [ passign (Var.make "tcp$_$1" 1) (bvi 1 1);
                    passign (Var.make "icmp$_$0" 1) (var (Var.make "icmp$_$1" 1));
                    passign (Var.make "udp$_$0" 1) (var (Var.make "udp$_$1" 1))];
@@ -217,8 +221,7 @@ let passifization_indexing_disjunction () =
           assume (and_ (eq_ (var (Var.make "icmp$_$0" 1))
                             (var (Var.make "icmp$_$1" 1)))
                        (eq_ (var (Var.make "tcp$_$0" 1))
-                            (var (Var.make "tcp$_$1" 1))))]
-      ])
+                            (var (Var.make "tcp$_$1" 1))))]])
 
 let tests =
   [

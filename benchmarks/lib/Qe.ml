@@ -1,7 +1,8 @@
 open Core
+open Cmd
 
 let vc prog asst =
-  Cmd.(vc (seq prog (assert_ asst)))
+  vc (GCL.(seq prog (assert_ asst)))
 
 let qe solver simpl body c =
   Log.print @@ lazy ("getting vars");
@@ -170,14 +171,14 @@ let subsolving (prog, asst) =
   (Clock.stop c, qf_phi_str, -1, true)
 
 let solving_all_paths_inner (prog, asst) =
-  let passive = Cmd.passify prog in
-  let path_optimized = Cmd.assume_disjuncts passive in
+  let passive = PassiveGCL.passify prog in
+  let path_optimized = PassiveGCL.assume_disjuncts passive in
   Breakpoint.set true;
-  let pis  = Cmd.paths path_optimized in
+  let pis = PassiveGCL.paths path_optimized in
   let completed = ref Bigint.zero in
   Sequence.fold pis ~init:[] ~f:(fun acc pi ->
-      Log.print @@ lazy (Printf.sprintf "Computing WP for path:\n%s \n" (Cmd.to_string pi));
-      let phi = Cmd.(wrong (seq pi (assert_ asst))) in
+      Log.print @@ lazy (Printf.sprintf "Computing WP for path:\n%s \n" (PassiveGCL.to_string pi));
+      let phi = PassiveGCL.(wrong (seq pi (assert_ asst))) in
       let (dvs, _) = BExpr.vars phi in
       List.iter dvs ~f:BExpr.incr_q;
       Log.print @@ lazy "smart constructors";
@@ -199,6 +200,7 @@ let solving_all_paths_inner (prog, asst) =
       Bigint.incr completed;
       Printf.printf "%s paths solved\n" (Bigint.to_string !completed);
       acc @ [qf_phi_str])
+
 
 let solving_all_paths (prog,asst) =
   let c    = Clock.start () in

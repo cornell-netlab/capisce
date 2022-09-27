@@ -1,7 +1,8 @@
 open Poulet4   
 open GCL
 open GCL (* Annoying. Can we fix this? *)
-open ToGCL       
+open ToGCL
+open Cmd
 
 let bv_bop (b : BitVec.bop) : Expr.t -> Expr.t -> Expr.t =
   match b with
@@ -106,27 +107,28 @@ let rec form_to_bexpr (phi : Form.t) : BExpr.t =
      comparison c (bv_to_expr bv1) (bv_to_expr bv2)
    
 (* Coq target to Cmd *)
-let rec gcl_to_cmd (t : target) : Cmd.t =
+let rec gcl_to_cmd (t : target) : GCL.t =
+  let open GCL in
   match t with
   | GSkip ->
-     Cmd.skip
+     skip
   | GAssign (typ, var, bv) ->
      begin match width_of_type var typ with
      | Error s -> failwith s
-     | Ok i -> Cmd.assign (Var.make var i) (bv_to_expr bv)
+     | Ok i -> assign (Var.make var i) (bv_to_expr bv)
      end
   | GSeq (g1,g2) ->
-     Cmd.seq (gcl_to_cmd g1) (gcl_to_cmd g2) 
+     seq (gcl_to_cmd g1) (gcl_to_cmd g2)
   | GChoice (g1,g2) ->
      let c1 = gcl_to_cmd g1 in
      let c2 = gcl_to_cmd g2 in
-     Cmd.choice c1 c2
+     choice c1 c2
   | GAssume phi ->
-     Cmd.assume (form_to_bexpr phi)
+     assume (form_to_bexpr phi)
   | GAssert phi ->
-     Cmd.assert_ (form_to_bexpr phi)
+     assert_ (form_to_bexpr phi)
   | GExternVoid ("assert",[phi]) ->
-     Cmd.assert_ (BExpr.eq_ (bv_to_expr phi) (Expr.bvi 1 1)) 
+     assert_ (BExpr.eq_ (bv_to_expr phi) (Expr.bvi 1 1))
   | GExternVoid _ | GExternAssn _ ->
      failwith "Externs should have been eliminated"
  

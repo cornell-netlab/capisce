@@ -1,28 +1,23 @@
-open Core 
-open Cmd
-open Expr
-open BExpr   
-
 let dur st nd = Time.(Span.(diff nd st |> to_ms))
-   
+
 let format_print num p4 program vc =
   let (data_plane_vars, control_plane_vars) = BExpr.vars vc in
   let quantified_vc = BExpr.forall data_plane_vars vc in
   let frees = Var.list_to_smtlib_decls control_plane_vars in
   let smtlib = Printf.sprintf "%s\n%!" (BExpr.to_smtlib quantified_vc) in
   Printf.printf "======================================\n\n%!";
-  Printf.printf "               Example %d \n\n%!" num;  
+  Printf.printf "               Example %d \n\n%!" num;
   Printf.printf "======================================\n%!";
   Printf.printf "%s\n%!" p4;
   Printf.printf "--------------------------------------\n%!";
   Printf.printf "               GCL\n%!";
-  Printf.printf "--------------------------------------\n%!";  
+  Printf.printf "--------------------------------------\n%!";
   Printf.printf "%s\n%!" (Cmd.to_string program);
   Printf.printf "--------------------------------------\n%!";
   Printf.printf "                 VC\n%!";
   Printf.printf "--------------------------------------\n%!";
   Printf.printf "%s\n%!" smtlib;
-  let t0 = Time.now() in  
+  let t0 = Time.now() in
   let simplified_smtlib = Printf.sprintf "%s\n%!" (BExpr.to_smtlib (BExpr.simplify quantified_vc)) in
   let t1 = Time.now() in
   Printf.printf "--------------------------------------\n%!";
@@ -30,25 +25,25 @@ let format_print num p4 program vc =
   Printf.printf "--------------------------------------\n%!";
   Printf.printf "%s\n%!" simplified_smtlib;
   let result = Printf.sprintf "%s\n(assert %s)\n(check-sat)" frees smtlib |> Solver.run_z3 in
-  let t2 = Time.now() in  
+  let t2 = Time.now() in
   Printf.printf "--------------------------------------\n%!";
   Printf.printf "            Result (%fms)\n%!" (dur t1 t2);
   Printf.printf "--------------------------------------\n%!";
   Printf.printf "%s\n%!" result;
-  let t3 = Time.now() in        
+  let t3 = Time.now() in
   let cvc4_qe = Printf.sprintf "(set-logic UFBV)%s\n(simplify %s)\n%!" frees smtlib |> Solver.run_cvc4 in
-  let t4 = Time.now() in  
+  let t4 = Time.now() in
   Printf.printf "--------------------------------------\n%!";
   Printf.printf "            CVC4 (%fms)\n%!" (dur t3 t4);
   Printf.printf "--------------------------------------\n%!";
-  Printf.printf "%s\n%!" cvc4_qe;  
-  let t5 = Time.now() in        
+  Printf.printf "%s\n%!" cvc4_qe;
+  let t5 = Time.now() in
   let p_qe = Printf.sprintf "%s\n(simplify %s)\n%!" frees smtlib |> Solver.run_princess in
-  let t6 = Time.now() in  
+  let t6 = Time.now() in
   Printf.printf "--------------------------------------\n%!";
   Printf.printf "            Princess QE (%fms)\n%!" (dur t5 t6);
   Printf.printf "--------------------------------------\n%!";
-  Printf.printf "%s\n%!" p_qe;  
+  Printf.printf "%s\n%!" p_qe;
   let t7 = Time.now() in
   let z3_qe = Printf.sprintf "(set-option :timeout 5000)%s\n(assert %s)\n(apply qe)" frees smtlib |> Solver.run_z3 in
   let t8 = Time.now() in
@@ -56,7 +51,7 @@ let format_print num p4 program vc =
   Printf.printf "             Z3 QE (%fms)\n%!" (dur t7 t8);
   Printf.printf "--------------------------------------\n%!";
   Printf.printf "%s\n%!" z3_qe;
-  Printf.printf "======================================\n%!";  
+  Printf.printf "======================================\n%!";
   Printf.printf "\n\n\n\n\n"
 
 (** The goal is to examine the ways in which control-plane state and data plane
@@ -67,14 +62,14 @@ let format_print num p4 program vc =
 
 (** WARMUP
  **
- **   First lets look at examples that show how the CP 
+ **   First lets look at examples that show how the CP
  **   influences assert validity
- ** 
- ** *)  
-   
+ **
+ ** *)
+
 (**
    WARM UP 1 (Action Data Only)
-   
+
    Lets first consider a one-tablen no keys one-action program on one bit
    The p4 program looks like the following
 
@@ -92,10 +87,10 @@ let format_print num p4 program vc =
    inserted.
 
    REALISM? This is evocative of a table adding a header. See below.
-  
+
    Computing the weakest precondition of this is simple. we get
         ∀ x. action(t) = 0 ∧ ?x = 1 ∨ ¬hit(t) ∧ x = 1
-   
+
    The x should be eliminated the heuristics I've already implemented, yielding
         hit(t) ∧ ?x = 1
  *)
@@ -106,8 +101,8 @@ let ex1 () =
   let x = Var.make "x" 1 in
   let cp_x = Var.make_symbRow 1 x in
   let program =
-    sequence [      
-        choice 
+    sequence [
+        choice
           (sequence [
                assume (eq_ (var act) zero);
                assign x (var cp_x)
@@ -126,7 +121,7 @@ let ex1 () =
 
 (**
    WARM UP 2 (Action Choice Only)
-   
+
    Lets first consider a one-tablen no keys one-action program on one bit
    The p4 program looks like the following
    table t {
@@ -151,7 +146,7 @@ let ex1 () =
         ∧ action(t) ≤ 1
    which is equivalent to
        action(t) = 0
-   
+
    which says that the specification is satisfied iff
       every packet that reaches t executes action 0
 
@@ -162,7 +157,7 @@ let ex2 () =
   let zero = bvi 0 1 in
   let valid = Var.make "x__is_valid" 1 in
   let program =
-    sequence [      
+    sequence [
           choice
              (sequence [
                   assume (eq_ (var act) zero);
@@ -183,7 +178,7 @@ control {
   t.apply();
   assert (x.isValid())
 }|}
-  in    
+  in
   format_print 2 p4 program vc
 
 (** WARM UP 3 (Key and action data interfere)
@@ -210,13 +205,13 @@ control {
           assert ($eg_spec != eg_spec)
        }
     ** END ASIDE **
-         
- 
+
+
     In this example, we need a relationship between ?x and ?z.
-    The WP is:   
+    The WP is:
         ∀ x. (action(t) = 0 ⇒ (x = ?x ⇒ x != ?z)
               ∧ (action(t) = 1) ⇒ x != z)
-   
+
     The x and z should be eliminated the heuristics
     I've already implemented, yielding
        action(t) = 0 ∧ ?x != ?z
@@ -231,8 +226,8 @@ let ex3 () =
   let cp_z = Var.make_symbRow 3 z in
   let program =
     sequence [
-        assume (eq_ (var x) (var cp_x));        
-        choice 
+        assume (eq_ (var x) (var cp_x));
+        choice
           (sequence [
                assume (eq_ (var act) zero);
                assign z (var cp_z)
@@ -251,7 +246,7 @@ control {
   t.apply();
   assert (x != z)
 }|}
-  in    
+  in
   format_print 3 p4 program vc
 
 
@@ -265,14 +260,14 @@ control {
       t.apply();
       assert (x != 0)
     }
- 
-    REALISM (?????) 
+
+    REALISM (?????)
 
     In this example, x is not modified, so it may be 0
-    The WP is:   
+    The WP is:
         ∀ x. ((x = ?x ⇒ action(t) = 0 ⇒ x != 0)
               ∧ (x = ?x ⇒ action(t) = 1 ⇒ x != 0))
- 
+
     Since action(t) is only 1 bit, this is equivalent to
       ∀ x. (x = ?x ⇒ x != 0)
 
@@ -283,9 +278,9 @@ control {
     In fact we can see this for ourselves.
     The one-point rule gives
        ?x != 0
-  
+
     Which is certainly satisfiable.
-    
+
     However, the totality assumption is important here.
     The keys ?x must capture ALL of the possible inputs
     In other words, they are universally quantified, while
@@ -302,7 +297,7 @@ let ex4 () =
   let program =
     sequence [
         assume (eq_ (var x) (var cp_x));
-        choice          
+        choice
           (sequence [
                assume (eq_ (var act) zero)
           ])
@@ -315,7 +310,7 @@ let ex4 () =
     Printf.sprintf
       "table t {\n  keys {x : exact} \n  action = {skip}\n}\n%s"
       "control {\n  t.apply();\n  assert x != 0;\n}"
-  in      
+  in
   format_print 4 p4 program vc
 
 
@@ -325,9 +320,9 @@ let ex4 () =
  ** Two-Table combinations of these interatcions
  **
  ***)
-  
-  
-(** Example 5   Join & Determined forwarding 
+
+
+(** Example 5   Join & Determined forwarding
 
     table t₁ {
       keys {x : exact}   #ip address
@@ -385,14 +380,14 @@ let ex4 () =
  *)
 let join_ex () =
   let act1 = Var.(make_symbRow 1 (make "action" 1))in
-  let act2 = Var.(make_symbRow 2 (make "action" 1))in  
+  let act2 = Var.(make_symbRow 2 (make "action" 1))in
   let one = bvi 1 1 in
   let zero = bvi 0 1 in
   let x = Var.make "x" 1 in
   let cp_x = Var.make_symbRow 1 x in
   let m = Var.make "m" 1 in
   let cp_m1 = Var.make_symbRow 1 m in
-  let cp_m2 = Var.make_symbRow 2 m in  
+  let cp_m2 = Var.make_symbRow 2 m in
   let p = Var.make "p" 1 in
   let g_p = Var.make_ghost 0 p in
   let cp_p = Var.(make_symbRow 2 p) in
@@ -411,7 +406,7 @@ control {
   t₂.apply();
   assert ($p != p)
 }|}
-  in     
+  in
   let program =
     sequence[
         assign g_p (var p);
@@ -428,7 +423,7 @@ control {
       ] in
   let vc = wp program true_ in
   format_print 5 p4 program vc
-  
+
 
 (** Example 5   Header Validity
 
@@ -466,7 +461,7 @@ control {
             action(t₁) = 0 ⇒ x = ?m₁
             ∧
             action(t₂) = 1 ⇒ x = m
- 
+
     which is, in fact equivalent to
        action(t₁) = 0 ∧ ?x = ?m₁
 
@@ -479,7 +474,7 @@ control {
  *)
 let hv_ex () =
   let act1 = Var.(make_symbRow 1 (make "action" 1)) in
-  let act2 = Var.(make_symbRow 2 (make "action" 1)) in  
+  let act2 = Var.(make_symbRow 2 (make "action" 1)) in
   let one = bvi 1 1 in
   let zero = bvi 0 1 in
   let x = Var.make "x" 1 in
@@ -501,7 +496,7 @@ control {
   if (m = x) {y.setValid()} {y.setInvalid()}
   t₂.apply();
 }|}
-  in     
+  in
   let program =
     sequence[
         assume (eq_ (var x) (var cp_x));
@@ -534,10 +529,10 @@ let simplest_nat () =
 
   let nat_id = 0 in
   let nat__action = Var.make_symbRow nat_id (Var.make "action" 2) in
-  
+
   let ipv4_lpm_id = 1 in
   let ipv4_lpm__action = Var.make_symbRow ipv4_lpm_id (Var.make "action" 2) in
-  
+
   let ipv4__valid = Var.make "ipv4__valid" 1 in
   let nat_ipv4__valid = Var.make_symbRow nat_id ipv4__valid in
   let tcp__valid = Var.make "tcp__valid" 1 in
@@ -562,11 +557,11 @@ let simplest_nat () =
   let ipv4_lpm__meta__ipv4_da = Var.make_symbRow ipv4_lpm_id meta__ipv4_da in
   (* let ipv4_lpm__meta__ipv4_sa = Var.make_symbRow ipv4_lpm_id meta__ipv4_sa in *)
   let ipv4_lpm__port = Var.make_symbRow ipv4_lpm_id (Var.make "port" port_width) in
-  
+
   let drop = Expr.bvi 511 port_width in
   let clone = Expr.bvi 999 inst_type_width in
   let program =
-    [ assume (eq_ (var ipv4__valid) (var nat_ipv4__valid)); 
+    [ assume (eq_ (var ipv4__valid) (var nat_ipv4__valid));
       assume (eq_ (var tcp__valid) (var nat_tcp__valid));
       assume (eq_ (var ipv4__srcAddr) (var nat_ipv4__srcAddr));
       assume (eq_ (var ipv4__dstAddr) (var  nat_ipv4__dstAddr));
@@ -604,10 +599,10 @@ let simplest_nat () =
           [(*default (skip)*)
             assume (eq_ (var ipv4_lpm__action) (Expr.bvi 3 2));
             skip
-          ]          
+          ]
         ];
-      assert_ BExpr.(not_ (eq_ (var stdmeta__egress) (zero 9)));    
-  ] |> sequence in 
+      assert_ BExpr.(not_ (eq_ (var stdmeta__egress) (zero 9)));
+  ] |> sequence in
   let vc = wp program true_ in
   format_print 7 "" program vc
 
@@ -615,18 +610,18 @@ let multi_table_bf4_ex () =
   let p4 ={|
 table t₁ {
   keys = {k₁};
-  actions= {validate_H; nop}      
+  actions= {validate_H; nop}
 }
 table₂ {
   keys = {k₂};
   actions = {use_H;}
 }
 action validate_H(){
-  H.setValid()           
+  H.setValid()
 }
 action use_H () {
   assert H.isValid();
-  h.f := 55;  
+  h.f := 55;
 }
 control {
   H.setInvalid();
@@ -641,7 +636,7 @@ control {
   let zero = Expr.bvi 0 1 in
   let one = Expr.bvi 1 1 in
   let t1_k1 = Var.make_symbRow t1 k1 in
-  let t2_k1 = Var.make_symbRow t2 k1 in  
+  let t2_k1 = Var.make_symbRow t2 k1 in
   let t2_k2 = Var.make_symbRow t2 k2 in
   let t1_act = Var.make_symbRow t1 (Var.make "action" 1) in
   let t2_act = Var.make_symbRow t2 (Var.make "action" 1) in
@@ -654,7 +649,7 @@ control {
         choice_seqs [
             [assume (eq_ (var t1_act) zero);
              assign h__valid one;
-            ];            
+            ];
             [assume (eq_ (var t1_act) one);
              skip]
           ];
@@ -663,7 +658,7 @@ control {
         choice_seqs [
             [assume (eq_ (var t2_act) zero);
              assert_ (eq_ (var h__valid) one);
-             assign h__f (Expr.bvi 16 w); 
+             assign h__f (Expr.bvi 16 w);
             ];
             [assume (eq_ (var t2_act) one);
              skip
@@ -674,7 +669,7 @@ control {
   let vc = wp program true_ in
   format_print 8 p4 program vc
 
-  
+
 let run_all _ =
   Printf.printf "+------------------------------------+\n%!";
   Printf.printf "|      WELCOME TO THE BEASTIARY      |\n%!";

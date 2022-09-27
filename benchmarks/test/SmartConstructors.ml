@@ -677,55 +677,54 @@ let cached_vars_ule_example () =
 
 let test_choice_skip_elim () =
   let open Cmd in
+  let open GCL in
   let b =
     Sequence.repeat skip
     |> Fn.flip Sequence.take 10
     |> Sequence.to_list
     |> choices
   in
-  Alcotest.(check cmd) "syntactic equivalence" (skip) b
+  Alcotest.(check gcl) "syntactic equivalence" (skip) b
 
 
 let test_choice_equiv_elim () =
   Test.run_exn
     (module struct
-       type t = Cmd.t * int [@@deriving quickcheck, sexp]
+       type t = Cmd.GCL.t * int [@@deriving quickcheck, sexp]
        let quickcheck_generator =
          let open Quickcheck.Generator in
          let open Let_syntax in
-         let%bind c = Cmd.quickcheck_generator in
+         let%bind c = Cmd.GCL.quickcheck_generator in
          let%bind n = quickcheck_generator_int in
          return (c,n)
      end)
     ~f:(fun (c,n) ->
         let n = Int.( abs(n % 100) + 1 ) in
-        Printf.printf "%d times:\n%s\n-------\n%!" n (Cmd.to_string c);
+        Printf.printf "%d times:\n%s\n-------\n%!" n (Cmd.GCL.to_string c);
         let old = !BExpr.enable_smart_constructors in
         BExpr.enable_smart_constructors := `Off;
         let choices =
           Sequence.repeat c (* Create an infinite list of c  *)
           |> Fn.flip Sequence.take n (* take the first i of them *)
           |> Sequence.to_list
-          |> Cmd.choices (* construct n-ary choice of cs (i.e. []_n c) *)
+          |> Cmd.GCL.choices (* construct n-ary choice of cs (i.e. []_n c) *)
         in
         BExpr.enable_smart_constructors := old;
-        [%test_eq : Cmd.t] c choices)
+        [%test_eq : Cmd.GCL.t] c choices)
 
 let test_skips_get_eliminated () =
   let open Cmd in
-  Alcotest.(check (list cmd)) "syntactically equal lists of commands" [skip] (List.dedup_and_sort ~compare [skip;skip])
+  let open GCL in
+  Alcotest.(check (list gcl)) "syntactically equal lists of commands" [skip] (List.dedup_and_sort ~compare [skip;skip])
 
 let test_choice_is_a_set () =
   let open Cmd in
+  let open GCL in
   let a = assign (Var.make "hdr.ipv4.is_valid" 1) (Expr.bvi 1 1) in
   let cs = [ skip; skip; a; skip; skip ] in
 
-  Alcotest.(check cmd) "syntactically equal commands"
+  Alcotest.(check gcl) "syntactically equal commands"
     (choice skip a) (choices cs)
-
-
-
-
 
 let tests =
   [
