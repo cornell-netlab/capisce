@@ -17,7 +17,7 @@ type bop =
   | LOr
   | LArr
   | LIff
-  [@@deriving eq, sexp, compare, quickcheck]
+  [@@deriving eq, sexp, hash, compare, quickcheck]
 
 let bop_to_smtlib = function
   | LAnd -> "and"
@@ -35,7 +35,7 @@ type comp =
   | Sle
   | Sgt
   | Sge
-  [@@deriving eq, sexp, compare, quickcheck]
+  [@@deriving eq, sexp, hash, compare, quickcheck]
 
 let comp_to_smtlib = function
   | Eq -> "="
@@ -57,7 +57,7 @@ type t =
   | TComp of comp * Expr.t * Expr.t
   | Forall of Var.t * t
   | Exists of Var.t * t
-  [@@deriving eq, sexp, compare, quickcheck]
+  [@@deriving eq, sexp, hash, compare, quickcheck]
 
 type s = t (*hack, is there a better way?*)        
 module Set_t = Set.Make (struct
@@ -725,7 +725,7 @@ let rec nnf (b : t) : t =
            |> not_ (* negate *) 
            |> nnf  (* normalize full term*)
                        
-let rec cnf_inner (b : t) : t list list=
+let rec cnf_inner (b : t) : t list list =
   match b with
   | TFalse | TTrue | LVar _ | TComp _ ->
      [[b]]
@@ -744,8 +744,10 @@ let rec cnf_inner (b : t) : t list list=
         | b1::bs -> 
            let open List.Let_syntax in
            let b2 = ors_ bs in
-           let%bind conj1 = cnf_inner b1 in
-           let%map conj2 = cnf_inner b2 in
+           let cb1 = cnf_inner b1 in
+           let cb2 = cnf_inner b2 in
+           let%bind conj1 = cb1 in
+           let%map conj2 = cb2 in
            conj1 @ conj2 |> List.dedup_and_sort ~compare
         end
      | LArr -> failwith "whoops! crap on a carbunckle"
@@ -757,7 +759,7 @@ let rec cnf_inner (b : t) : t list list=
      | TTrue -> [[false_]]
      | TComp _ -> [[not_ b]]
      | _ ->
-        failwith (Printf.sprintf "You really shouldn't be out here this late with a (not %s) in your hands " (to_smtlib b))
+        failwithf  "You really shouldn't be out here this late with a (not %s) in your hands " (to_smtlib b) ()
 
 let cnf b =
   Log.print @@ lazy (Printf.sprintf "cnfing.. %i " (size b));
@@ -1095,19 +1097,24 @@ let rec order_all_quantifiers b =
           Forall (y, Forall (x, b))
      | b -> forall_one x b 
 
-let rec comparisons b : (Var.t * Expr.t) list =
+let rec comparisons b : (Var.t * Expr.t) list option =
+  let open Option.Let_syntax in
   match b with
-  | TTrue | TFalse | LVar _ -> []
+  | TTrue | TFalse | LVar _ -> Some []
   | TNot b ->
     comparisons b
   | TComp (_, x, e) when Expr.is_var x ->
-    [Expr.get_var x, e]
+    Some ([Expr.get_var x, e])
   | TComp (_, e, x) when Expr.is_var x ->
-    [Expr.get_var x, e]
+    Some ([Expr.get_var x, e])
   | TComp _ ->
-    []
+    Some ([])
   | TNary (_, bs) ->
-    List.fold bs ~init:[]
-      ~f:(fun comps b -> comps @ comparisons b)
+    List.fold bs ~init:(Some [])
+      ~f:(fun comps b ->
+          let%bind comps = comps in
+          let%map comps' = comparisons b in
+          comps @ comps'
+        )
   | Forall _ | Exists _ ->
-    failwith "comparisons is underfined with quantifiers"
+    None

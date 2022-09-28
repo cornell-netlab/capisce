@@ -1,4 +1,4 @@
-type t [@@deriving eq, sexp, compare, quickcheck]
+type t [@@deriving eq, sexp, hash, compare, quickcheck]
 
 (* Constants *)
 val bv : Bigint.t -> int -> t

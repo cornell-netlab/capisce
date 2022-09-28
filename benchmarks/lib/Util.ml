@@ -29,4 +29,8 @@ let ldiff ~equal xs ys =
   List.filter xs ~f:(fun x -> not(List.exists ys ~f:(equal x)))
 
 let lmem ~equal x xs = List.exists xs ~f:(equal x)
-  
+
+let projMap ~put ~get ~f xs =
+  List.map xs ~f:(fun x -> put x (f (get x)))
+
+let inj2 (x, _) y = (x,y)

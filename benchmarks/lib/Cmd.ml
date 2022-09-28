@@ -5,7 +5,7 @@ module VarMap = Map.Make (Var)
 
 
 module type Primitive = sig
-  type t [@@deriving quickcheck, eq, sexp, compare]
+  type t [@@deriving quickcheck, eq, hash, sexp, compare]
   val assume : BExpr.t -> t
   val assert_ : BExpr.t -> t
   val contra : t -> t -> bool
@@ -15,13 +15,15 @@ module type Primitive = sig
   val subst : Var.t -> Expr.t -> t -> t
   val normalize_names : t -> t
   val comparisons : t -> (Var.t * Expr.t) list option
+  val is_node : t -> bool
+  val name : t -> string
 end
 
 module Passive = struct
   type t =
     | Assume of BExpr.t
     | Assert of BExpr.t
-  [@@deriving quickcheck, eq, sexp, compare]
+  [@@deriving quickcheck, eq, hash, sexp, compare]
 
   let assume b = Assume b
   let assert_ b = Assert b
@@ -36,9 +38,11 @@ module Passive = struct
 
   let to_smtlib = function
     | Assume b ->
-      Printf.sprintf "assume %s\n%!" (BExpr.to_smtlib b)
+      Printf.sprintf "assume %s%!" (BExpr.to_smtlib b)
     | Assert b ->
-      Printf.sprintf "assert %s\n%!" (BExpr.to_smtlib b)
+      Printf.sprintf "assert %s%!" (BExpr.to_smtlib b)
+
+  let name = to_smtlib
 
   let count_asserts = function
     | Assume _ -> 0
@@ -64,16 +68,21 @@ module Passive = struct
       Assume (BExpr.normalize_names b)
 
   let comparisons = function
-    | Assume b -> Some (BExpr.comparisons b)
+    | Assume b -> BExpr.comparisons b
     | Assert _ -> None
+
+  let is_node (_:t) = true
 
 end
 
 module Assign = struct
   type t = Assign of Var.t * Expr.t
-  [@@deriving quickcheck, eq, sexp, compare ]
+  [@@deriving quickcheck, eq, sexp, compare, hash]
+
   let to_smtlib = function
     | Assign (x, e) -> Printf.sprintf "%s:=%s" (Var.str x) (Expr.to_smtlib e)
+
+  let name = to_smtlib
 
   let assign x e = Assign (x,e)
 
@@ -101,7 +110,7 @@ module Active = struct
   type t =
     | Passive of Passive.t
     | Active of Assign.t
-  [@@deriving quickcheck, eq, sexp, compare]
+  [@@deriving quickcheck, eq, hash, sexp, compare]
 
   let assume b = Passive (Passive.assume b)
   let assert_ b = Passive (Passive.assert_ b)
@@ -143,18 +152,68 @@ module Active = struct
     | Passive p -> Passive.comparisons p
     | Active _ -> None
 
+  let name = function
+    | Passive p -> Passive.name p
+    | Active a -> Assign.name a
+
+  let is_node (_:t) = true
   
 end
 
+
 module Table = struct
+  type t = string * Var.t list * (Var.t list * Assign.t list) list
+  [@@deriving quickcheck, hash, eq, sexp, compare]
+
+  let to_smtlib (name,_,_) = Printf.sprintf "%s.apply()" name
+
+  let name (name, _, _) = name
+
+  let size (_, keys, actions) =
+    1 + List.length keys +
+    List.sum (module Int) actions ~f:(fun (_, prims) ->
+        List.sum (module Int) prims ~f:(fun p -> Assign.size p))
+
+  let subst x e (name, keys, actions) =
+    if List.exists keys ~f:(Var.equal x) then
+      failwithf "Cannot substitute variable %s, its a key in table %s" (Var.str x) name ()
+    else
+      let open List.Let_syntax in
+      let actions =
+        let%map (args, body) = actions in
+        if List.exists args ~f:(Var.equal x) then
+          (args, body)
+        else
+          let body = List.map body ~f:(Assign.subst x e) in
+          (args, body)
+      in
+      (name, keys, actions)
+
+  let normalize_names (name, keys, actions) =
+    let open List.Let_syntax in
+    let actions =
+      let%map (args, body) = actions in
+      (List.map ~f:Var.normalize_name args,
+       List.map ~f:Assign.normalize_names body )
+    in
+    let keys = List.map keys ~f:(Var.normalize_name)in
+    (name, keys, actions)
+
+end
+
+module Pipeline = struct
   type t =
     | Active of Active.t
-    | Table of {name: string; keys: Var.t list; actions: (Var.t list * Assign.t list) list }
-  [@@deriving quickcheck, eq, sexp, compare]
+    | Table of Table.t
+  [@@deriving quickcheck, eq, hash, sexp, compare]
 
   let to_smtlib = function
     | Active a -> Active.to_smtlib a
-    | Table t -> Printf.sprintf "%s.apply()" t.name
+    | Table t -> Table.to_smtlib t
+
+  let name = function
+    | Active a -> Active.name a
+    | Table t -> Table.name t
 
   let count_asserts = function
     | Active a -> Active.count_asserts a
@@ -163,39 +222,15 @@ module Table = struct
 
   let size = function
     | Active a -> Active.size a
-    | Table t ->
-      1 + List.length t.keys +
-      List.sum (module Int) t.actions ~f:(fun (_, prims) ->
-         List.sum (module Int) prims ~f:(fun p -> Assign.size p))
+    | Table t -> Table.size t
 
   let subst x e = function
     | Active a -> Active (Active.subst x e a)
-    | Table t ->
-      if List.exists t.keys ~f:(Var.equal x) then
-        failwithf "Cannot substitute variable %s, its a key in table %s" (Var.str x) t.name ()
-      else
-        let open List.Let_syntax in
-        let actions =
-          let%map (args, body) = t.actions in
-          if List.exists args ~f:(Var.equal x) then
-            (args, body)
-          else
-            let body = List.map body ~f:(Assign.subst x e) in
-            (args, body)
-        in
-        Table {t with actions}
+    | Table t -> Table (Table.subst x e t)
 
   let normalize_names = function
     | Active a -> Active (Active.normalize_names a)
-    | Table t ->
-      let open List.Let_syntax in
-      let actions =
-        let%map (args, body) = t.actions in
-        (List.map ~f:Var.normalize_name args,
-         List.map ~f:Assign.normalize_names body )
-      in
-      let keys = List.map t.keys ~f:(Var.normalize_name)in
-      Table {t with keys; actions }
+    | Table t -> Table (Table.normalize_names t)
 
   let contra c1 c2 = match c1, c2 with
     | Active a1, Active a2 ->
@@ -206,7 +241,45 @@ module Table = struct
     | Table _ -> None
     | Active a -> Active.comparisons a
   let assume b = Active (Active.assume b)
-  let assert_ b = Active (Active.assert_ b )
+  let assert_ b = Active (Active.assert_ b)
+
+  let is_node (_:t) = true
+end
+
+module type CMD = sig
+  type t [@@deriving quickcheck, eq, sexp, compare]
+  module G : sig type t end
+  val assume : BExpr.t -> t
+  val assert_ : BExpr.t -> t
+  val skip : t
+  val pass : t
+  val dead : t
+  val abort : t
+  val is_mult_unit : t -> bool
+  val is_mult_annihil : t -> bool
+  val is_add_unit : t -> bool
+  val is_add_annihil : t -> bool
+  val contra : t -> t -> bool
+  val to_string_aux : int -> t -> string
+  val to_string : t -> string
+  val count_asserts_aux : t -> int -> int
+  val count_asserts : t -> int
+  val size : t -> int
+  val sequence : t list -> t
+  val seq : t -> t -> t
+  val choices : t list -> t
+  val choice : t -> t -> t
+  val choice_seq : t list -> t list -> t
+  val choice_seqs : t list list -> t
+  val is_primitive : t -> bool
+  val subst : Var.t -> Expr.t -> t -> t
+  val normalize_names : t -> t
+  val dnf : t -> t
+  val count_paths : t -> Bigint.t
+  val paths : t -> t Sequence.t
+  val construct_graph : t -> G.t
+  val print_graph : string option -> G.t -> unit
+  val count_cfg_paths : G.t -> Bigint.t
 end
 
 module Make (P : Primitive) = struct
@@ -380,89 +453,6 @@ module Make (P : Primitive) = struct
     | Choice cs ->
       List.map cs ~f:(subst x e) |> choices
 
-  (* let match_key (id : string) k = *)
-  (*   let open BExpr in *)
-  (*   let open Expr in *)
-  (*   let v = Var.make_symbRow_str id k in *)
-  (*   eq_ (var v) (var k) *)
-
-  (* let matchrow (id : string) ks = *)
-  (*   let open BExpr in *)
-  (*   List.fold ks ~init:true_ *)
-  (*     ~f:(fun acc k -> match_key id k |> and_ acc) *)
-
-  (* let assign_key (id : string) k = *)
-  (*   let open Expr in *)
-  (*   let v = Var.make_symbRow_str id k in *)
-  (*   assign k (var v) *)
-
-  (* let assignrow id ks = *)
-  (*   List.map ks ~f:(assign_key id) *)
-  (*   |> sequence *)
-
-  (* let row_action (tid : string) act_id n = *)
-  (*   let open Expr in *)
-  (*   let v = Var.make_symbRow_str tid (Var.make "action" n) in *)
-  (*   BExpr.eq_ (var v) (bv (Bigint.of_int act_id) n) *)
-
-  (* let action_subst (tid : string) (x_opt, c) = *)
-  (*   match x_opt with *)
-  (*   | None -> *)
-  (*     c *)
-  (*   | Some x -> *)
-  (*     let r_data = Var.make_symbRow_str tid x in *)
-  (*     subst x (Expr.var r_data) c *)
-
-  (* (\** [mint_keyvar t i w] is a Var.t of width [w] corresponding to the [i]th key *)
-  (*     in table [t]*\) *)
-  (* let mint_keyvar t i w = *)
-  (*   let name = Printf.sprintf "_%s_key_$%d" t i in *)
-  (*   Var.make name w *)
-
-  (* let rec mint_key_names_aux idx assignments varkeys tbl_name ks = *)
-  (*   match ks with *)
-  (*   | [] -> (assignments, varkeys) *)
-  (*   | (kwidth, kexpr)::ks' -> *)
-  (*     (\* mint key *\) *)
-  (*     let v = mint_keyvar tbl_name idx kwidth in *)
-  (*     (\* update recursive state *\) *)
-  (*     let idx' = idx + 1 in *)
-  (*     let assignments' = assign v kexpr :: assignments in *)
-  (*     let varkeys' = v :: varkeys in *)
-  (*     (\* make recusive call with updated state *\) *)
-  (*     mint_key_names_aux idx' assignments' varkeys' tbl_name ks' *)
-
-  (* (\** [mint_key_names tbl_name keys] is a pair of lists [(as,vs)] where [vs] is the set of variable keys and [as] is the list of assignments copying [keys] to [vs] *\) *)
-  (* let mint_key_names = mint_key_names_aux 0 [] [] *)
-
-  (* (\* a lightweight table encoding scheme used for benchmarking *\) *)
-  (* let table (id_int : int) (ks : Var.t list) (acts : (Var.t option * t) list) : t = *)
-  (*   let id = Printf.sprintf "%d" id_int in *)
-  (*   let read_keys = matchrow id ks in *)
-  (*   let assign_keys = assignrow id ks in *)
-  (*   let hit act_id act = *)
-  (*     [Assume (row_action id act_id (List.length acts)); *)
-  (*      action_subst id act ] *)
-  (*   in *)
-  (*   let actions = List.foldi acts ~init:[] ~f:(fun i acc act -> (hit i act)::acc) in *)
-  (*   [Assume read_keys; *)
-  (*    if false then assign_keys else skip; *)
-  (*    choice_seqs actions] *)
-  (*   |> sequence *)
-
-  (* (\* a full table encoding scheme for interfacing with p4*\) *)
-  (* let full_table (tbl_name : string) (ks : (int * Expr.t) list) (acts : (string * t) list) : t = *)
-  (*   let (asgns, varkeys) = mint_key_names tbl_name ks in *)
-  (*   let read_keys = matchrow tbl_name varkeys in *)
-  (*   let hit act_id act = *)
-  (*     [assume (row_action tbl_name act_id (List.length acts)); *)
-  (*      act ] *)
-  (*   in *)
-  (*   let actions = List.foldi acts ~init:[] ~f:(fun i acc (_,act) -> (hit i act)::acc) in *)
-  (*   let table = [Assume read_keys; choice_seqs actions] in *)
-  (*   (\* TODO optimization. Rather than sequencing asgns, do the substitution! *\) *)
-  (*   sequence (asgns @ table) *)
-
   let rec normalize_names (c : t) : t =
     match c with
     | Prim p -> Prim (P.normalize_names p)
@@ -530,9 +520,92 @@ module Make (P : Primitive) = struct
     in
     loop c
 
+  module Edge = struct
+    include String
+    let default = ""
+  end
+
+  module G = Graph.Persistent.Digraph.ConcreteBidirectionalLabeled(P)(Edge)
+
+  let construct_graph t =
+    let g = G.empty in
+    let rec loop g ns t =
+      match t with
+      | Prim p ->
+        if P.is_node p then
+          let n' = G.V.create p in
+          let g = G.add_vertex g n' in
+          let g = List.fold ns ~init:g ~f:(fun g n -> G.add_edge g n n') in
+          (g, [n'])
+        else
+          (g, ns)
+      | Choice ts ->
+        List.fold ts ~init:(g,ns)
+          ~f:(fun (g, ns) t ->
+              let g, ns' = loop g ns t in
+              (g, ns @ ns')
+            )
+      | Seq ts ->
+        List.fold ts ~init:(g,ns)
+          ~f:(fun (g,ns) -> loop g ns)
+    in
+    let g, _ = loop g [] t in
+    g
+
+  module Dot = Graph.Graphviz.Dot (struct
+    include G
+    let edge_attributes (_, e, _) = [`Label e; `Color 4711]
+    let default_edge_attributes _ = []
+    let get_subgraph _ = None
+    let vertex_attributes _ = [`Shape `Box]
+    let vertex_name p = P.name p
+    let default_vertex_attributes _ = []
+    let graph_attributes _ = []
+  end)
+
+
+  let print_graph f g =
+    let file = match f with
+      | Some filename -> Out_channel.create filename
+      | None -> Out_channel.stdout in
+    Dot.output_graph file g
+
+  module DT = Hashtbl.Make(P)
+
+  let find_source g =
+    let f v = function
+      | Some found_source -> Some found_source
+      | None ->
+        if List.is_empty (G.pred g v) then
+          Some v
+        else
+          None
+    in
+    match G.fold_vertex f g None with
+    | None -> failwith "Could not find 0-degree vertex in graph"
+    | Some source -> source
+
+  let count_cfg_paths g =
+    let dt = DT.create () in
+    let src = find_source g in
+    let rec loop curr =
+      match DT.find dt curr with
+      | Some num_paths -> num_paths
+      | None ->
+        let succs = G.succ g curr in
+        let num_paths =
+          if List.is_empty succs then
+            Bigint.one
+          else
+            List.sum (module Bigint) succs ~f:loop
+        in
+        DT.set dt ~key:curr ~data:num_paths;
+        num_paths
+    in
+    loop src
+
 end
 
-module GPL = Make (Table)
 module GCL = struct
   include Make (Active)
 
@@ -682,7 +755,10 @@ module GCL = struct
   let vc (c : t) : BExpr.t =
     let o = optimize c in
     wp o BExpr.true_
+
 end
+
+
 module PassiveGCL = struct
   include Make (Passive)
 
@@ -779,3 +855,35 @@ end
 let vc (c : GCL.t) : BExpr.t =
   let open PassiveGCL in
   vc (passify c)
+
+module GPL = struct
+  include Make (Pipeline)
+  let assign x e = Prim (Active (Active.assign x e))
+  let table name keys actions =
+    let open Util in
+    let f = List.map ~f:(uncurry Assign.assign) in
+    let actions = projMap actions ~get:snd ~put:inj2 ~f in
+    Prim (Table (name, keys, actions))
+end
+
+module TFG = struct
+  module T = struct
+    include Pipeline
+    let is_node = function
+      | Table _ -> true
+      | _ -> false
+  end
+  include Make(T)
+  let rec project (gpl : GPL.t) : t =
+    match gpl with
+    | GPL.Choice cs ->
+      choices (List.map cs ~f:project)
+    | GPL.Seq cs ->
+      sequence (List.map cs ~f:project)
+    | GPL.Prim p ->
+      let p = match p with
+        | Pipeline.Active a -> T.Active a
+        | Pipeline.Table t -> T.Table t
+      in
+      Prim p
+end

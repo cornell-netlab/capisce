@@ -12,7 +12,7 @@ type bop =
   | BShl
   | BAshr
   | BLshr
-  [@@deriving eq, sexp, compare, quickcheck]
+  [@@deriving eq, sexp, hash, compare, quickcheck]
 
 let bop_to_smtlib = function
   | BAnd -> "bvand"
@@ -29,7 +29,7 @@ let bop_to_smtlib = function
 type uop =
   | UNot
   | USlice of int * int (* lo, hi *)
-  [@@deriving eq, sexp, compare, quickcheck]
+  [@@deriving eq, sexp, hash, compare, quickcheck]
 
             
 let uop_to_smtlib = function
@@ -44,7 +44,7 @@ type t =
   | Var of Var.t
   | BinOp of bop * t * t
   | UnOp of uop * t
-  [@@deriving eq, sexp, compare, quickcheck]
+  [@@deriving eq, sexp, hash, compare, quickcheck]
 
 let rec to_smtlib = function
   | BV (n,w) ->

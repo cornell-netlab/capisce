@@ -684,7 +684,7 @@ let test_choice_skip_elim () =
     |> Sequence.to_list
     |> choices
   in
-  Alcotest.(check gcl) "syntactic equivalence" (skip) b
+  Alcotest.(check gcl) "syntactic equivalence" skip b
 
 
 let test_choice_equiv_elim () =
@@ -722,7 +722,6 @@ let test_choice_is_a_set () =
   let open GCL in
   let a = assign (Var.make "hdr.ipv4.is_valid" 1) (Expr.bvi 1 1) in
   let cs = [ skip; skip; a; skip; skip ] in
-
   Alcotest.(check gcl) "syntactically equal commands"
     (choice skip a) (choices cs)
 
@@ -742,7 +741,7 @@ let tests =
     Alcotest.test_case "simplify(∀a. 73722014 = a) = smart(∀a.73722014=a)" `Quick single_forall;
     Alcotest.test_case "smart φ ⇔ dumb φ, φ = ∀ z. (¬ ∃ a. a = V) ⇒ (⊥ ⇔ z = N-1)" `Quick buggy_qc_example;
     Alcotest.test_case "∀ z. (¬ ∃ a. a = V) ⇒ (⊥ ⇔ z = N-1) = (¬ ∃ a. a = V) ⇒ ∀ z. (⊥ ⇔ z = N-1)" `Quick buggy_qc_example_literal;
-    Alcotest.test_case "∀m. (m = e) ⇒ ∀ c h z. z|(h-c) = ~3 simplifies correctly" `Slow buggy_qc_example_1;
+    Alcotest.test_case "∀m. (m = e) ⇒ ∀ c h z. z|(h-c) = ~3 simplifies correctly" `Quick buggy_qc_example_1;
     Alcotest.test_case "complicated formula simplifies correctly" `Quick buggy_qc_example_2;
     Alcotest.test_case "(∀x. x ≠ y) reduces to (false) via smarts" `Quick eliminate_quantified_variable_neq;
     Alcotest.test_case "(∀x. x = y) reduces to (false) via smarts" `Quick eliminate_quantified_variable_eq;

@@ -132,26 +132,26 @@ let rec gcl_to_cmd (t : target) : GCL.t =
   | GExternVoid _ | GExternAssn _ ->
      failwith "Externs should have been eliminated"
  
-(* Coq target to Cmd *)
-let rec gcl_to_tbl (t : target) : Tables.t =
+(* Coq target to GPL *)
+let rec gcl_to_gpl (t : target) : GPL.t =
   match t with
   | GSkip ->
-    Tables.skip
+    GPL.skip
   | GAssign _ ->
-    Tables.skip
+    GPL.skip
   | GSeq (g1,g2) ->
-    Tables.seq (gcl_to_tbl g1) (gcl_to_tbl g2)
+    GPL.seq (gcl_to_gpl g1) (gcl_to_gpl g2)
   | GChoice (g1,g2) ->
-     let c1 = gcl_to_tbl g1 in
-     let c2 = gcl_to_tbl g2 in
-     Tables.choice c1 c2
-  | GAssume _ ->
-    Tables.skip
-  | GAssert _ ->
-    Tables.skip
-  | GExternVoid ("assert",_) ->
-    Tables.skip
+    let c1 = gcl_to_gpl g1 in
+    let c2 = gcl_to_gpl g2 in
+    GPL.choice c1 c2
+  | GAssume phi ->
+    GPL.assume (form_to_bexpr phi)
+  | GAssert phi ->
+    GPL.assert_ (form_to_bexpr phi)
+  | GExternVoid ("assert",[phi]) ->
+    GPL.assert_ (BExpr.eq_ (bv_to_expr phi) (Expr.bvi 1 1))
   | GExternVoid (s,_) ->
-    Tables.table s
+    GPL.table s [] []
   | GExternAssn _ ->
     failwith "Externs should have been eliminated"

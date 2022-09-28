@@ -6,7 +6,7 @@ type bop =
   | LOr
   | LArr
   | LIff
-  [@@deriving eq, sexp, compare, quickcheck]
+  [@@deriving eq, sexp, hash, compare, quickcheck]
 
 type comp =
   | Eq
@@ -18,7 +18,7 @@ type comp =
   | Sle
   | Sgt
   | Sge
-  [@@deriving eq, sexp, compare, quickcheck]
+  [@@deriving eq, sexp, hash, compare, quickcheck]
 
 type t = 
   | TFalse
@@ -29,7 +29,7 @@ type t =
   | TComp of comp * Expr.t * Expr.t
   | Forall of Var.t * t
   | Exists of Var.t * t
-  [@@deriving eq, sexp, compare, quickcheck]
+  [@@deriving eq, sexp, hash, compare, quickcheck]
 
 val to_smtlib : t -> string
 (* val of_smtlib : ?cvs:Var.t list -> string -> t
@@ -105,7 +105,7 @@ val get_equality :  t -> (Var.t * Expr.t) option
   
 val label : Context.t -> t -> t
 
-val comparisons : t -> (Var.t * Expr.t) list
+val comparisons : t -> (Var.t * Expr.t) list option
 
 val equivalence : t -> t -> t
 

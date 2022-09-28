@@ -193,40 +193,9 @@ let small_switch_is_assumed () =
      |> seq (assume (y_eq 0)))
     (assume_disjuncts c)
 
-let passifization_indexing_disjunction () =
-  let open Cmd in
-  let open BExpr in
-  let open Expr in
-  let passign x e = PassiveGCL.(assume (eq_ (var x) e)) in
-  GCL.(
-    choices [
-      skip;
-      assign (Var.make "icmp" 1) (bvi 1 1);
-      assign (Var.make "tcp" 1) (bvi 1 1);
-      assign (Var.make "udp" 1) (bvi 1 1) ])
-  |> PassiveGCL.passify
-  |> Alcotest.(check psv) "literal equivalence"
-    PassiveGCL.(choices [
-        sequence [ passign (Var.make "tcp$_$1" 1) (bvi 1 1);
-                   passign (Var.make "icmp$_$0" 1) (var (Var.make "icmp$_$1" 1));
-                   passign (Var.make "udp$_$0" 1) (var (Var.make "udp$_$1" 1))];
-        sequence [ passign (Var.make "icmp$_$0" 1) (var (Var.make "icmp$_$1" 1));
-                   passign (Var.make "tcp$_$0" 1) (var (Var.make "tcp$_$1" 1));
-                   passign (Var.make "udp$_$0" 1) (var (Var.make "udp$_$1" 1))];
-        sequence [ passign (Var.make "icmp$_$1" 1) (bvi 1 1);
-                   passign (Var.make "tcp$_$0" 1) (var (Var.make "tcp$_$1" 1));
-                   passign (Var.make "udp$_$0" 1) (var (Var.make "udp$_$1" 1))];
-        sequence [
-          passign (Var.make "udp$_$1" 1) (bvi 1 1);
-          assume (and_ (eq_ (var (Var.make "icmp$_$0" 1))
-                            (var (Var.make "icmp$_$1" 1)))
-                       (eq_ (var (Var.make "tcp$_$0" 1))
-                            (var (Var.make "tcp$_$1" 1))))]])
-
 let tests =
   [
     Alcotest.test_case "[assume_disjuncts] small switch is assumed" `Quick small_switch_is_assumed;
-    Alcotest.test_case "[passify] passify([]ᵢ cᵢ) is ok" `Quick passifization_indexing_disjunction;
     Alcotest.test_case "cnf foils" `Quick cnf_foils;
     Alcotest.test_case "qc cnf_equiv" `Slow cnf_equiv;
     Alcotest.test_case "egress_spec vc" `Quick vc_egress_spec;

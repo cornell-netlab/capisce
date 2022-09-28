@@ -1,6 +1,6 @@
 open Base_quickcheck
    
-type t [@@deriving compare, sexp]
+type t [@@deriving compare, hash, sexp]
 
 val (=) : t -> t -> bool
 val equal : t -> t -> bool

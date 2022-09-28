@@ -159,24 +159,31 @@ let verify : Command.t =
    ]
 
 let graph : Command.t =
-  let open Pbench in
+  let open Cmd in
   let open Command.Let_syntax in
-  Command.basic ~summary:"Generate the table graph"
+  Command.basic ~summary:"Generate the CFG graph"
     [%map_open
      let source = anon ("p4 source file" %: string) and
          filename = flag "--out" (optional string) ~doc: "the output .dot file " and
          includes = flag "-I" (listed string) ~doc:"includes directories" and
          gas_opt = flag "-g" (optional int) ~doc:"how much gas to pass the compiler" and
-         unroll_opt = flag "-u" (optional int) ~doc:"how much to unroll the parser"
+         unroll_opt = flag "-u" (optional int) ~doc:"how much to unroll the parser" and
+         tables = flag "--tables" no_arg ~doc:"only show tables"
      in
          fun () ->
          let gas = Option.value gas_opt ~default:1000 in
          let unroll = Option.value unroll_opt ~default:10 in
          let gcl = P4Parse.tbl_abstraction_from_file includes source gas unroll false in
-         let tbl = Translate.gcl_to_tbl gcl in
-         let graph = Tables.construct_graph tbl in
-         Tables.print_graph filename graph;
-         Printf.printf "%s has %d table-paths\n%!" source (Tables.count_paths graph)
+         let gpl = Translate.gcl_to_gpl gcl in
+         if tables then
+           let tfg = TFG.project gpl in
+           let grf = TFG.construct_graph tfg in
+           TFG.print_graph filename grf;
+           Printf.printf "%s has %s table-paths\n%!" source (TFG.count_cfg_paths grf |> Bigint.to_string)
+         else
+           let grf = GPL.construct_graph gpl in
+           GPL.print_graph filename grf
+           (* Printf.printf "%s has %s table-paths\n%!" source (GPL.count_cfg_paths grf |> Bigint.to_string) *)
    ]
 
 let smtlib : Command.t =
@@ -192,7 +199,6 @@ let smtlib : Command.t =
          Printf.printf "%s\n%!" (BExpr.to_smtlib b);
     ]
 
-    
 let main =
   Command.group ~summary:"research toy for exploring verification & synthesis of p4 programs"
     [("infer", infer);
