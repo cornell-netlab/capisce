@@ -54,7 +54,35 @@ let compile : Command.t =
        (*   (Var.list_to_smtlib_quant dvs) *)
        (*   (BExpr.to_smtlib vc) *)
     ]
-       
+
+
+let table_infer : Command.t =
+  let open Command.Let_syntax in
+  Command.basic ~summary:"Infers control plane constraint from data plane"
+    [%map_open
+      let source = anon ("p4 source file" %: string) and
+      includes = flag "-I" (listed string) ~doc:"includes directories" and
+      debug = flag "-D" no_arg ~doc:"show debugging info" and
+      gas_opt = flag "-g" (optional int) ~doc:"how much gas to pass the compiler" and
+      unroll_opt = flag "-u" (optional int) ~doc:"how much to unroll the parser" and
+      no_smart = flag "--disable-smart" no_arg ~doc:"disable smart constructors"
+      in
+      fun () ->
+        let open Cmd in
+        Printexc.record_backtrace true;
+        Log.debug := debug;
+        BExpr.enable_smart_constructors := if no_smart then `Off else `On;
+        let gas = Option.value gas_opt ~default:1000 in
+        let unroll = Option.value unroll_opt ~default:10 in
+        Log.print @@ lazy (Printf.sprintf "compiling...");
+        let coq_gcl = P4Parse.tbl_abstraction_from_file includes source gas unroll false in
+        let gpl = Translate.gcl_to_gpl coq_gcl in
+        let st = Clock.start () in
+        let tfg = TFG.project gpl in
+        let cpf = Qe.table_paths (tfg, BExpr.true_) in
+        Printf.printf "Computed Formula in %f:\n%s" (Clock.stop st |> Time.Span.to_ms) (BExpr.to_smtlib cpf)
+    ]
+
 let infer : Command.t =
   let open Command.Let_syntax in
   Command.basic ~summary:"Infers control plane constraint from data plane"

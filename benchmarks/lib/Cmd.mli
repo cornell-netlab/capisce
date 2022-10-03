@@ -1,5 +1,22 @@
 open Core
 
+module type Primitive = sig
+  type t [@@deriving quickcheck, eq, hash, sexp, compare]
+  val assume : BExpr.t -> t
+  val assert_ : BExpr.t -> t
+  val contra : t -> t -> bool
+  val to_smtlib : t -> string
+  val count_asserts : t -> int
+  val size : t -> int
+  val subst : Var.t -> Expr.t -> t -> t
+  val normalize_names : t -> t
+  val comparisons : t -> (Var.t * Expr.t) list option
+  val is_node : t -> bool
+  val name : t -> string
+end
+
+
+module Pipeline : Primitive
 
 module type CMD = sig
   type t [@@deriving quickcheck, eq, sexp, compare]
@@ -10,10 +27,17 @@ module type CMD = sig
   val pass : t
   val dead : t
   val abort : t
+
+  (* idempotent semiring *)
+  val zero : t
+  val one : t
+  val ( + ) : t -> t -> t
+  val ( * ) : t -> t -> t (*note ( * ) is not reflexive *)
   val is_mult_unit : t -> bool
   val is_mult_annihil : t -> bool
   val is_add_unit : t -> bool
   val is_add_annihil : t -> bool
+
   val contra : t -> t -> bool
   val to_string_aux : int -> t -> string
   val to_string : t -> string
@@ -68,3 +92,10 @@ module TFG : sig
 end
 
 val vc : GCL.t -> BExpr.t
+
+module Generator : sig
+  val create : TFG.t -> unit
+  val get_next : unit -> Pipeline.t list option
+end
+
+val encode_tables : Pipeline.t list -> TFG.t -> GCL.t option

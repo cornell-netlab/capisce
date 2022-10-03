@@ -202,48 +202,53 @@ module Table = struct
 end
 
 module Pipeline = struct
-  type t =
-    | Active of Active.t
-    | Table of Table.t
-  [@@deriving quickcheck, eq, hash, sexp, compare]
+  module P = struct
+    type t =
+      | Active of Active.t
+      | Table of Table.t
+    [@@deriving quickcheck, eq, hash, sexp, compare]
 
-  let to_smtlib = function
-    | Active a -> Active.to_smtlib a
-    | Table t -> Table.to_smtlib t
+    let to_smtlib = function
+      | Active a -> Active.to_smtlib a
+      | Table t -> Table.to_smtlib t
 
-  let name = function
-    | Active a -> Active.name a
-    | Table t -> Table.name t
+    let name = function
+      | Active a -> Active.name a
+      | Table t -> Table.name t
 
-  let count_asserts = function
-    | Active a -> Active.count_asserts a
-    | Table _ -> 0
+    let count_asserts = function
+      | Active a -> Active.count_asserts a
+      | Table _ -> 0
 
 
-  let size = function
-    | Active a -> Active.size a
-    | Table t -> Table.size t
+    let size = function
+      | Active a -> Active.size a
+      | Table t -> Table.size t
 
-  let subst x e = function
-    | Active a -> Active (Active.subst x e a)
-    | Table t -> Table (Table.subst x e t)
+    let subst x e = function
+      | Active a -> Active (Active.subst x e a)
+      | Table t -> Table (Table.subst x e t)
 
-  let normalize_names = function
-    | Active a -> Active (Active.normalize_names a)
-    | Table t -> Table (Table.normalize_names t)
+    let normalize_names = function
+      | Active a -> Active (Active.normalize_names a)
+      | Table t -> Table (Table.normalize_names t)
 
-  let contra c1 c2 = match c1, c2 with
-    | Active a1, Active a2 ->
-      Active.contra a1 a2
-    | _, _ -> false
+    let contra c1 c2 = match c1, c2 with
+      | Active a1, Active a2 ->
+        Active.contra a1 a2
+      | _, _ -> false
 
-  let comparisons = function
-    | Table _ -> None
-    | Active a -> Active.comparisons a
-  let assume b = Active (Active.assume b)
-  let assert_ b = Active (Active.assert_ b)
+    let comparisons = function
+      | Table _ -> None
+      | Active a -> Active.comparisons a
+    let assume b = Active (Active.assume b)
+    let assert_ b = Active (Active.assert_ b)
+    let is_node (_:t) = true
+  end
 
-  let is_node (_:t) = true
+  module Map = Map.Make (P)
+  module Set = Set.Make (P)
+  include P
 end
 
 module type CMD = sig
@@ -255,6 +260,10 @@ module type CMD = sig
   val pass : t
   val dead : t
   val abort : t
+  val zero : t
+  val one : t
+  val ( + ) : t -> t -> t
+  val ( * ) : t -> t -> t
   val is_mult_unit : t -> bool
   val is_mult_annihil : t -> bool
   val is_add_unit : t -> bool
@@ -284,332 +293,368 @@ end
 
 module Make (P : Primitive) = struct
 
-  type t =
-    | Prim of P.t
-    | Seq of t list
-    | Choice of t list
-  [@@deriving quickcheck, eq, sexp, compare]
+  module Cmd = struct
+    type t =
+      | Prim of P.t
+      | Seq of t list
+      | Choice of t list
+    [@@deriving quickcheck, eq, sexp, compare]
 
-  let assume phi = Prim (P.assume phi)
-  let assert_ phi = Prim (P.assert_ phi)
-  let skip = Prim (P.assume BExpr.true_)
-  let pass = Prim (P.assert_ BExpr.true_)
-  let dead = Prim (P.assume BExpr.false_)
-  let abort = Prim (P.assert_ BExpr.false_)
+    let assume phi = Prim (P.assume phi)
+    let assert_ phi = Prim (P.assert_ phi)
+    let skip = Prim (P.assume BExpr.true_)
+    let pass = Prim (P.assert_ BExpr.true_)
+    let dead = Prim (P.assume BExpr.false_)
+    let abort = Prim (P.assert_ BExpr.false_)
 
-  let is_mult_unit p = equal skip p || equal pass p
-  let is_mult_annihil p = equal dead p || equal abort p
+    let prim p = Prim p
 
-  let is_add_unit p = equal dead p
-  let is_add_annihil p = equal abort p
+    let is_mult_unit p = equal skip p || equal pass p
+    let is_mult_annihil p = equal dead p || equal abort p
 
-  
-  let contra c1 c2 = match c1, c2 with
-    | Prim p1, Prim p2 -> P.contra p1 p2
-    | _, _ -> false
-
-  let rec to_string_aux indent (c : t) : string =
-    let open Printf in
-    let space = Util.space indent in
-    match c with
-    | Prim p ->
-      sprintf "%s %s" space (P.to_smtlib p)
-    | Seq cs ->
-      List.map cs ~f:(to_string_aux indent)
-      |> String.concat ~sep:(sprintf ";\n")
-    | Choice cs ->
-      List.map cs
-        ~f:(fun c ->
-            sprintf "{\n%s\n%s}" (to_string_aux (indent+2) c) space)
-      |> String.concat ~sep:(sprintf " [] ")
-      |> Printf.sprintf "%s%s" space
-
-  let to_string = to_string_aux 0
-
-  let rec count_asserts_aux c n =
-    match c with
-    | Prim p ->
-      n + P.count_asserts p
-    | Seq cs
-    | Choice cs ->
-      List.fold cs ~init:n ~f:(fun n c ->
-          count_asserts_aux c n
-        )
-
-  let count_asserts c = count_asserts_aux c 0
-
-  let rec size = function
-    | Prim p -> P.size p
-    | Seq cs
-    | Choice cs ->
-      List.fold cs ~init:(List.length cs - 1)
-        ~f:(fun n c -> n + size c)
+    let is_add_unit p = equal dead p
+    let is_add_annihil p = equal abort p
 
 
-  let sequence cs =
-    let cs = List.filter cs ~f:(Fn.non is_mult_unit) in
-    let cs = List.remove_consecutive_duplicates cs ~which_to_keep:`First ~equal in
-    match List.find cs ~f:is_mult_annihil with
-    | Some p -> p
-    | None ->
-      if List.exists2_exn cs cs ~f:(contra) then
-        abort
-      else
-        match cs with
-        | [] -> skip
-        | [c] -> c
-        | _ -> Seq cs
+    let contra c1 c2 = match c1, c2 with
+      | Prim p1, Prim p2 -> P.contra p1 p2
+      | _, _ -> false
 
-  let seq c1 c2 =
-    match c1, c2 with
-    | Seq c1s, Seq c2s ->
-      c2s
-      |> List.rev_append @@ List.rev c1s
-      |> sequence
-    | Seq c1s, _ ->
-      List.rev c1s
-      |> List.cons c2
-      |> List.rev
-      |> sequence
-    | _, Seq c2s ->
-      c1 :: c2s
-      |> sequence
-    | _, _ ->
-      sequence [c1; c2]
-
-  let rec trivial_branch_comparisons cs (comps : Expr.t list VarMap.t) =
-    let open Option.Let_syntax in
-    match cs with
-    | [] -> Some comps
-    | Prim p::cs ->
-      let%bind comps' = P.comparisons p in
-      List.fold comps' ~init:comps
-        ~f:(fun acc (key,data) -> VarMap.add_multi acc ~key ~data)
-      |> trivial_branch_comparisons cs
-    | _ ->
-      None
-
-  let can_collapse_total_trivial_branch cs =
-    match trivial_branch_comparisons cs VarMap.empty with
-    | None -> false
-    | Some comps ->
-      List.length (VarMap.keys comps) = 1
-      && VarMap.for_alli comps ~f:(fun ~key ~data ->
-          String.is_suffix (Var.str key) ~suffix:"$action"
-          && List.for_all data ~f:(fun e -> Option.is_some (Expr.get_const e)))
-
-  let choices cs : t =
-    if List.is_empty cs then
-      failwith "[Cmd.choices] cannot construct 0-ary choice"
-    else
-      let cs = List.filter cs ~f:(Fn.non is_add_unit) in
-      if List.is_empty cs then
-        (* all paths are dead *)
-        dead
-      else if List.exists cs ~f:(is_add_annihil) then
-        abort
-      else if can_collapse_total_trivial_branch cs then
-        skip
-      else
-        begin
-          match List.dedup_and_sort cs ~compare with
-          | [c] -> c
-          | cs -> Choice cs
-        end
-
-  let choice c1 c2 =
-    match c1, c2 with
-    | Choice c1s, Choice c2s ->
-      choices (List.rev_append c1s c2s)
-    | Choice c1s, _ ->
-      choices (c1s @ [c2])
-    | _, Choice c2s ->
-      choices (c1 :: c2s)
-    | _, _ ->
-      choices [c1;c2]
-
-  (* let negate = function *)
-  (*   | Assume t -> assume (BExpr.not_ t) *)
-  (*   | Assert t -> assert_ (BExpr.not_ t) *)
-  (*   | _ -> failwith "Can only negate an assumption or assertion" *)
-
-  let choice_seq cs1 cs2 = choice (sequence cs1) (sequence cs2)
-
-  let choice_seqs cs = List.map cs ~f:sequence |> choices
-
-  (**/ END Smart Constructors*)
-
-  let is_primitive (c : t) =
-    match c with
-    | Prim _ -> true
-    | _ -> false
-
-  (* PRE: x is not an lvalue in c *)
-  let rec subst x e c =
-    match c with
-    | Prim p -> Prim (P.subst x e p)
-    | Seq cs ->
-      List.map cs ~f:(subst x e) |> sequence
-    | Choice cs ->
-      List.map cs ~f:(subst x e) |> choices
-
-  let rec normalize_names (c : t) : t =
-    match c with
-    | Prim p -> Prim (P.normalize_names p)
-    | Seq cs ->
-      List.map cs ~f:normalize_names |> sequence
-    | Choice cs ->
-      List.map cs ~f:normalize_names
-      |> choices
-
-  let dnf (c : t) : t =
-    Log.print @@ lazy "DNFing cmd";
-    let rec loop c : t =
+    let rec to_string_aux indent (c : t) : string =
+      let open Printf in
+      let space = Util.space indent in
       match c with
-      | Prim p -> Prim p
-      | Choice chxs ->
-        List.fold chxs ~init:dead ~f:(fun acc c -> choice acc (loop c))
-      | Seq [] -> skip
-      | Seq (s::sqs) -> begin
-          match loop s, loop (sequence sqs) with
-          | Choice chxs, Choice chxs_rec ->
-            List.cartesian_product chxs chxs_rec
-            |> List.map ~f:(Util.uncurry seq)
-            |> choices
-          | Choice chxs, c_rec ->
-            List.map chxs ~f:(fun chx -> seq chx c_rec)
-            |> choices
-          | c, Choice chxs_rec ->
-            List.map chxs_rec ~f:(fun chx_rec -> seq c chx_rec)
-            |> choices
-          | c, c_rec ->
-            seq c c_rec
-        end
-    in
-    loop c
+      | Prim p ->
+        sprintf "%s %s" space (P.to_smtlib p)
+      | Seq cs ->
+        List.map cs ~f:(to_string_aux indent)
+        |> String.concat ~sep:(sprintf ";\n")
+      | Choice cs ->
+        List.map cs
+          ~f:(fun c ->
+              sprintf "{\n%s\n%s}" (to_string_aux (indent+2) c) space)
+        |> String.concat ~sep:(sprintf " [] ")
+        |> Printf.sprintf "%s%s" space
 
-  let rec count_paths c : Bigint.t =
-    match c with
-    | Prim _ ->
-      Bigint.one
-    | Seq cs ->
-      List.fold cs ~init:Bigint.one
-        ~f:(fun paths_so_far c -> Bigint.(paths_so_far * count_paths c))
-    | Choice cs ->
-      List.map cs ~f:(count_paths)
-      |> List.reduce_exn ~f:(Bigint.(+))
+    let to_string = to_string_aux 0
 
-  let paths (c : t) : t Sequence.t =
-    Log.print @@ lazy (Printf.sprintf "building the squence of %s paths" (count_paths c |> Bigint.to_string));
-    let rec loop (c : t) : t Sequence.t =
-      let open Sequence in
+    let rec count_asserts_aux c n =
+      match c with
+      | Prim p ->
+        n + P.count_asserts p
+      | Seq cs
+      | Choice cs ->
+        List.fold cs ~init:n ~f:(fun n c ->
+            count_asserts_aux c n
+          )
+
+    let count_asserts c = count_asserts_aux c 0
+
+    let rec size = function
+      | Prim p -> P.size p
+      | Seq cs
+      | Choice cs ->
+        List.fold cs ~init:(List.length cs - 1)
+          ~f:(fun n c -> n + size c)
+
+
+    let sequence cs =
+      let cs = List.filter cs ~f:(Fn.non is_mult_unit) in
+      let cs = List.remove_consecutive_duplicates cs ~which_to_keep:`First ~equal in
+      match List.find cs ~f:is_mult_annihil with
+      | Some p -> p
+      | None ->
+        if List.exists2_exn cs cs ~f:(contra) then
+          abort
+        else
+          match cs with
+          | [] -> skip
+          | [c] -> c
+          | _ -> Seq cs
+
+    let seq c1 c2 =
+      match c1, c2 with
+      | Seq c1s, Seq c2s ->
+        c2s
+        |> List.rev_append @@ List.rev c1s
+        |> sequence
+      | Seq c1s, _ ->
+        List.rev c1s
+        |> List.cons c2
+        |> List.rev
+        |> sequence
+      | _, Seq c2s ->
+        c1 :: c2s
+        |> sequence
+      | _, _ ->
+        sequence [c1; c2]
+
+    let rec trivial_branch_comparisons cs (comps : Expr.t list VarMap.t) =
+      let open Option.Let_syntax in
+      match cs with
+      | [] -> Some comps
+      | Prim p::cs ->
+        let%bind comps' = P.comparisons p in
+        List.fold comps' ~init:comps
+          ~f:(fun acc (key,data) -> VarMap.add_multi acc ~key ~data)
+        |> trivial_branch_comparisons cs
+      | _ ->
+        None
+
+    let can_collapse_total_trivial_branch cs =
+      match trivial_branch_comparisons cs VarMap.empty with
+      | None -> false
+      | Some comps ->
+        List.length (VarMap.keys comps) = 1
+        && VarMap.for_alli comps ~f:(fun ~key ~data ->
+            String.is_suffix (Var.str key) ~suffix:"$action"
+            && List.for_all data ~f:(fun e -> Option.is_some (Expr.get_const e)))
+
+    let choices cs : t =
+      if List.is_empty cs then
+        failwith "[Cmd.choices] cannot construct 0-ary choice"
+      else
+        let cs = List.filter cs ~f:(Fn.non is_add_unit) in
+        if List.is_empty cs then
+          (* all paths are dead *)
+          dead
+        else if List.exists cs ~f:(is_add_annihil) then
+          abort
+        else if can_collapse_total_trivial_branch cs then
+          skip
+        else
+          begin
+            match List.dedup_and_sort cs ~compare with
+            | [c] -> c
+            | cs -> Choice cs
+          end
+
+    let choice c1 c2 =
+      match c1, c2 with
+      | Choice c1s, Choice c2s ->
+        choices (List.rev_append c1s c2s)
+      | Choice c1s, _ ->
+        choices (c1s @ [c2])
+      | _, Choice c2s ->
+        choices (c1 :: c2s)
+      | _, _ ->
+        choices [c1;c2]
+
+    (* let negate = function *)
+    (*   | Assume t -> assume (BExpr.not_ t) *)
+    (*   | Assert t -> assert_ (BExpr.not_ t) *)
+    (*   | _ -> failwith "Can only negate an assumption or assertion" *)
+
+    let choice_seq cs1 cs2 = choice (sequence cs1) (sequence cs2)
+
+    let choice_seqs cs = List.map cs ~f:sequence |> choices
+
+    (**/ END Smart Constructors*)
+
+    let is_primitive (c : t) =
+      match c with
+      | Prim _ -> true
+      | _ -> false
+
+    (* PRE: x is not an lvalue in c *)
+    let rec subst x e c =
+      match c with
+      | Prim p -> Prim (P.subst x e p)
+      | Seq cs ->
+        List.map cs ~f:(subst x e) |> sequence
+      | Choice cs ->
+        List.map cs ~f:(subst x e) |> choices
+
+    let rec normalize_names (c : t) : t =
+      match c with
+      | Prim p -> Prim (P.normalize_names p)
+      | Seq cs ->
+        List.map cs ~f:normalize_names |> sequence
+      | Choice cs ->
+        List.map cs ~f:normalize_names
+        |> choices
+
+    let dnf (c : t) : t =
+      Log.print @@ lazy "DNFing cmd";
+      let rec loop c : t =
+        match c with
+        | Prim p -> Prim p
+        | Choice chxs ->
+          List.fold chxs ~init:dead ~f:(fun acc c -> choice acc (loop c))
+        | Seq [] -> skip
+        | Seq (s::sqs) -> begin
+            match loop s, loop (sequence sqs) with
+            | Choice chxs, Choice chxs_rec ->
+              List.cartesian_product chxs chxs_rec
+              |> List.map ~f:(Util.uncurry seq)
+              |> choices
+            | Choice chxs, c_rec ->
+              List.map chxs ~f:(fun chx -> seq chx c_rec)
+              |> choices
+            | c, Choice chxs_rec ->
+              List.map chxs_rec ~f:(fun chx_rec -> seq c chx_rec)
+              |> choices
+            | c, c_rec ->
+              seq c c_rec
+          end
+      in
+      loop c
+
+    let rec count_paths c : Bigint.t =
       match c with
       | Prim _ ->
-        return c
+        Bigint.one
       | Seq cs ->
-        of_list cs
-        |> fold ~init:(Sequence.singleton skip)
-          ~f:(fun sequence_of_paths c ->
-              loop c
-              |> cartesian_product sequence_of_paths
-              |> map ~f:(fun (s1,s2) -> seq s1 s2))
+        List.fold cs ~init:Bigint.one
+          ~f:(fun paths_so_far c -> Bigint.(paths_so_far * count_paths c))
       | Choice cs ->
-        of_list cs
-        |> map ~f:loop
-        |> concat
-    in
-    loop c
+        List.map cs ~f:(count_paths)
+        |> List.reduce_exn ~f:(Bigint.(+))
 
-  module Edge = struct
-    include String
-    let default = ""
+    let paths (c : t) : t Sequence.t =
+      Log.print @@ lazy (Printf.sprintf "building the squence of %s paths" (count_paths c |> Bigint.to_string));
+      let rec loop (c : t) : t Sequence.t =
+        let open Sequence in
+        match c with
+        | Prim _ ->
+          return c
+        | Seq cs ->
+          of_list cs
+          |> fold ~init:(Sequence.singleton skip)
+            ~f:(fun sequence_of_paths c ->
+                loop c
+                |> cartesian_product sequence_of_paths
+                |> map ~f:(fun (s1,s2) -> seq s1 s2))
+        | Choice cs ->
+          of_list cs
+          |> map ~f:loop
+          |> concat
+      in
+      loop c
+
+    module Edge = struct
+      include String
+      let default = ""
+    end
+
+    module G = Graph.Persistent.Digraph.ConcreteBidirectionalLabeled(P)(Edge)
+
+    let construct_graph t =
+      let g = G.empty in
+      let rec loop g ns t =
+        match t with
+        | Prim p ->
+          if P.is_node p then
+            let n' = G.V.create p in
+            let g = G.add_vertex g n' in
+            let g = List.fold ns ~init:g ~f:(fun g n -> G.add_edge g n n') in
+            (g, [n'])
+          else
+            (g, ns)
+        | Choice ts ->
+          List.fold ts ~init:(g,ns)
+            ~f:(fun (g, ns) t ->
+                let g, ns' = loop g ns t in
+                (g, ns @ ns')
+              )
+        | Seq ts ->
+          List.fold ts ~init:(g,ns)
+            ~f:(fun (g,ns) -> loop g ns)
+      in
+      let g, _ = loop g [] t in
+      g
+
+    module Dot = Graph.Graphviz.Dot (struct
+        include G
+        let edge_attributes (_, e, _) = [`Label e; `Color 4711]
+        let default_edge_attributes _ = []
+        let get_subgraph _ = None
+        let vertex_attributes _ = [`Shape `Box]
+        let vertex_name p = P.name p
+        let default_vertex_attributes _ = []
+        let graph_attributes _ = []
+      end)
+
+
+    let print_graph f g =
+      let file = match f with
+        | Some filename -> Out_channel.create filename
+        | None -> Out_channel.stdout in
+      Dot.output_graph file g
+
+    module DT = Hashtbl.Make(P)
+
+    let find_source g =
+      let f v = function
+        | Some found_source -> Some found_source
+        | None ->
+          if List.is_empty (G.pred g v) then
+            Some v
+          else
+            None
+      in
+      match G.fold_vertex f g None with
+      | None -> failwith "Could not find 0-degree vertex in graph"
+      | Some source -> source
+
+    let count_cfg_paths g =
+      let dt = DT.create () in
+      let src = find_source g in
+      let rec loop curr =
+        match DT.find dt curr with
+        | Some num_paths -> num_paths
+        | None ->
+          let succs = G.succ g curr in
+          let num_paths =
+            if List.is_empty succs then
+              Bigint.one
+            else
+              List.sum (module Bigint) succs ~f:loop
+          in
+          DT.set dt ~key:curr ~data:num_paths;
+          num_paths
+      in
+      loop src
+
+    (* Monoids *)
+    let zero = dead
+    let ( + ) = choice
+    let one = skip
+    let ( * ) = seq
   end
 
-  module G = Graph.Persistent.Digraph.ConcreteBidirectionalLabeled(P)(Edge)
-
-  let construct_graph t =
-    let g = G.empty in
-    let rec loop g ns t =
-      match t with
-      | Prim p ->
-        if P.is_node p then
-          let n' = G.V.create p in
-          let g = G.add_vertex g n' in
-          let g = List.fold ns ~init:g ~f:(fun g n -> G.add_edge g n n') in
-          (g, [n'])
-        else
-          (g, ns)
-      | Choice ts ->
-        List.fold ts ~init:(g,ns)
-          ~f:(fun (g, ns) t ->
-              let g, ns' = loop g ns t in
-              (g, ns @ ns')
-            )
-      | Seq ts ->
-        List.fold ts ~init:(g,ns)
-          ~f:(fun (g,ns) -> loop g ns)
-    in
-    let g, _ = loop g [] t in
-    g
-
-  module Dot = Graph.Graphviz.Dot (struct
-    include G
-    let edge_attributes (_, e, _) = [`Label e; `Color 4711]
-    let default_edge_attributes _ = []
-    let get_subgraph _ = None
-    let vertex_attributes _ = [`Shape `Box]
-    let vertex_name p = P.name p
-    let default_vertex_attributes _ = []
-    let graph_attributes _ = []
-  end)
-
-
-  let print_graph f g =
-    let file = match f with
-      | Some filename -> Out_channel.create filename
-      | None -> Out_channel.stdout in
-    Dot.output_graph file g
-
-  module DT = Hashtbl.Make(P)
-
-  let find_source g =
-    let f v = function
-      | Some found_source -> Some found_source
-      | None ->
-        if List.is_empty (G.pred g v) then
-          Some v
-        else
-          None
-    in
-    match G.fold_vertex f g None with
-    | None -> failwith "Could not find 0-degree vertex in graph"
-    | Some source -> source
-
-  let count_cfg_paths g =
-    let dt = DT.create () in
-    let src = find_source g in
-    let rec loop curr =
-      match DT.find dt curr with
-      | Some num_paths -> num_paths
-      | None ->
-        let succs = G.succ g curr in
-        let num_paths =
-          if List.is_empty succs then
-            Bigint.one
-          else
-            List.sum (module Bigint) succs ~f:loop
-        in
-        DT.set dt ~key:curr ~data:num_paths;
-        num_paths
-    in
-    loop src
+  include Cmd
 
 end
 
 module GCL = struct
   include Make (Active)
 
-  let assign x e = Prim (Active.assign x e)
+  let assign x e = prim (Active.assign x e)
+  let active a = prim (Active a)
+
+  let table (name, keys, actions) =
+    let cp_key idx  = Printf.sprintf "_symb$%s$key_$%d" name idx in
+    let act_size = Int.of_float (Float.log (Float.of_int Int.(List.length actions + 1))) in
+    let cp_action = Var.make (Printf.sprintf "_symb$%s$action" name) act_size in
+    let cp_data idx param = (Var.make (Printf.sprintf  "_symb$%s$%d$%s" name idx (Var.str param)) (Var.size param)) in
+    let phi_keys = List.mapi keys ~f:(fun idx k ->
+        let symb_k = Var.make (cp_key idx) (Var.size k) in
+        BExpr.eq_ (Expr.var symb_k) (Expr.var k)) in
+    let encode_action idx (params, body) =
+      let act_choice = assume (BExpr.eq_ (Expr.var cp_action) (Expr.bvi idx act_size)) in
+      let symb param = Expr.var (cp_data idx param) in
+      let symbolize body param = Assign.subst param (symb param) body in
+      let f acc body = active (List.fold params ~init:body ~f:symbolize) |> seq acc in
+      let body = List.fold body ~init:skip ~f in
+      seq act_choice body in
+    let encoded_actions = List.mapi actions ~f:encode_action in
+    sequence [
+      assume (BExpr.ands_ phi_keys);
+      choices encoded_actions
+    ]
+
+
 
   let rec wp c phi =
     let open BExpr in
@@ -791,8 +836,8 @@ module PassiveGCL = struct
       resid
     else
       let x_ i = Expr.var (Var.index x i) in
-      BExpr.(and_ resid (eq_ (x_ curr) (x_ (curr+1))))
-      |> update_resid x (curr + 1) tgt
+      BExpr.(and_ resid (eq_ (x_ curr) (x_ Int.(curr+1))))
+      |> update_resid x Int.(curr + 1) tgt
 
   let passify (c : GCL.t) : t =
     Log.print @@ lazy "Passifying";
@@ -887,3 +932,81 @@ module TFG = struct
       in
       Prim p
 end
+
+module Generator = struct
+  let graph = ref None
+  let worklist =
+    (* the elements of the workist are pairs (p,c) where p is the path to the
+       current node, and c is the to-be-explored children of the final node of
+       p. Note that the path is expressed as a reverse order list, so the last
+       element in the path is the first element in the list. That is, c are the
+       children of hd p. *)
+    Stack.create ()
+
+  let create c =
+    let g = TFG.construct_graph c in
+    graph := Some g;
+    let src = TFG.find_source g in
+    Stack.push worklist ([src], TFG.G.succ g src)
+
+  let rec get_next () =
+    let g = Option.value_exn !graph ~message:"[Generator.get_next] uninitialized graph" in
+    match Stack.pop worklist with
+    | None -> None
+    | Some ([], []) ->
+      failwith "path was empty"
+    | Some (vertex::_ as pi, []) ->
+      if List.is_empty (TFG.G.succ g vertex) then
+        (* vertex is a leaf node *)
+        Some pi
+      else
+        (* keep searching! *)
+        get_next ()
+    | Some (pi, c::children) ->
+      Stack.push worklist (pi, children);
+      Stack.push worklist (c::pi, TFG.G.succ g c);
+      get_next()
+end
+
+let encode_tables (pi : Pipeline.t list) (c : TFG.t) : GCL.t option =
+  let rec loop pi c =
+    match c, pi with
+    | TFG.Prim (Active a), _ -> Some (GCL.prim a, pi)
+    | TFG.Choice cs,_ ->
+      List.sum (module struct
+        type t = (GCL.t * Pipeline.t list) option
+        let zero = None
+        let ( + ) c1_opt c2_opt =
+          match c1_opt, c2_opt with
+          | None, None -> None
+          | None, _ -> c2_opt
+          | _, None -> c1_opt
+          | Some (c1', pi1'), Some (c2', pi2') ->
+            if List.equal Pipeline.equal pi1' pi2' then
+              Some (GCL.choice c1' c2', pi1')
+            else if GCL.equal c1' c2' then
+              failwith "Paths were different, but programs the same"
+            else if List.length pi1' < List.length pi2' then
+              (* Since tables can only occur in 1 syntactic place, the longer
+                 path can never be finished *)
+              Some (c1', pi1')
+            else
+              Some (c2', pi2')
+      end
+      ) ~f:(loop pi) cs
+    | TFG.Seq cs, _ ->
+      let open Option.Let_syntax in
+      List.fold cs ~init:(Some (GCL.skip, pi))
+        ~f:(fun opt_acc c ->
+            let%bind gcl, pi = opt_acc in
+            let%map c, pi = loop pi c in
+            GCL.seq c gcl, pi)
+    | TFG.Prim (Table _), [] ->
+      None
+    | TFG.Prim (Table tbl), p::pi ->
+      if Pipeline.equal (Table tbl) p then
+        Some (GCL.table tbl, pi)
+      else
+        None
+  in
+  Option.map (loop pi c) ~f:fst

@@ -170,36 +170,77 @@ let subsolving (prog, asst) =
   Log.print @@ lazy "done";    
   (Clock.stop c, qf_phi_str, -1, true)
 
+
+let check_no_quantified_vars dvs phi dvs' qf_phi =
+  Log.print @@ lazy (Printf.sprintf "checking all dataplane variables have been eliminated from %s" (BExpr.to_smtlib qf_phi));
+  if not (List.is_empty dvs') then
+    failwithf "QF Failed when it said it succeeded.\n\tstarted with:\n vars: %s \n form: %s\n%!\tERROR Not QF:\n vars: %s \n form: %s\n%!"
+      (List.to_string dvs ~f:(Var.str))
+      (BExpr.to_smtlib phi)
+      (List.to_string dvs' ~f:(Var.str))
+      (BExpr.to_smtlib qf_phi)
+      ()
+
+
+let solve_one asserted_prog =
+  let phi = PassiveGCL.vc asserted_prog in
+  let (dvs, _) = BExpr.vars phi in
+  List.iter dvs ~f:BExpr.incr_q;
+  Log.print @@ lazy "smart constructors";
+  let qphi = BExpr.(forall dvs phi |> order_all_quantifiers) in
+  let qf_phi = BottomUpQe.qe (solve_wto `Z3) qphi in
+  Log.print @@ lazy "getting the vars of the result";
+  let dvs', cvs = BExpr.vars qf_phi in
+  check_no_quantified_vars dvs phi dvs' qf_phi;
+  Log.print @@ lazy "using z3 to simplify";
+  let qf_phi_str = Solver.run_z3 (Smt.simplify cvs (BExpr.to_smtlib (BExpr.simplify qf_phi))) in
+  Log.print @@ lazy "done";
+  (cvs, qf_phi_str)
+
+
 let solving_all_paths_inner (prog, asst) =
-  let passive = PassiveGCL.passify prog in
+  let passive = PassiveGCL.passify GCL.(seq prog (assume asst))  in
   let path_optimized = PassiveGCL.assume_disjuncts passive in
   Breakpoint.set true;
   let pis = PassiveGCL.paths path_optimized in
   let completed = ref Bigint.zero in
   Sequence.fold pis ~init:[] ~f:(fun acc pi ->
-      Log.print @@ lazy (Printf.sprintf "Computing WP for path:\n%s \n" (PassiveGCL.to_string pi));
-      let phi = PassiveGCL.(wrong (seq pi (assert_ asst))) in
-      let (dvs, _) = BExpr.vars phi in
-      List.iter dvs ~f:BExpr.incr_q;
-      Log.print @@ lazy "smart constructors";
-      let qphi = BExpr.(forall dvs phi |> order_all_quantifiers) in
-      let qf_phi = BottomUpQe.qe (solve_wto `Z3) qphi in
-      Log.print @@ lazy "getting the vars of the result";
-      let dvs', cvs = BExpr.vars qf_phi in
-      Log.print @@ lazy (Printf.sprintf "checking all dataplane variables have been eliminated from %s" (BExpr.to_smtlib qf_phi));
-      if not (List.is_empty dvs') then begin
-        Printf.printf "started with:\n vars: %s \n form: %s\n%!" (List.to_string dvs ~f:(Var.str)) (BExpr.to_smtlib phi);
-        Printf.printf "ERROR Not QF:\n vars: %s \n form: %s\n%!" (List.to_string dvs' ~f:(Var.str)) (BExpr.to_smtlib qf_phi);
-        failwith "QF Failed when it said it succeeded"
-      end
-      else
-        Log.print @@ lazy (Printf.sprintf "No dataplane variables, only control vars: %s" (List.to_string cvs ~f:(Var.str)));
-      Log.print @@ lazy "using z3 to simplify";
-      let qf_phi_str = Solver.run_z3 (Smt.simplify cvs (BExpr.to_smtlib (BExpr.simplify qf_phi))) in
-      Log.print @@ lazy "done";
+      Log.print @@ lazy (Printf.sprintf "Solving path:\n%s \n" (PassiveGCL.to_string pi));
+      let _, qf_phi_str = solve_one pi in
       Bigint.incr completed;
-      Printf.printf "%s paths solved\n" (Bigint.to_string !completed);
       acc @ [qf_phi_str])
+
+(* let solving_all_paths_inner (prog, asst) = *)
+(*   let prog = GCL.(seq prog (assume asst)) in *)
+(*   let passive = PassiveGCL.passify prog in *)
+(*   let path_optimized = PassiveGCL.assume_disjuncts passive in *)
+(*   Breakpoint.set true; *)
+(*   let pis = PassiveGCL.paths path_optimized in *)
+(*   let completed = ref Bigint.zero in *)
+(*   Sequence.fold pis ~init:[] ~f:(fun acc pi -> *)
+(*       Log.print @@ lazy (Printf.sprintf "Computing WP for path:\n%s \n" (PassiveGCL.to_string pi)); *)
+(*       let phi = PassiveGCL.(wrong (seq pi (assert_ asst))) in *)
+(*       let (dvs, _) = BExpr.vars phi in *)
+(*       List.iter dvs ~f:BExpr.incr_q; *)
+(*       Log.print @@ lazy "smart constructors"; *)
+(*       let qphi = BExpr.(forall dvs phi |> order_all_quantifiers) in *)
+(*       let qf_phi = BottomUpQe.qe (solve_wto `Z3) qphi in *)
+(*       Log.print @@ lazy "getting the vars of the result"; *)
+(*       let dvs', cvs = BExpr.vars qf_phi in *)
+(*       Log.print @@ lazy (Printf.sprintf "checking all dataplane variables have been eliminated from %s" (BExpr.to_smtlib qf_phi)); *)
+(*       if not (List.is_empty dvs') then begin *)
+(*         Printf.printf "started with:\n vars: %s \n form: %s\n%!" (List.to_string dvs ~f:(Var.str)) (BExpr.to_smtlib phi); *)
+(*         Printf.printf "ERROR Not QF:\n vars: %s \n form: %s\n%!" (List.to_string dvs' ~f:(Var.str)) (BExpr.to_smtlib qf_phi); *)
+(*         failwith "QF Failed when it said it succeeded" *)
+(*       end *)
+(*       else *)
+(*         Log.print @@ lazy (Printf.sprintf "No dataplane variables, only control vars: %s" (List.to_string cvs ~f:(Var.str))); *)
+(*       Log.print @@ lazy "using z3 to simplify"; *)
+(*       let qf_phi_str = Solver.run_z3 (Smt.simplify cvs (BExpr.to_smtlib (BExpr.simplify qf_phi))) in *)
+(*       Log.print @@ lazy "done"; *)
+(*       Bigint.incr completed; *)
+(*       Printf.printf "%s paths solved\n" (Bigint.to_string !completed); *)
+(*       acc @ [qf_phi_str]) *)
 
 
 let solving_all_paths (prog,asst) =
@@ -208,3 +249,22 @@ let solving_all_paths (prog,asst) =
   let time = Clock.stop c in
   let phi_str = String.concat ~sep:"\n\n" phis in
   (time, phi_str, -1, true)
+
+
+let table_paths ((prog, asst) : TFG.t * BExpr.t) =
+  let asserted_prog = TFG.(seq prog (assume asst)) in
+  Generator.create asserted_prog;
+  let rec loop phi =
+    (* TODO CHECK SUFFICIENCY of phi*)
+    match Generator.get_next () with
+    | None -> phi
+    | Some pi ->
+      let gcl_opt = encode_tables pi asserted_prog in
+      let gcl = Option.value_exn gcl_opt ~message:"Failure encoding table path" in
+      let gcl = GCL.optimize gcl in
+      let psv = PassiveGCL.passify gcl in
+      let (cvs, qf_psi_str) = solve_one psv in
+      let qf_psi = Solver.of_smtlib ~dvs:[] ~cvs qf_psi_str in
+      loop (BExpr.and_ qf_psi phi)
+  in
+  loop BExpr.true_
