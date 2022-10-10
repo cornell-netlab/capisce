@@ -18,9 +18,16 @@ end
 
 module Pipeline : Primitive
 
+module Action : sig
+  include Primitive
+  val assign : Var.t -> Expr.t -> t
+end
+
 module type CMD = sig
   type t [@@deriving quickcheck, eq, sexp, compare]
   module G : sig type t end
+  module Vertex : sig type t end
+  module Edge : sig type t end
   val assume : BExpr.t -> t
   val assert_ : BExpr.t -> t
   val skip : t
@@ -75,27 +82,35 @@ module PassiveGCL : sig
   include CMD
   val normal : t -> BExpr.t
   val wrong : t -> BExpr.t
-  val passify : GCL.t -> t
+  val passify : GCL.t -> Context.t * t
   val assume_disjuncts : t -> t
   val vc : t -> BExpr.t
 end
 
 module GPL : sig
   include CMD
+  module Vertex : sig type t = Pipeline.t * int end
   val assign : Var.t -> Expr.t -> t
-  val table : string -> Var.t list -> (Var.t list * (Var.t * Expr.t) list) list -> t
+  val table : string -> Var.t list -> (Var.t list * (Action.t list)) list -> t
+  val symbolize : t -> t
+  val encode_tables : t -> GCL.t
+  val induce : G.t -> (Vertex.t list) -> G.t
+  val of_graph : G.t -> t
+  val print_key : G.t -> unit
 end
 
 module TFG : sig
   include CMD
+  module Vertex : sig type t = Pipeline.t * int end
   val project : GPL.t -> t
+  val inject : t -> GPL.t
+  val print_key : G.t -> unit
 end
 
 val vc : GCL.t -> BExpr.t
 
 module Generator : sig
   val create : TFG.t -> unit
-  val get_next : unit -> Pipeline.t list option
+  val get_next : unit -> (TFG.Vertex.t) list option
 end
 
-val encode_tables : Pipeline.t list -> TFG.t -> GCL.t option

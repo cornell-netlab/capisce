@@ -1,8 +1,10 @@
-open Poulet4   
+open Poulet4
 open GCL
 open GCL (* Annoying. Can we fix this? *)
 open ToGCL
 open Cmd
+
+open Core
 
 let bv_bop (b : BitVec.bop) : Expr.t -> Expr.t -> Expr.t =
   match b with
@@ -105,7 +107,13 @@ let rec form_to_bexpr (phi : Form.t) : BExpr.t =
      BExpr.eq_ (Expr.var (Var.make s 1)) (Expr.bvi 1 1)
   | LComp (c, bv1, bv2) ->
      comparison c (bv_to_expr bv1) (bv_to_expr bv2)
-   
+
+let make_var typ var =
+  match width_of_type var typ with
+  | Error s -> failwith s
+  | Ok i ->
+    Var.make var i
+
 (* Coq target to Cmd *)
 let rec gcl_to_cmd (t : target) : GCL.t =
   let open GCL in
@@ -113,10 +121,7 @@ let rec gcl_to_cmd (t : target) : GCL.t =
   | GSkip ->
      skip
   | GAssign (typ, var, bv) ->
-     begin match width_of_type var typ with
-     | Error s -> failwith s
-     | Ok i -> assign (Var.make var i) (bv_to_expr bv)
-     end
+    assign (make_var typ var) (bv_to_expr bv)
   | GSeq (g1,g2) ->
      seq (gcl_to_cmd g1) (gcl_to_cmd g2)
   | GChoice (g1,g2) ->
@@ -131,14 +136,73 @@ let rec gcl_to_cmd (t : target) : GCL.t =
      assert_ (BExpr.eq_ (bv_to_expr phi) (Expr.bvi 1 1))
   | GExternVoid _ | GExternAssn _ ->
      failwith "Externs should have been eliminated"
- 
+  | GTable (tbl,_,_) ->
+    failwithf "Table %s was not eliminated" tbl ()
+
+let make_act table (act_name, act) : Var.t list * (Action.t list) =
+  let prefix = Printf.sprintf "_symb$%s$%s$arg$" table act_name in
+  let rename x = String.chop_prefix x ~prefix in
+  let hole_mapping vars = let open List.Let_syntax in
+    let%bind full_var = vars in
+    match String.chop_prefix (Var.str full_var) ~prefix with
+    | Some chopped_var ->
+      return (full_var, Var.rename full_var chopped_var)
+    | None -> []
+  in
+  let parameterize phi =
+    let (_, cvs) = BExpr.vars phi in
+    let curr_act_holes = hole_mapping cvs in
+    let phi = List.fold curr_act_holes ~init:phi ~f:(fun phi (old,new_) -> BExpr.subst old (Expr.var new_) phi) in
+    let params = List.map curr_act_holes ~f:snd in
+    params, phi
+  in
+  let rec loop params (act : Action.t list) prim : Var.t list * (Action.t list) =
+    match prim with
+    | GSkip -> (params, act)
+    | GSeq (a1,a2) ->
+      let (p1, a1) = loop params act a1 in
+      loop (params@p1) (act@a1) a2
+    | GAssign (typ, var, bv) -> begin
+      match rename var with
+      | Some var ->
+        let x = make_var typ var in
+        params@[x],
+        act@[Action.assign x (bv_to_expr bv)]
+      | None ->
+        let x = make_var typ var in
+        (params,
+         act@[Action.assign x (bv_to_expr bv)])
+    end
+    | GAssert phi ->
+      let phi = form_to_bexpr phi in
+      let params', phi = parameterize phi in
+      params @ params', [Action.assert_ phi]
+    | GExternVoid ("assert",[phi]) ->
+      let phi = BExpr.eq_ (bv_to_expr phi) (Expr.bvi 1 1) in
+      let params', phi = parameterize phi in
+      params@params', [Action.assert_ phi]
+    | GAssume _ ->
+      failwith "actions cannot contain assume"
+    | GChoice _ ->
+      failwith "actions cannot contain choice"
+    | GTable _ ->
+      failwith "actions cannot contain table"
+    | GExternAssn _
+    | GExternVoid _ ->
+      failwith "externs should be factored out of actions"
+
+  in
+  loop [] [] act
+  |> Tuple.T2.map_fst ~f:(List.dedup_and_sort ~compare:Var.compare)
+
+
 (* Coq target to GPL *)
 let rec gcl_to_gpl (t : target) : GPL.t =
   match t with
   | GSkip ->
     GPL.skip
-  | GAssign _ ->
-    GPL.skip
+  | GAssign (typ, var, bv)  ->
+    GPL.assign (make_var typ var) (bv_to_expr bv)
   | GSeq (g1,g2) ->
     GPL.seq (gcl_to_gpl g1) (gcl_to_gpl g2)
   | GChoice (g1,g2) ->
@@ -151,7 +215,10 @@ let rec gcl_to_gpl (t : target) : GPL.t =
     GPL.assert_ (form_to_bexpr phi)
   | GExternVoid ("assert",[phi]) ->
     GPL.assert_ (BExpr.eq_ (bv_to_expr phi) (Expr.bvi 1 1))
-  | GExternVoid (s,_) ->
-    GPL.table s [] []
-  | GExternAssn _ ->
+  | GTable (table, keys, actions) ->
+    let keys = List.map keys ~f:(fun (k,_) -> bv_to_expr k |> Expr.get_var) in
+    let actions = List.map actions ~f:(make_act table) in
+    GPL.table table keys actions
+  | GExternAssn _
+  | GExternVoid _ ->
     failwith "Externs should have been eliminated"

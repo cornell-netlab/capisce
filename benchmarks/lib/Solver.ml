@@ -52,7 +52,7 @@ let z3_simplify dvs cvs phi =
 let check_sat ?(timeout=None) consts phi =
   BExpr.to_smtlib phi
   |> Smt.check_sat ~timeout consts
-  |> run_z3 
+  |> run_z3
   |> Smt.is_sat
 
 let check_unsat ?(timeout=None) consts phi =

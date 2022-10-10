@@ -104,6 +104,9 @@ val get_atoms : t -> t list
 val get_equality :  t -> (Var.t * Expr.t) option
   
 val label : Context.t -> t -> t
+val erase_max_label : Context.t -> t -> t
+(** [erase_max_label ctx b] erases the variables from only the variables that are maximally indexed *)
+
 
 val comparisons : t -> (Var.t * Expr.t) list option
 

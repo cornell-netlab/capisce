@@ -23,7 +23,7 @@ let compile : Command.t =
        let cmd = P4Parse.as_cmd_from_file includes source gas unroll false in
        let cmd_o = Cmd.GCL.optimize cmd in
        (* let cmd_a,_ = Cmd.abstract cmd_o (NameGen.create ()) in *)
-       let cmd_p = PassiveGCL.passify cmd_o in
+       let (_, cmd_p) = PassiveGCL.passify cmd_o in
        let merged = PassiveGCL.assume_disjuncts cmd_p in
        (* let vc = Cmd.vc cmd_o in *)
        (* let (dvs, cvs) = BExpr.vars vc in *)
@@ -68,7 +68,6 @@ let table_infer : Command.t =
       no_smart = flag "--disable-smart" no_arg ~doc:"disable smart constructors"
       in
       fun () ->
-        let open Cmd in
         Printexc.record_backtrace true;
         Log.debug := debug;
         BExpr.enable_smart_constructors := if no_smart then `Off else `On;
@@ -76,11 +75,10 @@ let table_infer : Command.t =
         let unroll = Option.value unroll_opt ~default:10 in
         Log.print @@ lazy (Printf.sprintf "compiling...");
         let coq_gcl = P4Parse.tbl_abstraction_from_file includes source gas unroll false in
-        let gpl = Translate.gcl_to_gpl coq_gcl in
+        let gpl = Tuple.T2.map ~f:(Translate.gcl_to_gpl) coq_gcl in
         let st = Clock.start () in
-        let tfg = TFG.project gpl in
-        let cpf = Qe.table_paths (tfg, BExpr.true_) in
-        Printf.printf "Computed Formula in %f:\n%s" (Clock.stop st |> Time.Span.to_ms) (BExpr.to_smtlib cpf)
+        let cpf = Qe.table_infer gpl in
+        Printf.printf "Computed Formula in %f:\n%s\n%!" (Clock.stop st |> Time.Span.to_ms) (BExpr.to_smtlib cpf)
     ]
 
 let infer : Command.t =
@@ -202,7 +200,7 @@ let graph : Command.t =
          let gas = Option.value gas_opt ~default:1000 in
          let unroll = Option.value unroll_opt ~default:10 in
          let gcl = P4Parse.tbl_abstraction_from_file includes source gas unroll false in
-         let gpl = Translate.gcl_to_gpl gcl in
+         let gpl = Tuple.T2.map ~f:(Translate.gcl_to_gpl) gcl |> Util.uncurry GPL.seq in
          if tables then
            let tfg = TFG.project gpl in
            let grf = TFG.construct_graph tfg in
@@ -210,7 +208,8 @@ let graph : Command.t =
            Printf.printf "%s has %s table-paths\n%!" source (TFG.count_cfg_paths grf |> Bigint.to_string)
          else
            let grf = GPL.construct_graph gpl in
-           GPL.print_graph filename grf
+           GPL.print_graph filename grf;
+           GPL.print_key grf;
            (* Printf.printf "%s has %s table-paths\n%!" source (GPL.count_cfg_paths grf |> Bigint.to_string) *)
    ]
 
@@ -230,6 +229,7 @@ let smtlib : Command.t =
 let main =
   Command.group ~summary:"research toy for exploring verification & synthesis of p4 programs"
     [("infer", infer);
+     ("table", table_infer);
      ("verify", verify);
      ("graph", graph);
      ("compile", compile);

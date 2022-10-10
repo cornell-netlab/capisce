@@ -9,12 +9,25 @@ let empty : t = VarMap.empty
 let set (x : Var.t) (i : int) (ctx : t) =
   VarMap.set ctx ~key:x ~data:i
 
-let label (ctx : t) (x : Var.t)  =
+let get (ctx : t) (x : Var.t) =
   match VarMap.find ctx x with
+  | None -> 0
+  | Some i -> i
+
+let label (ctx : t) (x : Var.t)  =
+  get ctx x
+  |> Var.index x
+
+let unlabel_if_max (ctx : t) (indexed : Var.t) =
+  match Var.unindex indexed with
   | None ->
-     Var.index x 0
-  | Some i ->
-     Var.index x i
+    failwithf "all variables should be indexed, but variable %s wasnt" (Var.str indexed) ()
+  | Some (bare, chopped_idx) ->
+    let max_idx = get ctx bare in
+    if (chopped_idx = max_idx) then
+      bare
+    else
+      indexed
 
 let increment ctx x =
   VarMap.update ctx x ~f:(function

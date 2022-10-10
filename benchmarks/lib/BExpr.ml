@@ -1118,3 +1118,20 @@ let rec comparisons b : (Var.t * Expr.t) list option =
         )
   | Forall _ | Exists _ ->
     None
+
+let erase_max_label (ctx : Context.t) : t ->  t =
+  let rec loop b =
+    match b with
+    | TTrue | TFalse | LVar _ -> b
+    | TNot b -> not_ (loop b)
+    | TNary (op, bs) ->
+      List.map bs ~f:loop
+      |> get_smarts op
+    | TComp (c, e1, e2) ->
+      let e1 = Expr.erase_max_label ctx e1 in
+      let e2 = Expr.erase_max_label ctx e2 in
+      (get_smart_comp c) e1 e2
+    | Forall _ | Exists _ ->
+      failwith "Cannot erase max label under quantifiers"
+  in
+  loop

@@ -387,7 +387,20 @@ let rec coerce_types gamma e =
   | UnOp (uop, e) ->
      get_smart1 uop (coerce_types gamma e)
      
-       
+
+let erase_max_label (ctx : Context.t) =
+  let rec loop e =
+    match e with
+    | BV _ -> e
+    | Var x ->
+      Var (Context.unlabel_if_max ctx x)
+    | BinOp (bop, e1, e2) ->
+      get_smart2 bop (loop e1) (loop e2)
+    | UnOp (uop, e) ->
+      get_smart1 uop (loop e)
+  in
+  loop
+
 
 let quickcheck_generator_uop : uop Generator.t =
   let open Quickcheck.Generator in

@@ -10,6 +10,8 @@ val dedup : t list -> t list
 val make : string -> int -> t
 val str : t -> string
 val size : t -> int
+val rename : t -> string -> t
+(* [rename x s] is a new variable named [s] with the same size as [x]*)
 
 val well_formed : t -> bool 
 
@@ -26,7 +28,10 @@ val is_sym_of : sym:t -> data:t -> bool
 val list_to_smtlib_quant : t list -> string
 val list_to_smtlib_decls : t list -> string
 
-val index : t -> int -> t 
+val index : t -> int -> t
+val unindex : t -> (t * int) option
+(* [unindex x] is Some (y,i) when (str x) == y$_$i *)
+
   
 val quickcheck_generator : t Generator.t
 val quickcheck_observer : t Observer.t

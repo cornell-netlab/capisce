@@ -6,6 +6,7 @@ let make s i : t =
   if String.length s = 0 then
     failwith "Variable cannot have length 0"
   else (s,i)
+let rename (_,i) s  = (s,i)
 let str ((s,_) : t) = s
 let size ((_,i) : t) = i
 
@@ -68,11 +69,29 @@ let list_to_smtlib_decls : t list -> string =
   ~f:(fun acc v -> Printf.sprintf "%s%s" acc (to_smtlib_decl v))
 
 let index ((s,w) : t) (i : int) =
-  if String.is_substring s ~substring:"$_$" then
-    failwithf "Variable %s has already been indexed" s ()
-  else
-    (Printf.sprintf "%s$_$%d" s i, w)
-      
+  (* if String.is_substring s ~substring:"$_$" then *)
+  (*   failwithf "Variable %s has already been indexed" s () *)
+  (* else *)
+  (Printf.sprintf "%s$_$%d" s i, w)
+
+let unindex (indexed : t) =
+  let s = str indexed in
+  match String.rsplit2 s ~on:'$' with
+  | None ->
+    None
+  | Some (l, idx) ->
+    (*the suffix here is only "$_" instead of $_$ because the rightmost [$] is
+      removed by rsplit *)
+    match String.chop_suffix l ~suffix:"$_" with
+    | None -> None
+    | Some bare ->
+      try
+        Some (rename indexed bare, Int.of_string idx)
+      with Failure _ ->
+        None
+
+    
+
   
 let quickcheck_generator =
   let open Base_quickcheck.Generator in

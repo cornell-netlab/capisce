@@ -19,53 +19,67 @@ module type Primitive = sig
   val name : t -> string
 end
 
+
+module Assert = struct
+  type t = BExpr.t
+  [@@deriving quickcheck, eq, hash, sexp, compare]
+
+  let assert_ b = b
+  let contra b1 b2 = BExpr.equal b1 (BExpr.not_ b2) || BExpr.equal b2 (BExpr.not_ b2)
+  let to_smtlib b =
+    Printf.sprintf "assert %s" (BExpr.to_smtlib b)
+  let name _ = Printf.sprintf "assert"
+  let count_asserts (_:t) = 1
+  let size (b : t) = BExpr.size b
+  let subst x e (b:t) : t = BExpr.subst x e b
+  let wp (b:t) (phi : BExpr.t) : BExpr.t = BExpr.and_ b phi
+  let normalize_names : t -> t = BExpr.normalize_names
+  let comparisons = BExpr.comparisons
+end
+
 module Passive = struct
   type t =
     | Assume of BExpr.t
-    | Assert of BExpr.t
+    | Assert of Assert.t
   [@@deriving quickcheck, eq, hash, sexp, compare]
 
   let assume b = Assume b
-  let assert_ b = Assert b
+  let assert_ a = Assert a
 
   let contra c1 c2 =
     match c1, c2 with
-    | Assert b1, Assert b2 ->
-      BExpr.equal b1 (BExpr.not_ b2)
-      || BExpr.equal b2 (BExpr.not_ b1)
-    | _, _ ->
-      false
+    | Assert b1, Assert b2 -> Assert.contra b1 b2
+    | _, _ -> false
 
   let to_smtlib = function
     | Assume b ->
       Printf.sprintf "assume %s%!" (BExpr.to_smtlib b)
-    | Assert b ->
-      Printf.sprintf "assert %s%!" (BExpr.to_smtlib b)
+    | Assert b -> Assert.to_smtlib b
 
-  let name = to_smtlib
+  let name = function
+    | Assume _ -> "assume"
+    | Assert b ->
+      Assert.name b
 
   let count_asserts = function
     | Assume _ -> 0
     | Assert _ -> 1
 
   let size = function
-    | Assume b
-    | Assert b ->
-      1 + BExpr.size b
+    | Assume b -> 1 + BExpr.size b
+    | Assert b -> 1 + Assert.size b
 
   let subst x e = function
     | Assume b -> assume (BExpr.subst x e b)
-    | Assert b -> assert_ (BExpr.subst x e b)
+    | Assert b -> assert_ (Assert.subst x e b)
 
   let wp t phi = match t with
     | Assume b -> BExpr.imp_ b phi
-    | Assert b -> BExpr.and_ b phi
+    | Assert b -> Assert.wp b phi
 
   let normalize_names = function
-    | Assert b ->
-      assert_ (BExpr.normalize_names b)
-    | Assume b ->
-      Assume (BExpr.normalize_names b)
+    | Assume b -> assume (BExpr.normalize_names b)
+    | Assert b -> assert_ (Assert.normalize_names b)
 
   let comparisons = function
     | Assume b -> BExpr.comparisons b
@@ -76,45 +90,86 @@ module Passive = struct
 end
 
 module Assign = struct
-  type t = Assign of Var.t * Expr.t
+  type t = Var.t * Expr.t
   [@@deriving quickcheck, eq, sexp, compare, hash]
 
-  let to_smtlib = function
-    | Assign (x, e) -> Printf.sprintf "%s:=%s" (Var.str x) (Expr.to_smtlib e)
+  let to_smtlib (x,e) = Printf.sprintf "%s:=%s" (Var.str x) (Expr.to_smtlib e)
 
-  let name = to_smtlib
+  let name _ = "assign"
 
-  let assign x e = Assign (x,e)
+  let assign x e = (x,e)
 
   let count_asserts (_ : t) = 0
 
+  let size (_,e) = 1 + Expr.size e
+
+  let subst x e ((y,e') : t) =
+    if Var.(x = y) then
+      failwithf "tried to substitute an lvalue %s with %s" (Var.str x) (Expr.to_smtlib e) ()
+    else
+      assign y (Expr.subst x e e')
+
+  let wp (x,e) phi =  BExpr.subst x e phi
+
+  let normalize_names (x,e) = assign (Var.normalize_name x) (Expr.normalize_names e)
+
+end
+
+
+module Action = struct
+  type t =
+    | Assign of Assign.t
+    | Assert of Assert.t
+  [@@deriving quickcheck, hash, eq, sexp, compare]
+
+  let assign x e = Assign (Assign.assign x e)
+  let assert_ b = Assert (Assert.assert_ b)
+  let assume _ = failwith "assumes are not allowed in actions"
+  let contra c1 c2 = match c1,c2 with
+    | Assert b1, Assert b2 -> Assert.contra b1 b2
+    | _ -> false
+
+  let to_smtlib = function
+    | Assign a -> Assign.to_smtlib a
+    | Assert b -> Assert.to_smtlib b
+
+  let name = function
+    | Assign a -> Assign.name a
+    | Assert b -> Assert.name b
+
   let size = function
-    | Assign (_, e) -> 1 + Expr.size e
+    | Assign a -> Assign.size a
+    | Assert b -> Assert.size b
 
   let subst x e = function
-    | Assign (y, e') ->
-      if Var.(x = y) then
-        failwith "tried to substitute an lvalue"
-      else
-        assign y (Expr.subst x e e')
-
-  let wp a phi = match a with
-    | Assign (x,e) -> BExpr.subst x e phi
+    | Assign a -> Assign (Assign.subst x e a)
+    | Assert b -> Assert (Assert.subst x e b)
 
   let normalize_names = function
-    | Assign (x,e) -> assign (Var.normalize_name x) (Expr.normalize_names e)
+    | Assign a -> Assign (Assign.normalize_names a)
+    | Assert b -> Assert (Assert.normalize_names b)
+
+  let count_asserts = function
+    | Assign a -> Assign.count_asserts a
+    | Assert b -> Assert.count_asserts b
+
+  let comparisons = function
+    | Assign _ -> None
+    | Assert b -> Assert.comparisons b
+
+  let is_node (_ : t) = true
 
 end
 
 module Active = struct
   type t =
     | Passive of Passive.t
-    | Active of Assign.t
+    | Assign of Assign.t
   [@@deriving quickcheck, eq, hash, sexp, compare]
 
   let assume b = Passive (Passive.assume b)
   let assert_ b = Passive (Passive.assert_ b)
-  let assign x e = Active (Assign.assign x e)
+  let assign x e = Assign (Assign.assign x e)
   let contra a1 a2 =
     match a1, a2 with
     | Passive p1, Passive p2 -> Passive.contra p1 p2
@@ -122,15 +177,15 @@ module Active = struct
 
   let to_smtlib = function
     | Passive p -> Passive.to_smtlib p
-    | Active a -> Assign.to_smtlib a
+    | Assign a -> Assign.to_smtlib a
 
   let count_asserts = function
     | Passive p -> Passive.count_asserts p
-    | Active a -> Assign.count_asserts a
+    | Assign a -> Assign.count_asserts a
 
   let size = function
     | Passive p -> Passive.size p
-    | Active a -> Assign.size a
+    | Assign a -> Assign.size a
 
   (* let vars = function *)
   (*   | Passive p -> Passive.vars p *)
@@ -138,66 +193,71 @@ module Active = struct
 
   let subst x e = function
     | Passive p -> Passive (Passive.subst x e p)
-    | Active a -> Active (Assign.subst x e a)
+    | Assign a -> Assign (Assign.subst x e a)
 
   let wp active phi = match active with
     | Passive p -> Passive.wp p phi
-    | Active p -> Assign.wp p phi
+    | Assign p -> Assign.wp p phi
 
   let normalize_names = function
     | Passive p -> Passive (Passive.normalize_names p)
-    | Active a -> Active (Assign.normalize_names a)
+    | Assign a -> Assign (Assign.normalize_names a)
 
   let comparisons = function
     | Passive p -> Passive.comparisons p
-    | Active _ -> None
+    | Assign _ -> None
 
   let name = function
     | Passive p -> Passive.name p
-    | Active a -> Assign.name a
+    | Assign a -> Assign.name a
 
   let is_node (_:t) = true
+
+  let of_action = function
+    | Action.Assign (x,e) -> assign x e
+    | Action.Assert b -> assert_ b
   
 end
 
-
 module Table = struct
-  type t = string * Var.t list * (Var.t list * Assign.t list) list
+  type t = {name : string;
+            keys : Var.t list;
+            actions : (Var.t list * Action.t list) list }
   [@@deriving quickcheck, hash, eq, sexp, compare]
 
-  let to_smtlib (name,_,_) = Printf.sprintf "%s.apply()" name
+  let to_smtlib tbl = Printf.sprintf "%s.apply()" tbl.name
 
-  let name (name, _, _) = name
+  let name tbl = tbl.name
 
-  let size (_, keys, actions) =
-    1 + List.length keys +
-    List.sum (module Int) actions ~f:(fun (_, prims) ->
-        List.sum (module Int) prims ~f:(fun p -> Assign.size p))
+  let size (tbl : t) =
+    1 + List.length tbl.keys +
+    List.sum (module Int) tbl.actions ~f:(fun (_,prims) ->
+        List.sum (module Int) prims ~f:(Action.size))
 
-  let subst x e (name, keys, actions) =
-    if List.exists keys ~f:(Var.equal x) then
-      failwithf "Cannot substitute variable %s, its a key in table %s" (Var.str x) name ()
+  let subst x e (tbl : t) =
+    if List.exists tbl.keys ~f:(Var.equal x) then
+      failwithf "Cannot substitute variable %s, its a key in table %s" (Var.str x) tbl.name ()
     else
       let open List.Let_syntax in
       let actions =
-        let%map (args, body) = actions in
+        let%map (args, body) = tbl.actions in
         if List.exists args ~f:(Var.equal x) then
           (args, body)
         else
-          let body = List.map body ~f:(Assign.subst x e) in
+          let body = List.map body ~f:(Action.subst x e) in
           (args, body)
       in
-      (name, keys, actions)
+      {tbl with actions}
 
-  let normalize_names (name, keys, actions) =
+  let normalize_names (tbl : t) =
     let open List.Let_syntax in
+    let keys = List.map tbl.keys ~f:(Var.normalize_name) in
     let actions =
-      let%map (args, body) = actions in
+      let%map (args, body) = tbl.actions in
       (List.map ~f:Var.normalize_name args,
-       List.map ~f:Assign.normalize_names body )
+       List.map ~f:Action.normalize_names body )
     in
-    let keys = List.map keys ~f:(Var.normalize_name)in
-    (name, keys, actions)
+    {tbl with keys; actions}
 
 end
 
@@ -254,6 +314,8 @@ end
 module type CMD = sig
   type t [@@deriving quickcheck, eq, sexp, compare]
   module G : sig type t end
+  module Vertex : sig type t end
+  module Edge : sig type t end
   val assume : BExpr.t -> t
   val assert_ : BExpr.t -> t
   val skip : t
@@ -300,6 +362,13 @@ module Make (P : Primitive) = struct
       | Choice of t list
     [@@deriving quickcheck, eq, sexp, compare]
 
+
+    module PSet = Set.Make (P)
+    module PMap = Map.Make (P)
+    module PHash_set = Hash_set.Make (P)
+    module PHashtbl = Hashtbl.Make (P)
+
+    
     let assume phi = Prim (P.assume phi)
     let assert_ phi = Prim (P.assert_ phi)
     let skip = Prim (P.assume BExpr.true_)
@@ -532,36 +601,56 @@ module Make (P : Primitive) = struct
       in
       loop c
 
+    module Vertex = struct
+      type t = P.t * int
+      [@@deriving compare, hash, equal]
+    end
+
     module Edge = struct
       include String
       let default = ""
     end
 
-    module G = Graph.Persistent.Digraph.ConcreteBidirectionalLabeled(P)(Edge)
+    module G = Graph.Persistent.Digraph.ConcreteBidirectionalLabeled(Vertex)(Edge)
+
+    let print_nodes msg ns =
+      List.map ns ~f:(fun (_, idx) -> Int.to_string idx)
+      |> String.concat ~sep:","
+      |> Printf.printf "\t%s: [%s]\n%!" msg
 
     let construct_graph t =
+      Printf.printf "Constructing Graph\n%!";
       let g = G.empty in
-      let rec loop g ns t =
+      let rec loop idx g ns t =
         match t with
         | Prim p ->
           if P.is_node p then
-            let n' = G.V.create p in
+            let n' = G.V.create (p, idx) in
             let g = G.add_vertex g n' in
             let g = List.fold ns ~init:g ~f:(fun g n -> G.add_edge g n n') in
-            (g, [n'])
-          else
-            (g, ns)
+            print_nodes (Printf.sprintf "Creating node %d, adding edges from" idx) ns;
+            (g, idx + 1, [n'])
+          else begin
+            print_nodes (Printf.sprintf "Skipping node %d, edges persist" idx) ns;
+            (g, idx + 1, ns)
+          end
         | Choice ts ->
-          List.fold ts ~init:(g,ns)
-            ~f:(fun (g, ns) t ->
-                let g, ns' = loop g ns t in
-                (g, ns @ ns')
+          print_nodes "endpoints prior to choice" ns;
+          List.fold ts ~init:(g, idx, [])
+            ~f:(fun (g, idx, ns') t ->
+                let g, idx, ns'' = loop idx g ns t in
+                print_nodes "aggregate_endpoints:" ns;
+                (g, idx, ns' @ ns'')
               )
         | Seq ts ->
-          List.fold ts ~init:(g,ns)
-            ~f:(fun (g,ns) -> loop g ns)
+          List.fold ts ~init:(g, idx, ns)
+            ~f:(fun (g, idx, ns) t -> loop idx g ns t)
       in
-      let g, _ = loop g [] t in
+      let g, idx, ns = loop 0 g [] t in
+      (*Create a sink node, and add edges to it*)
+      let snk = G.V.create (P.assume BExpr.true_, idx) in
+      let g = List.fold ns ~init:g ~f:(fun g n -> G.add_edge g n snk) in
+      Printf.printf "Done constructing Graph\n%!";
       g
 
     module Dot = Graph.Graphviz.Dot (struct
@@ -570,7 +659,7 @@ module Make (P : Primitive) = struct
         let default_edge_attributes _ = []
         let get_subgraph _ = None
         let vertex_attributes _ = [`Shape `Box]
-        let vertex_name p = P.name p
+        let vertex_name ((p,idx) : vertex) = Printf.sprintf "\"%s %d\"" (P.name p) idx
         let default_vertex_attributes _ = []
         let graph_attributes _ = []
       end)
@@ -582,7 +671,10 @@ module Make (P : Primitive) = struct
         | None -> Out_channel.stdout in
       Dot.output_graph file g
 
-    module DT = Hashtbl.Make(P)
+    let print_key g =
+      G.fold_vertex (fun (vtx, idx) _ ->
+          Printf.printf "%s@%d %s\n\n%!" (P.name vtx) idx (P.to_smtlib vtx);
+        ) g ()
 
     let find_source g =
       let f v = function
@@ -594,13 +686,31 @@ module Make (P : Primitive) = struct
             None
       in
       match G.fold_vertex f g None with
-      | None -> failwith "Could not find 0-degree vertex in graph"
+      | None -> failwith "Could not find 0-indegree vertex in graph"
       | Some source -> source
+
+    (* let find_sink g = *)
+    (*   let f v = function *)
+    (*     | Some found_sink -> Some found_sink *)
+    (*     | None -> *)
+    (*       if List.is_empty (G.succ g v) then *)
+    (*         Some v *)
+    (*       else *)
+    (*         None *)
+    (*   in *)
+    (*   match G.fold_vertex f g None with *)
+    (*   | None -> failwith "Could not find 0-outdegree vertex in graph" *)
+    (*   | Some sink -> sink *)
+
+    module DT = Hashtbl.Make (struct
+        type t = (P.t * int)
+        [@@deriving sexp, hash, compare]
+      end)
 
     let count_cfg_paths g =
       let dt = DT.create () in
       let src = find_source g in
-      let rec loop curr =
+      let rec loop (curr : G.V.t) =
         match DT.find dt curr with
         | Some num_paths -> num_paths
         | None ->
@@ -615,6 +725,111 @@ module Make (P : Primitive) = struct
           num_paths
       in
       loop src
+
+
+    module Path = struct
+      type t = G.V.t * G.V.t list
+      (* list but it can never be empty *)
+      (* The path is reversed! i.e. LIFO-style *)
+      let singleton vtx : t = (vtx, [])
+      let add new_head ((head, pi) : t) : t = (new_head, head::pi)
+      let peek ((head, _) : t) = head
+      let pop (head, pi) : G.V.t * t option =
+        match pi with
+        | [] -> head, None
+        | head'::pi' -> (head, Some (head', pi'))
+    end
+
+    module VTbl = Hashtbl.Make (struct
+        type t = (P.t * int) [@@deriving sexp, compare, hash]
+      end)
+
+    let get_paths_between g (src : G.V.t) (snk : G.V.t) : Path.t list =
+      Printf.printf "getting paths between %d and %d\n%!" (snd src) (snd snk);
+      let rec loop paths worklist =
+        match worklist with
+        | [] -> paths
+        | pi::worklist ->
+          let curr_vtx = Path.peek pi in
+          (* Log.print @@ lazy (Printf.sprintf "The current node is %s%!" (P.to_smtlib (fst curr_vtx))); *)
+          if G.V.equal curr_vtx src then
+            loop (pi::paths) worklist
+          else begin
+            let preds = G.pred g curr_vtx in
+            List.fold preds ~init:worklist
+              ~f:(fun worklist prev_vtx ->
+                  Path.add prev_vtx pi :: worklist)
+            |> loop paths
+          end
+      in
+      loop [] [Path.singleton snk]
+
+    let add_vertex_if_not_exists g vtx =
+      if G.mem_vertex g vtx then
+        g
+      else
+        G.add_vertex g vtx
+
+
+    let add_edge_if_not_exists g src dst =
+      if G.mem_edge g src dst then
+        g
+      else
+        G.add_edge g src dst
+
+    let add_paths_between g src snk acc_graph =
+      let pis = get_paths_between g src snk in
+      Log.print @@ lazy (Printf.sprintf "There are %d paths\n%!" (List.length pis));
+      let rec add_path acc_graph pi =
+        match Path.pop pi with
+        | _, None -> acc_graph
+        | (src, Some pi) ->
+          (* Invariant: [src] is already in the graph *)
+          let dst = Path.peek pi in
+          let acc_graph = add_vertex_if_not_exists acc_graph dst in
+          let acc_graph = add_edge_if_not_exists acc_graph src dst in
+          add_path acc_graph pi
+      in
+      List.fold pis
+        ~f:(add_path)
+        ~init:(add_vertex_if_not_exists acc_graph snk)
+
+    let induce (g : G.t) (pi : G.V.t list) : G.t =
+      (*outer pi is in reverese order*)
+      let rec induce_path result_graph pi : G.t =
+        (* inner pi is in forward order *)
+        match pi with
+        | [] -> failwith "Shouldn't end with nothing in the pipeline"
+        | [_] -> result_graph
+        | src::tgt::pi ->
+          assert ((snd src) < (snd tgt));
+          let result_graph = add_paths_between g src tgt result_graph in
+          induce_path result_graph (tgt::pi)
+      in
+      let src = find_source g in
+      (* let tgt = find_sink g in *)
+      (*add src & tgt to pi and make sure pi is in the correct order*)
+      let pi = List.(rev pi |> cons src) in
+      Printf.printf "The induced path:\n%!";
+      List.iter pi ~f:(fun vtx ->
+        Printf.printf "\tNode %d\n%!" (snd vtx)
+      );
+      induce_path G.empty pi
+
+    let of_graph (g : G.t) : t =
+      Log.print @@ lazy "Getting CMD of graph";
+      let rec loop (curr : G.V.t) =
+        Log.print @@ lazy (Printf.sprintf "Node %d" (snd curr));
+        let succs = G.succ g curr in
+        if List.is_empty succs then
+          prim (fst curr)
+        else
+          List.map succs ~f:(loop)
+          |> choices
+          |> seq (prim (fst curr))
+      in
+      let source = find_source g in
+      loop source
 
     (* Monoids *)
     let zero = dead
@@ -631,9 +846,8 @@ module GCL = struct
   include Make (Active)
 
   let assign x e = prim (Active.assign x e)
-  let active a = prim (Active a)
 
-  let table (name, keys, actions) =
+  let table (name, keys, (actions : (Var.t list * Action.t list) list)) =
     let cp_key idx  = Printf.sprintf "_symb$%s$key_$%d" name idx in
     let act_size = Int.of_float (Float.log (Float.of_int Int.(List.length actions + 1))) in
     let cp_action = Var.make (Printf.sprintf "_symb$%s$action" name) act_size in
@@ -641,11 +855,11 @@ module GCL = struct
     let phi_keys = List.mapi keys ~f:(fun idx k ->
         let symb_k = Var.make (cp_key idx) (Var.size k) in
         BExpr.eq_ (Expr.var symb_k) (Expr.var k)) in
-    let encode_action idx (params, body) =
+    let encode_action idx (params, (body : Action.t list)) =
       let act_choice = assume (BExpr.eq_ (Expr.var cp_action) (Expr.bvi idx act_size)) in
       let symb param = Expr.var (cp_data idx param) in
-      let symbolize body param = Assign.subst param (symb param) body in
-      let f acc body = active (List.fold params ~init:body ~f:symbolize) |> seq acc in
+      let symbolize body param = Action.subst param (symb param) body in
+      let f acc body = prim (Active.of_action (List.fold params ~init:body ~f:symbolize)) |> seq acc in
       let body = List.fold body ~init:skip ~f in
       seq act_choice body in
     let encoded_actions = List.mapi actions ~f:encode_action in
@@ -653,8 +867,6 @@ module GCL = struct
       assume (BExpr.ands_ phi_keys);
       choices encoded_actions
     ]
-
-
 
   let rec wp c phi =
     let open BExpr in
@@ -665,32 +877,26 @@ module GCL = struct
 
   let rec const_prop_aux (f : Facts.t) (c : t) =
     match c with
-    | Prim (Active (Assign (x,e))) ->
+    | Prim (Assign (x,e)) ->
       let e = Expr.fun_subst (Facts.lookup f) e in
       let f = Facts.update f x e in
-      (* Log.print @@ lazy (Printf.sprintf "assignment %s produced: %s\n" (to_string c) (Facts.to_string f));      *)
-      (f, assign x e)
+       (f, assign x e)
     | Prim (Passive (Assert b)) ->
-      (* Log.print @@ lazy (Printf.sprintf "substitute %s using: %s\n" (to_string c) (Facts.to_string f)); *)
       let b = BExpr.fun_subst (Facts.lookup f) b |> BExpr.simplify in
       let f =
         match BExpr.get_equality b with
         | Some (x, e) -> Facts.update f x e
         | None -> f
       in
-      (* Log.print @@ lazy (Printf.sprintf "Got assert(%s)\n" (BExpr.to_smtlib b)); *)
       (f, assert_ b)
     | Prim (Passive (Assume b)) ->
-      (* Log.print @@ lazy (Printf.sprintf "substitute %s using: %s\n" (to_string c) (Facts.to_string f));      *)
       let b = BExpr.fun_subst (Facts.lookup f) b |> BExpr.simplify in
-      (* Log.print @@ lazy (Printf.sprintf "Got assume(%s)\n" (BExpr.to_smtlib b)); *)
       let f =
         match BExpr.get_equality b with
         | Some (x, e) -> Facts.update f x e
         | None -> f
       in
       (f, assume b)
-
     | Seq cs ->
       let fs, cs =
         List.fold cs ~init:(f, [])
@@ -714,7 +920,7 @@ module GCL = struct
     let open VarSet in
     let concat (x,y) = x @ y in
     match c with
-    | Prim (Active (Assign (x, e))) ->
+    | Prim (Assign (x, e)) ->
       if exists reads ~f:(Var.(=) x) then
         let read_by_e = of_list (concat (Expr.vars e)) in
         let reads_minus_x = remove reads x in
@@ -746,42 +952,42 @@ module GCL = struct
               (c::cs, reads)) in
       sequence cs, reads
 
-  let rec dead_code_elim_fwd c (used : VarSet.t) : (t * VarSet.t) =
-    let open VarSet in
-    let concat (x,y) = x @ y in
-    let setify f e = f e |> concat |> of_list in
-    match c with
-    | (Prim (Active (Assign (x,e)))) ->
-      let vars_of_e = setify Expr.vars e in
-      (assign x e, union (add used x) vars_of_e)
-    | (Prim (Passive (Assert b))) -> (assert_ b, union used (setify BExpr.vars b))
-    | (Prim (Passive (Assume b))) ->
-      let bs_vars = setify BExpr.vars b in
-      if is_empty (inter bs_vars used)
-      && VarSet.for_all bs_vars ~f:(Fn.non Var.is_symbRow) then
-        (skip, used)
-      else
-        (assume b, union bs_vars used)
-    | Choice [] ->
-      failwith "cannot have 0-ary choice"
-    | Choice (c::cs) ->
-      List.fold cs
-        ~init:(dead_code_elim_fwd c used)
-        ~f:(fun (cs, used_by_cs) c ->
-            let c, used_by_c = dead_code_elim_fwd c used in
-            (choice cs c, union used_by_cs used_by_c))
-    | Seq cs ->
-      let rcs, used =
-        List.fold cs ~init:([], used)
-          ~f:(fun (cs, used) c ->
-              let c, used = dead_code_elim_fwd c used in
-              (c::cs, used))
-      in
-      (List.rev rcs |> sequence, used)
+  (* let rec dead_code_elim_fwd c (used : VarSet.t) : (t * VarSet.t) = *)
+  (*   let open VarSet in *)
+  (*   let concat (x,y) = x @ y in *)
+  (*   let setify f e = f e |> concat |> of_list in *)
+  (*   match c with *)
+  (*   | (Prim (Assign (x,e))) -> *)
+  (*     let vars_of_e = setify Expr.vars e in *)
+  (*     (assign x e, union (add used x) vars_of_e) *)
+  (*   | (Prim (Passive (Assert b))) -> (assert_ b, union used (setify BExpr.vars b)) *)
+  (*   | (Prim (Passive (Assume b))) -> *)
+  (*     let bs_vars = setify BExpr.vars b in *)
+  (*     if is_empty (inter bs_vars used) *)
+  (*     && VarSet.for_all bs_vars ~f:(Fn.non Var.is_symbRow) then *)
+  (*       (skip, used) *)
+  (*     else *)
+  (*       (assume b, union bs_vars used) *)
+  (*   | Choice [] -> *)
+  (*     failwith "cannot have 0-ary choice" *)
+  (*   | Choice (c::cs) -> *)
+  (*     List.fold cs *)
+  (*       ~init:(dead_code_elim_fwd c used) *)
+  (*       ~f:(fun (cs, used_by_cs) c -> *)
+  (*           let c, used_by_c = dead_code_elim_fwd c used in *)
+  (*           (choice cs c, union used_by_cs used_by_c)) *)
+  (*   | Seq cs -> *)
+  (*     let rcs, used = *)
+  (*       List.fold cs ~init:([], used) *)
+  (*         ~f:(fun (cs, used) c -> *)
+  (*             let c, used = dead_code_elim_fwd c used in *)
+  (*             (c::cs, used)) *)
+  (*     in *)
+  (*     (List.rev rcs |> sequence, used) *)
 
   let dead_code_elim_inner c =
     let c, _ = dead_code_elim_bwd c VarSet.empty in
-    let c, _ = dead_code_elim_fwd c VarSet.empty in
+    (* let c, _ = dead_code_elim_fwd c VarSet.empty in *)
     c
 
   let rec fix f x =
@@ -839,11 +1045,11 @@ module PassiveGCL = struct
       BExpr.(and_ resid (eq_ (x_ curr) (x_ Int.(curr+1))))
       |> update_resid x Int.(curr + 1) tgt
 
-  let passify (c : GCL.t) : t =
+  let passify (c : GCL.t) : Context.t * t =
     Log.print @@ lazy "Passifying";
     let rec loop (ctx : Context.t) (c : GCL.t) : Context.t * t =
       match c with
-      | Prim (Active (Assign (x,e))) ->
+      | Prim (Assign (x,e)) ->
         let ctx = Context.increment ctx x in
         let x' = Context.label ctx x in
         let e' = Expr.label ctx e in
@@ -870,7 +1076,7 @@ module PassiveGCL = struct
               let rc = seq c (assume resid) in
               (ctx, choice rc_acc rc))
     in
-    snd (loop Context.empty c)
+    loop Context.empty c
 
   let assume_disjunct ?(threshold=1000) cs =
     let c = choices cs in
@@ -899,16 +1105,41 @@ end
 
 let vc (c : GCL.t) : BExpr.t =
   let open PassiveGCL in
-  vc (passify c)
+  vc (snd (passify c))
 
 module GPL = struct
   include Make (Pipeline)
   let assign x e = Prim (Active (Active.assign x e))
-  let table name keys actions =
-    let open Util in
-    let f = List.map ~f:(uncurry Assign.assign) in
-    let actions = projMap actions ~get:snd ~put:inj2 ~f in
-    Prim (Table (name, keys, actions))
+  let table name keys actions = Prim (Table {name;keys;actions})
+
+  let encode_tables (c : t) : GCL.t =
+    let rec loop c =
+      match c with
+      | Prim (Table tbl) ->
+        Log.print @@ lazy (Printf.sprintf "encode_tables.loop:\n%s" (to_string c));
+        GCL.table (tbl.name, tbl.keys, tbl.actions)
+      | Prim (Active a) ->
+        Log.print @@ lazy (Printf.sprintf "encode_tables.loop:\n%s" (to_string c));
+        GCL.prim a
+      | Choice cs ->
+        List.sum (module GCL) cs ~f:loop
+      | Seq cs ->
+        List.fold cs ~init:(GCL.skip)
+          ~f:(fun gcl gpl -> GCL.seq gcl (loop gpl))
+    in
+    let gcl = loop c in
+    gcl
+
+  let symbolize (c : t) =
+    let gcl = encode_tables c in
+    Log.print @@ lazy (Printf.sprintf "GCL: %s" (GCL.to_string gcl));
+    let (ctx, psv) = PassiveGCL.passify gcl in
+    Log.print @@ lazy (Printf.sprintf "PSV: %s" (PassiveGCL.to_string psv));
+    let symbolic_parser = PassiveGCL.normal psv in
+    let symbolic_parser = BExpr.erase_max_label ctx symbolic_parser in
+    Log.print @@ lazy (Printf.sprintf "symbolic parser: %s" (BExpr.to_smtlib symbolic_parser));
+    assume symbolic_parser
+
 end
 
 module TFG = struct
@@ -919,6 +1150,7 @@ module TFG = struct
       | _ -> false
   end
   include Make(T)
+
   let rec project (gpl : GPL.t) : t =
     match gpl with
     | GPL.Choice cs ->
@@ -931,6 +1163,20 @@ module TFG = struct
         | Pipeline.Table t -> T.Table t
       in
       Prim p
+
+  let rec inject (tfg : t) : GPL.t =
+    match tfg with
+    | Choice cs ->
+      GPL.choices (List.map cs ~f:inject)
+    | Seq cs ->
+      GPL.sequence (List.map cs ~f:inject)
+    | Prim p ->
+      let p = match p with
+        | Pipeline.Active a -> T.Active a
+        | Pipeline.Table t -> T.Table t
+      in
+      GPL.prim p
+
 end
 
 module Generator = struct
@@ -941,10 +1187,12 @@ module Generator = struct
        p. Note that the path is expressed as a reverse order list, so the last
        element in the path is the first element in the list. That is, c are the
        children of hd p. *)
+    Log.print @@ lazy "Initializing generator";
     Stack.create ()
 
   let create c =
     let g = TFG.construct_graph c in
+    if !Log.debug then TFG.print_graph (Some "tfg.dot") g;
     graph := Some g;
     let src = TFG.find_source g in
     Stack.push worklist ([src], TFG.G.succ g src)
@@ -967,46 +1215,3 @@ module Generator = struct
       Stack.push worklist (c::pi, TFG.G.succ g c);
       get_next()
 end
-
-let encode_tables (pi : Pipeline.t list) (c : TFG.t) : GCL.t option =
-  let rec loop pi c =
-    match c, pi with
-    | TFG.Prim (Active a), _ -> Some (GCL.prim a, pi)
-    | TFG.Choice cs,_ ->
-      List.sum (module struct
-        type t = (GCL.t * Pipeline.t list) option
-        let zero = None
-        let ( + ) c1_opt c2_opt =
-          match c1_opt, c2_opt with
-          | None, None -> None
-          | None, _ -> c2_opt
-          | _, None -> c1_opt
-          | Some (c1', pi1'), Some (c2', pi2') ->
-            if List.equal Pipeline.equal pi1' pi2' then
-              Some (GCL.choice c1' c2', pi1')
-            else if GCL.equal c1' c2' then
-              failwith "Paths were different, but programs the same"
-            else if List.length pi1' < List.length pi2' then
-              (* Since tables can only occur in 1 syntactic place, the longer
-                 path can never be finished *)
-              Some (c1', pi1')
-            else
-              Some (c2', pi2')
-      end
-      ) ~f:(loop pi) cs
-    | TFG.Seq cs, _ ->
-      let open Option.Let_syntax in
-      List.fold cs ~init:(Some (GCL.skip, pi))
-        ~f:(fun opt_acc c ->
-            let%bind gcl, pi = opt_acc in
-            let%map c, pi = loop pi c in
-            GCL.seq c gcl, pi)
-    | TFG.Prim (Table _), [] ->
-      None
-    | TFG.Prim (Table tbl), p::pi ->
-      if Pipeline.equal (Table tbl) p then
-        Some (GCL.table tbl, pi)
-      else
-        None
-  in
-  Option.map (loop pi c) ~f:fst

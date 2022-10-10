@@ -31,7 +31,7 @@ let check_equiv consts1 phi1_str consts2 phi2_str =
     phi1_str
     (Var.list_to_smtlib_quant consts2)
     phi2_str
- 
+
 let check_sat ?(timeout=None) consts phi_str =
   Printf.sprintf "%s%s\n\n(assert %s)\n\n(check-sat)%!"
     (string_of_timeout timeout)

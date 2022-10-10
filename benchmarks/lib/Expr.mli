@@ -58,5 +58,8 @@ val width : t -> int (* the bitwidth of the expr*)
 val label : Context.t -> t -> t
 (** [label ctx e] indexes the variables in [e] according to [ctx] *)              
 
+val erase_max_label : Context.t -> t -> t
+(** [erase_max_label ctx e] erases the variables from only the variables that are maximally indexed *)
+
 val fun_subst : (Var.t -> t) -> t -> t
 (** [fun_subst f e] substitutes [e] according to function [f] *)        
