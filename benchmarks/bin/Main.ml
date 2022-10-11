@@ -75,7 +75,9 @@ let table_infer : Command.t =
         let unroll = Option.value unroll_opt ~default:10 in
         Log.print @@ lazy (Printf.sprintf "compiling...");
         let coq_gcl = P4Parse.tbl_abstraction_from_file includes source gas unroll false in
+        Log.print @@ lazy (Printf.sprintf "compiling to gpl...");
         let gpl = Tuple.T2.map ~f:(Translate.gcl_to_gpl) coq_gcl in
+        Log.print @@ lazy (Printf.sprintf "starting the clock");
         let st = Clock.start () in
         let cpf = Qe.table_infer gpl in
         Printf.printf "Computed Formula in %f:\n%s\n%!" (Clock.stop st |> Time.Span.to_ms) (BExpr.to_smtlib cpf)

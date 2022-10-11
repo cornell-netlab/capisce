@@ -35,7 +35,7 @@ let run_cvc4 = run_proc cvc4_exe
 let of_smtlib ~cvs ~dvs smt : BExpr.t =
   (* Log.print @@ lazy (Printf.sprintf "parsing string with vars:\n control %s,\n data %s\n%!"
    *                (List.to_string cvs ~f:Var.str) (List.to_string cvs ~f:Var.str)); *)
-  Log.print @@ lazy "printign";
+  Log.print @@ lazy (Printf.sprintf "parsing:\n%s\n" smt);
   let ast = SmtParser.parse_string smt in
   Log.print @@ lazy "translating";
   let b = SmtAst.translate ast ~cvs ~dvs in

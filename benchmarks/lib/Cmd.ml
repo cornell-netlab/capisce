@@ -849,7 +849,7 @@ module GCL = struct
 
   let table (name, keys, (actions : (Var.t list * Action.t list) list)) =
     let cp_key idx  = Printf.sprintf "_symb$%s$key_$%d" name idx in
-    let act_size = Int.of_float (Float.log (Float.of_int Int.(List.length actions + 1))) in
+    let act_size = Int.of_float Float.(log (of_int (List.length actions)) + 1.0) in
     let cp_action = Var.make (Printf.sprintf "_symb$%s$action" name) act_size in
     let cp_data idx param = (Var.make (Printf.sprintf  "_symb$%s$%d$%s" name idx (Var.str param)) (Var.size param)) in
     let phi_keys = List.mapi keys ~f:(fun idx k ->

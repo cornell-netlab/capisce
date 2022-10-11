@@ -140,6 +140,7 @@ let rec gcl_to_cmd (t : target) : GCL.t =
     failwithf "Table %s was not eliminated" tbl ()
 
 let make_act table (act_name, act) : Var.t list * (Action.t list) =
+  let gcl_act = gcl_to_cmd act in
   let prefix = Printf.sprintf "_symb$%s$%s$arg$" table act_name in
   let rename x = String.chop_prefix x ~prefix in
   let hole_mapping vars = let open List.Let_syntax in
@@ -156,12 +157,12 @@ let make_act table (act_name, act) : Var.t list * (Action.t list) =
     let params = List.map curr_act_holes ~f:snd in
     params, phi
   in
-  let rec loop params (act : Action.t list) prim : Var.t list * (Action.t list) =
-    match prim with
+  let rec loop params (act : Action.t list) prog : Var.t list * (Action.t list) =
+    match prog with
     | GSkip -> (params, act)
     | GSeq (a1,a2) ->
-      let (p1, a1) = loop params act a1 in
-      loop (params@p1) (act@a1) a2
+      let params, act = loop params act a1 in
+      loop params act a2
     | GAssign (typ, var, bv) -> begin
       match rename var with
       | Some var ->
@@ -184,13 +185,13 @@ let make_act table (act_name, act) : Var.t list * (Action.t list) =
     | GAssume _ ->
       failwith "actions cannot contain assume"
     | GChoice _ ->
-      failwith "actions cannot contain choice"
+      let gcl = gcl_to_cmd prog in
+      failwithf "actions cannot contain choice, in action %s.%s: %s\n" table act_name (GCL.to_string gcl) ()
     | GTable _ ->
       failwith "actions cannot contain table"
     | GExternAssn _
     | GExternVoid _ ->
       failwith "externs should be factored out of actions"
-
   in
   loop [] [] act
   |> Tuple.T2.map_fst ~f:(List.dedup_and_sort ~compare:Var.compare)
@@ -216,8 +217,10 @@ let rec gcl_to_gpl (t : target) : GPL.t =
   | GExternVoid ("assert",[phi]) ->
     GPL.assert_ (BExpr.eq_ (bv_to_expr phi) (Expr.bvi 1 1))
   | GTable (table, keys, actions) ->
+    Log.print @@ (lazy "[gcl_to_gpl] TABLE");
     let keys = List.map keys ~f:(fun (k,_) -> bv_to_expr k |> Expr.get_var) in
     let actions = List.map actions ~f:(make_act table) in
+    Log.print @@ (lazy "[gcl_to_gpl] TABLE END ");
     GPL.table table keys actions
   | GExternAssn _
   | GExternVoid _ ->

@@ -72,7 +72,7 @@ let tbl_abstraction_from_file (includes : string list) p4file gas unroll verbose
       |> Poulet4.Result.Result.ok
     in
     let coq_gcl = V1model.gcl_from_p4cub (P4info.dummy) instr true gas unroll p4cub in
-    Log.print @@ lazy "Got Coq_gcl";
+    Log.print @@ lazy "[TFG] got coq_gcl";
     match coq_gcl with
     | Error s ->
       failwithf "Compilation Error in stage [P4cub->GCL]: %s" s ()
