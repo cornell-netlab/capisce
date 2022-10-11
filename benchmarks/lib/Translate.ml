@@ -140,7 +140,6 @@ let rec gcl_to_cmd (t : target) : GCL.t =
     failwithf "Table %s was not eliminated" tbl ()
 
 let make_act table (act_name, act) : Var.t list * (Action.t list) =
-  let gcl_act = gcl_to_cmd act in
   let prefix = Printf.sprintf "_symb$%s$%s$arg$" table act_name in
   let rename x = String.chop_prefix x ~prefix in
   let hole_mapping vars = let open List.Let_syntax in
