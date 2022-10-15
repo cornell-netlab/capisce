@@ -277,3 +277,8 @@ TSWLatexianTemp*
 *.org
 *~
 *.pdf
+**/*.dot
+**/*.ps
+**/*.json
+**/*.cpi
+**/*.gcl
