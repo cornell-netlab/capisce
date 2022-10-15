@@ -17,7 +17,6 @@ let compile : Command.t =
        fun () ->
        let open Cmd in
        BExpr.enable_smart_constructors := `On;
-       Log.debug := true;
        let gas = Option.value gas_opt ~default:1000 in
        let unroll = Option.value unroll_opt ~default:10 in
        let cmd = P4Parse.as_cmd_from_file includes source gas unroll false in
@@ -62,25 +61,27 @@ let table_infer : Command.t =
     [%map_open
       let source = anon ("p4 source file" %: string) and
       includes = flag "-I" (listed string) ~doc:"includes directories" and
-      debug = flag "-D" no_arg ~doc:"show debugging info" and
+      debug = flag "-DEBUG" no_arg ~doc:"allow pure debug messages" and
+      verbosity = flag "-v" (listed string) ~doc:"verbosity" and
       gas_opt = flag "-g" (optional int) ~doc:"how much gas to pass the compiler" and
       unroll_opt = flag "-u" (optional int) ~doc:"how much to unroll the parser" and
       no_smart = flag "--disable-smart" no_arg ~doc:"disable smart constructors"
       in
       fun () ->
         Printexc.record_backtrace true;
-        Log.debug := debug;
+        Log.parse_flags (String.concat verbosity);
+        if debug then Log.override ();
         BExpr.enable_smart_constructors := if no_smart then `Off else `On;
         let gas = Option.value gas_opt ~default:1000 in
         let unroll = Option.value unroll_opt ~default:10 in
-        Log.print @@ lazy (Printf.sprintf "compiling...");
+        Log.compiler "gas %d" @@ lazy gas;
+        Log.compiler "unroll %d" @@ lazy unroll;
         let coq_gcl = P4Parse.tbl_abstraction_from_file includes source gas unroll false in
-        Log.print @@ lazy (Printf.sprintf "compiling to gpl...");
+        Log.compiler "%s" @@ lazy "compiling to gpl...";
         let gpl = Tuple.T2.map ~f:(Translate.gcl_to_gpl) coq_gcl in
-        Log.print @@ lazy (Printf.sprintf "starting the clock");
         let st = Clock.start () in
         let cpf = Qe.table_infer gpl in
-        Printf.printf "Computed Formula in %f:\n%s\n%!" (Clock.stop st |> Time.Span.to_ms) (BExpr.to_smtlib cpf)
+        Printf.printf "Result:\n%s\n%!Computedin %f:\n%!" (BExpr.to_smtlib cpf) (Clock.stop st)
     ]
 
 let infer : Command.t =
@@ -89,73 +90,51 @@ let infer : Command.t =
     [%map_open
      let source = anon ("p4 source file" %: string) and
          includes = flag "-I" (listed string) ~doc:"includes directories" and
-         debug = flag "-D" no_arg ~doc:"show debugging info" and
+         debug = flag "-DEBUG" no_arg ~doc:"allow pure debug messages" and
+         verbosity = flag "-v" (listed string) ~doc:"verbosity" and
          gas_opt = flag "-g" (optional int) ~doc:"how much gas to pass the compiler" and
          unroll_opt = flag "-u" (optional int) ~doc:"how much to unroll the parser" and
          no_smart = flag "--disable-smart" no_arg ~doc:"disable smart constructors" and
-         check_only = flag "--check-only" no_arg ~doc:"simply check the existence of a solution" and
-         skip_check = flag "--skip-check" no_arg ~doc:"dont check whether a solution exists" and
          iter = flag "--iter" no_arg ~doc:"use iterative solution" and
          solvers = flag "-s" (listed string) ~doc:"solving order"
          in
          fun () ->
          let open Cmd in
          Printexc.record_backtrace true;
-         Log.debug := debug;
+         Log.parse_flags (String.concat verbosity);
+         if debug then Log.override ();
          BExpr.enable_smart_constructors := if no_smart then `Off else `On;
          let gas = Option.value gas_opt ~default:1000 in
          let unroll = Option.value unroll_opt ~default:10 in
-         Log.print @@ lazy (Printf.sprintf "compiling...");
+         let st = Clock.start () in
+         Log.compiler "at %f start compiling..." @@ lazy (Clock.read st);
          let cmd = P4Parse.as_cmd_from_file includes source gas unroll false in
-         Log.print @@ lazy (Printf.sprintf "done\noptimizing...");
+         Log.compiler "done in %f \noptimizing..." @@ lazy (Clock.stop st);
+         let st = Clock.start () in
          let cmd_o = GCL.optimize cmd in
-         Log.print @@ lazy (Printf.sprintf "done\nserializing....");
-         Log.print @@ lazy (GCL.to_string cmd_o);
-         let vc = Cmd.vc cmd_o in
-         let (dvs, cvs) = BExpr.vars vc in
-         Printf.printf "\n And its VC: %s \n (forall (%s) \n %s) \n\n%!"
-           (Var.list_to_smtlib_decls cvs)
-           (Var.list_to_smtlib_quant dvs)
-           (BExpr.to_smtlib vc);
-
-         Log.print @@ lazy (Printf.sprintf "cmd went from %d nodes to %d nodes" (GCL.size cmd) (GCL.size cmd_o));
+         Log.compiler "done in %f..." @@ lazy (Clock.stop st);
+         Log.irs "Optimized program:\n%s" @@ lazy (GCL.to_string cmd_o);
+         Log.compiler "cmd started with %d nodes" @@ lazy (GCL.size cmd);
+         Log.compiler "it ended up with %d nodes" @@ lazy (GCL.size cmd_o);
          let cmd = cmd_o in
          (* Breakpoint.set true; *)
-         let (dur, res, _, called_solver) =
-           if skip_check then
-             (Time.Span.zero, "sat", 0, false)
-           else begin 
-               Log.print @@ lazy "checking satisfiability\n";
-               Qe.z3_check false (cmd, BExpr.true_)
-             end
-         in
-         Printf.printf "%s\n%!" res;
-         if String.is_substring res ~substring:"sat"
-            && not (String.is_substring res ~substring:"unsat") then
-           if check_only then
-             Printf.printf "Checked feasibility in %fms with%s calling the solver. Got: \n%s\n%!"
-               (Time.Span.to_ms dur)
-               (if called_solver then "" else "out")
-               res
+         let _ : [`CVC4 | `Z3 | `Z3Light ] list =
+           List.map solvers ~f:(function
+               | "CVC4" | "cvc4" | "c" -> `CVC4
+               | "Z3" | "z3" | "z" -> `Z3
+               | "z3-light" | "light" | "qe-light" -> `Z3Light
+               |  _ -> failwith "unrecognized qe solver" ) in
+         let (inf_dur, inf_res, _, _) =
+           (* Bench.z3_infer false (cmd, BExpr.true_) *)
+           if iter then
+             (Qe.solving_all_paths (cmd, BExpr.true_))
            else
-             let _ : [`CVC4 | `Z3 | `Z3Light ] list =
-               List.map solvers ~f:(function 
-                   | "CVC4" | "cvc4" | "c" -> `CVC4
-                   | "Z3" | "z3" | "z" -> `Z3
-                   | "z3-light" | "light" | "qe-light" -> `Z3Light
-                   |  _ -> failwith "unrecognized qe solver" ) in
-             let (inf_dur, inf_res, _, inf_called_solver) =
-               (* Bench.z3_infer false (cmd, BExpr.true_) *)
-               if iter then
-                 (Qe.solving_all_paths (cmd, BExpr.true_))
-               else
-                 (* Qe.cvc4_z3_fix fix solvers false (cmd, BExpr.true_) *)
-                 Qe.subsolving (cmd, BExpr.true_)
-             in
-             Printf.printf "Done in %fms with%s calling the solver in inference phase. Got: \n%s\n%!"
-               (Time.Span.(to_ms (inf_dur + dur)))
-               (if inf_called_solver then "" else "out")
-               inf_res
+             (* Qe.cvc4_z3_fix fix solvers false (cmd, BExpr.true_) *)
+             Qe.subsolving (cmd, BExpr.true_)
+         in
+         Printf.printf "Done in %fms with calling the solver in inference phase. Got: \n%s\n%!"
+           (inf_dur)
+           inf_res
     ]
 
 let verify : Command.t =
@@ -171,12 +150,8 @@ let verify : Command.t =
          let open Cmd in
          let gas = Option.value gas_opt ~default:1000 in
          let unroll = Option.value unroll_opt ~default:10 in
-         Log.print @@ lazy (Printf.sprintf "compiling...");
          let cmd = P4Parse.as_cmd_from_file includes source gas unroll false in
-         Log.print @@ lazy (Printf.sprintf "done\noptimizing...");
          let cmd_o = GCL.optimize cmd in
-         Log.print @@ lazy (Printf.sprintf "done\nserializing....");
-         Log.print @@ lazy (GCL.to_string cmd_o);
          let vc = Cmd.vc cmd_o in
          let (dvs, cvs) = BExpr.vars vc in
          if (Solver.check_unsat (cvs @ dvs) (BExpr.not_ vc)) then
@@ -205,13 +180,12 @@ let graph : Command.t =
          if tables then
            let tfg = TFG.project gpl in
            let grf = TFG.construct_graph tfg in
-           TFG.print_graph filename grf;
+           TFG.print_graph grf filename;
            Printf.printf "%s has %s table-paths\n%!" source (TFG.count_cfg_paths grf |> Bigint.to_string)
          else
            let grf = GPL.construct_graph gpl in
-           GPL.print_graph filename grf;
-           GPL.print_key grf;
-           (* Printf.printf "%s has %s table-paths\n%!" source (GPL.count_cfg_paths grf |> Bigint.to_string) *)
+           GPL.print_graph grf filename;
+           Printf.printf "%s" (GPL.print_key grf);
    ]
 
 let smtlib : Command.t =

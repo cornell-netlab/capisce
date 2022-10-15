@@ -8,7 +8,7 @@ let z3_exe = "/usr/bin/z3 -smt2"
 let cvc4_exe = "/usr/bin/cvc5 --lang smt2" 
   
 let run_proc p str =
-  Log.print @@ lazy (Printf.sprintf "SMT Query:\n%s\n%!" str);
+  Log.smt "SMT Query:\n%s\n%!" (lazy str);
   Printf.printf "SMT Query:\n%s\n%!" str;
   Breakpoint.set true;
   let file = FileIO.tmp_write str in
@@ -36,13 +36,13 @@ let run_cvc4 = run_proc cvc4_exe
 let of_smtlib ~cvs ~dvs smt : BExpr.t =
   (* Log.print @@ lazy (Printf.sprintf "parsing string with vars:\n control %s,\n data %s\n%!"
    *                (List.to_string cvs ~f:Var.str) (List.to_string cvs ~f:Var.str)); *)
-  Log.print @@ lazy (Printf.sprintf "parsing:\n%s\n" smt);
+  Log.smt "parsing:\n%s\n" (lazy smt);
   let ast = SmtParser.parse_string smt in
-  Log.print @@ lazy "translating";
+  Log.smt "%s" (lazy "translating");
   let b = SmtAst.translate ast ~cvs ~dvs in
-  Log.print @@ lazy "type anotations (is this even necessary anymore?)";
+  Log.smt "%s" (lazy "type anotations (is this even necessary anymore?)");
   let b = BExpr.coerce_types (TypeContext.of_list cvs) b in
-  Log.print @@ lazy "done parsing";
+  Log.smt "%s" (lazy "done_parsing");
   b
   
 let z3_simplify dvs cvs phi =

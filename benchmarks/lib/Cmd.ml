@@ -370,7 +370,7 @@ module type CMD = sig
   val count_paths : t -> Bigint.t
   val paths : t -> t Sequence.t
   val construct_graph : t -> G.t
-  val print_graph : string option -> G.t -> unit
+  val print_graph : G.t -> string option -> unit
   val count_cfg_paths : G.t -> Bigint.t
 end
 
@@ -565,7 +565,6 @@ module Make (P : Primitive) = struct
         |> choices
 
     let dnf (c : t) : t =
-      Log.print @@ lazy "DNFing cmd";
       let rec loop c : t =
         match c with
         | Prim p -> Prim p
@@ -602,7 +601,7 @@ module Make (P : Primitive) = struct
         |> List.reduce_exn ~f:(Bigint.(+))
 
     let paths (c : t) : t Sequence.t =
-      Log.print @@ lazy (Printf.sprintf "building the squence of %s paths" (count_paths c |> Bigint.to_string));
+      Log.path_gen "building the squence of %s paths" @@ lazy (count_paths c |> Bigint.to_string);
       let rec loop (c : t) : t Sequence.t =
         let open Sequence in
         match c with
@@ -688,7 +687,7 @@ module Make (P : Primitive) = struct
       end)
 
 
-    let print_graph f g =
+    let print_graph g f =
       let file = match f with
         | Some filename -> Out_channel.create filename
         | None -> Out_channel.stdout in
@@ -696,9 +695,9 @@ module Make (P : Primitive) = struct
       Out_channel.close file
 
     let print_key g =
-      G.fold_vertex (fun (vtx, idx) _ ->
-          Printf.printf "%s@%d %s\n\n%!" (P.name vtx) idx (P.to_smtlib vtx);
-        ) g ()
+      G.fold_vertex (fun (vtx, idx) ->
+          Printf.sprintf "%s@%d %s\n\n%s%!" (P.name vtx) idx (P.to_smtlib vtx);
+        ) g ""
 
     let find_source g =
       let f v = function
@@ -711,8 +710,9 @@ module Make (P : Primitive) = struct
       in
       match G.fold_vertex f g None with
       | None ->
-        print_graph (Some "error_graph.dot") g;
-        Printf.printf "there are %d nodes, and %d edges\n" (G.nb_vertex g) (G.nb_edges g);
+        print_graph g (Some "error_graph.dot");
+        Log.error "there are %d nodes" @@ lazy (G.nb_vertex g);
+        Log.error "there are %d edges" @@ lazy (G.nb_edges g);
         failwith "Could not find 0-indegree vertex in graph; logged at error_graph.dot"
       | Some source -> source
 
@@ -807,25 +807,19 @@ module Make (P : Primitive) = struct
         let add = (+)
       end in
       let module P = Graph.Prim.Make (G) (WEdge) in
-      print_graph (Some "graph.dot") g;
+      Log.path_gen_dot (print_graph g) "graph.dot";
       let fwd = induce_graph_between g src snk in
-      print_graph (Some "fwd_graph.dot") fwd;
+      Log.path_gen_dot (print_graph fwd) "fwd_graph.dot";
       let bwd = O.mirror fwd in
-      print_graph (Some "bwd_graph.dot") bwd;
+      Log.path_gen_dot (print_graph bwd) "bwd_graph.dot";
       let fwd_span_edges = P.spanningtree_from fwd src in
       Printf.printf "%d Spanning tree_edges" (List.length fwd_span_edges);
       let fwd_span = edges_to_graph fwd_span_edges in
-      print_graph (Some "fwd_span.dot") fwd_span;
+      Log.path_gen_dot (print_graph fwd_span) "fwd_span.dot";
       let bwd_span = P.spanningtree_from bwd snk |> edges_to_graph |> O.mirror in
-      print_graph (Some "bwd_span.dot") bwd_span;
+      Log.path_gen_dot (print_graph bwd_span) "bwd_span.dot";
       let slice_graph = O.intersect fwd_span bwd_span in
-      print_graph (Some "slice_graph.dot") slice_graph;
-      ["graph"; "fwd_graph"; "bwd_graph";
-       "fwd_span"; "bwd_span"; "slice_graph"]
-      |> List.map ~f:(Log.dot)
-      |> String.concat ~sep:" "
-      |> Printf.printf "%s";
-      Breakpoint.set true;
+      Log.path_gen_dot (print_graph slice_graph) "slice_graph.dot";
       slice_graph
 
 
@@ -838,36 +832,32 @@ module Make (P : Primitive) = struct
       let g_paths_between = add_paths_between g in
       fun (pi : G.V.t list) : G.t ->
       (*outer pi is in reverese order*)
-      let rec induce_path result_graph pi : G.t =
+      let rec induce_path pi result_graph : G.t =
         (* inner pi is in forward order *)
         match pi with
         | [] -> failwith "Shouldn't end with nothing in the pipeline"
         | [_] -> result_graph
         | src::tgt::pi ->
           assert ((snd src) < (snd tgt));
-          let result_graph = g_paths_between src tgt result_graph in
-          print_graph (Some "result_graph.dot") result_graph;
-          Log.print @@ lazy (Printf.sprintf "Printing graph between %d and %d" (snd src) (snd tgt));
-          Log.print @@ lazy (Log.dot "result_graph");
-          Breakpoint.set true;
-          induce_path result_graph (tgt::pi)
+          result_graph
+          |> g_paths_between src tgt
+          |> induce_path (tgt::pi)
       in
       (* let src = find_source g in *)
       (* let tgt = find_sink g in *)
       (*add src & tgt to pi and make sure pi is in the correct order*)
       (* let pi = List.(rev pi |> cons src) in *)
       let pi = List.rev pi in
-      Printf.printf "The induced path:\n%!";
-      List.iter pi ~f:(fun vtx ->
-        Printf.printf "\tNode %d\n%!" (snd vtx)
-      );
-      induce_path G.empty pi
+      Log.path_gen "The induced path:\n%s%!" @@
+      lazy (String.concat ~sep:"\n" (List.map pi ~f:(fun vtx ->
+          Printf.sprintf "\tNode %d\n%!" (snd vtx)
+        )));
+      induce_path pi G.empty
 
     let find_first_join_point g =
       let memo_table = VTbl.create () in
       fun src ->
-      Log.print @@ lazy (Printf.sprintf "Find First Join Point after %d" (snd src));
-      let rec loop worklist =
+        let rec loop worklist =
         match worklist with
         | [] -> failwith "could not find a join point"
         | pi::worklist ->
@@ -892,18 +882,14 @@ module Make (P : Primitive) = struct
 
 
     let of_graph (g : G.t) : t =
-      Log.print @@ lazy "Getting CMD of graph";
       let g_join_point_finder = find_first_join_point g in
       let rec loop join_point_opt (curr : G.V.t) =
         match join_point_opt with
         | Some join_point when (snd curr) = (snd join_point) ->
-          Log.print @@ lazy (Printf.sprintf "Skipping join_point %d == %s" (snd curr) (P.to_smtlib @@ fst curr));
           skip
         | Some join_point when (snd curr) > (snd join_point) ->
           failwith "passed the predetermined join point"
         | _ ->
-          let _ = Log.print @@ lazy (Printf.sprintf "Node %d is %s" (snd curr) (P.to_smtlib @@ fst curr)) in
-          (* Log.print @@ lazy (Printf.sprintf "Node %d" (snd curr)); *)
           let succs = G.succ g curr in
           if List.is_empty succs then
             prim (fst curr)
@@ -916,7 +902,6 @@ module Make (P : Primitive) = struct
                     ]
       in
       let source = find_source g in
-      Log.print @@ lazy (Printf.sprintf "starting at %d\n%!" (snd source));
       loop None source
 
     (* Monoids *)
@@ -1134,7 +1119,6 @@ module PassiveGCL = struct
       |> update_resid x Int.(curr + 1) tgt
 
   let passify (c : GCL.t) : Context.t * t =
-    Log.print @@ lazy "Passifying";
     let rec loop (ctx : Context.t) (c : GCL.t) : Context.t * t =
       match c with
       | Prim (Assign (x,e)) ->
@@ -1174,7 +1158,6 @@ module PassiveGCL = struct
       assume (normal c)
 
   let assume_disjuncts c =
-    Log.print @@ lazy "assuming disjuncts";
     let rec loop c =
       match c with
       | Prim (Assume phi) -> assume phi
@@ -1204,10 +1187,8 @@ module GPL = struct
     let rec loop c =
       match c with
       | Prim (Table tbl) ->
-        Log.print @@ lazy (Printf.sprintf "encode_tables.loop:\n%s" (to_string c));
         GCL.table (tbl.name, tbl.keys, tbl.actions)
       | Prim (Active a) ->
-        Log.print @@ lazy (Printf.sprintf "encode_tables.loop:\n%s" (to_string c));
         GCL.prim a
       | Choice cs ->
         List.sum (module GCL) cs ~f:loop
@@ -1220,12 +1201,9 @@ module GPL = struct
 
   let symbolize (c : t) =
     let gcl = encode_tables c in
-    Log.print @@ lazy (Printf.sprintf "GCL: %s" (GCL.to_string gcl));
     let (ctx, psv) = PassiveGCL.passify gcl in
-    Log.print @@ lazy (Printf.sprintf "PSV: %s" (PassiveGCL.to_string psv));
     let symbolic_parser = PassiveGCL.normal psv in
     let symbolic_parser = BExpr.erase_max_label ctx symbolic_parser in
-    Log.print @@ lazy (Printf.sprintf "symbolic parser: %s" (BExpr.to_smtlib symbolic_parser));
     assume symbolic_parser
 
 end
@@ -1275,15 +1253,12 @@ module Generator = struct
        p. Note that the path is expressed as a reverse order list, so the last
        element in the path is the first element in the list. That is, c are the
        children of hd p. *)
-    Log.print @@ lazy "Initializing generator";
     Stack.create ()
 
   let create c =
     let g = TFG.construct_graph c in
-    Printf.printf "TFG made\n%!";
-    Printf.printf "There are %s paths" (Bigint.to_string @@ TFG.count_cfg_paths g);
-    TFG.print_graph (Some "tfg.dot") g;
-    Breakpoint.set true;
+    Log.path_gen "TFG made with %s paths" @@ lazy (Bigint.to_string @@ TFG.count_cfg_paths g);
+    Log.path_gen_dot (TFG.print_graph g) "tfg.dot";
     graph := Some g;
     let src = TFG.find_source g in
     Stack.push worklist ([src], TFG.G.succ g src)

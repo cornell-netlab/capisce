@@ -37,9 +37,9 @@ let as_p4cub_from_file includes p4file verbose =
   | `Ok (typed : Surface.program) ->
     let typed, renamer = Elaborate.elab typed in
     let _, prog = Checker.check_program renamer typed in
-    Log.print @@ lazy "got p4light";
+    Log.compiler "%s" @@ lazy "got p4light";
     let p4cub = ToP4cub.translate_program (P4info.dummy) prog in
-    Log.print @@ lazy "Got p4cub";
+    Log.compiler "%s" @@ lazy "Got p4cub";
     p4cub
 
 
@@ -51,7 +51,7 @@ let as_cmd_from_file (includes : string list) p4file gas unroll verbose =
   | Ok p4cub ->
     let instr tbl_name _ = TableInstr.instr tbl_name in
     let coq_gcl = V1model.gcl_from_p4cub (P4info.dummy) instr true gas unroll p4cub in
-    Log.print @@ lazy "Got coq_gcl";
+    Log.compiler "%s" @@ lazy "Got coq_gcl";
     match coq_gcl with
     | Error s ->
       failwith (Printf.sprintf "Compilation Error in stage [P4cub->GCL]: %s" s)
@@ -72,7 +72,7 @@ let tbl_abstraction_from_file (includes : string list) p4file gas unroll verbose
       |> Poulet4.Result.Result.ok
     in
     let coq_gcl = V1model.gcl_from_p4cub (P4info.dummy) instr true gas unroll p4cub in
-    Log.print @@ lazy "[TFG] got coq_gcl";
+    Log.compiler "%s" @@ lazy "[TFG] got coq_gcl";
     match coq_gcl with
     | Error s ->
       failwithf "Compilation Error in stage [P4cub->GCL]: %s" s ()

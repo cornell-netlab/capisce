@@ -65,7 +65,7 @@ module type CMD = sig
   val count_paths : t -> Bigint.t
   val paths : t -> t Sequence.t
   val construct_graph : t -> G.t
-  val print_graph : string option -> G.t -> unit
+  val print_graph : G.t -> string option -> unit
   val count_cfg_paths : G.t -> Bigint.t
 end
 
@@ -97,7 +97,7 @@ module GPL : sig
   val encode_tables : t -> GCL.t
   val induce : G.t -> (Vertex.t list) -> G.t
   val of_graph : G.t -> t
-  val print_key : G.t -> unit
+  val print_key : G.t -> string
 end
 
 module TFG : sig
@@ -105,12 +105,13 @@ module TFG : sig
   module Vertex : sig type t = Pipeline.t * int end
   val project : GPL.t -> t
   val inject : t -> GPL.t
-  val print_key : G.t -> unit
+  val print_key : G.t -> string
 end
 
 val vc : GCL.t -> BExpr.t
 
 module Generator : sig
+  val graph : TFG.G.t option ref
   val create : TFG.t -> unit
   val get_next : unit -> (TFG.Vertex.t) list option
 end

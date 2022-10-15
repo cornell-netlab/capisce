@@ -6,12 +6,14 @@ let check_success result_string =
   Smt.success result_string && Smt.qf result_string
 
 let is_small_enough old new_ =
+  Log.qe "%s" @@ lazy "is the formula small enough?";
   match new_ with
   | Some new_ -> 
      let open BExpr in
-     Log.print @@ lazy (Printf.sprintf "checking sol'n, was size %d, got size %d from solver" (size old) (size new_));
+     Log.qe "was size %d" @@ lazy (size old);
+     Log.qe "now size %d" @@ lazy (size new_);
      let goodness = (size new_) < 10 * (size old) in
-     if not goodness then Log.print @@ lazy (Printf.sprintf "form too big: %d" (size new_));
+     if not goodness then Log.qe "form too big: %d" @@ lazy (size new_);
      (new_, goodness)
   | None ->
      (BExpr.false_, false)
@@ -40,15 +42,14 @@ let unrestricted_solver (solver : ?with_timeout:int -> Var.t list -> string -> s
   else   
     let res = solver cvs (to_smtlib phi) in
     decr_q x @@ Printf.sprintf "z3,%d" (size phi);
-    Log.print @@ lazy res;
+    Log.smt "%s" @@ lazy res;
     Solver.of_smtlib ~dvs:[] ~cvs res
 
   
 let try_cnfing body : BExpr.t =
   if BExpr.qf body
   then begin
-      Log.print @@ lazy "cnfing";
-      Breakpoint.set break;
+      Log.qe "%s" @@ lazy "cnfing";
       BExpr.cnf body (* if the formula isn't too big, cnf it*)
     end
   else body
@@ -82,14 +83,13 @@ let rec qe (solver : ?with_timeout:int -> Var.t list -> string -> string)  b : B
         let b'' = if ok then Some (Solver.of_smtlib ~dvs:[] ~cvs:vars res) else None in
         let b'', ok = is_small_enough b b'' in
         if ok then begin
-            Log.print @@ lazy "form small enough"; Breakpoint.set break;
+            Log.qe "%s" @@ lazy "form small enough";
             decr_q x @@ Printf.sprintf "z3,%d" (size b');
             b''
           end
         else begin (* TRY CNFING *)
-            Log.print @@ lazy (Printf.sprintf "trying to cnf something of size %d" (BExpr.size body));
-            Log.print @@ lazy (Smt.assert_apply vars (BExpr.to_smtlib b'));
-            Breakpoint.set true;
+            Log.qe "trying to cnf something of size %d" @@ lazy (BExpr.size body);
+            Log.qe "%s" @@ lazy (Smt.assert_apply vars (BExpr.to_smtlib b'));
             let body = try_cnfing body in
             if size body >= size b'' then
               (*if cnfing only made it worse, use the original z3-provided response*)

@@ -4,7 +4,8 @@ open Core
 let enable_smart_constructors = ref `On
 
 let q_count = ref (Bigint.zero)
-let measure s : unit = Log.measure (Printf.sprintf "%f,%s,%s" (Clock.now()) (Bigint.to_string !q_count) s)  
+let measure s : unit =
+  Log.measure "%s" (lazy (Printf.sprintf "%f,%s,%s" (Clock.now()) (Bigint.to_string !q_count) s))
 let incr_q x : unit =
   Bigint.incr q_count;
   measure (Printf.sprintf "+,%s" (Var.str x))
@@ -145,7 +146,7 @@ let vars t : Var.t list * Var.t list =
   let c = Clock.start () in
   let vars = get_labelled_vars t in
   let res = List.partition_tf vars ~f:(Fn.non Var.is_symbRow) in
-  let dur = Clock.stop c |> Time.Span.to_ms in
+  let dur = Clock.stop c in
   varstime := Float.(!varstime + dur);
   (* Log.print @@ lazy (Printf.sprintf "Vars has taken %fms" !varstime); *)
   res
@@ -583,7 +584,7 @@ let forall_or self x bs =
 let rec forall_one (x : Var.t) b =  
   (* Log.size (size b); *)
   (* Log.print @@ lazy (Printf.sprintf "smart constructor for ∀ %s (_ BitVec %d) over an ast comprising %d bits and %d nodes!" (Var.str x) (Var.size x) (Obj.(reachable_words (repr b) + 1) * 64) (size b)); *)
-  Log.print @@ lazy ("smart constructor for " ^ Var.str x);
+  Log.smart "smart constructor for %s" (lazy (Var.str x));
   match !enable_smart_constructors with
   | `Off ->  Forall(x,b)
   | `On -> 
@@ -762,17 +763,13 @@ let rec cnf_inner (b : t) : t list list =
         failwithf  "You really shouldn't be out here this late with a (not %s) in your hands " (to_smtlib b) ()
 
 let cnf b =
-  Log.print @@ lazy (Printf.sprintf "cnfing.. %i " (size b));
+  Log.rewrites "cnfing.. %i " (lazy (size b));
   let nnfd = nnf b in
-  Log.print @@ lazy (Printf.sprintf "nuffy.. %i" (size nnfd));
+  Log.rewrites "nnfed.. %i" (lazy (size nnfd));
   let ands_of_ors = cnf_inner nnfd in
-  (* let sz = SetOfSet_t.fold ands_of_ors ~init:0 ~f:(fun sum conj -> sum + 1 + (Set_t.length conj)) in *)
-  Log.print @@ lazy (Printf.sprintf "un-cnfing...");
-  (* enable_smart_constructors := `Off; *)
+  Log.rewrites "un-cnfing...%s" (lazy "");
   let cnfd = TNary(LAnd, List.map ands_of_ors ~f:(fun ors -> TNary(LOr, ors))) in
-  (* enable_smart_constructors := `On; *)
-  Log.print @@ lazy (Printf.sprintf "done, size %i" (size cnfd));
-  (* Log.print @@ lazy (Printf.sprintf "done. (size %i)" (size cnf)); *)
+  Log.rewrites "done, size %i" (lazy (size cnfd));
   cnfd
 
 
@@ -997,17 +994,11 @@ let complete_predicate_abstraction x (b : t) =
   let atoms = get_atoms_containing x b in
   if abstraction_is_complete x atoms then
     let atom = List.hd_exn atoms in
-    Log.print @@ lazy (Printf.sprintf "The variable %s only occurs in the single atom: %s  "
-                         (Var.str x)
-                         (to_smtlib atom)
-                   );
     let var = "$___REMOVE___$" in
     Some (abstract_atom atom var b)
-  else begin
-      Log.print @@ lazy (Printf.sprintf "The variable %s occurs under many atoms (%d)" (Var.str x) (List.length atoms));
-      None
-    end
-    
+  else
+    None
+
 let rec get_abstract_predicates b =
   match b with
   | TFalse | TTrue | TComp _ -> []
