@@ -2,7 +2,6 @@ open Core
 
 let break = false
 
-
 let check_success result_string =
   Smt.success result_string && Smt.qf result_string
 

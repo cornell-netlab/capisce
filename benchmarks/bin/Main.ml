@@ -118,7 +118,6 @@ let infer : Command.t =
            (Var.list_to_smtlib_quant dvs)
            (BExpr.to_smtlib vc);
 
-         Breakpoint.set true;
          Log.print @@ lazy (Printf.sprintf "cmd went from %d nodes to %d nodes" (GCL.size cmd) (GCL.size cmd_o));
          let cmd = cmd_o in
          (* Breakpoint.set true; *)

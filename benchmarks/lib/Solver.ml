@@ -9,7 +9,8 @@ let cvc4_exe = "/usr/bin/cvc5 --lang smt2"
   
 let run_proc p str =
   Log.print @@ lazy (Printf.sprintf "SMT Query:\n%s\n%!" str);
-  (* Printf.printf "SMT Query:\n%s\n%!" str; *)
+  Printf.printf "SMT Query:\n%s\n%!" str;
+  Breakpoint.set true;
   let file = FileIO.tmp_write str in
   (* let chan = Unix.open_process_in (Printf.sprintf "%s %s 2> /tmp/errors.log" p file) in *)
   let chan = Core_unix.open_process_in (Printf.sprintf "%s %s" p file) in

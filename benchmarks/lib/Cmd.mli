@@ -13,6 +13,7 @@ module type Primitive = sig
   val comparisons : t -> (Var.t * Expr.t) list option
   val is_node : t -> bool
   val name : t -> string
+  val is_table : t -> bool
 end
 
 

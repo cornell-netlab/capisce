@@ -256,28 +256,33 @@ let table_path_to_string (pi : TFG.Vertex.t list) : string =
   |> List.map ~f:(fun (pipeline, idx ) -> Printf.sprintf "%s@%d" (Pipeline.to_smtlib pipeline) idx)
   |> String.concat ~sep:" --> "
 
-let dot f = Printf.sprintf "dot -Tps %s.dot -o %s.pdf; xdg-open %s.pdf;" f f f
-
-
 let table_paths ((prog, asst) : TFG.t * BExpr.t) =
   let asserted_prog = TFG.(seq prog (assert_ asst)) in
   let gpl_prog = TFG.inject asserted_prog in
-  Log.print @@ lazy (Printf.sprintf "Constructing Graph For Gpl:%s\n%!\n\n" (GPL.to_string gpl_prog));
+  Printf.printf "Constructing Graph For Gpl:%s\n%!\n\n" (GPL.to_string gpl_prog);
   let gpl_graph = GPL.construct_graph gpl_prog in
-  if !Log.debug then GPL.print_graph (Some "gpl.dot") gpl_graph;
+  GPL.print_key gpl_graph;
+  GPL.print_graph (Some "gpl.dot") gpl_graph;
+  Breakpoint.set true;
   Generator.create asserted_prog;
+  let explored_paths = ref Bigint.zero  in
+  let induce = GPL.induce gpl_graph in (* DO NOT INLINE, for caching performance reasons *)
   let rec loop phi =
     (* TODO CHECK SUFFICIENCY of phi*)
     match Generator.get_next () with
     | None -> phi
     | Some pi ->
-      let induced_program = GPL.induce gpl_graph pi in
-      GPL.print_graph (Some "induced_program.dot") induced_program;
+      Printf.printf "Inducing path #%s\n" (Bigint.to_string !explored_paths);
+      let induced_program = induce pi in
+      GPL.print_graph (Some "PATH_PROG.dot") induced_program;
+      Log.print @@ lazy ("Converting to syntax");
       let gpl = GPL.of_graph induced_program in
       Log.print @@ lazy (Printf.sprintf "GPL:\n%s\n%!" (GPL.to_string gpl));
       let gcl = GPL.encode_tables gpl in
       Log.print @@ lazy (Printf.sprintf "GCL:\n%s\n%!" (GCL.to_string gcl));
       let gcl = GCL.optimize gcl in
+      Printf.printf "GCL:\n%s\n%!" (GCL.to_string gcl);
+      Breakpoint.set true;
       let (_, psv) = PassiveGCL.passify gcl in
       let (cvs, qf_psi_str) = solve_one psv in
       let qf_psi = Solver.of_smtlib ~dvs:[] ~cvs qf_psi_str in
@@ -290,9 +295,12 @@ let table_paths ((prog, asst) : TFG.t * BExpr.t) =
         Printf.printf "TFG:%s\n%!" (TFG.to_string asserted_prog);
         Printf.printf "GPL:\n%s\n\nGCL:%s\n\nPSV:%s\n\n"
           (GPL.to_string gpl) (GCL.to_string gcl) (PassiveGCL.to_string psv);
-        Printf.printf "%s\n%s\n%s\n%!" (dot "induced_program") (dot "tfg") (dot "gpl");
+        Printf.printf "%s\n%s\n%s\n%!" (Log.dot "induced_program") (Log.dot "tfg") (Log.dot "gpl");
         raise (Failure "Found unsolveable path")
       end;
+      Bigint.incr explored_paths;
+      Printf.printf "%s\n%!" (BExpr.to_smtlib phi);
+      Breakpoint.set true;
       loop (BExpr.and_ qf_psi phi)
   in
   loop BExpr.true_
@@ -301,10 +309,9 @@ let preprocess gpl_prsr gpl_pipeline =
   Log.print @@ lazy (Printf.sprintf "parser:\n%s\n%!" (GPL.to_string gpl_prsr));
   let symbolic_parser = GPL.symbolize gpl_prsr in
   Log.print @@ lazy (Printf.sprintf "symbolic parser:\n%s\n%!" (GPL.to_string symbolic_parser));
-  let gpl = GPL.seq symbolic_parser gpl_pipeline in
-  let tfg = TFG.project gpl in
+  let _ = GPL.seq symbolic_parser gpl_pipeline in
+  let tfg = TFG.project gpl_pipeline in
   tfg
-
 
 let table_infer (gpl_prsr, gpl_pipeline) =
   let tfg = preprocess gpl_prsr gpl_pipeline in

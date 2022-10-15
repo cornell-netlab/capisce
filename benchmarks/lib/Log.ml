@@ -12,3 +12,5 @@ let enable_measurement () =
 let measure s = if !measure then  Printf.eprintf "%s\n%!" s              
 
 let size d = measure (Printf.sprintf "size,%f,%d" (Clock.now()) d)
+
+let dot f = Printf.sprintf "dot -Tps %s.dot -o %s.pdf; xdg-open %s.pdf;" f f f

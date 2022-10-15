@@ -17,6 +17,7 @@ module type Primitive = sig
   val comparisons : t -> (Var.t * Expr.t) list option
   val is_node : t -> bool
   val name : t -> string
+  val is_table : t -> bool
 end
 
 
@@ -35,6 +36,7 @@ module Assert = struct
   let wp (b:t) (phi : BExpr.t) : BExpr.t = BExpr.and_ b phi
   let normalize_names : t -> t = BExpr.normalize_names
   let comparisons = BExpr.comparisons
+  let is_table (_:t) = false
 end
 
 module Passive = struct
@@ -87,6 +89,10 @@ module Passive = struct
 
   let is_node (_:t) = true
 
+  let is_table = function
+    | Assume _ -> false
+    | Assert a -> Assert.is_table a
+
 end
 
 module Assign = struct
@@ -112,6 +118,8 @@ module Assign = struct
   let wp (x,e) phi =  BExpr.subst x e phi
 
   let normalize_names (x,e) = assign (Var.normalize_name x) (Expr.normalize_names e)
+
+  let is_table (_:t) = false
 
 end
 
@@ -158,6 +166,7 @@ module Action = struct
     | Assert b -> Assert.comparisons b
 
   let is_node (_ : t) = true
+  let is_table (_:t) = false
 
 end
 
@@ -216,6 +225,11 @@ module Active = struct
   let of_action = function
     | Action.Assign (x,e) -> assign x e
     | Action.Assert b -> assert_ b
+
+
+  let is_table = function
+    | Passive p -> Passive.is_table p
+    | Assign a -> Assign.is_table a
   
 end
 
@@ -258,6 +272,8 @@ module Table = struct
        List.map ~f:Action.normalize_names body )
     in
     {tbl with keys; actions}
+
+  let is_table (_:t) = true
 
 end
 
@@ -304,6 +320,11 @@ module Pipeline = struct
     let assume b = Active (Active.assume b)
     let assert_ b = Active (Active.assert_ b)
     let is_node (_:t) = true
+
+    let is_table = function
+      | Active a -> Active.is_table a
+      | Table t -> Table.is_table t
+
   end
 
   module Map = Map.Make (P)
@@ -608,45 +629,46 @@ module Make (P : Primitive) = struct
 
     module Edge = struct
       include String
-      let default = ""
+      (* let default = "" *)
     end
 
-    module G = Graph.Persistent.Digraph.ConcreteBidirectionalLabeled(Vertex)(Edge)
-
-    let print_nodes msg ns =
-      List.map ns ~f:(fun (_, idx) -> Int.to_string idx)
-      |> String.concat ~sep:","
-      |> Printf.printf "\t%s: [%s]\n%!" msg
+    module G = Graph.Persistent.Digraph.ConcreteBidirectional(Vertex) (* (Edge)*)
+    module O = Graph.Oper.P (G)
+    module VMap = Graph.Gmap.Vertex (G) (struct include G let empty () = empty end)
 
     let construct_graph t =
       Printf.printf "Constructing Graph\n%!";
-      let g = G.empty in
+      let src = (P.assume BExpr.true_, 0) in
+      let g = G.(add_vertex empty src) in
+      let dedup = List.dedup_and_sort ~compare:(fun (_,idx) (_, idx') -> Int.compare idx idx') in
       let rec loop idx g ns t =
+        let extend_graph g idx ns p =
+            let n' = G.V.create (p, idx) in
+            let g = G.add_vertex g n' in
+            let ns = dedup ns in
+            let g = List.fold ns ~init:g ~f:(fun g n -> G.add_edge g n n') in
+            (g, idx + 1, [n'])
+        in
         match t with
         | Prim p ->
           if P.is_node p then
-            let n' = G.V.create (p, idx) in
-            let g = G.add_vertex g n' in
-            let g = List.fold ns ~init:g ~f:(fun g n -> G.add_edge g n n') in
-            print_nodes (Printf.sprintf "Creating node %d, adding edges from" idx) ns;
-            (g, idx + 1, [n'])
+            extend_graph g idx ns p
           else begin
-            print_nodes (Printf.sprintf "Skipping node %d, edges persist" idx) ns;
             (g, idx + 1, ns)
           end
         | Choice ts ->
-          print_nodes "endpoints prior to choice" ns;
-          List.fold ts ~init:(g, idx, [])
-            ~f:(fun (g, idx, ns') t ->
-                let g, idx, ns'' = loop idx g ns t in
-                print_nodes "aggregate_endpoints:" ns;
-                (g, idx, ns' @ ns'')
-              )
+          let g, idx, ns = List.fold ts ~init:(g, idx, [])
+              ~f:(fun (g, idx, ns') t ->
+                  let g, idx, ns'' = loop idx g ns t in
+                  (g, idx, ns' @ ns'')
+                ) in
+          (* Create a join point *)
+          extend_graph g idx ns (P.assume BExpr.true_)
         | Seq ts ->
           List.fold ts ~init:(g, idx, ns)
             ~f:(fun (g, idx, ns) t -> loop idx g ns t)
       in
-      let g, idx, ns = loop 0 g [] t in
+      let g, idx, ns = loop 1 g [src] t in
       (*Create a sink node, and add edges to it*)
       let snk = G.V.create (P.assume BExpr.true_, idx) in
       let g = List.fold ns ~init:g ~f:(fun g n -> G.add_edge g n snk) in
@@ -655,10 +677,11 @@ module Make (P : Primitive) = struct
 
     module Dot = Graph.Graphviz.Dot (struct
         include G
-        let edge_attributes (_, e, _) = [`Label e; `Color 4711]
+        let edge_attributes (_, _) = [`Color 4711]
         let default_edge_attributes _ = []
         let get_subgraph _ = None
-        let vertex_attributes _ = [`Shape `Box]
+        let vertex_attributes ((p, _) : vertex) : Graph.Graphviz.DotAttributes.vertex list =
+          if P.is_table p then [`Shape `Oval ; `Color 255 ] else [`Shape `Box]
         let vertex_name ((p,idx) : vertex) = Printf.sprintf "\"%s %d\"" (P.name p) idx
         let default_vertex_attributes _ = []
         let graph_attributes _ = []
@@ -669,7 +692,8 @@ module Make (P : Primitive) = struct
       let file = match f with
         | Some filename -> Out_channel.create filename
         | None -> Out_channel.stdout in
-      Dot.output_graph file g
+      Dot.output_graph file g;
+      Out_channel.close file
 
     let print_key g =
       G.fold_vertex (fun (vtx, idx) _ ->
@@ -686,32 +710,21 @@ module Make (P : Primitive) = struct
             None
       in
       match G.fold_vertex f g None with
-      | None -> failwith "Could not find 0-indegree vertex in graph"
+      | None ->
+        print_graph (Some "error_graph.dot") g;
+        Printf.printf "there are %d nodes, and %d edges\n" (G.nb_vertex g) (G.nb_edges g);
+        failwith "Could not find 0-indegree vertex in graph; logged at error_graph.dot"
       | Some source -> source
 
-    (* let find_sink g = *)
-    (*   let f v = function *)
-    (*     | Some found_sink -> Some found_sink *)
-    (*     | None -> *)
-    (*       if List.is_empty (G.succ g v) then *)
-    (*         Some v *)
-    (*       else *)
-    (*         None *)
-    (*   in *)
-    (*   match G.fold_vertex f g None with *)
-    (*   | None -> failwith "Could not find 0-outdegree vertex in graph" *)
-    (*   | Some sink -> sink *)
-
-    module DT = Hashtbl.Make (struct
-        type t = (P.t * int)
-        [@@deriving sexp, hash, compare]
+    module VTbl = Hashtbl.Make (struct
+        type t = (P.t * int) [@@deriving sexp, compare, hash]
       end)
 
     let count_cfg_paths g =
-      let dt = DT.create () in
+      let dt = VTbl.create () in
       let src = find_source g in
       let rec loop (curr : G.V.t) =
-        match DT.find dt curr with
+        match VTbl.find dt curr with
         | Some num_paths -> num_paths
         | None ->
           let succs = G.succ g curr in
@@ -721,7 +734,7 @@ module Make (P : Primitive) = struct
             else
               List.sum (module Bigint) succs ~f:loop
           in
-          DT.set dt ~key:curr ~data:num_paths;
+          VTbl.set dt ~key:curr ~data:num_paths;
           num_paths
       in
       loop src
@@ -729,72 +742,101 @@ module Make (P : Primitive) = struct
 
     module Path = struct
       type t = G.V.t * G.V.t list
+      [@@deriving equal]
       (* list but it can never be empty *)
       (* The path is reversed! i.e. LIFO-style *)
       let singleton vtx : t = (vtx, [])
       let add new_head ((head, pi) : t) : t = (new_head, head::pi)
       let peek ((head, _) : t) = head
-      let pop (head, pi) : G.V.t * t option =
-        match pi with
-        | [] -> head, None
-        | head'::pi' -> (head, Some (head', pi'))
+      (* let pop (head, pi) : G.V.t * t option = *)
+      (*   match pi with *)
+      (*   | [] -> head, None *)
+      (*   | head'::pi' -> (head, Some (head', pi')) *)
+      let contains vtx ((head, rst) : t) =
+        G.V.equal vtx head
+        || List.exists rst ~f:(G.V.equal vtx)
     end
 
-    module VTbl = Hashtbl.Make (struct
-        type t = (P.t * int) [@@deriving sexp, compare, hash]
+    let feasible_edge (e : G.edge) g =
+      G.mem_vertex g (G.E.src e)
+      && G.mem_vertex g (G.E.dst e)
+
+    let induce_graph_between g (src : G.V.t) (snk : G.V.t) =
+      let is_good_node p =
+        not (P.is_table p) || P.equal p (fst src) || P.equal p (fst snk)
+      in
+      let vertex_graph = VMap.filter_map (fun vtx ->
+          Option.some_if
+            (is_good_node (fst vtx) && (snd vtx) >= (snd src) && (snd vtx) <= (snd snk))
+            vtx
+        ) g
+      in
+      let edges_graph =
+        G.fold_edges_e (fun e g ->
+          if feasible_edge e g then
+            G.add_edge_e g e
+          else
+            g
+        ) g vertex_graph
+      in
+      edges_graph
+
+    module PathsTable = Hashtbl.Make (struct
+        type t = (P.t * int) * (P.t * int)
+        [@@deriving compare, hash, sexp]
       end)
 
-    let get_paths_between g (src : G.V.t) (snk : G.V.t) : Path.t list =
-      Printf.printf "getting paths between %d and %d\n%!" (snd src) (snd snk);
-      let rec loop paths worklist =
-        match worklist with
-        | [] -> paths
-        | pi::worklist ->
-          let curr_vtx = Path.peek pi in
-          (* Log.print @@ lazy (Printf.sprintf "The current node is %s%!" (P.to_smtlib (fst curr_vtx))); *)
-          if G.V.equal curr_vtx src then
-            loop (pi::paths) worklist
-          else begin
-            let preds = G.pred g curr_vtx in
-            List.fold preds ~init:worklist
-              ~f:(fun worklist prev_vtx ->
-                  Path.add prev_vtx pi :: worklist)
-            |> loop paths
-          end
-      in
-      loop [] [Path.singleton snk]
+    (* let get_nodes es = *)
+    (*   let pair_to_list (v1,v2) = [v1;v2] in *)
+    (*   List.bind es ~f:pair_to_list *)
+    (*   |> List.dedup_and_sort ~compare:Vertex.compare *)
 
-    let add_vertex_if_not_exists g vtx =
-      if G.mem_vertex g vtx then
-        g
-      else
-        G.add_vertex g vtx
+    let edges_to_graph es =
+      List.fold es ~init:G.empty ~f:(fun g (v1, v2) ->
+          let g = G.add_vertex g v1 in
+          let g = G.add_vertex g v2 in
+          let g = G.add_edge g v1 v2 in
+          g
+        )
+
+    let reachable_graph_between g src snk =
+      let module WEdge = struct
+        include G
+        include Int
+        let weight (_: G.edge) : t = zero
+        let add = (+)
+      end in
+      let module P = Graph.Prim.Make (G) (WEdge) in
+      print_graph (Some "graph.dot") g;
+      let fwd = induce_graph_between g src snk in
+      print_graph (Some "fwd_graph.dot") fwd;
+      let bwd = O.mirror fwd in
+      print_graph (Some "bwd_graph.dot") bwd;
+      let fwd_span_edges = P.spanningtree_from fwd src in
+      Printf.printf "%d Spanning tree_edges" (List.length fwd_span_edges);
+      let fwd_span = edges_to_graph fwd_span_edges in
+      print_graph (Some "fwd_span.dot") fwd_span;
+      let bwd_span = P.spanningtree_from bwd snk |> edges_to_graph |> O.mirror in
+      print_graph (Some "bwd_span.dot") bwd_span;
+      let slice_graph = O.intersect fwd_span bwd_span in
+      print_graph (Some "slice_graph.dot") slice_graph;
+      ["graph"; "fwd_graph"; "bwd_graph";
+       "fwd_span"; "bwd_span"; "slice_graph"]
+      |> List.map ~f:(Log.dot)
+      |> String.concat ~sep:" "
+      |> Printf.printf "%s";
+      Breakpoint.set true;
+      slice_graph
 
 
-    let add_edge_if_not_exists g src dst =
-      if G.mem_edge g src dst then
-        g
-      else
-        G.add_edge g src dst
+    let add_paths_between g =
+      fun src snk acc_graph ->
+      reachable_graph_between g src snk
+      |> O.union acc_graph
 
-    let add_paths_between g src snk acc_graph =
-      let pis = get_paths_between g src snk in
-      Log.print @@ lazy (Printf.sprintf "There are %d paths\n%!" (List.length pis));
-      let rec add_path acc_graph pi =
-        match Path.pop pi with
-        | _, None -> acc_graph
-        | (src, Some pi) ->
-          (* Invariant: [src] is already in the graph *)
-          let dst = Path.peek pi in
-          let acc_graph = add_vertex_if_not_exists acc_graph dst in
-          let acc_graph = add_edge_if_not_exists acc_graph src dst in
-          add_path acc_graph pi
-      in
-      List.fold pis
-        ~f:(add_path)
-        ~init:(add_vertex_if_not_exists acc_graph snk)
-
-    let induce (g : G.t) (pi : G.V.t list) : G.t =
+    let induce (g : G.t) =
+      let g_paths_between = add_paths_between g in
+      fun (pi : G.V.t list) : G.t ->
       (*outer pi is in reverese order*)
       let rec induce_path result_graph pi : G.t =
         (* inner pi is in forward order *)
@@ -803,33 +845,79 @@ module Make (P : Primitive) = struct
         | [_] -> result_graph
         | src::tgt::pi ->
           assert ((snd src) < (snd tgt));
-          let result_graph = add_paths_between g src tgt result_graph in
+          let result_graph = g_paths_between src tgt result_graph in
+          print_graph (Some "result_graph.dot") result_graph;
+          Log.print @@ lazy (Printf.sprintf "Printing graph between %d and %d" (snd src) (snd tgt));
+          Log.print @@ lazy (Log.dot "result_graph");
+          Breakpoint.set true;
           induce_path result_graph (tgt::pi)
       in
-      let src = find_source g in
+      (* let src = find_source g in *)
       (* let tgt = find_sink g in *)
       (*add src & tgt to pi and make sure pi is in the correct order*)
-      let pi = List.(rev pi |> cons src) in
+      (* let pi = List.(rev pi |> cons src) in *)
+      let pi = List.rev pi in
       Printf.printf "The induced path:\n%!";
       List.iter pi ~f:(fun vtx ->
         Printf.printf "\tNode %d\n%!" (snd vtx)
       );
       induce_path G.empty pi
 
+    let find_first_join_point g =
+      let memo_table = VTbl.create () in
+      fun src ->
+      Log.print @@ lazy (Printf.sprintf "Find First Join Point after %d" (snd src));
+      let rec loop worklist =
+        match worklist with
+        | [] -> failwith "could not find a join point"
+        | pi::worklist ->
+          let vtx = Path.peek pi in
+          if List.for_all worklist ~f:(Path.contains vtx) then
+            vtx
+          else
+            List.rev worklist
+            |> G.fold_succ (fun vtx -> List.cons (Path.add vtx pi)) g vtx
+            |> List.rev
+            |> loop
+      in
+      match VTbl.find memo_table src with
+      | None ->
+        let jp = loop (List.map (G.succ g src) ~f:Path.singleton)in
+        (* Log.print @@ lazy (Printf.sprintf "Found %d" (snd jp)); *)
+        VTbl.set memo_table ~key:src ~data:jp;
+        jp
+      | Some jp ->
+        (* Log.print @@ lazy (Printf.sprintf "Found Cached %d" (snd jp)); *)
+        jp
+
+
     let of_graph (g : G.t) : t =
       Log.print @@ lazy "Getting CMD of graph";
-      let rec loop (curr : G.V.t) =
-        Log.print @@ lazy (Printf.sprintf "Node %d" (snd curr));
-        let succs = G.succ g curr in
-        if List.is_empty succs then
-          prim (fst curr)
-        else
-          List.map succs ~f:(loop)
-          |> choices
-          |> seq (prim (fst curr))
+      let g_join_point_finder = find_first_join_point g in
+      let rec loop join_point_opt (curr : G.V.t) =
+        match join_point_opt with
+        | Some join_point when (snd curr) = (snd join_point) ->
+          Log.print @@ lazy (Printf.sprintf "Skipping join_point %d == %s" (snd curr) (P.to_smtlib @@ fst curr));
+          skip
+        | Some join_point when (snd curr) > (snd join_point) ->
+          failwith "passed the predetermined join point"
+        | _ ->
+          let _ = Log.print @@ lazy (Printf.sprintf "Node %d is %s" (snd curr) (P.to_smtlib @@ fst curr)) in
+          (* Log.print @@ lazy (Printf.sprintf "Node %d" (snd curr)); *)
+          let succs = G.succ g curr in
+          if List.is_empty succs then
+            prim (fst curr)
+          else
+            let join_point = g_join_point_finder curr in
+            let branches = List.map succs ~f:(loop (Some join_point)) in
+            sequence [prim (fst curr);
+                      choices branches;
+                      loop None join_point
+                    ]
       in
       let source = find_source g in
-      loop source
+      Log.print @@ lazy (Printf.sprintf "starting at %d\n%!" (snd source));
+      loop None source
 
     (* Monoids *)
     let zero = dead
@@ -1192,7 +1280,10 @@ module Generator = struct
 
   let create c =
     let g = TFG.construct_graph c in
-    if !Log.debug then TFG.print_graph (Some "tfg.dot") g;
+    Printf.printf "TFG made\n%!";
+    Printf.printf "There are %s paths" (Bigint.to_string @@ TFG.count_cfg_paths g);
+    TFG.print_graph (Some "tfg.dot") g;
+    Breakpoint.set true;
     graph := Some g;
     let src = TFG.find_source g in
     Stack.push worklist ([src], TFG.G.succ g src)
