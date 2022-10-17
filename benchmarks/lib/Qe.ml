@@ -126,11 +126,8 @@ let subsolving (prog, asst) =
                    if List.exists (fst (BExpr.vars soln)) ~f:(fun y -> String.(Var.str x = Var.str y)) then begin
                        Printf.printf "Didn't elim %s from \n %s\n\n GOT \n %s\n %!" (Var.str x) (BExpr.to_smtlib qf_phi) (BExpr.to_smtlib soln);
                        assert false
-                     end
-                   else begin
-                       Printf.printf "REMOVED %s\n%!" (Var.str x);
                      end;
-                   soln
+                  soln
                  ) in
   Log.qe "%s" @@ lazy "getting the vars of the result";
   let dvs', cvs = BExpr.vars qf_phi in
@@ -178,7 +175,6 @@ let solve_one asserted_prog =
 let solving_all_paths_inner (prog, asst) =
   let (_, passive) = PassiveGCL.passify GCL.(seq prog (assume asst))  in
   let path_optimized = PassiveGCL.assume_disjuncts passive in
-  Breakpoint.set true;
   let pis = PassiveGCL.paths path_optimized in
   let completed = ref Bigint.zero in
   Sequence.fold pis ~init:[] ~f:(fun acc pi ->
@@ -235,50 +231,63 @@ let table_path_to_string (pi : TFG.Vertex.t list) : string =
 let table_paths ((prog, asst) : TFG.t * BExpr.t) =
   let asserted_prog = TFG.(seq prog (assert_ asst)) in
   let gpl_prog = TFG.inject asserted_prog in
-  Printf.printf "Constructing Graph For Gpl:%s\n%!\n\n" (GPL.to_string gpl_prog);
+  Log.graph "Constructing Graph For Gpl:%s\n%!\n\n" @@ lazy (GPL.to_string gpl_prog);
   let gpl_graph = GPL.construct_graph gpl_prog in
   Log.graph "%s" @@ lazy (GPL.print_key gpl_graph);
   Log.graph_dot (GPL.print_graph gpl_graph) "gpl.dot";
-  Breakpoint.set true;
   Generator.create asserted_prog;
   let explored_paths = ref Bigint.zero  in
-  let induce = GPL.induce gpl_graph in (* DO NOT INLINE, for caching performance reasons *)
+  let inducer = GPL.induce gpl_graph in (* DO NOT INLINE, for caching performance reasons *)
+  let phi_prog = GPL.encode_tables gpl_prog |> PassiveGCL.passify |> snd |> PassiveGCL.vc in
+  let vars = BExpr.vars phi_prog |> Tuple2.uncurry (@) in
+  let sufficient phi phi_prog =
+    (* check that phi => phi_prog is valid *)
+    Solver.check_unsat vars
+      BExpr.(and_ phi (not_ phi_prog))
+      ~timeout:(Some 20000)
+  in
+  let clock = Clock.start () in
   let rec loop phi =
-    (* TODO CHECK SUFFICIENCY of phi*)
-    match Generator.get_next () with
-    | None -> phi
-    | Some pi ->
-      Printf.printf "Inducing path #%s\n" (Bigint.to_string !explored_paths);
-      let induced_program = induce pi in
-      Log.path_gen "%s" @@ lazy "Converting to syntax";
-      Log.path_gen_dot (GPL.print_graph induced_program) "induced_program";
-      let gpl = GPL.of_graph induced_program in
-      Log.irs "GPL:\n%s\n%!" @@ lazy (GPL.to_string gpl);
-      let gcl = GPL.encode_tables gpl in
-      Log.irs "GCL:\n%s\n%!" @@ lazy (GCL.to_string gcl);
-      let gcl = GCL.optimize gcl in
-      Log.irs "Optimized GCL:\n%s\n%!" @@ lazy (GCL.to_string gcl);
-      let (_, psv) = PassiveGCL.passify gcl in
-      let (cvs, qf_psi_str) = solve_one psv in
-      let qf_psi = Solver.of_smtlib ~dvs:[] ~cvs qf_psi_str in
-      let sat = Solver.check_sat cvs qf_psi in
-      if sat then Printf.printf "SAT\n%!" else Printf.printf "UNSAT\n%!";
-      if sat then
-        assert (not (BExpr.(equal qf_psi false_)))
-      else begin
-        Log.path_gen "Table list:\n\t%s\n" @@ lazy (table_path_to_string pi);
-        Log.irs "TFG:%s\n%!" @@ lazy (TFG.to_string asserted_prog);
-        Log.irs "GPL:%s\n%!" @@ lazy (GPL.to_string gpl);
-        Log.irs "GCL:%s\n%!" @@ lazy (GCL.to_string gcl);
-        Log.irs "PSV:%s\n%!" @@ lazy (PassiveGCL.to_string psv);
-        Log.graph_dot (TFG.print_graph (Option.value_exn !Generator.graph)) "tfg";
-        Log.graph_dot (GPL.print_graph gpl_graph) "gpl";
+    if sufficient phi phi_prog then
+      phi
+    else
+      match Generator.get_next () with
+      | None -> phi
+      | Some pi ->
+        Log.debug "Inducing path #%s" @@ lazy (Bigint.to_string !explored_paths);
+        Log.debug "\tRunning for %fms" @@ lazy (Clock.stop clock);
+        let induced_program = inducer pi in
+        Log.path_gen "%s" @@ lazy "Converting to syntax";
         Log.path_gen_dot (GPL.print_graph induced_program) "induced_program";
-        raise (Failure "Found unsolveable path")
-      end;
-      Bigint.incr explored_paths;
-      Log.path_gen "Path condition: \n%s\n%!" @@ lazy (BExpr.to_smtlib phi);
-      loop (BExpr.and_ qf_psi phi)
+        let gpl = GPL.of_graph induced_program in
+        Log.irs "GPL:\n%s\n%!" @@ lazy (GPL.to_string gpl);
+        let gcl = GPL.encode_tables gpl in
+        Log.irs "GCL:\n%s\n%!" @@ lazy (GCL.to_string gcl);
+        let gcl = GCL.optimize gcl in
+        Log.irs "Optimized GCL:\n%s\n%!" @@ lazy (GCL.to_string gcl);
+        let (_, psv) = PassiveGCL.passify gcl in
+        if sufficient phi (PassiveGCL.vc psv) then
+          loop phi
+        else
+          let (cvs, qf_psi_str) = solve_one psv in
+          let qf_psi = Solver.of_smtlib ~dvs:[] ~cvs qf_psi_str in
+          let sat = Solver.check_sat cvs qf_psi in
+          if sat then
+            assert (not (BExpr.(equal qf_psi false_)))
+          else begin
+            Log.path_gen "Table list:\n\t%s\n" @@ lazy (table_path_to_string pi);
+            Log.irs "TFG:%s\n%!" @@ lazy (TFG.to_string asserted_prog);
+            Log.irs "GPL:%s\n%!" @@ lazy (GPL.to_string gpl);
+            Log.irs "GCL:%s\n%!" @@ lazy (GCL.to_string gcl);
+            Log.irs "PSV:%s\n%!" @@ lazy (PassiveGCL.to_string psv);
+            Log.graph_dot (TFG.print_graph (Option.value_exn !Generator.graph)) "tfg";
+            Log.graph_dot (GPL.print_graph gpl_graph) "gpl";
+            Log.path_gen_dot (GPL.print_graph induced_program) "induced_program";
+            raise (Failure "Found unsolveable path")
+          end;
+          Bigint.incr explored_paths;
+          Log.path_gen "Path condition: \n%s\n%!" @@ lazy (BExpr.to_smtlib phi);
+          loop (BExpr.and_ qf_psi phi)
   in
   loop BExpr.true_
 

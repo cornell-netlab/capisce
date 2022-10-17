@@ -636,7 +636,6 @@ module Make (P : Primitive) = struct
     module VMap = Graph.Gmap.Vertex (G) (struct include G let empty () = empty end)
 
     let construct_graph t =
-      Printf.printf "Constructing Graph\n%!";
       let src = (P.assume BExpr.true_, 0) in
       let g = G.(add_vertex empty src) in
       let dedup = List.dedup_and_sort ~compare:(fun (_,idx) (_, idx') -> Int.compare idx idx') in
@@ -671,7 +670,6 @@ module Make (P : Primitive) = struct
       (*Create a sink node, and add edges to it*)
       let snk = G.V.create (P.assume BExpr.true_, idx) in
       let g = List.fold ns ~init:g ~f:(fun g n -> G.add_edge g n snk) in
-      Printf.printf "Done constructing Graph\n%!";
       g
 
     module Dot = Graph.Graphviz.Dot (struct
@@ -813,7 +811,6 @@ module Make (P : Primitive) = struct
       let bwd = O.mirror fwd in
       Log.path_gen_dot (print_graph bwd) "bwd_graph.dot";
       let fwd_span_edges = P.spanningtree_from fwd src in
-      Printf.printf "%d Spanning tree_edges" (List.length fwd_span_edges);
       let fwd_span = edges_to_graph fwd_span_edges in
       Log.path_gen_dot (print_graph fwd_span) "fwd_span.dot";
       let bwd_span = P.spanningtree_from bwd snk |> edges_to_graph |> O.mirror in
@@ -921,7 +918,7 @@ module GCL = struct
   let assign x e = prim (Active.assign x e)
 
   let table (name, keys, (actions : (Var.t list * Action.t list) list)) =
-    let cp_key idx  = Printf.sprintf "_symb$%s$key_$%d" name idx in
+    let cp_key idx  = Printf.sprintf "_symb$%s$match_%d" name idx in
     let act_size = Int.of_float Float.(log (of_int (List.length actions)) + 1.0) in
     let cp_action = Var.make (Printf.sprintf "_symb$%s$action" name) act_size in
     let cp_data idx param = (Var.make (Printf.sprintf  "_symb$%s$%d$%s" name idx (Var.str param)) (Var.size param)) in
