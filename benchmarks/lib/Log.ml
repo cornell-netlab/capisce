@@ -81,7 +81,7 @@ let dot_string f = Printf.sprintf "dot -Tps %s.dot -o %s.pdf; xdg-open %s.pdf;" 
 
 let log flag output fmt a : unit =
   if enabled flag then begin
-    Printf.fprintf output (fmt ^^ "\n%!")  (Lazy.force a);
+    Printf.fprintf output (fmt ^^ "\n%!") (Lazy.force a);
     Breakpoint.set (is_break flag)
   end
 
@@ -94,6 +94,7 @@ let graph fmt    = log FLAGS.graph    stdout fmt
 let irs fmt      = log FLAGS.irs      stdout fmt
 let path_gen fmt = log FLAGS.path_gen stdout fmt
 let compiler fmt = log FLAGS.compiler stdout fmt
+let compiler_s s = compiler "%s" (lazy s)
 let smart fmt    = log FLAGS.smart    stdout fmt
 let rewrites fmt = log FLAGS.rewrites stdout fmt
 let qe fmt       = log FLAGS.qe stdout fmt
@@ -116,3 +117,5 @@ let debug fmt =
     log FLAGS.debug stdout fmt
   else
     failwith "REMOVE ALL DEBUG STATEMENTS"
+
+let debug_s s = debug "%s" (lazy s)

@@ -1,3 +1,4 @@
+open Core
 open Base_quickcheck
    
 type t [@@deriving compare, hash, sexp]
@@ -36,3 +37,7 @@ val unindex : t -> (t * int) option
 val quickcheck_generator : t Generator.t
 val quickcheck_observer : t Observer.t
 val quickcheck_shrinker : t Shrinker.t
+
+
+module Set : Set.S with type Elt.t = t
+module Map : Map.S with type Key.t = t

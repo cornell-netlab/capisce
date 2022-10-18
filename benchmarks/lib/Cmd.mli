@@ -1,28 +1,6 @@
 open Core
+open Primitives
 
-module type Primitive = sig
-  type t [@@deriving quickcheck, eq, hash, sexp, compare]
-  val assume : BExpr.t -> t
-  val assert_ : BExpr.t -> t
-  val contra : t -> t -> bool
-  val to_smtlib : t -> string
-  val count_asserts : t -> int
-  val size : t -> int
-  val subst : Var.t -> Expr.t -> t -> t
-  val normalize_names : t -> t
-  val comparisons : t -> (Var.t * Expr.t) list option
-  val is_node : t -> bool
-  val name : t -> string
-  val is_table : t -> bool
-end
-
-
-module Pipeline : Primitive
-
-module Action : sig
-  include Primitive
-  val assign : Var.t -> Expr.t -> t
-end
 
 module type CMD = sig
   type t [@@deriving quickcheck, eq, sexp, compare]
@@ -67,15 +45,16 @@ module type CMD = sig
   val construct_graph : t -> G.t
   val print_graph : G.t -> string option -> unit
   val count_cfg_paths : G.t -> Bigint.t
-end
 
+  val optimize : t -> t
+  val optimize_seq_pair : (t * t) -> (t * t)
+end
 
 module GCL : sig
   include CMD
   val assign : Var.t -> Expr.t -> t
   val wp : t -> BExpr.t -> BExpr.t
   val const_prop : t -> t
-  val optimize : t -> t
   val vc : t -> BExpr.t
 end
 

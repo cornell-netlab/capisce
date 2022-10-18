@@ -34,3 +34,13 @@ let projMap ~put ~get ~f xs =
   List.map xs ~f:(fun x -> put x (f (get x)))
 
 let inj2 (x, _) y = (x,y)
+
+let rec fix ~equal f x =
+  let x' = f x in
+  if equal x' x then
+    x
+  else
+    fix ~equal f x'
+
+
+let concat (x,y) = x @ y

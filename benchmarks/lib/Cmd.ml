@@ -1,336 +1,5 @@
 open Core
-
-module VarSet = Set.Make (Var)
-module VarMap = Map.Make (Var)
-
-
-module type Primitive = sig
-  type t [@@deriving quickcheck, eq, hash, sexp, compare]
-  val assume : BExpr.t -> t
-  val assert_ : BExpr.t -> t
-  val contra : t -> t -> bool
-  val to_smtlib : t -> string
-  val count_asserts : t -> int
-  val size : t -> int
-  val subst : Var.t -> Expr.t -> t -> t
-  val normalize_names : t -> t
-  val comparisons : t -> (Var.t * Expr.t) list option
-  val is_node : t -> bool
-  val name : t -> string
-  val is_table : t -> bool
-end
-
-
-module Assert = struct
-  type t = BExpr.t
-  [@@deriving quickcheck, eq, hash, sexp, compare]
-
-  let assert_ b = b
-  let contra b1 b2 = BExpr.equal b1 (BExpr.not_ b2) || BExpr.equal b2 (BExpr.not_ b2)
-  let to_smtlib b =
-    Printf.sprintf "assert %s" (BExpr.to_smtlib b)
-  let name _ = Printf.sprintf "assert"
-  let count_asserts (_:t) = 1
-  let size (b : t) = BExpr.size b
-  let subst x e (b:t) : t = BExpr.subst x e b
-  let wp (b:t) (phi : BExpr.t) : BExpr.t = BExpr.and_ b phi
-  let normalize_names : t -> t = BExpr.normalize_names
-  let comparisons = BExpr.comparisons
-  let is_table (_:t) = false
-end
-
-module Passive = struct
-  type t =
-    | Assume of BExpr.t
-    | Assert of Assert.t
-  [@@deriving quickcheck, eq, hash, sexp, compare]
-
-  let assume b = Assume b
-  let assert_ a = Assert a
-
-  let contra c1 c2 =
-    match c1, c2 with
-    | Assert b1, Assert b2 -> Assert.contra b1 b2
-    | _, _ -> false
-
-  let to_smtlib = function
-    | Assume b ->
-      Printf.sprintf "assume %s%!" (BExpr.to_smtlib b)
-    | Assert b -> Assert.to_smtlib b
-
-  let name = function
-    | Assume _ -> "assume"
-    | Assert b ->
-      Assert.name b
-
-  let count_asserts = function
-    | Assume _ -> 0
-    | Assert _ -> 1
-
-  let size = function
-    | Assume b -> 1 + BExpr.size b
-    | Assert b -> 1 + Assert.size b
-
-  let subst x e = function
-    | Assume b -> assume (BExpr.subst x e b)
-    | Assert b -> assert_ (Assert.subst x e b)
-
-  let wp t phi = match t with
-    | Assume b -> BExpr.imp_ b phi
-    | Assert b -> Assert.wp b phi
-
-  let normalize_names = function
-    | Assume b -> assume (BExpr.normalize_names b)
-    | Assert b -> assert_ (Assert.normalize_names b)
-
-  let comparisons = function
-    | Assume b -> BExpr.comparisons b
-    | Assert _ -> None
-
-  let is_node (_:t) = true
-
-  let is_table = function
-    | Assume _ -> false
-    | Assert a -> Assert.is_table a
-
-end
-
-module Assign = struct
-  type t = Var.t * Expr.t
-  [@@deriving quickcheck, eq, sexp, compare, hash]
-
-  let to_smtlib (x,e) = Printf.sprintf "%s:=%s" (Var.str x) (Expr.to_smtlib e)
-
-  let name _ = "assign"
-
-  let assign x e = (x,e)
-
-  let count_asserts (_ : t) = 0
-
-  let size (_,e) = 1 + Expr.size e
-
-  let subst x e ((y,e') : t) =
-    if Var.(x = y) then
-      failwithf "tried to substitute an lvalue %s with %s" (Var.str x) (Expr.to_smtlib e) ()
-    else
-      assign y (Expr.subst x e e')
-
-  let wp (x,e) phi =  BExpr.subst x e phi
-
-  let normalize_names (x,e) = assign (Var.normalize_name x) (Expr.normalize_names e)
-
-  let is_table (_:t) = false
-
-end
-
-
-module Action = struct
-  type t =
-    | Assign of Assign.t
-    | Assert of Assert.t
-  [@@deriving quickcheck, hash, eq, sexp, compare]
-
-  let assign x e = Assign (Assign.assign x e)
-  let assert_ b = Assert (Assert.assert_ b)
-  let assume _ = failwith "assumes are not allowed in actions"
-  let contra c1 c2 = match c1,c2 with
-    | Assert b1, Assert b2 -> Assert.contra b1 b2
-    | _ -> false
-
-  let to_smtlib = function
-    | Assign a -> Assign.to_smtlib a
-    | Assert b -> Assert.to_smtlib b
-
-  let name = function
-    | Assign a -> Assign.name a
-    | Assert b -> Assert.name b
-
-  let size = function
-    | Assign a -> Assign.size a
-    | Assert b -> Assert.size b
-
-  let subst x e = function
-    | Assign a -> Assign (Assign.subst x e a)
-    | Assert b -> Assert (Assert.subst x e b)
-
-  let normalize_names = function
-    | Assign a -> Assign (Assign.normalize_names a)
-    | Assert b -> Assert (Assert.normalize_names b)
-
-  let count_asserts = function
-    | Assign a -> Assign.count_asserts a
-    | Assert b -> Assert.count_asserts b
-
-  let comparisons = function
-    | Assign _ -> None
-    | Assert b -> Assert.comparisons b
-
-  let is_node (_ : t) = true
-  let is_table (_:t) = false
-
-end
-
-module Active = struct
-  type t =
-    | Passive of Passive.t
-    | Assign of Assign.t
-  [@@deriving quickcheck, eq, hash, sexp, compare]
-
-  let assume b = Passive (Passive.assume b)
-  let assert_ b = Passive (Passive.assert_ b)
-  let assign x e = Assign (Assign.assign x e)
-  let contra a1 a2 =
-    match a1, a2 with
-    | Passive p1, Passive p2 -> Passive.contra p1 p2
-    | _, _ -> false
-
-  let to_smtlib = function
-    | Passive p -> Passive.to_smtlib p
-    | Assign a -> Assign.to_smtlib a
-
-  let count_asserts = function
-    | Passive p -> Passive.count_asserts p
-    | Assign a -> Assign.count_asserts a
-
-  let size = function
-    | Passive p -> Passive.size p
-    | Assign a -> Assign.size a
-
-  (* let vars = function *)
-  (*   | Passive p -> Passive.vars p *)
-  (*   | Active a -> Assign.vars a *)
-
-  let subst x e = function
-    | Passive p -> Passive (Passive.subst x e p)
-    | Assign a -> Assign (Assign.subst x e a)
-
-  let wp active phi = match active with
-    | Passive p -> Passive.wp p phi
-    | Assign p -> Assign.wp p phi
-
-  let normalize_names = function
-    | Passive p -> Passive (Passive.normalize_names p)
-    | Assign a -> Assign (Assign.normalize_names a)
-
-  let comparisons = function
-    | Passive p -> Passive.comparisons p
-    | Assign _ -> None
-
-  let name = function
-    | Passive p -> Passive.name p
-    | Assign a -> Assign.name a
-
-  let is_node (_:t) = true
-
-  let of_action = function
-    | Action.Assign (x,e) -> assign x e
-    | Action.Assert b -> assert_ b
-
-
-  let is_table = function
-    | Passive p -> Passive.is_table p
-    | Assign a -> Assign.is_table a
-  
-end
-
-module Table = struct
-  type t = {name : string;
-            keys : Var.t list;
-            actions : (Var.t list * Action.t list) list }
-  [@@deriving quickcheck, hash, eq, sexp, compare]
-
-  let to_smtlib tbl = Printf.sprintf "%s.apply()" tbl.name
-
-  let name tbl = tbl.name
-
-  let size (tbl : t) =
-    1 + List.length tbl.keys +
-    List.sum (module Int) tbl.actions ~f:(fun (_,prims) ->
-        List.sum (module Int) prims ~f:(Action.size))
-
-  let subst x e (tbl : t) =
-    if List.exists tbl.keys ~f:(Var.equal x) then
-      failwithf "Cannot substitute variable %s, its a key in table %s" (Var.str x) tbl.name ()
-    else
-      let open List.Let_syntax in
-      let actions =
-        let%map (args, body) = tbl.actions in
-        if List.exists args ~f:(Var.equal x) then
-          (args, body)
-        else
-          let body = List.map body ~f:(Action.subst x e) in
-          (args, body)
-      in
-      {tbl with actions}
-
-  let normalize_names (tbl : t) =
-    let open List.Let_syntax in
-    let keys = List.map tbl.keys ~f:(Var.normalize_name) in
-    let actions =
-      let%map (args, body) = tbl.actions in
-      (List.map ~f:Var.normalize_name args,
-       List.map ~f:Action.normalize_names body )
-    in
-    {tbl with keys; actions}
-
-  let is_table (_:t) = true
-
-end
-
-module Pipeline = struct
-  module P = struct
-    type t =
-      | Active of Active.t
-      | Table of Table.t
-    [@@deriving quickcheck, eq, hash, sexp, compare]
-
-    let to_smtlib = function
-      | Active a -> Active.to_smtlib a
-      | Table t -> Table.to_smtlib t
-
-    let name = function
-      | Active a -> Active.name a
-      | Table t -> Table.name t
-
-    let count_asserts = function
-      | Active a -> Active.count_asserts a
-      | Table _ -> 0
-
-
-    let size = function
-      | Active a -> Active.size a
-      | Table t -> Table.size t
-
-    let subst x e = function
-      | Active a -> Active (Active.subst x e a)
-      | Table t -> Table (Table.subst x e t)
-
-    let normalize_names = function
-      | Active a -> Active (Active.normalize_names a)
-      | Table t -> Table (Table.normalize_names t)
-
-    let contra c1 c2 = match c1, c2 with
-      | Active a1, Active a2 ->
-        Active.contra a1 a2
-      | _, _ -> false
-
-    let comparisons = function
-      | Table _ -> None
-      | Active a -> Active.comparisons a
-    let assume b = Active (Active.assume b)
-    let assert_ b = Active (Active.assert_ b)
-    let is_node (_:t) = true
-
-    let is_table = function
-      | Active a -> Active.is_table a
-      | Table t -> Table.is_table t
-
-  end
-
-  module Map = Map.Make (P)
-  module Set = Set.Make (P)
-  include P
-end
+open Primitives
 
 module type CMD = sig
   type t [@@deriving quickcheck, eq, sexp, compare]
@@ -372,6 +41,8 @@ module type CMD = sig
   val construct_graph : t -> G.t
   val print_graph : G.t -> string option -> unit
   val count_cfg_paths : G.t -> Bigint.t
+  val optimize : t -> t
+  val optimize_seq_pair : (t * t) -> (t * t)
 end
 
 module Make (P : Primitive) = struct
@@ -479,24 +150,24 @@ module Make (P : Primitive) = struct
       | _, _ ->
         sequence [c1; c2]
 
-    let rec trivial_branch_comparisons cs (comps : Expr.t list VarMap.t) =
+    let rec trivial_branch_comparisons cs (comps : Expr.t list Var.Map.t) =
       let open Option.Let_syntax in
       match cs with
       | [] -> Some comps
       | Prim p::cs ->
         let%bind comps' = P.comparisons p in
         List.fold comps' ~init:comps
-          ~f:(fun acc (key,data) -> VarMap.add_multi acc ~key ~data)
+          ~f:(fun acc (key,data) -> Var.Map.add_multi acc ~key ~data)
         |> trivial_branch_comparisons cs
       | _ ->
         None
 
     let can_collapse_total_trivial_branch cs =
-      match trivial_branch_comparisons cs VarMap.empty with
+      match trivial_branch_comparisons cs Var.Map.empty with
       | None -> false
       | Some comps ->
-        List.length (VarMap.keys comps) = 1
-        && VarMap.for_alli comps ~f:(fun ~key ~data ->
+        List.length (Var.Map.keys comps) = 1
+        && Var.Map.for_alli comps ~f:(fun ~key ~data ->
             String.is_suffix (Var.str key) ~suffix:"$action"
             && List.for_all data ~f:(fun e -> Option.is_some (Expr.get_const e)))
 
@@ -620,6 +291,83 @@ module Make (P : Primitive) = struct
           |> concat
       in
       loop c
+
+    let rec const_prop_inner f c : Facts.t * t =
+      match c with
+      | Prim p ->
+        let (f, p) = P.const_prop f p in
+        (f, Prim p)
+      | Seq cs ->
+        let fs, cs =
+          List.fold cs ~init:(f, [])
+            ~f:(fun (f, cs) c ->
+                let f, c = const_prop_inner f c in
+                (f, cs @ [c])) in
+        (fs, sequence cs)
+      | Choice [] ->
+        failwith "Choice of no alternatives"
+      | Choice (c::cs) ->
+        List.fold cs
+          ~init:(const_prop_inner f c)
+          ~f:(fun (fs, cs) c1 ->
+              let f1, c1 = const_prop_inner f c1 in
+              let fs = Facts.merge fs f1 in
+              (fs , choice c1 cs))
+
+    let const_prop c : t =
+      Log.compiler_s "constant propagation";
+      const_prop_inner Facts.empty c |> snd
+
+    let rec dead_code_elim_inner reads c : (Var.Set.t * t) =
+      match c with
+      | Prim (p) ->
+        begin match P.dead_code_elim reads p with
+          | None ->
+            (reads, skip)
+          | Some (reads, p) ->
+            (reads, prim p)
+        end
+      | Choice [] -> failwith "cannot have 0-ary choice"
+      | Choice (c::cs) ->
+        List.fold cs
+          ~init:(dead_code_elim_inner reads c)
+          ~f:(fun (read_by_cs, cs) c ->
+              let read_by_c, c = dead_code_elim_inner reads c in
+              (Var.Set.union read_by_cs read_by_c, choice cs c))
+      | Seq cs ->
+        let (reads, cs) =
+          List.fold (List.rev cs) ~init:(reads, [])
+            ~f:(fun (reads, cs) c ->
+                let reads, c = dead_code_elim_inner reads c in
+                (reads, c::cs)) in
+        (reads, sequence cs)
+
+    let dead_code_elim c =
+      Log.compiler_s "dead code elim";
+      Util.fix ~equal
+        (fun c -> snd (dead_code_elim_inner Var.Set.empty c))
+        c
+
+    let optimize c =
+      Log.compiler_s "optimizing...";
+      let o c = dead_code_elim (const_prop c) in
+      Util.fix ~equal o c
+
+    let optimize_seq_pair (c1,c2) =
+      Log.compiler_s "optimizing pair";
+      let dce (c1,c2) =
+        let (reads, c2) = dead_code_elim_inner Var.Set.empty c2 in
+        let (_, c1) = dead_code_elim_inner reads c1 in
+        (c1, c2)
+      in
+      let cp (c1, c2)=
+        let (facts, c1) = const_prop_inner Facts.empty c1 in
+        let (_    , c2) = const_prop_inner facts       c2 in
+        (c1, c2)
+      in
+      let equal (c1,c2) (c1',c2') = equal c1 c1' && equal c2 c2' in
+      let o (c1,c2) = dce (cp (c1,c2)) in
+      Util.fix ~equal o (c1,c2)
 
     module Vertex = struct
       type t = P.t * int
@@ -813,7 +561,8 @@ module Make (P : Primitive) = struct
       let fwd_span_edges = P.spanningtree_from fwd src in
       let fwd_span = edges_to_graph fwd_span_edges in
       Log.path_gen_dot (print_graph fwd_span) "fwd_span.dot";
-      let bwd_span = P.spanningtree_from bwd snk |> edges_to_graph |> O.mirror in
+      let bwd_span_edges = P.spanningtree_from bwd snk in
+      let bwd_span = O.mirror (edges_to_graph bwd_span_edges) in
       Log.path_gen_dot (print_graph bwd_span) "bwd_span.dot";
       let slice_graph = O.intersect fwd_span bwd_span in
       Log.path_gen_dot (print_graph slice_graph) "slice_graph.dot";
@@ -945,134 +694,6 @@ module GCL = struct
     | Seq cs -> List.fold_right cs ~init:phi ~f:wp
     | Choice cs -> ands_ (List.map cs ~f:(fun c -> wp c phi))
 
-  let rec const_prop_aux (f : Facts.t) (c : t) =
-    match c with
-    | Prim (Assign (x,e)) ->
-      let e = Expr.fun_subst (Facts.lookup f) e in
-      let f = Facts.update f x e in
-       (f, assign x e)
-    | Prim (Passive (Assert b)) ->
-      let b = BExpr.fun_subst (Facts.lookup f) b |> BExpr.simplify in
-      let f =
-        match BExpr.get_equality b with
-        | Some (x, e) -> Facts.update f x e
-        | None -> f
-      in
-      (f, assert_ b)
-    | Prim (Passive (Assume b)) ->
-      let b = BExpr.fun_subst (Facts.lookup f) b |> BExpr.simplify in
-      let f =
-        match BExpr.get_equality b with
-        | Some (x, e) -> Facts.update f x e
-        | None -> f
-      in
-      (f, assume b)
-    | Seq cs ->
-      let fs, cs =
-        List.fold cs ~init:(f, [])
-          ~f:(fun (f, cs) c ->
-              let f, c = const_prop_aux f c in
-              (f, cs @ [c])) in
-      (fs, sequence cs)
-    | Choice [] ->
-      failwith "Choice of no alternatives"
-    | Choice (c::cs) ->
-      List.fold cs
-        ~init:(const_prop_aux f c)
-        ~f:(fun (fs, cs) c1 ->
-            let f1, c1 = const_prop_aux f c1 in
-            let fs = Facts.merge fs f1 in
-            (fs , choice c1 cs))
-
-  let const_prop c = snd (const_prop_aux Facts.empty c)
-
-  let rec dead_code_elim_bwd c (reads : VarSet.t) : (t * VarSet.t) =
-    let open VarSet in
-    let concat (x,y) = x @ y in
-    match c with
-    | Prim (Assign (x, e)) ->
-      if exists reads ~f:(Var.(=) x) then
-        let read_by_e = of_list (concat (Expr.vars e)) in
-        let reads_minus_x = remove reads x in
-        let reads = union read_by_e reads_minus_x in
-        (assign x e, reads)
-      else
-        (skip, reads)
-    | Prim (Passive (Assert b)) ->
-      let read_by_b = of_list (concat (BExpr.vars b)) in
-      let simpl_b = BExpr.simplify b in
-      (assert_ simpl_b, union reads read_by_b)
-    | Prim (Passive (Assume b)) ->
-      let read_by_b = of_list (concat (BExpr.vars b)) in
-      let simpl_b = BExpr.simplify b in
-      (assume simpl_b, union reads read_by_b)
-    | Choice [] ->
-      failwith "cannot have 0-ary choice"
-    | Choice (c::cs) ->
-      List.fold cs
-        ~init:(dead_code_elim_bwd c reads)
-        ~f:(fun (cs, read_by_cs) c ->
-            let c, read_by_c = dead_code_elim_bwd c reads in
-            (choice cs c, union read_by_cs read_by_c))
-    | Seq cs ->
-      let cs, reads =
-        List.fold (List.rev cs) ~init:([], reads)
-          ~f:(fun (cs, reads) c ->
-              let c, reads = dead_code_elim_bwd c reads in
-              (c::cs, reads)) in
-      sequence cs, reads
-
-  (* let rec dead_code_elim_fwd c (used : VarSet.t) : (t * VarSet.t) = *)
-  (*   let open VarSet in *)
-  (*   let concat (x,y) = x @ y in *)
-  (*   let setify f e = f e |> concat |> of_list in *)
-  (*   match c with *)
-  (*   | (Prim (Assign (x,e))) -> *)
-  (*     let vars_of_e = setify Expr.vars e in *)
-  (*     (assign x e, union (add used x) vars_of_e) *)
-  (*   | (Prim (Passive (Assert b))) -> (assert_ b, union used (setify BExpr.vars b)) *)
-  (*   | (Prim (Passive (Assume b))) -> *)
-  (*     let bs_vars = setify BExpr.vars b in *)
-  (*     if is_empty (inter bs_vars used) *)
-  (*     && VarSet.for_all bs_vars ~f:(Fn.non Var.is_symbRow) then *)
-  (*       (skip, used) *)
-  (*     else *)
-  (*       (assume b, union bs_vars used) *)
-  (*   | Choice [] -> *)
-  (*     failwith "cannot have 0-ary choice" *)
-  (*   | Choice (c::cs) -> *)
-  (*     List.fold cs *)
-  (*       ~init:(dead_code_elim_fwd c used) *)
-  (*       ~f:(fun (cs, used_by_cs) c -> *)
-  (*           let c, used_by_c = dead_code_elim_fwd c used in *)
-  (*           (choice cs c, union used_by_cs used_by_c)) *)
-  (*   | Seq cs -> *)
-  (*     let rcs, used = *)
-  (*       List.fold cs ~init:([], used) *)
-  (*         ~f:(fun (cs, used) c -> *)
-  (*             let c, used = dead_code_elim_fwd c used in *)
-  (*             (c::cs, used)) *)
-  (*     in *)
-  (*     (List.rev rcs |> sequence, used) *)
-
-  let dead_code_elim_inner c =
-    let c, _ = dead_code_elim_bwd c VarSet.empty in
-    (* let c, _ = dead_code_elim_fwd c VarSet.empty in *)
-    c
-
-  let rec fix f x =
-    let x' = f x in
-    if equal x' x then
-      x
-    else
-      fix f x'
-
-  let dead_code_elim = fix dead_code_elim_inner
-
-  let optimize c =
-    let o c = dead_code_elim (const_prop (dead_code_elim (const_prop c))) in
-    fix o c
-
   let vc (c : t) : BExpr.t =
     let o = optimize c in
     wp o BExpr.true_
@@ -1178,7 +799,7 @@ let vc (c : GCL.t) : BExpr.t =
 module GPL = struct
   include Make (Pipeline)
   let assign x e = Prim (Active (Active.assign x e))
-  let table name keys actions = Prim (Table {name;keys;actions})
+  let table name keys actions = Prim (Table {name; keys; actions})
 
   let encode_tables (c : t) : GCL.t =
     let rec loop c =

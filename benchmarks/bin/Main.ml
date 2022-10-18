@@ -65,7 +65,8 @@ let table_infer : Command.t =
       verbosity = flag "-v" (listed string) ~doc:"verbosity" and
       gas_opt = flag "-g" (optional int) ~doc:"how much gas to pass the compiler" and
       unroll_opt = flag "-u" (optional int) ~doc:"how much to unroll the parser" and
-      no_smart = flag "--disable-smart" no_arg ~doc:"disable smart constructors"
+      no_smart = flag "--disable-smart" no_arg ~doc:"disable smart constructors" and
+      sfreq = flag "--freq" (optional int) ~doc:"frequency of sufficiency check"
       in
       fun () ->
         Printexc.record_backtrace true;
@@ -74,13 +75,16 @@ let table_infer : Command.t =
         BExpr.enable_smart_constructors := if no_smart then `Off else `On;
         let gas = Option.value gas_opt ~default:1000 in
         let unroll = Option.value unroll_opt ~default:10 in
+        let sfreq = Option.value sfreq ~default:100 in
         Log.compiler "gas %d" @@ lazy gas;
         Log.compiler "unroll %d" @@ lazy unroll;
+        let prsr = if unroll < 1 then `Skip else `Use in
         let coq_gcl = P4Parse.tbl_abstraction_from_file includes source gas unroll false in
         Log.compiler "%s" @@ lazy "compiling to gpl...";
-        let gpl = Tuple.T2.map ~f:(Translate.gcl_to_gpl) coq_gcl in
+        let gpl = Tuple2.map ~f:(Translate.gcl_to_gpl) coq_gcl in
         let st = Clock.start () in
-        let cpf = Qe.table_infer gpl in
+        let gpl = Tuple2.map_snd ~f:Cmd.GPL.optimize gpl in
+        let cpf = Qe.table_infer ~sfreq ~prsr gpl in
         Printf.printf "Result:\n%s\n%!Computedin %f:\n%!" (BExpr.to_smtlib cpf) (Clock.stop st)
     ]
 
