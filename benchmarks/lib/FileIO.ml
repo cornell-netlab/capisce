@@ -6,6 +6,11 @@ let tmp () =
 let write data ~to_ =
   Out_channel.write_all to_ ~data
 
+let append data ~to_ =
+  let outc = Out_channel.create ~append:true to_ in
+  fprintf outc "%s" data;
+  Out_channel.close outc
+
 let tmp_write str =
   let file = tmp () in
   write str ~to_:file;

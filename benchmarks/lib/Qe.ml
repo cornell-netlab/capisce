@@ -244,23 +244,45 @@ let handle_failure ~pi ~prog ~gpl ~gcl ~psv ~gpl_graph ~induced_graph =
   raise (Failure "Found unsolveable path")
 
 let passive_vc prog =
-   GPL.encode_tables prog
-                 |> PassiveGCL.passify
-                 |> snd
-                 |> PassiveGCL.vc
+  GPL.encode_tables prog
+  |> PassiveGCL.passify
+  |> snd
+  |> PassiveGCL.vc
+
+let paths_per_second paths time_s =  Float.((Bigint.to_float !paths) / time_s)
+
+let completion_time total paths time  =
+  let open Float in
+  let completed_f = Bigint.to_float !paths in
+  ((total - completed_f) / (paths_per_second paths time)) / (60.0 * 60.0 * 24.0)
 
 
-let table_paths ~sfreq ((prsr, prog) : GPL.t * GPL.t) =
+let write_path_results_to_file ~fn pi dur =
+  match fn with
+  | None -> ()
+  | Some file ->
+    let path = List.map pi ~f:(fun (cmd, idx) ->
+        Printf.sprintf "{\"cmd\": \"%s\", \"idx\": %d}"
+          (Pipeline.to_smtlib cmd) idx
+      ) |> String.concat ~sep:"," in
+    let path_json = Printf.sprintf "{\"path\": [%s], \"time\":%f}\n%!" path dur in
+    FileIO.append path_json ~to_:file
+
+
+let table_paths ~sfreq ~fn ((prsr, prog) : GPL.t * GPL.t) =
+
+  (* Initialize the program state*)
   let (prsr, prog) = GPL.optimize_seq_pair (prsr, prog) in
   let gcl_prsr = GPL.encode_tables prsr in                 Log.compiler "Optimized GCL parser:\n%s\n" @@ lazy (GCL.to_string gcl_prsr);
   let gpl_graph = GPL.construct_graph prog in              Log.graph "Constructing Graph For Optimized GPL:%s\n%!\n\n" @@ lazy (GPL.to_string prog);
-  Generator.create (TFG.project prog);                     Log.graph "%s" @@ lazy (GPL.print_key gpl_graph);
-  let explored_paths = ref Bigint.zero  in                 Log.graph_dot (GPL.print_graph gpl_graph) "gpl.dot";
-  let phi_prog = passive_vc prog in
-  let vars = BExpr.vars phi_prog |> Tuple2.uncurry (@)
+  let tot_paths = Generator.create (TFG.project prog) in   Log.graph "%s" @@ lazy (GPL.print_key gpl_graph);
+  (* track the number of paths *)                         Log.graph_dot (GPL.print_graph gpl_graph) "gpl.dot";
+  let paths = ref Bigint.zero  in
+  (* Only check sufficiency when countdown reaches [sfreq] *)
   let countdown = ref 0 in
   let sufficient phi phi_prog =
     (* check that phi => phi_prog is valid *)
+    let vars = BExpr.vars phi_prog |> Tuple2.uncurry (@) in
     if !countdown > 0 then begin
       Int.decr countdown;
       false
@@ -271,16 +293,32 @@ let table_paths ~sfreq ((prsr, prog) : GPL.t * GPL.t) =
         ~timeout:(Some 20000)
     end
   in
-  let inducer = GPL.induce gpl_graph in               (* DO NOT INLINE, for caching performance reasons *)
+  (* DO NOT INLINE --- Partial Applications for performance reasons *)
+  let inducer = GPL.induce gpl_graph in
   let parser_optimize gcl = GCL.(optimize (seq gcl_prsr gcl)) in
+
+  (* Start the timer *)
   let clock = Clock.start () in
+
+  (** THE MAIN LOOP *)
   let rec loop phi =
     if sufficient phi phi_prog then
       phi
     else
       match Generator.get_next () with
       | None -> phi
-      | Some pi ->                                          Log.debug_s (Printf.sprintf "[%fms] Inducing path #%s" (Clock.stop clock) (Bigint.to_string !explored_paths));
+      | Some pi ->
+        (* Failed path #33747 *)
+        (*	assume true@0 --> ingress_port_mapping.apply()@2 --> ingress_port_properties.apply()@4 --> switch_config_params.apply()@5 --> port_vlan_mapping.apply()@13 --> spanning_tree.apply()@18 --> assume true@19 --> assume true@40 --> assume true@46 --> assume true@76 --> assume true@80 --> assume true@84 --> assume true@88 --> assume true@92 --> assume true@96 --> assume true@100 --> assume true@104 --> qos.apply()@105 --> rmac.apply()@108 --> assume true@121 --> assume true@125 --> assume true@129 --> assume true@133 --> assume true@137 --> assume true@141 --> ipv4_racl.apply()@142 --> ipv4_urpf.apply()@147 --> assume true@156 --> assume true@157 --> ipv4_fib.apply()@160 --> assume true@167 --> ipv4_fib_lpm.apply()@168 --> assume true@169 --> assume true@170 --> assume true@176 --> assume true@177 --> assume true@178 --> assume true@179 --> compute_non_ip_hashes.apply()@182 --> assume true@186 --> compute_other_hashes.apply()@188 --> assume true@246 --> ecmp_group.apply()@253 --> assume true@254 --> assume true@261 --> assume true@267 --> assume true@271 --> assume true@275 --> learn_notify.apply()@276 --> assume true@277 --> assume true@278 --> assume true@286 --> assume true@290 --> assume true@294 --> assume true@298 --> assume true@302 --> assume true@306 --> assume true@310 --> assume true@314 --> assume true@318 --> assume true@322 --> assume true@326 --> assume true@330 --> assume true@334 --> assume true@338 --> system_acl.apply()@339 --> drop_stats_0.apply()@342 --> assume true@343 --> assume true@344 --> assume true@345 --> assume true@346*)
+        (* if Bigint.(!paths < of_int 33747) then begin        Log.debug "Skipping Path %s" (lazy (Bigint.to_string !paths)); *)
+        (*   Bigint.incr paths; *)
+        (*   loop phi *)
+        (* end else *)
+        let pi_clock = Clock.start () in
+        let time_s = Float.(Clock.stop clock / 1000.0) in   Log.debug_s (Printf.sprintf "[%fs] Inducing path #%s" time_s (Bigint.to_string !paths));
+                                                            Log.debug "Table list:\n\t%s\n" @@ lazy (table_path_to_string pi);
+                                                            Log.debug "current rate is %f paths per second" @@ lazy (paths_per_second paths time_s);
+                                                            Log.debug "estimated time to completion: %f days" @@ lazy (completion_time (Bigint.to_float tot_paths) paths time_s );
         let induced_graph = inducer pi in                   Log.path_gen_dot (GPL.print_graph induced_graph) "induced_graph";
         let gpl = GPL.of_graph induced_graph in             Log.irs "GPL:\n%s\n%!" @@ lazy (GPL.to_string gpl);
         let gcl = GPL.encode_tables gpl in                  Log.irs "GCL:\n%s\n%!" @@ lazy (GCL.to_string gcl);
@@ -288,14 +326,16 @@ let table_paths ~sfreq ((prsr, prog) : GPL.t * GPL.t) =
         let psv = PassiveGCL.(passify gcl) |> snd in
         if sufficient phi (PassiveGCL.vc psv) then          let () = Log.debug_s "\tSkipped for sufficiency!;\n%!" in
           loop phi
-        else
+        else                                                let () = Log.debug_s "solving" in
           let (cvs, res) = solve_one psv in
           let qf_psi = Solver.of_smtlib ~dvs:[] ~cvs res in
           let sat = Solver.check_sat cvs qf_psi in
           if not sat then handle_failure
                             ~pi  ~prog ~gpl ~gcl ~psv
                             ~gpl_graph ~induced_graph;
-          Bigint.incr explored_paths;                       Log.path_gen "Path condition: \n%s\n%!" @@ lazy (BExpr.to_smtlib phi);
+          Bigint.incr paths;                                Log.smt "Path condition: \n%s\n%!" @@ lazy (BExpr.to_smtlib phi);
+          let dur = Clock.stop pi_clock in
+          write_path_results_to_file ~fn pi dur;
           loop (BExpr.and_ qf_psi phi)
   in
   loop BExpr.true_
@@ -307,6 +347,6 @@ let preprocess ~prsr gpl_prsr gpl_pipeline =
   | `Skip ->
     (GPL.skip, gpl_pipeline)
 
-let table_infer ~sfreq ~prsr (gpl_prsr, gpl_pipeline) =
+let table_infer ~sfreq ~prsr ~fn (gpl_prsr, gpl_pipeline) =
   preprocess ~prsr gpl_prsr gpl_pipeline
-  |> table_paths ~sfreq
+  |> table_paths ~sfreq ~fn

@@ -864,26 +864,34 @@ module TFG = struct
 end
 
 module Generator = struct
+
+  (* module W = Stack *)
+  module W = RandomBag.Make (struct
+      type t = (Pipeline.t * int) list * (Pipeline.t * int) list
+      [@@deriving sexp, compare]
+    end)
+  (* the elements of the workist are pairs (p,c) where p is the path to the
+     current node, and c is the to-be-explored children of the final node of
+     p. Note that the path is expressed as a reverse order list, so the last
+     element in the path is the first element in the list. That is, c are the
+     children of hd p. *)
+
   let graph = ref None
-  let worklist =
-    (* the elements of the workist are pairs (p,c) where p is the path to the
-       current node, and c is the to-be-explored children of the final node of
-       p. Note that the path is expressed as a reverse order list, so the last
-       element in the path is the first element in the list. That is, c are the
-       children of hd p. *)
-    Stack.create ()
+  let worklist = W.create ()
 
   let create c =
     let g = TFG.construct_graph c in
+    (* let g = TFG.break_random_nodes g  in *)
     Log.path_gen "TFG made with %s paths" @@ lazy (Bigint.to_string @@ TFG.count_cfg_paths g);
     Log.path_gen_dot (TFG.print_graph g) "tfg.dot";
     graph := Some g;
     let src = TFG.find_source g in
-    Stack.push worklist ([src], TFG.G.succ g src)
+    W.push worklist ([src], TFG.G.succ g src);
+    TFG.count_cfg_paths g
 
   let rec get_next () =
     let g = Option.value_exn !graph ~message:"[Generator.get_next] uninitialized graph" in
-    match Stack.pop worklist with
+    match W.pop worklist with
     | None -> None
     | Some ([], []) ->
       failwith "path was empty"
@@ -895,7 +903,7 @@ module Generator = struct
         (* keep searching! *)
         get_next ()
     | Some (pi, c::children) ->
-      Stack.push worklist (pi, children);
-      Stack.push worklist (c::pi, TFG.G.succ g c);
+      W.push worklist (pi, children);
+      W.push worklist (c::pi, TFG.G.succ g c);
       get_next()
 end

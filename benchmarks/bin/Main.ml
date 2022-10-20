@@ -66,7 +66,8 @@ let table_infer : Command.t =
       gas_opt = flag "-g" (optional int) ~doc:"how much gas to pass the compiler" and
       unroll_opt = flag "-u" (optional int) ~doc:"how much to unroll the parser" and
       no_smart = flag "--disable-smart" no_arg ~doc:"disable smart constructors" and
-      sfreq = flag "--freq" (optional int) ~doc:"frequency of sufficiency check"
+      sfreq = flag "--freq" (optional int) ~doc:"frequency of sufficiency check" and
+      fn = flag "--log" (optional string) ~doc:"file in which to log incremental paths"
       in
       fun () ->
         Printexc.record_backtrace true;
@@ -84,7 +85,7 @@ let table_infer : Command.t =
         let gpl = Tuple2.map ~f:(Translate.gcl_to_gpl) coq_gcl in
         let st = Clock.start () in
         let gpl = Tuple2.map_snd ~f:Cmd.GPL.optimize gpl in
-        let cpf = Qe.table_infer ~sfreq ~prsr gpl in
+        let cpf = Qe.table_infer ~sfreq ~prsr ~fn gpl in
         Printf.printf "Result:\n%s\n%!Computedin %f:\n%!" (BExpr.to_smtlib cpf) (Clock.stop st)
     ]
 

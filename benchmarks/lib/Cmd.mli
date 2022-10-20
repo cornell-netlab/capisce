@@ -91,7 +91,8 @@ val vc : GCL.t -> BExpr.t
 
 module Generator : sig
   val graph : TFG.G.t option ref
-  val create : TFG.t -> unit
+  val create : TFG.t -> Bigint.t
+  (* create initializes the generator, returning the number of paths *)
   val get_next : unit -> (TFG.Vertex.t) list option
 end
 
