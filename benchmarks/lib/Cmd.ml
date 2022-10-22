@@ -1,50 +1,6 @@
 open Core
 open Primitives
 
-module type CMD = sig
-  type t [@@deriving quickcheck, eq, sexp, compare]
-  module G : sig type t end
-  module Vertex : sig type t end
-  module Edge : sig type t end
-  val assume : BExpr.t -> t
-  val assert_ : BExpr.t -> t
-  val skip : t
-  val pass : t
-  val dead : t
-  val abort : t
-  val zero : t
-  val one : t
-  val ( + ) : t -> t -> t
-  val ( * ) : t -> t -> t
-  val is_mult_unit : t -> bool
-  val is_mult_annihil : t -> bool
-  val is_add_unit : t -> bool
-  val is_add_annihil : t -> bool
-  val contra : t -> t -> bool
-  val to_string_aux : int -> t -> string
-  val to_string : t -> string
-  val count_asserts_aux : t -> int -> int
-  val count_asserts : t -> int
-  val size : t -> int
-  val sequence : t list -> t
-  val seq : t -> t -> t
-  val choices : t list -> t
-  val choice : t -> t -> t
-  val choice_seq : t list -> t list -> t
-  val choice_seqs : t list list -> t
-  val is_primitive : t -> bool
-  val subst : Var.t -> Expr.t -> t -> t
-  val normalize_names : t -> t
-  val dnf : t -> t
-  val count_paths : t -> Bigint.t
-  val paths : t -> t Sequence.t
-  val construct_graph : t -> G.t
-  val print_graph : G.t -> string option -> unit
-  val count_cfg_paths : G.t -> Bigint.t
-  val optimize : t -> t
-  val optimize_seq_pair : (t * t) -> (t * t)
-end
-
 module Make (P : Primitive) = struct
 
   module Cmd = struct
@@ -357,11 +313,13 @@ module Make (P : Primitive) = struct
       Log.compiler_s "optimizing pair";
       let dce (c1,c2) =
         let (reads, c2) = dead_code_elim_inner Var.Set.empty c2 in
+        Log.compiler "[DCE] Passing Reads from pipe to parser: %s" @@ lazy (Var.Set.to_list reads |> List.to_string ~f:Var.str);
         let (_, c1) = dead_code_elim_inner reads c1 in
         (c1, c2)
       in
       let cp (c1, c2)=
         let (facts, c1) = const_prop_inner Facts.empty c1 in
+        Log.compiler "[DCE] Passing Facts from parser to pipe: %s" @@ lazy (Facts.to_string facts);
         let (_    , c2) = const_prop_inner facts       c2 in
         (c1, c2)
       in
@@ -369,17 +327,22 @@ module Make (P : Primitive) = struct
       let o (c1,c2) = dce (cp (c1,c2)) in
       Util.fix ~equal o (c1,c2)
 
-    module Vertex = struct
+    module V = struct
       type t = P.t * int
-      [@@deriving compare, hash, equal]
+      [@@deriving sexp, compare, hash, equal]
+      let get_id (_, id) = id
+      let to_string (p, idx) =
+        Printf.sprintf "%s@%d" (P.to_smtlib p) idx
     end
 
-    module Edge = struct
+    let vertex_to_cmd (p,_) = prim p
+
+    module E = struct
       include String
       (* let default = "" *)
     end
 
-    module G = Graph.Persistent.Digraph.ConcreteBidirectional(Vertex) (* (Edge)*)
+    module G = Graph.Persistent.Digraph.ConcreteBidirectional(V) (* (Edge)*)
     module O = Graph.Oper.P (G)
     module VMap = Graph.Gmap.Vertex (G) (struct include G let empty () = empty end)
 
@@ -456,7 +419,7 @@ module Make (P : Primitive) = struct
       in
       match G.fold_vertex f g None with
       | None ->
-        print_graph g (Some "error_graph.dot");
+        print_graph g (Some "error_graph");
         Log.error "there are %d nodes" @@ lazy (G.nb_vertex g);
         Log.error "there are %d edges" @@ lazy (G.nb_edges g);
         failwith "Could not find 0-indegree vertex in graph; logged at error_graph.dot"
@@ -553,21 +516,38 @@ module Make (P : Primitive) = struct
         let add = (+)
       end in
       let module P = Graph.Prim.Make (G) (WEdge) in
-      Log.path_gen_dot (print_graph g) "graph.dot";
+      (* let str = lazy (Printf.sprintf "%d and %d" (snd src) (snd snk)) in *)
+      (* Log.debug "generating path between %s" @@ str; *)
+      (* Log.path_gen_s "the full graph"; *)
+      (* Log.path_gen_dot (print_graph g) "graph"; *)
       let fwd = induce_graph_between g src snk in
-      Log.path_gen_dot (print_graph fwd) "fwd_graph.dot";
+      (* Log.path_gen "forward graph between %s" str; *)
+      (* Log.path_gen_dot (print_graph fwd) "fwd_graph"; *)
       let bwd = O.mirror fwd in
-      Log.path_gen_dot (print_graph bwd) "bwd_graph.dot";
+      (* Log.path_gen "backward graph between %s" str; *)
+      (* Log.path_gen_dot (print_graph bwd) "bwd_graph"; *)
       let fwd_span_edges = P.spanningtree_from fwd src in
       let fwd_span = edges_to_graph fwd_span_edges in
-      Log.path_gen_dot (print_graph fwd_span) "fwd_span.dot";
+      (* Log.path_gen "forward spanning tree between %s" str; *)
+      (* Log.path_gen_dot (print_graph fwd_span) "fwd_span"; *)
       let bwd_span_edges = P.spanningtree_from bwd snk in
       let bwd_span = O.mirror (edges_to_graph bwd_span_edges) in
-      Log.path_gen_dot (print_graph bwd_span) "bwd_span.dot";
-      let slice_graph = O.intersect fwd_span bwd_span in
-      Log.path_gen_dot (print_graph slice_graph) "slice_graph.dot";
+      (* Log.path_gen "backward spanning tree between %s" str; *)
+      (* Log.path_gen_dot (print_graph bwd_span) "bwd_span"; *)
+      let spans = O.intersect fwd_span bwd_span in
+      (* Log.path_gen "Span graph between %s" str; *)
+      (* Log.path_gen_dot (print_graph spans) "spans"; *)
+      let slice_graph =
+        G.fold_edges (fun src dst slice_graph ->
+            if G.mem_vertex slice_graph src && G.mem_vertex slice_graph dst then
+              G.add_edge slice_graph src dst
+            else
+              slice_graph
+          ) g spans
+      in
+      (* Log.path_gen "Slice graph between %s" str; *)
+      (* Log.path_gen_dot (print_graph slice_graph) "slice_graph"; *)
       slice_graph
-
 
     let add_paths_between g =
       fun src snk acc_graph ->
@@ -596,7 +576,7 @@ module Make (P : Primitive) = struct
       let pi = List.rev pi in
       Log.path_gen "The induced path:\n%s%!" @@
       lazy (String.concat ~sep:"\n" (List.map pi ~f:(fun vtx ->
-          Printf.sprintf "\tNode %d\n%!" (snd vtx)
+          Printf.sprintf "\tNode %d%!" (snd vtx)
         )));
       induce_path pi G.empty
 
@@ -636,10 +616,12 @@ module Make (P : Primitive) = struct
         | Some join_point when (snd curr) > (snd join_point) ->
           failwith "passed the predetermined join point"
         | _ ->
-          let succs = G.succ g curr in
-          if List.is_empty succs then
-            prim (fst curr)
-          else
+          match G.succ g curr with
+          | [] -> prim (fst curr)
+          | [next] ->
+            loop join_point_opt next
+            |> seq (prim (fst curr))
+          | succs ->
             let join_point = g_join_point_finder curr in
             let branches = List.map succs ~f:(loop (Some join_point)) in
             sequence [prim (fst curr);
@@ -863,47 +845,4 @@ module TFG = struct
 
 end
 
-module Generator = struct
-
-  (* module W = Stack *)
-  module W = RandomBag.Make (struct
-      type t = (Pipeline.t * int) list * (Pipeline.t * int) list
-      [@@deriving sexp, compare]
-    end)
-  (* the elements of the workist are pairs (p,c) where p is the path to the
-     current node, and c is the to-be-explored children of the final node of
-     p. Note that the path is expressed as a reverse order list, so the last
-     element in the path is the first element in the list. That is, c are the
-     children of hd p. *)
-
-  let graph = ref None
-  let worklist = W.create ()
-
-  let create c =
-    let g = TFG.construct_graph c in
-    (* let g = TFG.break_random_nodes g  in *)
-    Log.path_gen "TFG made with %s paths" @@ lazy (Bigint.to_string @@ TFG.count_cfg_paths g);
-    Log.path_gen_dot (TFG.print_graph g) "tfg.dot";
-    graph := Some g;
-    let src = TFG.find_source g in
-    W.push worklist ([src], TFG.G.succ g src);
-    TFG.count_cfg_paths g
-
-  let rec get_next () =
-    let g = Option.value_exn !graph ~message:"[Generator.get_next] uninitialized graph" in
-    match W.pop worklist with
-    | None -> None
-    | Some ([], []) ->
-      failwith "path was empty"
-    | Some (vertex::_ as pi, []) ->
-      if List.is_empty (TFG.G.succ g vertex) then
-        (* vertex is a leaf node *)
-        Some pi
-      else
-        (* keep searching! *)
-        get_next ()
-    | Some (pi, c::children) ->
-      W.push worklist (pi, children);
-      W.push worklist (c::pi, TFG.G.succ g c);
-      get_next()
-end
+let induce_gpl_from_tfg_path (g : GPL.G.t) : TFG.V.t list -> GPL.G.t = GPL.induce g

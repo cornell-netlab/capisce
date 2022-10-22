@@ -185,9 +185,8 @@ module Assign = struct
       let reads = Var.Set.union read_by_e reads_minus_x in
       Some (reads, assign x e)
     else
+      (* let () = Log.compiler "Eliminating %s because it's dead" @@ lazy (to_smtlib (x,e)) in *)
       None
-
-
 
 end
 
@@ -437,7 +436,6 @@ module Pipeline = struct
       | Active a -> Active.count_asserts a
       | Table _ -> 0
 
-
     let size = function
       | Active a -> Active.size a
       | Table t -> Table.size t
@@ -471,7 +469,7 @@ module Pipeline = struct
         let f, a = Active.const_prop f a in
         (f, Active a)
       | Table t ->
-        let f, t= Table.const_prop f t in
+        let f, t = Table.const_prop f t in
         (f, Table t)
 
     let dead_code_elim reads = function

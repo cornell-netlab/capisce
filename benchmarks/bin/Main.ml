@@ -17,22 +17,46 @@ let compile : Command.t =
        fun () ->
        let open Cmd in
        BExpr.enable_smart_constructors := `On;
+       Log.parse_flags "vgi";
        let gas = Option.value gas_opt ~default:1000 in
        let unroll = Option.value unroll_opt ~default:10 in
+       let coq_pair = P4Parse.tbl_abstraction_from_file includes source gas unroll false in
+       let (gpl_prsr, gpl_pipe) = Tuple2.map ~f:Translate.gcl_to_gpl coq_pair in
+       Log.irs "RAW parser:\n%s\n" @@ lazy (GPL.to_string gpl_prsr);
+       Log.irs "RAW pipeline: \n%s" @@ lazy (GPL.to_string gpl_pipe);
+       (* let (gpl_prsr_o, gpl_pipe_o) = GPL.optimize_seq_pair (gpl_prsr, gpl_pipe) in *)
+       (* let (gcl_prsr_o, gcl_pipe_o) = Tuple2.map ~f:GPL.encode_tables (gpl_prsr_o, gpl_pipe_o) in *)
+       Log.irs "%s" @@ lazy ("compiling from scratch");
        let cmd = P4Parse.as_cmd_from_file includes source gas unroll false in
-       let cmd_o = Cmd.GCL.optimize cmd in
+       Log.irs "RAW FULL PROGRAM:\n%s" @@ lazy (GCL.to_string cmd);
+       (* let cmd_o = Cmd.GCL.optimize cmd in *)
+
+       (* let parse_graph = GCL.construct_graph gcl_prsr_o in *)
+       (* Log.graph_dot (GCL.print_graph parse_graph) "parser"; *)
+       (* Log.graph "Paths through parser %s" @@ lazy (parse_graph |> GCL.count_cfg_paths |> Bigint.to_string); *)
+       (* let tfg_graph = TFG.project pipe |> TFG.construct_graph in *)
+       (* Log.graph_dot (TFG.print_graph tfg_graph) "tfg_pipeline"; *)
+       (* Log.graph "Paths through pipeline %s" @@ lazy (tfg_graph |> TFG.count_cfg_paths |> Bigint.to_string); *)
+       (* let gpl_graph = pipe |> GPL.construct_graph in *)
+       (* Log.graph_dot (GPL.print_graph gpl_graph) "gpl_pipeline"; *)
+       (* Log.graph "Paths through pipeline %s" @@ lazy (gpl_graph |> GPL.count_cfg_paths |> Bigint.to_string) *)
+
+       (* Log.irs "Optimized parser: \n%s" @@ lazy (GCL.to_string gcl_prsr_o); *)
+       (* Log.irs "Optimized pipe: \n%s" @@ lazy (GCL.to_string gcl_pipe_o); *)
+       (* Log.irs "Optimized together: %s" @@ lazy (GCL.to_string cmd_o); *)
+
        (* let cmd_a,_ = Cmd.abstract cmd_o (NameGen.create ()) in *)
-       let (_, cmd_p) = PassiveGCL.passify cmd_o in
-       let merged = PassiveGCL.assume_disjuncts cmd_p in
+       (* let (_, cmd_p) = PassiveGCL.passify cmd_o in *)
+       (* let merged = PassiveGCL.assume_disjuncts cmd_p in *)
        (* let vc = Cmd.vc cmd_o in *)
        (* let (dvs, cvs) = BExpr.vars vc in *)
-       Printf.printf "GCL program:\n%s\n\n%!" @@ GCL.to_string cmd;
-       Printf.printf "ConstProp'd:\n%s\n\n%!" @@ GCL.to_string cmd_o;
-       Printf.printf "cmd went from %d nodes to %d nodes\n\n%!" (GCL.size cmd) (GCL.size cmd_o);
-       Printf.printf "Path Merging:\n%s\n\n%!" (PassiveGCL.to_string merged);
-       Printf.printf "From %s paths to %s\n%!"
-         (Bigint.to_string (GCL.count_paths cmd_o))
-         (Bigint.to_string (PassiveGCL.count_paths merged));
+       (* Printf.printf "GCL program:\n%s\n\n%!" @@ GCL.to_string cmd; *)
+       (* Printf.printf "ConstProp'd:\n%s\n\n%!" @@ GCL.to_string cmd_o; *)
+       (* Printf.printf "cmd went from %d nodes to %d nodes\n\n%!" (GCL.size cmd) (GCL.size cmd_o); *)
+       (* Printf.printf "Path Merging:\n%s\n\n%!" (PassiveGCL.to_string merged); *)
+       (* Printf.printf "From %s paths to %s\n%!" *)
+       (*   (Bigint.to_string (GCL.count_paths cmd_o)) *)
+       (*   (Bigint.to_string (PassiveGCL.count_paths merged)); *)
        (* Printf.printf "abstracted program is a homeomorphism of the OG program: %d nodes, %s paths\n %s\n%!" *)
        (*   (Cmd.size cmd_a) *)
        (*   (Cmd.count_paths cmd_o |> Bigint.to_string) *)

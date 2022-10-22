@@ -55,18 +55,19 @@ let try_cnfing body : BExpr.t =
   else body
 
   
-let rec qe (solver : ?with_timeout:int -> Var.t list -> string -> string)  b : BExpr.t =
+let rec cnf_qe (solver : ?with_timeout:int -> Var.t list -> string -> string)  b : BExpr.t option =
+  let open Option.Let_syntax in
   let open BExpr in
   (* Log.size (size b); *)
   match b with
-  | TTrue | TFalse | TComp _ | LVar _ -> b
+  | TTrue | TFalse | TComp _ | LVar _ -> Some b
   | TNot (b) ->
-     not_ (qe solver b)
+    Option.map ~f:not_ (cnf_qe solver b)
   | TNary (o, bs) ->
-     List.map bs ~f:(qe solver)
-     |> BExpr.get_smarts o
+     Util.option_map bs ~f:(cnf_qe solver)
+     >>| BExpr.get_smarts o
   | Forall (x, b) ->
-     let b' = qe solver b in
+     let%bind b' = cnf_qe solver b in
      let vars = BExpr.vars b' |> Util.uncurry (@) in
      (* try smart constructor over result of recursive call*)
      (* do I need to do NNF here? *)
@@ -85,7 +86,7 @@ let rec qe (solver : ?with_timeout:int -> Var.t list -> string -> string)  b : B
         if ok then begin
             Log.qe "%s" @@ lazy "form small enough";
             decr_q x @@ Printf.sprintf "z3,%d" (size b');
-            b''
+            Some b''
           end
         else begin (* TRY CNFING *)
             Log.qe "trying to cnf something of size %d" @@ lazy (BExpr.size body);
@@ -93,27 +94,55 @@ let rec qe (solver : ?with_timeout:int -> Var.t list -> string -> string)  b : B
             let body = try_cnfing body in
             if size body >= size b'' then
               (*if cnfing only made it worse, use the original z3-provided response*)
-              b''
+              Some b''
             else
             begin match BExpr.forall [x'] body |> simplify with
             | Forall (x'', _) as phi when Var.equal x' x'' ->
                (* Log.size (size body); *)
                (*If it had no effect, we are out of things to try*)               
-               unrestricted_solver solver vars x phi
+               Some (unrestricted_solver solver vars x phi)
             | b'' ->
                (* Log.size (size b''); *)
-               if qf b'' then begin
-                   b''
-                 end
-               else qe solver b''
+               if qf b'' then
+                 Some b''
+               else cnf_qe solver b''
             end
           end
      | b' ->
         (* Log.size (size b'); *)
-        if qf b' then begin
-            b'
-          end
-        else qe solver b'
+        if qf b' then
+          Some b'
+        else cnf_qe solver b'
      end
   | Exists _ ->
      failwith "not sure how to handle exists"
+
+let rec optimistic_qe (solver : ?with_timeout:int -> Var.t list -> string -> string) b : BExpr.t option =
+  let open Option.Let_syntax in
+  let open BExpr in
+  (* Log.size (size b); *)
+  match b with
+  | TTrue | TFalse | TComp _ | LVar _ -> Some b
+  | TNot (b) ->
+     let%map b = optimistic_qe solver b in
+     not_ b
+  | TNary (o, bs) ->
+    Util.option_map bs ~f:(optimistic_qe solver)
+    >>| BExpr.get_smarts o
+  | Exists _ ->
+    failwith "not sure how to handle exists"
+  | Forall (x, b) ->
+     let%bind b' = optimistic_qe solver b in
+     let vars = BExpr.vars b' |> Util.uncurry (@) in
+     (* try smart constructor over result of recursive call*)
+     (* do I need to do NNF here? *)
+     (* could you do nnf in the smart constrction *)
+     begin match forall [x] (nnf b') with
+     | Forall (x', _) as b' when Var.equal x x' ->
+       (* in this case, the smart constructor had no effect*)
+       let res = timeout_solver solver vars b' in
+       if check_success res then
+         Some (Solver.of_smtlib ~dvs:[] ~cvs:vars res)
+       else None
+     | b -> optimistic_qe solver b
+     end

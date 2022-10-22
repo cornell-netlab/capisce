@@ -668,7 +668,7 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
     }
     @name(".parse_ethernet") state parse_ethernet {
         packet.extract(hdr.ethernet);
-        hdr.ethernet.etherType = 16w0x800;
+        // hdr.ethernet.etherType = 16w0x800;
         transition select(hdr.ethernet.etherType) {
             16w0 &&& 16w0xfe00: parse_llc_header;
             16w0 &&& 16w0xfa00: parse_llc_header;
@@ -829,9 +829,9 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
     }
     @name(".parse_ipv4") state parse_ipv4 {
         packet.extract(hdr.ipv4);
-        hdr.ipv4.fragOffset = 13w0;
-        hdr.ipv4.ihl = 4w0x5;
-        hdr.ipv4.protocol = 8w0x11;
+        // hdr.ipv4.fragOffset = 13w0;
+        // hdr.ipv4.ihl = 4w0x5;
+        // hdr.ipv4.protocol = 8w0x11;
         transition select(hdr.ipv4.fragOffset, hdr.ipv4.ihl, hdr.ipv4.protocol) {
             (13w0x0, 4w0x5, 8w0x1): parse_icmp;
             (13w0x0, 4w0x5, 8w0x6): parse_tcp;
@@ -1358,26 +1358,26 @@ control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t
     @name(".process_vlan_xlate") process_vlan_xlate() process_vlan_xlate_0;
     @name(".process_egress_acl") process_egress_acl() process_egress_acl_0;
     apply {
-        // if (meta.egress_metadata.bypass == 1w0) {
-        //    if (standard_metadata.instance_type != 32w0 && standard_metadata.instance_type != 32w5) {
-        //         mirror.apply();
-        //     }
-        //     switch (egress_port_mapping.apply().action_run) {
-        //         egress_port_type_normal: {
-        //             if (standard_metadata.instance_type == 32w0 || standard_metadata.instance_type == 32w5) {
-        //                 process_vlan_decap_0.apply(hdr, meta, standard_metadata);
-        //             }
-        //             process_rewrite_0.apply(hdr, meta, standard_metadata);
-        //             process_egress_bd_0.apply(hdr, meta, standard_metadata);
-        //             process_mac_rewrite_0.apply(hdr, meta, standard_metadata);
-        //             process_mtu_0.apply(hdr, meta, standard_metadata);
-        //         }
-        //     }
-        //     if (meta.egress_metadata.port_type == 2w0) {
-        //         process_vlan_xlate_0.apply(hdr, meta, standard_metadata);
-        //     }
-        // }
-        // process_egress_acl_0.apply(hdr, meta, standard_metadata);
+        if (meta.egress_metadata.bypass == 1w0) {
+           if (standard_metadata.instance_type != 32w0 && standard_metadata.instance_type != 32w5) {
+                mirror.apply();
+            }
+            switch (egress_port_mapping.apply().action_run) {
+                egress_port_type_normal: {
+                    if (standard_metadata.instance_type == 32w0 || standard_metadata.instance_type == 32w5) {
+                        process_vlan_decap_0.apply(hdr, meta, standard_metadata);
+                    }
+                    process_rewrite_0.apply(hdr, meta, standard_metadata);
+                    process_egress_bd_0.apply(hdr, meta, standard_metadata);
+                    process_mac_rewrite_0.apply(hdr, meta, standard_metadata);
+                    process_mtu_0.apply(hdr, meta, standard_metadata);
+                }
+            }
+            if (meta.egress_metadata.port_type == 2w0) {
+                process_vlan_xlate_0.apply(hdr, meta, standard_metadata);
+            }
+        }
+        process_egress_acl_0.apply(hdr, meta, standard_metadata);
         standard_metadata.egress_spec = 9w511;
     }
 }
@@ -2540,12 +2540,12 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         process_tunnel_0.apply(hdr, meta, standard_metadata);
         if (meta.ingress_metadata.port_type != 2w1) {
             process_validate_packet_0.apply(hdr, meta, standard_metadata);
-            // process_mac_0.apply(hdr, meta, standard_metadata);
-            // if (meta.l3_metadata.lkp_ip_type == 2w0) {
-                // process_mac_acl_0.apply(hdr, meta, standard_metadata);
-            // } else {
-                // process_ip_acl_0.apply(hdr, meta, standard_metadata);
-            // }
+            process_mac_0.apply(hdr, meta, standard_metadata);
+            if (meta.l3_metadata.lkp_ip_type == 2w0) {
+                process_mac_acl_0.apply(hdr, meta, standard_metadata);
+            } else {
+                process_ip_acl_0.apply(hdr, meta, standard_metadata);
+            }
             process_qos_0.apply(hdr, meta, standard_metadata);
             switch (rmac.apply().action_run) {
                 rmac_miss: {

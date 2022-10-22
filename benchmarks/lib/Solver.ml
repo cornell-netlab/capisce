@@ -2,22 +2,44 @@ open Core
 
 let princess_exe = "/home/ericthewry/Downloads/princess-bin-2021-05-10/princess -inputFormat=smtlib +mostGeneralConstraint +incremental "
 (* let z3_exe = "/usr/bin/z3 -smt2 -t:30000" *)
-
 let z3_exe = "/usr/bin/z3 -smt2"
-           
+(* let z3_daemon = z3_exe ^ " -in" *)
+
+(* let z3_chan_in, z3_chan_out = Core_unix.open_process z3_daemon *)
+
 let cvc4_exe = "/usr/bin/cvc5 --lang smt2" 
-  
-let run_proc p str =
-  Log.smt "SMT Query:\n%s\n%!" (lazy str);
-  let file = FileIO.tmp_write str in
-  (* let chan = Unix.open_process_in (Printf.sprintf "%s %s 2> /tmp/errors.log" p file) in *)
-  let chan = Core_unix.open_process_in (Printf.sprintf "%s %s" p file) in
-    (* let chan = Unix.open_process_in (Printf.sprintf "%s %s" p file) in   *)
-  let strs = In_channel.input_lines chan in
-  In_channel.close chan;
+
+let close_process_in in_chan =
+  try
+    Core_unix.close_process_in in_chan |> ignore;
+    In_channel.close in_chan
+  with _ ->
+    Log.warn "%s" @@ lazy "process already closed\n%!"
+
+let run_proc_file p str =
+  let str = Printf.sprintf "%s\n(exit)\n%!" str in
+  Log.smt "SENDING SMT QUERY:\n%s\n%!" (lazy str);
+  (* let file = FileIO.tmp_write str in *)
+  let in_chan, out_chan = Core_unix.open_process (Printf.sprintf "%s -in" p) in
+  Out_channel.fprintf out_chan "%s\n%!" str; Out_channel.flush out_chan;
+  let strs = In_channel.input_lines in_chan in
+  Log.smt "%s" @@ lazy "Got a result";
+  Core_unix.close_process (in_chan, out_chan) |> ignore;
+  Log.smt "%s" @@ lazy "Closed processes";
   String.concat strs ~sep:"\n"
+
+(* let run_proc (in_chan,out_chan) str = *)
+(*   let s = Printf.sprintf "(push)\n%s\n(pop 1)\n%!" str in *)
+(*   Log.smt "%s" @@ lazy s; *)
+(*   fprintf out_chan "%s\n%!" s; *)
+(*   Out_channel.flush out_chan; *)
+(*   Log.smt "%s" @@ lazy "sent"; *)
+(*   let lines = In_channel.input_lines in_chan in *)
+(*   Log.smt "%s" @@ lazy "got"; *)
+(*   String.concat lines ~sep:"\n" *)
+
   
-let run_princess = run_proc princess_exe
+let run_princess = run_proc_file princess_exe
 let run_z3 =
   let table = String.Table.create () in
   fun str ->
@@ -25,11 +47,11 @@ let run_z3 =
   | Some res ->
      res
   | None ->
-     let res = run_proc z3_exe str in
+     let res = run_proc_file z3_exe str in
      String.Table.set table ~key:str ~data:res;
      res
      
-let run_cvc4 = run_proc cvc4_exe               
+let run_cvc4 = run_proc_file cvc4_exe
 
 let of_smtlib ~cvs ~dvs smt : BExpr.t =
   (* Log.print @@ lazy (Printf.sprintf "parsing string with vars:\n control %s,\n data %s\n%!"
@@ -37,11 +59,15 @@ let of_smtlib ~cvs ~dvs smt : BExpr.t =
   Log.smt "parsing:\n%s\n" (lazy smt);
   let ast = SmtParser.parse_string smt in
   Log.smt "%s" (lazy "translating");
-  let b = SmtAst.translate ast ~cvs ~dvs in
-  Log.smt "%s" (lazy "type anotations (is this even necessary anymore?)");
-  let b = BExpr.coerce_types (TypeContext.of_list cvs) b in
-  Log.smt "%s" (lazy "done_parsing");
-  b
+  try
+    let b = SmtAst.translate ast ~cvs ~dvs in
+    Log.smt "%s" (lazy "type anotations (is this even necessary anymore?)");
+    let b = BExpr.coerce_types (TypeContext.of_list cvs) b in
+    Log.smt "%s" (lazy "done_parsing");
+    b
+  with except ->
+    Printf.eprintf "Failed to parse:\n%s\n%!" smt;
+    raise except
   
 let z3_simplify dvs cvs phi =
   Smt.simplify dvs (BExpr.to_smtlib phi)

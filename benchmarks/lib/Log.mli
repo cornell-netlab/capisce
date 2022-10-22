@@ -26,7 +26,9 @@ val smt      : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit
 val measure  : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit
 val graph    : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit
 val irs      : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit
+
 val path_gen : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit
+val path_gen_s : string -> unit
 
 val compiler : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit
 val compiler_s : string -> unit

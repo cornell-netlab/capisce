@@ -217,10 +217,8 @@ let rec gcl_to_gpl (t : target) : GPL.t =
   | GExternVoid ("assert",[phi]) ->
     GPL.assert_ (BExpr.eq_ (bv_to_expr phi) (Expr.bvi 1 1))
   | GTable (table, keys, actions) ->
-    Log.compiler "TABLE %s" @@ lazy table;
     let keys = List.map keys ~f:(fun (k,_) -> bv_to_expr k |> Expr.get_var) in
     let actions = List.map actions ~f:(make_act table) in
-    Log.compiler "END TABLE %s" @@ lazy table;
     GPL.table table keys actions
   | GExternAssn _
   | GExternVoid _ ->

@@ -1354,26 +1354,26 @@ control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t
     @name(".process_egress_acl") process_egress_acl() process_egress_acl_0;
     apply {
         // EGRESS
-        if (meta.egress_metadata.bypass == 1w0) {
-            if (standard_metadata.instance_type != 32w0 && standard_metadata.instance_type != 32w5) {
-                 mirror.apply();
-            }
-           switch (egress_port_mapping.apply().action_run) {
-                egress_port_type_normal: {
-                    if (standard_metadata.instance_type == 32w0 || standard_metadata.instance_type == 32w5) {
-                        process_vlan_decap_0.apply(hdr, meta, standard_metadata);
-                    }
-                    process_rewrite_0.apply(hdr, meta, standard_metadata);
-                    process_egress_bd_0.apply(hdr, meta, standard_metadata);
-                    process_mac_rewrite_0.apply(hdr, meta, standard_metadata);
-                    process_mtu_0.apply(hdr, meta, standard_metadata);
-                }
-            }
-            if (meta.egress_metadata.port_type == 2w0) {
-                process_vlan_xlate_0.apply(hdr, meta, standard_metadata);
-            }
-        }
-        process_egress_acl_0.apply(hdr, meta, standard_metadata);
+        // if (meta.egress_metadata.bypass == 1w0) {
+        //     if (standard_metadata.instance_type != 32w0 && standard_metadata.instance_type != 32w5) {
+        //          mirror.apply();
+        //     }
+        //    switch (egress_port_mapping.apply().action_run) {
+        //         egress_port_type_normal: {
+        //             if (standard_metadata.instance_type == 32w0 || standard_metadata.instance_type == 32w5) {
+        //                 process_vlan_decap_0.apply(hdr, meta, standard_metadata);
+        //             }
+        //             process_rewrite_0.apply(hdr, meta, standard_metadata);
+        //             process_egress_bd_0.apply(hdr, meta, standard_metadata);
+        //             process_mac_rewrite_0.apply(hdr, meta, standard_metadata);
+        //             process_mtu_0.apply(hdr, meta, standard_metadata);
+        //         }
+        //     }
+        //     if (meta.egress_metadata.port_type == 2w0) {
+        //         process_vlan_xlate_0.apply(hdr, meta, standard_metadata);
+        //     }
+        // }
+        // process_egress_acl_0.apply(hdr, meta, standard_metadata);
         standard_metadata.egress_spec = 9w9;
     }
 }
@@ -2534,47 +2534,47 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         process_spanning_tree_0.apply(hdr, meta, standard_metadata);
         process_ip_sourceguard_0.apply(hdr, meta, standard_metadata);
         process_tunnel_0.apply(hdr, meta, standard_metadata);
-        if (meta.ingress_metadata.port_type != 2w1) {
-            process_validate_packet_0.apply(hdr, meta, standard_metadata);
-            process_mac_0.apply(hdr, meta, standard_metadata);
-            if (meta.l3_metadata.lkp_ip_type == 2w0) {
-                process_mac_acl_0.apply(hdr, meta, standard_metadata);
-            } else {
-                process_ip_acl_0.apply(hdr, meta, standard_metadata);
-            }
-            process_qos_0.apply(hdr, meta, standard_metadata);
-            switch (rmac.apply().action_run) {
-                rmac_miss: {
-                }
-                default: {
-                    if (meta.ingress_metadata.bypass_lookups & 16w0x2 == 16w0) {
-                        if (meta.l3_metadata.lkp_ip_type == 2w1 && meta.ipv4_metadata.ipv4_unicast_enabled == 1w1) {
-                            process_ipv4_racl_0.apply(hdr, meta, standard_metadata);
-                            process_ipv4_urpf_0.apply(hdr, meta, standard_metadata);
-                            process_ipv4_fib_0.apply(hdr, meta, standard_metadata);
-                        } else {
-                            if (meta.l3_metadata.lkp_ip_type == 2w2 && meta.ipv6_metadata.ipv6_unicast_enabled == 1w1) {
-                            }
-                        }
-                        process_urpf_bd_0.apply(hdr, meta, standard_metadata);
-                    }
-                }
-           }
-        }
-        process_hashes_0.apply(hdr, meta, standard_metadata);
-        if (meta.ingress_metadata.port_type != 2w1) {
-            process_fwd_results_0.apply(hdr, meta, standard_metadata);
-            process_nexthop_0.apply(hdr, meta, standard_metadata);
-            assert(meta.ingress_metadata.hit_fwd_result == 1w1 && meta.ingress_metadata.hit_nexthop == 1w1 || (meta.ingress_metadata.hit_fwd_result == 1w0) && (meta.ingress_metadata.hit_nexthop == 1w0));
-            if (meta.ingress_metadata.egress_ifindex == 16w65535) {
-            } else {
-                 process_lag_0.apply(hdr, meta, standard_metadata);
-            }
-            process_mac_learning_0.apply(hdr, meta, standard_metadata);
-        }
-        if (meta.ingress_metadata.port_type != 2w1) {
-            process_system_acl_0.apply(hdr, meta, standard_metadata);
-        }
+        // if (meta.ingress_metadata.port_type != 2w1) {
+        //     process_validate_packet_0.apply(hdr, meta, standard_metadata);
+        //     process_mac_0.apply(hdr, meta, standard_metadata);
+        //     if (meta.l3_metadata.lkp_ip_type == 2w0) {
+        //         process_mac_acl_0.apply(hdr, meta, standard_metadata);
+        //     } else {
+        //         process_ip_acl_0.apply(hdr, meta, standard_metadata);
+        //     }
+        //     process_qos_0.apply(hdr, meta, standard_metadata);
+        //     switch (rmac.apply().action_run) {
+        //         rmac_miss: {
+        //         }
+        //         default: {
+        //             if (meta.ingress_metadata.bypass_lookups & 16w0x2 == 16w0) {
+        //                 if (meta.l3_metadata.lkp_ip_type == 2w1 && meta.ipv4_metadata.ipv4_unicast_enabled == 1w1) {
+        //                     process_ipv4_racl_0.apply(hdr, meta, standard_metadata);
+        //                     process_ipv4_urpf_0.apply(hdr, meta, standard_metadata);
+        //                     process_ipv4_fib_0.apply(hdr, meta, standard_metadata);
+        //                 } else {
+        //                     if (meta.l3_metadata.lkp_ip_type == 2w2 && meta.ipv6_metadata.ipv6_unicast_enabled == 1w1) {
+        //                     }
+        //                 }
+        //                 process_urpf_bd_0.apply(hdr, meta, standard_metadata);
+        //             }
+        //         }
+        //    }
+        // }
+        // process_hashes_0.apply(hdr, meta, standard_metadata);
+        // if (meta.ingress_metadata.port_type != 2w1) {
+        //     process_fwd_results_0.apply(hdr, meta, standard_metadata);
+        //     process_nexthop_0.apply(hdr, meta, standard_metadata);
+        //     assert(meta.ingress_metadata.hit_fwd_result == 1w1 && meta.ingress_metadata.hit_nexthop == 1w1 || (meta.ingress_metadata.hit_fwd_result == 1w0) && (meta.ingress_metadata.hit_nexthop == 1w0));
+        //     if (meta.ingress_metadata.egress_ifindex == 16w65535) {
+        //     } else {
+        //          process_lag_0.apply(hdr, meta, standard_metadata);
+        //     }
+        //     process_mac_learning_0.apply(hdr, meta, standard_metadata);
+        // }
+        // if (meta.ingress_metadata.port_type != 2w1) {
+        //     process_system_acl_0.apply(hdr, meta, standard_metadata);
+        // }
     }
 }
 

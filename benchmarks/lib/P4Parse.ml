@@ -49,6 +49,14 @@ let as_cmd_from_file (includes : string list) p4file gas unroll verbose =
   | Error s ->
     failwith (Printf.sprintf "Compilation Error in stage [P4light->P4cub]: %s" s)
   | Ok p4cub ->
+    (* begin match ToP4cub.flatten_DeclCtx p4cub with *)
+    (*   | Error s -> *)
+    (*     failwithf "Could not flatten declctx %s" s (); *)
+    (*   | Ok flatp4cub -> *)
+    (*     Printf.printf "---------P4CUB-----------------------------"; *)
+    (*     Printp4cub.print_tp_decl Format.std_formatter flatp4cub; *)
+    (*     Printf.printf "---------END P4CUB-------------------------"; *)
+    (* end; *)
     let instr tbl_name _ = TableInstr.instr tbl_name in
     let coq_gcl = V1model.gcl_from_p4cub (P4info.dummy) instr true gas unroll p4cub in
     Log.compiler "%s" @@ lazy "Got coq_gcl";

@@ -44,3 +44,15 @@ let rec fix ~equal f x =
 
 
 let concat (x,y) = x @ y
+
+let option_map ~f =
+  let open Option.Let_syntax in
+  let rec loop xs =
+    match xs with
+    | [] -> Some []
+    | x :: xs ->
+      let%bind y = f x in
+      let%map ys = loop xs in
+      y :: ys
+  in
+  loop

@@ -48,7 +48,9 @@ module FLAGS = struct
 end
 
 let parse verbosity flag char =
-  assert (Char.is_lowercase char);
+  if not (Char.is_lowercase char) then begin
+    failwithf "Tried to check verbosity of %c in %s" char verbosity ()
+  end;
   let contains = String.contains verbosity in
   if contains char then
     flag := On
@@ -56,7 +58,6 @@ let parse verbosity flag char =
     flag := Break
   else
     flag := Off
-
 
 let override () =
   FLAGS.override := true
@@ -93,6 +94,7 @@ let smt fmt      = log FLAGS.smt      stdout fmt
 let graph fmt    = log FLAGS.graph    stdout fmt
 let irs fmt      = log FLAGS.irs      stdout fmt
 let path_gen fmt = log FLAGS.path_gen stdout fmt
+let path_gen_s s = path_gen "%s" (lazy s)
 let compiler fmt = log FLAGS.compiler stdout fmt
 let compiler_s s = compiler "%s" (lazy s)
 let smart fmt    = log FLAGS.smart    stdout fmt
