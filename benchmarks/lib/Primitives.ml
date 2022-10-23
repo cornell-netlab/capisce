@@ -17,8 +17,8 @@ module type Primitive = sig
   val is_table : t -> bool
   val const_prop : Facts.t -> t -> (Facts.t * t)
   val dead_code_elim : Var.Set.t -> t -> (Var.Set.t * t) option
+  val explode : t -> t list list
 end
-
 
 module Assert = struct
   type t = BExpr.t
@@ -51,6 +51,8 @@ module Assert = struct
     let b = BExpr.simplify b in
     Some (Var.Set.union reads read_by_b, assert_ b)
 
+  let explode b = [[b]]
+
 end
 
 module Assume = struct
@@ -72,6 +74,8 @@ module Assume = struct
 
   let const_prop f b = Assert.const_prop f b
   let dead_code_elim reads b = Assert.dead_code_elim reads b
+
+  let explode b = [[b]]
 
 end
 
@@ -145,6 +149,10 @@ module Passive = struct
       let%map reads, b = Assume.dead_code_elim reads b in
       (reads, assume b)
 
+  let explode = function
+    | Assert b -> Assert.explode b |> Util.mapmap ~f:assert_
+    | Assume b -> Assume.explode b |> Util.mapmap ~f:assume
+
 end
 
 module Assign = struct
@@ -188,6 +196,8 @@ module Assign = struct
       (* let () = Log.compiler "Eliminating %s because it's dead" @@ lazy (to_smtlib (x,e)) in *)
       None
 
+  let explode assign = [[assign]]
+
 end
 
 
@@ -199,7 +209,7 @@ module Action = struct
 
   let assign x e = Assign (Assign.assign x e)
   let assert_ b = Assert (Assert.assert_ b)
-  let assume _ = failwith "assumes are not allowed in actions"
+  let assume b = failwithf "assumes are not allowed in actions, got %s" (BExpr.to_smtlib b) ()
   let contra c1 c2 = match c1,c2 with
     | Assert b1, Assert b2 -> Assert.contra b1 b2
     | _ -> false
@@ -250,6 +260,18 @@ module Action = struct
     | Assert a ->
       let%map (reads, a) = Assert.dead_code_elim reads a in
       (reads, assert_ a)
+
+  let explode action = [[action]]
+
+  let symbolize (name : string) (act_size : int) (idx : int) ((params : Var.t list), (body : t list)) : (BExpr.t * t list) =
+    let cp_action = Var.make (Printf.sprintf "_symb$%s$action" name) act_size in
+    let cp_data idx param = (Var.make (Printf.sprintf  "_symb$%s$%d$%s" name idx (Var.str param)) (Var.size param)) in
+    let act_choice = BExpr.eq_ (Expr.var cp_action) (Expr.bvi idx act_size) in
+    let symb param = Expr.var (cp_data idx param) in
+    let symbolize body param = subst param (symb param) body in
+    let f body = List.fold params ~init:body ~f:symbolize in
+    (act_choice, List.map body ~f)
+
 
 end
 
@@ -307,9 +329,9 @@ module Active = struct
 
   let is_node (_:t) = true
 
-  let of_action = function
-    | Action.Assign (x,e) -> assign x e
-    | Action.Assert b -> assert_ b
+  (* let of_action = function *)
+  (*   | Action.Assign (x,e) -> assign x e *)
+  (*   | Action.Assert b -> assert_ b *)
 
   let is_table = function
     | Passive p -> Passive.is_table p
@@ -330,13 +352,25 @@ module Active = struct
     | Assign a ->
       let%map reads, a = Assign.dead_code_elim reads a in
       (reads, assign_ a)
+
+  let explode = function
+    | Passive p ->  Passive.explode p |> Util.mapmap ~f:passive
+    | Assign a -> List.map ~f:(List.map ~f:assign_) (Assign.explode a)
+
+  let of_action : Action.t -> t = function
+    | Action.Assign a -> Assign a
+    | Action.Assert a -> Passive (Assert a)
 end
 
 module Table = struct
   type t = {name : string;
             keys : Var.t list;
-            actions : (Var.t list * Action.t list) list }
+            actions : (Var.t list * Action.t list) list;
+           }
   [@@deriving quickcheck, hash, eq, sexp, compare]
+
+
+  let make name keys actions = {name; keys; actions}
 
   let to_smtlib tbl = Printf.sprintf "%s.apply()" tbl.name
 
@@ -415,6 +449,19 @@ module Table = struct
       |> Option.value_exn ~message:"Table had no actions"
     in
     Some (reads, {t with actions})
+
+  let act_size tbl =
+    if List.length tbl.actions <= 0 then failwithf "Table %s has 0 actions" tbl.name ();
+    List.length tbl.actions
+    |> Int.succ
+    |> Float.of_int
+    |> Float.log
+    |> Float.round_up
+    |> Int.of_float
+
+  let explode _ = failwith "Ironically tables themselves cannot be exploded"
+
+
 end
 
 module Pipeline = struct
@@ -423,6 +470,13 @@ module Pipeline = struct
       | Active of Active.t
       | Table of Table.t
     [@@deriving quickcheck, eq, hash, sexp, compare]
+
+    let active a = Active a
+
+    let action (a : Action.t) = Active (Active.of_action a)
+
+    let table name keys actions =
+      Table (Table.make name keys actions)
 
     let to_smtlib = function
       | Active a -> Active.to_smtlib a
@@ -479,6 +533,28 @@ module Pipeline = struct
       | Table t ->
         let%map reads, t = Table.dead_code_elim reads t in
         (reads, Table t)
+
+    let explode : t -> t list list = function
+      | Active a ->
+        Active.explode a
+        |> Util.mapmap ~f:(fun a -> Active a)
+      | Table tbl ->
+        Log.debug "encoding table %s" @@ lazy tbl.name;
+        (* let cp_key idx  = Printf.sprintf "_symb$%s$match_%d" name idx in *)
+        (* let phi_keys = List.mapi keys ~f:(fun idx k -> *)
+        (*     let symb_k = Var.make (cp_key idx) (Var.size k) in *)
+        (*     BExpr.eq_ (Expr.var symb_k) (Expr.var k)) in *)
+        let act_size = Table.act_size tbl in
+        let of_action_list = List.map ~f:(fun a -> (active (Active.of_action a))) in
+        let f idx action =
+          let (phi, acts) = Action.symbolize tbl.name act_size idx action in
+          assume phi :: of_action_list acts
+        in
+        List.mapi tbl.actions ~f
+
+    let to_active_exn = function
+      | Active a -> a
+      | Table tbl -> failwithf "cannot convert table %s to action" tbl.name ()
 
   end
 

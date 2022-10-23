@@ -10,6 +10,7 @@ module FLAGS : sig
   val graph : t ref
   val path_gen : t ref
   val compiler : t ref
+  val exploder : t ref
   val smart : t ref
   val rewrites : t ref
   val qe : t ref
@@ -32,6 +33,9 @@ val path_gen_s : string -> unit
 
 val compiler : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit
 val compiler_s : string -> unit
+
+val exploder : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit
+val exploder_s : string -> unit
 
 val smart    : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit
 val rewrites : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit

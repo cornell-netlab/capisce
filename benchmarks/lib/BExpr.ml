@@ -585,7 +585,7 @@ let rec forall_one (x : Var.t) b =
   (* Log.size (size b); *)
   (* Log.print @@ lazy (Printf.sprintf "smart constructor for ∀ %s (_ BitVec %d) over an ast comprising %d bits and %d nodes!" (Var.str x) (Var.size x) (Obj.(reachable_words (repr b) + 1) * 64) (size b)); *)
   Log.smart "smart constructor for %s" (lazy (Var.str x));
-  match `Off with (*!enable_smart_constructors with*)
+  match `Off with (* !enable_smart_constructors with *)
   | `Off ->  Forall(x,b)
   | `On -> 
      (* Log.size (size b);       *)

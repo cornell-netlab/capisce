@@ -74,7 +74,6 @@ module Make (P : Primitive) = struct
         List.fold cs ~init:(List.length cs - 1)
           ~f:(fun n c -> n + size c)
 
-
     let sequence cs =
       let cs = List.filter cs ~f:(Fn.non is_mult_unit) in
       let cs = List.remove_consecutive_duplicates cs ~which_to_keep:`First ~equal in
@@ -88,6 +87,10 @@ module Make (P : Primitive) = struct
           | [] -> skip
           | [c] -> c
           | _ -> Seq cs
+
+    let sequence_opt cs =
+      Util.commute cs
+      |> Option.map ~f:sequence
 
     let seq c1 c2 =
       match c1, c2 with
@@ -145,6 +148,11 @@ module Make (P : Primitive) = struct
             | [c] -> c
             | cs -> Choice cs
           end
+
+    let choices_opt cs : t option =
+      Util.commute cs
+      |> Option.map ~f:choices
+
 
     let choice c1 c2 =
       match c1, c2 with
@@ -310,16 +318,13 @@ module Make (P : Primitive) = struct
       Util.fix ~equal o c
 
     let optimize_seq_pair (c1,c2) =
-      Log.compiler_s "optimizing pair";
       let dce (c1,c2) =
         let (reads, c2) = dead_code_elim_inner Var.Set.empty c2 in
-        Log.compiler "[DCE] Passing Reads from pipe to parser: %s" @@ lazy (Var.Set.to_list reads |> List.to_string ~f:Var.str);
         let (_, c1) = dead_code_elim_inner reads c1 in
         (c1, c2)
       in
       let cp (c1, c2)=
         let (facts, c1) = const_prop_inner Facts.empty c1 in
-        Log.compiler "[DCE] Passing Facts from parser to pipe: %s" @@ lazy (Facts.to_string facts);
         let (_    , c2) = const_prop_inner facts       c2 in
         (c1, c2)
       in
@@ -331,8 +336,12 @@ module Make (P : Primitive) = struct
       type t = P.t * int
       [@@deriving sexp, compare, hash, equal]
       let get_id (_, id) = id
-      let to_string (p, idx) =
+      let to_string ((p, idx) : t) =
         Printf.sprintf "%s@%d" (P.to_smtlib p) idx
+
+      let is_explodable (p, _) = P.is_table p
+
+      let explode (_,_) = failwith "Cannot synthesize explosion vertices with no context"
     end
 
     let vertex_to_cmd (p,_) = prim p
@@ -351,7 +360,7 @@ module Make (P : Primitive) = struct
       let g = G.(add_vertex empty src) in
       let dedup = List.dedup_and_sort ~compare:(fun (_,idx) (_, idx') -> Int.compare idx idx') in
       let rec loop idx g ns t =
-        let extend_graph g idx ns p =
+        let extend_graph g idx (ns : G.V.t list) p =
             let n' = G.V.create (p, idx) in
             let g = G.add_vertex g n' in
             let ns = dedup ns in
@@ -390,7 +399,8 @@ module Make (P : Primitive) = struct
         let get_subgraph _ = None
         let vertex_attributes ((p, _) : vertex) : Graph.Graphviz.DotAttributes.vertex list =
           if P.is_table p then [`Shape `Oval ; `Color 255 ] else [`Shape `Box]
-        let vertex_name ((p,idx) : vertex) = Printf.sprintf "\"%s %d\"" (P.name p) idx
+        let vertex_name ((p,idx) : vertex) =
+            Printf.sprintf "\"%s %d\"" (P.name p) idx
         let default_vertex_attributes _ = []
         let graph_attributes _ = []
       end)
@@ -405,25 +415,52 @@ module Make (P : Primitive) = struct
 
     let print_key g =
       G.fold_vertex (fun (vtx, idx) ->
-          Printf.sprintf "%s@%d %s\n\n%s%!" (P.name vtx) idx (P.to_smtlib vtx);
+          Printf.sprintf "%s@%d %s\n\n%s%!"
+            (P.name vtx) idx
+            (P.to_smtlib vtx);
         ) g ""
 
-    let find_source g =
-      let f v = function
-        | Some found_source -> Some found_source
-        | None ->
-          if List.is_empty (G.pred g v) then
-            Some v
-          else
-            None
+    let find_source g : V.t =
+      let f v =
+        if List.is_empty (G.pred g v) then
+          List.cons v
+        else
+          Fn.id
       in
-      match G.fold_vertex f g None with
-      | None ->
+      match G.fold_vertex f g [] with
+      | [source] -> source
+      | [] ->
         print_graph g (Some "error_graph");
         Log.error "there are %d nodes" @@ lazy (G.nb_vertex g);
         Log.error "there are %d edges" @@ lazy (G.nb_edges g);
         failwith "Could not find 0-indegree vertex in graph; logged at error_graph.dot"
-      | Some source -> source
+      | sources ->
+        print_graph g (Some "error_graph");
+        Log.error "there are %d nodes" @@ lazy (G.nb_vertex g);
+        Log.error "there are %d edges" @@ lazy (G.nb_edges g);
+        failwithf "Found %d sources!!!!! logged at error_graph.dot" (List.length sources) ()
+
+    let find_sink g : V.t =
+      let f v =
+          if List.is_empty (G.succ g v) then
+            List.cons v
+          else
+            Fn.id
+      in
+      match G.fold_vertex f g [] with
+      | [sink] -> sink
+      | [] ->
+        print_graph g (Some "error_graph");
+        Log.error "there are %d nodes" @@ lazy (G.nb_vertex g);
+        Log.error "there are %d edges" @@ lazy (G.nb_edges g);
+        failwith "Could not find 0-indegree vertex in graph; logged at error_graph.dot"
+      | sinks ->
+        print_graph g (Some "error_graph");
+        Log.error "there are %d nodes" @@ lazy (G.nb_vertex g);
+        Log.error "there are %d edges" @@ lazy (G.nb_edges g);
+        failwithf "Found %d sinks!!!!! logged at error_graph.dot" (List.length sinks) ()
+
+
 
     module VTbl = Hashtbl.Make (struct
         type t = (P.t * int) [@@deriving sexp, compare, hash]
@@ -476,7 +513,9 @@ module Make (P : Primitive) = struct
       in
       let vertex_graph = VMap.filter_map (fun vtx ->
           Option.some_if
-            (is_good_node (fst vtx) && (snd vtx) >= (snd src) && (snd vtx) <= (snd snk))
+            (is_good_node (fst vtx)
+             && (snd vtx) >=  (snd src)
+             && (snd vtx) <= (snd snk))
             vtx
         ) g
       in
@@ -491,7 +530,7 @@ module Make (P : Primitive) = struct
       edges_graph
 
     module PathsTable = Hashtbl.Make (struct
-        type t = (P.t * int) * (P.t * int)
+        type t = V.t * V.t
         [@@deriving compare, hash, sexp]
       end)
 
@@ -516,27 +555,30 @@ module Make (P : Primitive) = struct
         let add = (+)
       end in
       let module P = Graph.Prim.Make (G) (WEdge) in
-      (* let str = lazy (Printf.sprintf "%d and %d" (snd src) (snd snk)) in *)
+      let str = lazy (Printf.sprintf "%d and %d" (snd src) (snd snk)) in
       (* Log.debug "generating path between %s" @@ str; *)
-      (* Log.path_gen_s "the full graph"; *)
-      (* Log.path_gen_dot (print_graph g) "graph"; *)
+      Log.path_gen_s "the full graph";
+      Log.path_gen_dot (print_graph g) "graph";
+      assert (G.mem_vertex g snk);
       let fwd = induce_graph_between g src snk in
-      (* Log.path_gen "forward graph between %s" str; *)
-      (* Log.path_gen_dot (print_graph fwd) "fwd_graph"; *)
+      assert (G.mem_vertex fwd snk);
+      Log.path_gen "forward graph between %s" str;
+      Log.path_gen_dot (print_graph fwd) "fwd_graph";
       let bwd = O.mirror fwd in
-      (* Log.path_gen "backward graph between %s" str; *)
-      (* Log.path_gen_dot (print_graph bwd) "bwd_graph"; *)
+      Log.path_gen "backward graph between %s" str;
+      Log.path_gen_dot (print_graph bwd) "bwd_graph";
       let fwd_span_edges = P.spanningtree_from fwd src in
       let fwd_span = edges_to_graph fwd_span_edges in
-      (* Log.path_gen "forward spanning tree between %s" str; *)
-      (* Log.path_gen_dot (print_graph fwd_span) "fwd_span"; *)
+      Log.path_gen "forward spanning tree between %s" str;
+      Log.path_gen_dot (print_graph fwd_span) "fwd_span";
+      assert (G.mem_vertex bwd snk);
       let bwd_span_edges = P.spanningtree_from bwd snk in
       let bwd_span = O.mirror (edges_to_graph bwd_span_edges) in
-      (* Log.path_gen "backward spanning tree between %s" str; *)
-      (* Log.path_gen_dot (print_graph bwd_span) "bwd_span"; *)
+      Log.path_gen "backward spanning tree between %s" str;
+      Log.path_gen_dot (print_graph bwd_span) "bwd_span";
       let spans = O.intersect fwd_span bwd_span in
-      (* Log.path_gen "Span graph between %s" str; *)
-      (* Log.path_gen_dot (print_graph spans) "spans"; *)
+      Log.path_gen "Span graph between %s" str;
+      Log.path_gen_dot (print_graph spans) "spans";
       let slice_graph =
         G.fold_edges (fun src dst slice_graph ->
             if G.mem_vertex slice_graph src && G.mem_vertex slice_graph dst then
@@ -565,6 +607,8 @@ module Make (P : Primitive) = struct
         | [_] -> result_graph
         | src::tgt::pi ->
           assert ((snd src) < (snd tgt));
+          assert (G.mem_vertex g src);
+          assert (G.mem_vertex g tgt);
           result_graph
           |> g_paths_between src tgt
           |> induce_path (tgt::pi)
@@ -576,7 +620,7 @@ module Make (P : Primitive) = struct
       let pi = List.rev pi in
       Log.path_gen "The induced path:\n%s%!" @@
       lazy (String.concat ~sep:"\n" (List.map pi ~f:(fun vtx ->
-          Printf.sprintf "\tNode %d%!" (snd vtx)
+          Printf.sprintf "\tNode %s%!" (V.to_string vtx)
         )));
       induce_path pi G.empty
 
@@ -632,6 +676,15 @@ module Make (P : Primitive) = struct
       let source = find_source g in
       loop None source
 
+    let rec maps ~prim ~sequence ~choices (c : t) =
+      let f = maps ~prim ~sequence ~choices in
+      match c with
+      | Prim p -> prim p
+      | Seq cs -> sequence @@ List.map cs ~f
+      | Choice cs -> choices @@ List.map cs ~f
+
+
+
     (* Monoids *)
     let zero = dead
     let ( + ) = choice
@@ -648,26 +701,12 @@ module GCL = struct
 
   let assign x e = prim (Active.assign x e)
 
-  let table (name, keys, (actions : (Var.t list * Action.t list) list)) =
-    let cp_key idx  = Printf.sprintf "_symb$%s$match_%d" name idx in
-    let act_size = Int.of_float Float.(log (of_int (List.length actions)) + 1.0) in
-    let cp_action = Var.make (Printf.sprintf "_symb$%s$action" name) act_size in
-    let cp_data idx param = (Var.make (Printf.sprintf  "_symb$%s$%d$%s" name idx (Var.str param)) (Var.size param)) in
-    let phi_keys = List.mapi keys ~f:(fun idx k ->
-        let symb_k = Var.make (cp_key idx) (Var.size k) in
-        BExpr.eq_ (Expr.var symb_k) (Expr.var k)) in
-    let encode_action idx (params, (body : Action.t list)) =
-      let act_choice = assume (BExpr.eq_ (Expr.var cp_action) (Expr.bvi idx act_size)) in
-      let symb param = Expr.var (cp_data idx param) in
-      let symbolize body param = Action.subst param (symb param) body in
-      let f acc body = prim (Active.of_action (List.fold params ~init:body ~f:symbolize)) |> seq acc in
-      let body = List.fold body ~init:skip ~f in
-      seq act_choice body in
-    let encoded_actions = List.mapi actions ~f:encode_action in
-    sequence [
-      assume (BExpr.ands_ phi_keys);
-      choices encoded_actions
-    ]
+  let table (tbl_name, keys, (actions : (Var.t list * Action.t list) list)) =
+    let open Pipeline in
+    table tbl_name keys actions
+    |> explode
+    |> Util.mapmap ~f:(fun a -> prim (to_active_exn a))
+    |> choice_seqs
 
   let rec wp c phi =
     let open BExpr in
@@ -806,6 +845,13 @@ module GPL = struct
     let symbolic_parser = BExpr.erase_max_label ctx symbolic_parser in
     assume symbolic_parser
 
+  let tables c : Table.t list =
+    maps c ~sequence:List.concat ~choices:List.concat
+      ~prim:(function | Table tbl -> [tbl]
+                      | _ -> [])
+    |> List.dedup_and_sort ~compare:Table.compare
+
+
 end
 
 module TFG = struct
@@ -817,32 +863,147 @@ module TFG = struct
   end
   include Make(T)
 
-  let rec project (gpl : GPL.t) : t =
-    match gpl with
-    | GPL.Choice cs ->
-      choices (List.map cs ~f:project)
-    | GPL.Seq cs ->
-      sequence (List.map cs ~f:project)
-    | GPL.Prim p ->
-      let p = match p with
-        | Pipeline.Active a -> T.Active a
-        | Pipeline.Table t -> T.Table t
-      in
-      Prim p
+  let project (gpl : GPL.t) : t =
+    GPL.maps gpl ~choices ~sequence ~prim:(fun p ->
+        let p = match p with
+          | Pipeline.Active a -> T.Active a
+          | Pipeline.Table t -> T.Table t
+        in
+        prim p
+      )
 
-  let rec inject (tfg : t) : GPL.t =
-    match tfg with
-    | Choice cs ->
-      GPL.choices (List.map cs ~f:inject)
-    | Seq cs ->
-      GPL.sequence (List.map cs ~f:inject)
-    | Prim p ->
+  let inject (tfg : t) : GPL.t =
+    let maps_ = maps in
+    let open GPL in
+    maps_ tfg ~choices ~sequence ~prim:(fun p ->
       let p = match p with
-        | Pipeline.Active a -> T.Active a
-        | Pipeline.Table t -> T.Table t
+        | T.Active a -> Pipeline.Active a
+        | T.Table t -> Pipeline.Table t
       in
-      GPL.prim p
+      prim p
+      )
+
+  let of_gpl_graph_no_collapse : GPL.G.t -> G.t  =
+    let module OfGPL = Graph.Gmap.Edge (GPL.G) (struct
+        include G
+        let empty () = empty
+      end) in
+    OfGPL.map Fn.id
+
+  (* let auto_encode_tables (c : t) : t = *)
+  (*   (\** Here `auto` is as in -morphism not -matic *\) *)
+  (*   c *)
+  (*   |> inject *)
+  (*   |> GPL.encode_tables *)
+  (*   |> GCL.maps ~choices ~sequence ~prim:(fun a -> prim (Pipeline.active a)) *)
+
+  let pick_random_explodable gpl_graph =
+    let filter_explodable vtx =
+      if V.is_explodable vtx then List.cons vtx else Fn.id
+    in
+    G.fold_vertex filter_explodable gpl_graph []
+    |> Util.choose
+
+  let negativize_indices : G.t -> G.t =
+    (* we compute -(idx + 1) to avoid generating 0*)
+    let negativize idx = Int.(neg (succ idx)) in
+    let negativize_idx (p,idx) = (p, negativize idx) in
+    G.map_vertex negativize_idx
+
+  
+  let renormalize_indices tfg =
+    let module Topo = Graph.Topological.Make (G) in
+    let acc_rewrites (_, old_idx) (new_idx, rewriter) =
+      let rewriter (p, idx) =
+        if idx = old_idx then (p, new_idx) else rewriter (p, idx)
+      in
+      (Int.succ new_idx, rewriter )
+    in
+
+    let missingno (_,idx) = failwithf "couldnt find index %d" idx () in
+    let _, topo_rewriter = Topo.fold acc_rewrites tfg (0, missingno) in
+    G.map_vertex topo_rewriter tfg
+
+  let create_explosion_graph (p, _) =
+    Pipeline.explode p
+    |> Util.mapmap ~f:GPL.prim
+    |> GPL.choice_seqs
+    |> GPL.construct_graph
+
+
+  let stitch_into graph node subgraph =
+    let src = find_source subgraph in
+    let snk = find_sink subgraph in
+    let preds = G.pred graph node in
+    let succs = G.succ graph node in
+    let replaced = G.remove_vertex graph node
+                   |> O.union subgraph in
+    let add_pred x graph pred = G.add_edge graph pred x    in
+    let add_succ x graph succ = G.add_edge graph x    succ in
+    let with_preds = List.fold preds ~init:replaced   ~f:(add_pred src) in
+    let with_succs = List.fold succs ~init:with_preds ~f:(add_succ snk) in
+    with_succs
+
+  
+  let explode (node : V.t) (g : G.t) =
+    create_explosion_graph node
+    |> of_gpl_graph_no_collapse
+    |> negativize_indices
+    |> stitch_into g node
+    |> renormalize_indices
+
+  let explode_random c =
+    let open Option.Let_syntax in
+    let graph = construct_graph c in
+    let%map node_to_explode = pick_random_explodable graph in
+    explode node_to_explode graph
+
+  let cast_to_gpl_graph : G.t -> GPL.G.t =
+    let module ToGPL = Graph.Gmap.Edge (G) (struct
+        include GPL.G
+        let empty () = empty
+      end) in
+    ToGPL.map Fn.id
 
 end
 
 let induce_gpl_from_tfg_path (g : GPL.G.t) : TFG.V.t list -> GPL.G.t = GPL.induce g
+
+module Exploder = struct
+  module H = Hashtbl.Make (String)
+  type t = (int * (Var.t list * Action.t list)) Stack.t H.t
+
+  let create () : t = H.create ()
+
+  let arm (exploder : t) (table : Table.t) =
+    match H.find exploder table.name with
+    | Some _ -> failwithf "Tried to arm table %s twice" table.name ()
+    | None ->
+      let stack = Stack.create () in
+      H.set exploder ~key:table.name ~data:stack;
+      List.iteri table.actions ~f:(fun i action ->
+          Stack.push stack (i, action)
+        )
+
+  let pop (exploder : t) gpl : GPL.t option =
+    let open GPL in
+    maps gpl
+      ~choices:choices_opt
+      ~sequence:sequence_opt
+      ~prim:(fun p ->
+          match p with
+          | Pipeline.Active _ -> Some (prim p)
+          | Pipeline.Table tbl ->
+            match H.find exploder tbl.name with
+            | None -> Some (prim p)
+            | Some stack ->
+              match Stack.pop stack with
+              | None -> None
+              | Some (idx, act) ->
+                let phi, acts = Action.symbolize tbl.name (Table.act_size tbl) idx act in
+                List.map acts ~f:(fun a -> prim (Pipeline.action a))
+                |> List.cons (assume phi)
+                |> sequence
+                |> Option.return
+         )
+end

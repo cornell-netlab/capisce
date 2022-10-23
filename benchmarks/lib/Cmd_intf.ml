@@ -7,6 +7,8 @@ module type S = sig
     [@@deriving sexp, compare, hash, equal]
     val to_string : t -> string
     val get_id : t -> int
+    val is_explodable : t -> bool
+    val explode : t -> t list list
   end
   module E : sig type t end
   module G : sig
@@ -46,6 +48,7 @@ module type S = sig
   val count_paths : t -> Bigint.t
   val paths : t -> t Sequence.t
   val construct_graph : t -> G.t
+  val of_graph : G.t -> t
   val print_graph : G.t -> string option -> unit
   val count_cfg_paths : G.t -> Bigint.t
   val find_source : G.t -> V.t

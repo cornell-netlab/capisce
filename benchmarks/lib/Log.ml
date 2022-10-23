@@ -43,6 +43,8 @@ module FLAGS = struct
   let qe = ref Off
   (* printfs messages regarding top-level quantifier elimination *)
 
+  let exploder = ref Off
+
   let error = ref On
   let warn = ref On
 end
@@ -74,7 +76,8 @@ let parse_flags verbosity =
   parse FLAGS.compiler 'c';       (* Compiler *)
   parse FLAGS.smart 's';          (* Smart constructors *)
   parse FLAGS.rewrites 'r';       (* Rewrites *)
-  parse FLAGS.qe 'q'              (* Quantifier elimination *)
+  parse FLAGS.qe 'q';             (* Quantifier elimination *)
+  parse FLAGS.exploder 'e'        (* Exploder *)
 
   (* let size d = measure (Printf.sprintf "size,%f,%d" (Clock.now()) d) *)
 
@@ -100,6 +103,10 @@ let compiler_s s = compiler "%s" (lazy s)
 let smart fmt    = log FLAGS.smart    stdout fmt
 let rewrites fmt = log FLAGS.rewrites stdout fmt
 let qe fmt       = log FLAGS.qe stdout fmt
+
+let exploder fmt = log FLAGS.exploder stdout fmt
+let exploder_s s = path_gen "%s" (lazy s)
+
 
 let dot flag do_ fn =
   (*run [do_] then use [fn] to create the message*)

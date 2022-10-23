@@ -1,10 +1,8 @@
 module Make : functor
   (V : sig
-         type t
-         val t_of_sexp : Sexplib0.Sexp.t -> t
-         val sexp_of_t : t -> Sexplib0.Sexp.t
-         val compare :
-           t Base.Exported_for_specific_uses.Ppx_compare_lib.compare
+         type t [@@deriving sexp, compare]
+         val is_explodable : t -> bool
+         val explode : t -> t list list
        end)
   (G : sig
          type t
@@ -14,7 +12,9 @@ module Make : functor
        end)
   ->
   sig
-    val graph : G.t option ref
-    val create : G.t -> Bigint.t
-    val get_next : unit -> V.t list option
+    type t
+    val graph : t -> G.t
+    val create : G.t -> t
+    val get_next : t -> V.t list option
+    val total_paths : t -> Bigint.t
   end

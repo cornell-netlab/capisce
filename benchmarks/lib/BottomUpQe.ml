@@ -30,7 +30,7 @@ let timeout_solver (solver : ?with_timeout:int -> Var.t list -> string -> string
   (* optimistically try the solver with a timeout between 1s and 10s *)
   (* this threshold should void bitblasting *)
   (* solver ~with_timeout:(min (max (BExpr.size phi) 1000) 20000) vars phi_str *)
-  solver ~with_timeout:20000 vars phi_str
+  solver ~with_timeout:2000 vars phi_str
 
 let unrestricted_solver (solver : ?with_timeout:int -> Var.t list -> string -> string) cvs x phi =
   let open BExpr in
@@ -143,6 +143,8 @@ let rec optimistic_qe (solver : ?with_timeout:int -> Var.t list -> string -> str
        let res = timeout_solver solver vars b' in
        if check_success res then
          Some (Solver.of_smtlib ~dvs:[] ~cvs:vars res)
-       else None
+       else
+         let () = Log.smt "Solver failed with message %s" @@ lazy res in
+         None
      | b -> optimistic_qe solver b
      end

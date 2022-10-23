@@ -21,10 +21,10 @@ module GPL : sig
   include Cmd_intf.S
   val assign : Var.t -> Expr.t -> t
   val table : string -> Var.t list -> (Var.t list * (Action.t list)) list -> t
+  val tables : t -> Table.t list
   val symbolize : t -> t
   val encode_tables : t -> GCL.t
   val induce : G.t -> (V.t list) -> G.t
-  val of_graph : G.t -> t
   val print_key : G.t -> string
 end
 
@@ -33,7 +33,16 @@ module TFG : sig
   val project : GPL.t -> t
   val inject : t -> GPL.t
   val print_key : G.t -> string
+  val explode_random : t -> G.t option
+  val cast_to_gpl_graph : G.t -> GPL.G.t
 end
 
 val vc : GCL.t -> BExpr.t
 val induce_gpl_from_tfg_path : GPL.G.t -> TFG.V.t list -> GPL.G.t
+
+module Exploder : sig
+  type t
+  val create : unit -> t
+  val arm : t -> Table.t -> unit
+  val pop : t -> GPL.t -> GPL.t option
+end

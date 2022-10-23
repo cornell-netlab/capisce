@@ -21,34 +21,63 @@ module Make
      element in the path is the first element in the list. That is, c are the
      children of hd p. *)
 
-  let graph = ref None
-  let worklist = W.create ()
+  type t = {graph : G.t ref;
+            worklist : (V.t list * V.t list) Stack.t;
+            total_paths : Bigint.t
+           }
+
+  let graph state = !(state.graph)
 
   let create g =
     (* let g = TFG.construct_graph c in *)
     (* (\* let g = TFG.break_random_nodes g  in *\) *)
     (* Log.path_gen "TFG made with %s paths" @@ lazy (Bigint.to_string @@ TFG.count_cfg_paths g); *)
     (* Log.path_gen_dot (TFG.print_graph g) "tfg.dot"; *)
-    graph := Some g;
+    let state = {graph = ref g; worklist = W.create (); total_paths = G.count_cfg_paths g} in
     let src = G.find_source g in
-    W.push worklist ([src], G.succ g src);
-    G.count_cfg_paths g
+    W.push state.worklist ([src], G.succ g src);
+    state
 
-  let rec get_next () =
-    let g = Option.value_exn !graph ~message:"[Generator.get_next] uninitialized graph" in
-    match W.pop worklist with
+  let total_paths (state : t) = state.total_paths
+
+  let rec get_next (state : t) =
+    match W.pop state.worklist with
     | None -> None
     | Some ([], []) ->
       failwith "path was empty"
     | Some (vertex::_ as pi, []) ->
-      if List.is_empty (G.succ g vertex) then
+      if List.is_empty (G.succ (graph state) vertex) then
         (* vertex is a leaf node *)
         Some pi
       else
         (* keep searching! *)
-        get_next ()
+        get_next state
     | Some (pi, c::children) ->
-      W.push worklist (pi, children);
-      W.push worklist (c::pi, G.succ g c);
-      get_next()
+      W.push state.worklist (pi, children);
+      W.push state.worklist (c::pi, G.succ (graph state) c);
+      get_next state
+
+
+  (* let explode_random pi : int = *)
+  (*   let to_explode = List.filter pi ~f:V.is_explodable |> Util.choose_exn in *)
+  (*   let rec explode pi : V.t list list = *)
+  (*   let open List.Let_syntax in *)
+  (*   match pi with *)
+  (*   | [] -> [[]] *)
+  (*   | vtx::pi -> *)
+  (*     if V.compare vtx to_explode = 0 then *)
+  (*       let%bind pi = explode pi in *)
+  (*       let%map choice = V.explode vtx in *)
+  (*       choice @ pi *)
+  (*     else *)
+  (*       let%map pi = explode pi in *)
+  (*       vtx::pi *)
+  (*   in *)
+  (*   (\* explode it *\) *)
+  (*   let new_paths = explode pi in *)
+  (*   (\* push the new paths to the stack *\) *)
+  (*   List.iter new_paths ~f:(fun new_pi -> *)
+  (*       W.push worklist (new_pi, []) *)
+  (*     ); *)
+  (*   List.length new_paths *)
 end

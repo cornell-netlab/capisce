@@ -45,6 +45,16 @@ let rec fix ~equal f x =
 
 let concat (x,y) = x @ y
 
+let commute (xs : 'a option list) : 'a list option  =
+  let open Option.Let_syntax in
+  List.fold xs ~init:(Some [])
+    ~f:(fun acc_opt x_opt ->
+        let%bind acc = acc_opt in
+        let%map x = x_opt in
+        acc @ [x]
+      )
+
+
 let option_map ~f =
   let open Option.Let_syntax in
   let rec loop xs =
@@ -56,3 +66,24 @@ let option_map ~f =
       y :: ys
   in
   loop
+
+let choose xs =
+  let n = List.length xs in
+  if n <= 0 then
+    None
+  else
+    Random.int n
+    |> List.nth xs
+
+let choose_exn xs =
+  if List.is_empty xs then
+    failwith "[choose_exn] cannot choose an element from an empty list"
+  else
+    let n = Random.int (List.length xs) in
+    List.nth_exn xs n
+
+let mapmap ~f xss =
+  let open List.Let_syntax in
+  let%map xs = xss in
+  let%map x = xs in
+  f x
