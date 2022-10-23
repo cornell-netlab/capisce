@@ -223,20 +223,39 @@ let solving_all_paths (prog,asst) =
   let phi_str = String.concat ~sep:"\n\n" phis in
   (time, phi_str, -1, true)
 
-module GPLGen =
-  Generator.Make (GPL.V) (struct
-    include GPL.G
-    let find_source = GPL.find_source
-    let count_cfg_paths = GPL.count_cfg_paths
+
+module RandomStack (V : sig type t [@@deriving sexp, compare] end) =
+  RandomBag.Make (struct
+    type t = V.t list * V.t list
+    [@@deriving sexp, compare]
   end)
 
+module VStack (VV : sig type t [@@deriving sexp, compare] end) = struct
+  type t = (VV.t list * VV.t list) Stack.t
+  let create () : t = Stack.create ()
+  let push (stck : t) (elt : VV.t list * VV.t list) : unit = Stack.push stck elt
+  let pop (stck : t) : (VV.t list * VV.t list) option = Stack.pop stck
+end
+
+module GPLGen =
+  Generator.Make
+    (VStack)
+    (GPL.V)
+    (struct
+      include GPL.G
+      let find_source = GPL.find_source
+      let count_cfg_paths = GPL.count_cfg_paths
+    end)
+
 module PathGenerator =
-  Generator.Make (GCL.V) (struct
-    include GCL.G
-    let find_source = GCL.find_source
-    let count_cfg_paths = GCL.count_cfg_paths
-  end
-  )
+  Generator.Make
+    (RandomStack)
+    (GCL.V)
+    (struct
+      include GCL.G
+      let find_source = GCL.find_source
+      let count_cfg_paths = GCL.count_cfg_paths
+    end)
 
 let table_path_to_string (pi : GPL.V.t list) : string =
   List.rev pi
@@ -305,36 +324,58 @@ let write_path_results_to_file ~fn pi dur =
     let path_json = Printf.sprintf "{\"path\": [%s], \"time\":%f}\n%!" path dur in
     FileIO.append path_json ~to_:file
 
+let implies phi1 phi2 =
+  let cond = BExpr.(and_ phi1 (not_ phi2)) in
+  let cvs = BExpr.vars cond |> Tuple2.uncurry (@) in
+  Solver.check_unsat cvs cond
+    ~timeout:(Some 2000)
+
+let sufficient ~vc ~prog =
+  let program_spec = vc prog in
+  Fn.flip implies program_spec
+
 let all_paths gcl =
-  let gcl_graph = GCL.construct_graph gcl in     Log.graph_dot (GCL.print_graph gcl_graph) "broken_cfg";
-  let gen = PathGenerator.create gcl_graph in    Log.path_gen "couldn't solve table-path, path-exploding the %s paths" @@ lazy (Bigint.to_string @@ PathGenerator.total_paths gen);
+  let gcl_graph = GCL.construct_graph gcl in          Log.graph_dot (GCL.print_graph gcl_graph) "broken_cfg";
+  let gen = PathGenerator.create gcl_graph in         Log.path_gen "couldn't solve table-path, path-exploding the %s paths" @@ lazy (Bigint.to_string @@ PathGenerator.total_paths gen);
   let paths = ref 0 in
+  let sufficient = sufficient ~vc:Cmd.vc ~prog:gcl in
   let rec loop phi_agg =
-    match PathGenerator.get_next gen with
-    | None ->
-      Log.debug_s "inner paths done";
-      phi_agg
-    | Some pi ->
-      let pi = List.rev pi in
-      Log.debug "Inner Path #%d" @@ lazy !paths;
-      Log.debug "Paths to go %s" @@ lazy Bigint.(to_string (PathGenerator.total_paths gen -  of_int !paths));
-      let gcl = List.map pi ~f:(GCL.vertex_to_cmd) |> GCL.sequence in           (* Log.path_gen "solving path %s" @@ lazy (GCL.to_string gcl);*)
-      let phi = GCL.wp gcl BExpr.true_ |> BExpr.nnf in  (* Would be efficient with WP *)
-      match solve_one phi ~qe:BottomUpQe.optimistic_qe with
+    if sufficient phi_agg
+    then begin Log.debug_s "skipped"; phi_agg end
+    else match PathGenerator.get_next gen with
       | None ->
-        (* Log.error "%s" @@ lazy (GCL.to_string gcl); *)
-        (* Log.error "%s" @@ lazy (BExpr.to_smtlib phi); *)
-        failwith "Couldn't solve path"
-      | Some (cvs,res) ->
-        let qf_psi = Solver.of_smtlib ~dvs:[] ~cvs res in Log.debug "Got %s" @@ lazy res;
-        if Solver.check_unsat ~timeout:(Some 1000) cvs qf_psi then begin
-          Printf.eprintf "Inner path Failed %s\n%!"  (GCL.to_string gcl);
-          Printf.eprintf "Formulae was %s\n%!" res;
-          failwith "unsolveable"
-        end else begin
+        Log.debug_s "inner paths done";
+        phi_agg
+      | Some pi ->
+        let pi = List.rev pi in
+        Log.debug "Inner Path #%d" @@ lazy !paths;
+        Log.debug "Paths to go %s" @@ lazy Bigint.(to_string (PathGenerator.total_paths gen -  of_int !paths));
+        let gcl = List.map pi ~f:(GCL.vertex_to_cmd) |> GCL.sequence in           (* Log.path_gen "solving path %s" @@ lazy (GCL.to_string gcl);*)
+        let phi = GCL.wp gcl BExpr.true_ |> BExpr.nnf in  (* Would be efficient with WP *)
+        if implies phi_agg phi
+        then begin
+          Log.debug_s "Skipped; already covered!";
           Int.incr paths;
-          loop (BExpr.and_ phi_agg qf_psi)
+          loop phi_agg
         end
+        else
+          let () = Log.debug_s "Gotta analyze this one" in
+          match solve_one phi ~qe:BottomUpQe.optimistic_qe with
+          | None ->
+            (* Log.error "%s" @@ lazy (GCL.to_string gcl); *)
+            (* Log.error "%s" @@ lazy (BExpr.to_smtlib phi); *)
+            failwith "Couldn't solve path"
+          | Some (cvs,res) ->
+            let qf_psi = Solver.of_smtlib ~dvs:[] ~cvs res in Log.debug "Got %s" @@ lazy res;
+            assert (implies qf_psi phi);
+            if Solver.check_unsat ~timeout:(Some 1000) cvs qf_psi then begin
+              Printf.eprintf "Inner path Failed %s\n%!"  (GCL.to_string gcl);
+              Printf.eprintf "Formulae was %s\n%!" res;
+              failwith "unsolveable"
+            end else begin
+              Int.incr paths;
+              loop (BExpr.and_ phi_agg qf_psi)
+            end
   in
   let phi = loop BExpr.true_ in
   BExpr.simplify phi
@@ -344,7 +385,7 @@ let rec explode_tables ~parserify exploder gpl phi_agg =
   match Util.choose tables with
   | None ->
     Log.exploder_s "Ran out of things to explode..... trying paths";
-    all_paths (GPL.encode_tables gpl)
+    all_paths (parserify (GPL.encode_tables gpl))
   | Some tbl ->
     Exploder.arm exploder tbl;
     let rec loop phi_agg =

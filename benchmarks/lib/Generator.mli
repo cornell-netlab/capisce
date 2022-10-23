@@ -1,15 +1,20 @@
 module Make : functor
-  (V : sig
-         type t [@@deriving sexp, compare]
-         val is_explodable : t -> bool
-         val explode : t -> t list list
-       end)
-  (G : sig
-         type t
-         val find_source : t -> V.t
-         val count_cfg_paths : t -> Bigint.t
-         val succ : t -> V.t -> V.t list
-       end)
+    ( WMake : functor (VV : sig type t [@@deriving sexp, compare] end)
+        -> sig
+        type t
+        val create : unit -> t
+        val push : t -> (VV.t list * VV.t list) -> unit
+        val pop : t -> (VV.t list * VV.t list) option
+      end )
+    ( V : sig
+        type t [@@deriving sexp, compare]
+      end )
+    (G : sig
+       type t
+       val find_source : t -> V.t
+       val count_cfg_paths : t -> Bigint.t
+       val succ : t -> V.t -> V.t list
+     end)
   ->
   sig
     type t

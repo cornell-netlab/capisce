@@ -1,5 +1,12 @@
 open Core
 module Make
+    ( WMake : functor (VV : sig type t [@@deriving sexp, compare] end) ->
+          sig
+            type t
+            val create : unit -> t
+            val push : t -> (VV.t list * VV.t list) -> unit
+            val pop : t -> (VV.t list * VV.t list) option
+          end )
     ( V : sig
         type t [@@deriving sexp, compare]
       end )
@@ -10,7 +17,6 @@ module Make
        val succ : t -> V.t -> V.t list
      end) = struct
 
-  module W = Stack
       (* RandomBag.Make (struct *)
       (*   type t = V.t list * V.t list *)
       (*   [@@deriving sexp, compare] *)
@@ -21,8 +27,10 @@ module Make
      element in the path is the first element in the list. That is, c are the
      children of hd p. *)
 
+  module W = WMake(V)
+
   type t = {graph : G.t ref;
-            worklist : (V.t list * V.t list) Stack.t;
+            worklist : W.t;
             total_paths : Bigint.t
            }
 
