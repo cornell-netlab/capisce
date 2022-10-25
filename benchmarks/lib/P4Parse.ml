@@ -43,7 +43,7 @@ let as_p4cub_from_file includes p4file verbose =
     p4cub
 
 
-let as_cmd_from_file (includes : string list) p4file gas unroll verbose =
+let as_cmd_from_file (includes : string list) p4file gas unroll verbose hv =
   let p4cub = as_p4cub_from_file includes p4file verbose in
   match p4cub with
   | Error s ->
@@ -58,7 +58,7 @@ let as_cmd_from_file (includes : string list) p4file gas unroll verbose =
     (*     Printf.printf "---------END P4CUB-------------------------"; *)
     (* end; *)
     let instr tbl_name _ = TableInstr.instr tbl_name in
-    let coq_gcl = V1model.gcl_from_p4cub (P4info.dummy) instr true gas unroll p4cub in
+    let coq_gcl = V1model.gcl_from_p4cub (P4info.dummy) instr hv gas unroll p4cub in
     Log.compiler "%s" @@ lazy "Got coq_gcl";
     match coq_gcl with
     | Error s ->
@@ -68,7 +68,7 @@ let as_cmd_from_file (includes : string list) p4file gas unroll verbose =
       let pipe = Translate.gcl_to_cmd pipe in
       Cmd.GCL.(normalize_names (seq prsr pipe))
 
-let tbl_abstraction_from_file (includes : string list) p4file gas unroll verbose =
+let tbl_abstraction_from_file (includes : string list) p4file gas unroll verbose hv =
   let p4cub = as_p4cub_from_file includes p4file verbose in
   match p4cub with
   | Error s ->
@@ -79,7 +79,7 @@ let tbl_abstraction_from_file (includes : string list) p4file gas unroll verbose
       (GCL.GCL.GTable (tbl_name, keys, actions))
       |> Poulet4.Result.Result.ok
     in
-    let coq_gcl = V1model.gcl_from_p4cub (P4info.dummy) instr true gas unroll p4cub in
+    let coq_gcl = V1model.gcl_from_p4cub (P4info.dummy) instr hv gas unroll p4cub in
     Log.compiler "%s" @@ lazy "[TFG] got coq_gcl";
     match coq_gcl with
     | Error s ->

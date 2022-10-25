@@ -83,6 +83,8 @@ val subst_lvar : string -> t -> t -> t
 val fun_subst_lvar : (string -> t) -> t -> t    
 (** [fun_subst f b] substitutes b according to function [f] *)  
 
+val eval : Model.t -> t -> bool option
+
 val one_point_rule : Expr.t -> Expr.t -> t -> t
   
 val vars : t -> Var.t list * Var.t list
@@ -107,7 +109,6 @@ val label : Context.t -> t -> t
 val erase_max_label : Context.t -> t -> t
 (** [erase_max_label ctx b] erases the variables from only the variables that are maximally indexed *)
 
-
 val comparisons : t -> (Var.t * Expr.t) list option
 
 val equivalence : t -> t -> t
@@ -124,8 +125,7 @@ val order_all_quantifiers : t -> t
 val predicate_abstraction : t -> t
 val abstract_qvars : t -> string
 
-  
-val qf_quickcheck_generator : t Generator.t
+  val qf_quickcheck_generator : t Generator.t
   
   
 (* FOR TESTING PURPOSES ONLY *)

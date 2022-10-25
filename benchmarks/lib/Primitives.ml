@@ -18,6 +18,7 @@ module type Primitive = sig
   val const_prop : Facts.t -> t -> (Facts.t * t)
   val dead_code_elim : Var.Set.t -> t -> (Var.Set.t * t) option
   val explode : t -> t list list
+  val vars : t -> Var.t list
 end
 
 module Assert = struct
@@ -36,14 +37,10 @@ module Assert = struct
   let normalize_names : t -> t = BExpr.normalize_names
   let comparisons = BExpr.comparisons
   let is_table (_:t) = false
+  let vars b = BExpr.vars b |> Tuple2.uncurry (@)
 
   let const_prop f b =
     let b = BExpr.fun_subst (Facts.lookup f) b |> BExpr.simplify in
-    let f =
-      match BExpr.get_equality b with
-      | Some (x, e) -> Facts.update f x e
-      | None -> f
-    in
     (f, assert_ b)
 
   let dead_code_elim reads b =
@@ -52,6 +49,7 @@ module Assert = struct
     Some (Var.Set.union reads read_by_b, assert_ b)
 
   let explode b = [[b]]
+
 
 end
 
@@ -76,6 +74,7 @@ module Assume = struct
   let dead_code_elim reads b = Assert.dead_code_elim reads b
 
   let explode b = [[b]]
+  let vars b = BExpr.vars b |> Tuple2.uncurry (@)
 
 end
 
@@ -153,6 +152,10 @@ module Passive = struct
     | Assert b -> Assert.explode b |> Util.mapmap ~f:assert_
     | Assume b -> Assume.explode b |> Util.mapmap ~f:assume
 
+  let vars = function
+    | Assert b -> Assert.vars b
+    | Assume b -> Assume.vars b
+
 end
 
 module Assign = struct
@@ -197,6 +200,11 @@ module Assign = struct
       None
 
   let explode assign = [[assign]]
+
+  let vars (x,e) =
+    Expr.vars e
+    |> Tuple2.uncurry (@)
+    |> List.cons x
 
 end
 
@@ -263,15 +271,26 @@ module Action = struct
 
   let explode action = [[action]]
 
-  let symbolize (name : string) (act_size : int) (idx : int) ((params : Var.t list), (body : t list)) : (BExpr.t * t list) =
+  let symbolize
+      (name : string)
+      ~num_actions
+      ~act_size
+      ~idx
+      ((params : Var.t list), (body : t list)) : (BExpr.t * t list) =
     let cp_action = Var.make (Printf.sprintf "_symb$%s$action" name) act_size in
     let cp_data idx param = (Var.make (Printf.sprintf  "_symb$%s$%d$%s" name idx (Var.str param)) (Var.size param)) in
-    let act_choice = BExpr.eq_ (Expr.var cp_action) (Expr.bvi idx act_size) in
+    let act_choice =
+      let c = if idx >= num_actions - 1 then BExpr.uge_ else BExpr.eq_ in
+      c (Expr.var cp_action) (Expr.bvi idx act_size)
+    in
     let symb param = Expr.var (cp_data idx param) in
     let symbolize body param = subst param (symb param) body in
     let f body = List.fold params ~init:body ~f:symbolize in
     (act_choice, List.map body ~f)
 
+  let vars = function
+    | Assign a -> Assign.vars a
+    | Assert a -> Assert.vars a
 
 end
 
@@ -360,6 +379,10 @@ module Active = struct
   let of_action : Action.t -> t = function
     | Action.Assign a -> Assign a
     | Action.Assert a -> Passive (Assert a)
+
+  let vars = function
+    | Passive p -> Passive.vars p
+    | Assign a -> Assign.vars a
 end
 
 module Table = struct
@@ -455,11 +478,13 @@ module Table = struct
     List.length tbl.actions
     |> Int.succ
     |> Float.of_int
-    |> Float.log
+    |> Stdlib.Float.log2
     |> Float.round_up
     |> Int.of_float
 
   let explode _ = failwith "Ironically tables themselves cannot be exploded"
+
+  let vars _ = failwith "dont get the variables of a table, you should probably encode it first"
 
 
 end
@@ -539,15 +564,15 @@ module Pipeline = struct
         Active.explode a
         |> Util.mapmap ~f:(fun a -> Active a)
       | Table tbl ->
-        Log.debug "encoding table %s" @@ lazy tbl.name;
         (* let cp_key idx  = Printf.sprintf "_symb$%s$match_%d" name idx in *)
         (* let phi_keys = List.mapi keys ~f:(fun idx k -> *)
         (*     let symb_k = Var.make (cp_key idx) (Var.size k) in *)
         (*     BExpr.eq_ (Expr.var symb_k) (Expr.var k)) in *)
         let act_size = Table.act_size tbl in
         let of_action_list = List.map ~f:(fun a -> (active (Active.of_action a))) in
+        let num_actions = List.length tbl.actions in
         let f idx action =
-          let (phi, acts) = Action.symbolize tbl.name act_size idx action in
+          let (phi, acts) = Action.symbolize tbl.name ~num_actions ~act_size ~idx action in
           assume phi :: of_action_list acts
         in
         List.mapi tbl.actions ~f
@@ -555,6 +580,11 @@ module Pipeline = struct
     let to_active_exn = function
       | Active a -> a
       | Table tbl -> failwithf "cannot convert table %s to action" tbl.name ()
+
+
+    let vars = function
+      | Active  a -> Active.vars a
+      | Table tbl -> Table.vars tbl
 
   end
 

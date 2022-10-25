@@ -123,11 +123,11 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         hdr.ipv4.ttl = hdr.ipv4.ttl - 8w1;
     }
     @name(".set_heavy_hitter_count") action set_heavy_hitter_count() {
-        hash(meta.custom_metadata.hash_val1, HashAlgorithm.csum16, (bit<16>)16w0, { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.tcp.srcPort, hdr.tcp.dstPort }, (bit<32>)32w16);
+        // hash(meta.custom_metadata.hash_val1, HashAlgorithm.csum16, (bit<16>)16w0, { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.tcp.srcPort, hdr.tcp.dstPort }, (bit<32>)32w16);
         heavy_hitter_counter1.read(meta.custom_metadata.count_val1, (bit<32>)meta.custom_metadata.hash_val1);
         meta.custom_metadata.count_val1 = meta.custom_metadata.count_val1 + 16w1;
         heavy_hitter_counter1.write((bit<32>)meta.custom_metadata.hash_val1, (bit<16>)meta.custom_metadata.count_val1);
-        hash(meta.custom_metadata.hash_val2, HashAlgorithm.crc16, (bit<16>)16w0, { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.tcp.srcPort, hdr.tcp.dstPort }, (bit<32>)32w16);
+        // hash(meta.custom_metadata.hash_val2, HashAlgorithm.crc16, (bit<16>)16w0, { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.tcp.srcPort, hdr.tcp.dstPort }, (bit<32>)32w16);
         heavy_hitter_counter2.read(meta.custom_metadata.count_val2, (bit<32>)meta.custom_metadata.hash_val2);
         meta.custom_metadata.count_val2 = meta.custom_metadata.count_val2 + 16w1;
         heavy_hitter_counter2.write((bit<32>)meta.custom_metadata.hash_val2, (bit<16>)meta.custom_metadata.count_val2);

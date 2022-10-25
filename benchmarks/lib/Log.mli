@@ -20,30 +20,38 @@ val parse_flags : String.t -> unit
 val override : unit -> unit
 
 
-val warn : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit
-val error : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit
 
-val smt      : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit
-val measure  : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit
-val graph    : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit
-val irs      : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit
+val warn : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
+val error :  ('a -> unit, unit, string, string, string, unit) format6  -> 'a lazy_t -> unit
 
-val path_gen : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit
+val smt      : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
+val measure  : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
+val irs      : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
+
+val graph    : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
+val graph_s  : string -> unit
+
+val path_gen : ('a -> unit, unit, string, string, string, unit) format6  -> 'a lazy_t -> unit
 val path_gen_s : string -> unit
 
-val compiler : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit
+val compiler : ('a -> unit, unit, string, string, string, unit) format6  -> 'a lazy_t -> unit
 val compiler_s : string -> unit
 
-val exploder : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit
+val exploder : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
 val exploder_s : string -> unit
 
-val smart    : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit
-val rewrites : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit
-val qe       : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit
+val tree : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
+val tree_s : string -> unit
+
+
+val smart    : ('a -> unit, unit, string, string, string, unit) format6  -> 'a lazy_t -> unit
+val rewrites : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
+val qe       : ('a -> unit, unit, string, string, string, unit) format6  -> 'a lazy_t -> unit
 
 val graph_dot    : (string option -> unit) -> string -> unit
 val path_gen_dot : (string option -> unit) -> string -> unit
+val tree_dot : (string option -> unit) -> string -> unit
 
 
-val debug    : ('a -> unit, out_channel, unit) format -> 'a lazy_t -> unit
+val debug    : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
 val debug_s  : string -> unit

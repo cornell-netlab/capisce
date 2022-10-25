@@ -53,6 +53,7 @@ module type S = sig
   val count_cfg_paths : G.t -> Bigint.t
   val find_source : G.t -> V.t
   val vertex_to_cmd : V.t -> t
+  val vars : t -> Var.t list
 
   val optimize : t -> t
   val optimize_seq_pair : (t * t) -> (t * t)

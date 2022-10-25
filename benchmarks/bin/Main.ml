@@ -20,14 +20,14 @@ let compile : Command.t =
        Log.parse_flags "vgi";
        let gas = Option.value gas_opt ~default:1000 in
        let unroll = Option.value unroll_opt ~default:10 in
-       let coq_pair = P4Parse.tbl_abstraction_from_file includes source gas unroll false in
+       let coq_pair = P4Parse.tbl_abstraction_from_file includes source gas unroll false true in
        let (gpl_prsr, gpl_pipe) = Tuple2.map ~f:Translate.gcl_to_gpl coq_pair in
        Log.irs "RAW parser:\n%s\n" @@ lazy (GPL.to_string gpl_prsr);
        Log.irs "RAW pipeline: \n%s" @@ lazy (GPL.to_string gpl_pipe);
        (* let (gpl_prsr_o, gpl_pipe_o) = GPL.optimize_seq_pair (gpl_prsr, gpl_pipe) in *)
        (* let (gcl_prsr_o, gcl_pipe_o) = Tuple2.map ~f:GPL.encode_tables (gpl_prsr_o, gpl_pipe_o) in *)
        Log.irs "%s" @@ lazy ("compiling from scratch");
-       let cmd = P4Parse.as_cmd_from_file includes source gas unroll false in
+       let cmd = P4Parse.as_cmd_from_file includes source gas unroll false true in
        Log.irs "RAW FULL PROGRAM:\n%s" @@ lazy (GCL.to_string cmd);
        (* let cmd_o = Cmd.GCL.optimize cmd in *)
 
@@ -91,7 +91,8 @@ let table_infer : Command.t =
       unroll_opt = flag "-u" (optional int) ~doc:"how much to unroll the parser" and
       no_smart = flag "--disable-smart" no_arg ~doc:"disable smart constructors" and
       sfreq = flag "--freq" (optional int) ~doc:"frequency of sufficiency check" and
-      fn = flag "--log" (optional string) ~doc:"file in which to log incremental paths"
+      fn = flag "--log" (optional string) ~doc:"file in which to log incremental paths" and
+      disable_header_validity = flag "--no-hv" (no_arg) ~doc:"disable header validity checks"
       in
       fun () ->
         Printexc.record_backtrace true;
@@ -104,7 +105,7 @@ let table_infer : Command.t =
         Log.compiler "gas %d" @@ lazy gas;
         Log.compiler "unroll %d" @@ lazy unroll;
         let prsr = if unroll < 1 then `Skip else `Use in
-        let coq_gcl = P4Parse.tbl_abstraction_from_file includes source gas unroll false in
+        let coq_gcl = P4Parse.tbl_abstraction_from_file includes source gas unroll false (not disable_header_validity) in
         Log.compiler "%s" @@ lazy "compiling to gpl...";
         let gpl = Tuple2.map ~f:(Translate.gcl_to_gpl) coq_gcl in
         let st = Clock.start () in
@@ -125,7 +126,8 @@ let infer : Command.t =
          unroll_opt = flag "-u" (optional int) ~doc:"how much to unroll the parser" and
          no_smart = flag "--disable-smart" no_arg ~doc:"disable smart constructors" and
          iter = flag "--iter" no_arg ~doc:"use iterative solution" and
-         solvers = flag "-s" (listed string) ~doc:"solving order"
+         solvers = flag "-s" (listed string) ~doc:"solving order" and
+      disable_header_validity = flag "--no-hv" (no_arg) ~doc:"disable header validity checks"
          in
          fun () ->
          let open Cmd in
@@ -137,7 +139,7 @@ let infer : Command.t =
          let unroll = Option.value unroll_opt ~default:10 in
          let st = Clock.start () in
          Log.compiler "at %f start compiling..." @@ lazy (Clock.read st);
-         let cmd = P4Parse.as_cmd_from_file includes source gas unroll false in
+         let cmd = P4Parse.as_cmd_from_file includes source gas unroll false (not disable_header_validity) in
          Log.compiler "done in %f \noptimizing..." @@ lazy (Clock.stop st);
          let st = Clock.start () in
          let cmd_o = GCL.optimize cmd in
@@ -179,7 +181,7 @@ let verify : Command.t =
          let open Cmd in
          let gas = Option.value gas_opt ~default:1000 in
          let unroll = Option.value unroll_opt ~default:10 in
-         let cmd = P4Parse.as_cmd_from_file includes source gas unroll false in
+         let cmd = P4Parse.as_cmd_from_file includes source gas unroll false true in
          let cmd_o = GCL.optimize cmd in
          let vc = Cmd.vc cmd_o in
          let (dvs, cvs) = BExpr.vars vc in
@@ -204,7 +206,7 @@ let graph : Command.t =
          fun () ->
          let gas = Option.value gas_opt ~default:1000 in
          let unroll = Option.value unroll_opt ~default:10 in
-         let gcl = P4Parse.tbl_abstraction_from_file includes source gas unroll false in
+         let gcl = P4Parse.tbl_abstraction_from_file includes source gas unroll false false in
          let gpl = Tuple.T2.map ~f:(Translate.gcl_to_gpl) gcl |> Util.uncurry GPL.seq in
          if tables then
            let tfg = TFG.project gpl in

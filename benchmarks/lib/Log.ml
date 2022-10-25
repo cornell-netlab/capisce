@@ -1,4 +1,5 @@
 open Core
+open ANSITerminal
 
 type t = Off | On | Break [@@deriving eq]
 
@@ -45,6 +46,8 @@ module FLAGS = struct
 
   let exploder = ref Off
 
+  let tree = ref Off
+
   let error = ref On
   let warn = ref On
 end
@@ -77,53 +80,59 @@ let parse_flags verbosity =
   parse FLAGS.smart 's';          (* Smart constructors *)
   parse FLAGS.rewrites 'r';       (* Rewrites *)
   parse FLAGS.qe 'q';             (* Quantifier elimination *)
-  parse FLAGS.exploder 'e'        (* Exploder *)
+  parse FLAGS.exploder 'e';       (* Exploder *)
+  parse FLAGS.tree 't'            (* spanning Tree logging *)
 
   (* let size d = measure (Printf.sprintf "size,%f,%d" (Clock.now()) d) *)
 
 let dot_string f = Printf.sprintf "dot -Tps %s.dot -o %s.pdf; xdg-open %s.pdf;" f f f
 
-let log flag output fmt a : unit =
+let log flag fmt colors a : unit =
   if enabled flag then begin
-    Printf.fprintf output (fmt ^^ "\n%!") (Lazy.force a);
-    Breakpoint.set (is_break flag)
+    ANSITerminal.printf colors (fmt ^^ "\n%!") (Lazy.force a);
+    Out_channel.flush stdout;
+    Breakpoint.set ~colors (is_break flag)
   end
 
-let error fmt   = log FLAGS.error    stderr fmt
-let warn fmt    = log FLAGS.warn     stderr fmt
-let measure fmt = log FLAGS.measure  stderr fmt
 
-let smt fmt      = log FLAGS.smt      stdout fmt
-let graph fmt    = log FLAGS.graph    stdout fmt
-let irs fmt      = log FLAGS.irs      stdout fmt
-let path_gen fmt = log FLAGS.path_gen stdout fmt
+let error fmt   = log FLAGS.error     fmt [red]
+let warn fmt    = log FLAGS.warn      fmt [yellow; Bold]
+let measure fmt = log FLAGS.measure   fmt []
+let smt fmt      = log FLAGS.smt      fmt [green]
+let irs fmt      = log FLAGS.irs      fmt []
+let path_gen fmt = log FLAGS.path_gen fmt [blue; Bold]
 let path_gen_s s = path_gen "%s" (lazy s)
-let compiler fmt = log FLAGS.compiler stdout fmt
+let compiler fmt = log FLAGS.compiler fmt []
 let compiler_s s = compiler "%s" (lazy s)
-let smart fmt    = log FLAGS.smart    stdout fmt
-let rewrites fmt = log FLAGS.rewrites stdout fmt
-let qe fmt       = log FLAGS.qe stdout fmt
+let smart fmt    = log FLAGS.smart    fmt []
+let rewrites fmt = log FLAGS.rewrites fmt []
+let qe fmt       = log FLAGS.qe       fmt []
 
-let exploder fmt = log FLAGS.exploder stdout fmt
-let exploder_s s = path_gen "%s" (lazy s)
+let graph fmt    = log FLAGS.graph    fmt [green]
+let graph_s s    = graph "%s" (lazy s)
 
+let exploder fmt = log FLAGS.exploder fmt [red; Bold]
+let exploder_s s = exploder "%s" (lazy s)
+
+let tree fmt = log FLAGS.tree fmt []
+let tree_s s = tree "%s" (lazy s)
 
 let dot flag do_ fn =
   (*run [do_] then use [fn] to create the message*)
   if enabled FLAGS.dot && enabled flag then begin
     assert (not (String.is_substring fn ~substring:".dot"));
     do_ (Some (Printf.sprintf "%s.dot" fn));
-    log FLAGS.dot stdout "%s" (lazy (dot_string fn));
+    log FLAGS.dot "%s" [] (lazy (dot_string fn));
     Breakpoint.set (is_break FLAGS.dot || is_break flag)
   end
 
 let graph_dot    = dot FLAGS.graph
 let path_gen_dot = dot FLAGS.path_gen
-
+let tree_dot     = dot FLAGS.tree
 
 let debug fmt =
   if !FLAGS.override then
-    log FLAGS.debug stdout fmt
+    log FLAGS.debug fmt [magenta; Bold]
   else
     failwith "REMOVE ALL DEBUG STATEMENTS"
 

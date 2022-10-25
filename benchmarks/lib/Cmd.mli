@@ -14,6 +14,7 @@ module PassiveGCL : sig
   val wrong : t -> BExpr.t
   val passify : GCL.t -> Context.t * t
   val assume_disjuncts : t -> t
+  val remove_asserts : t -> t
   val vc : t -> BExpr.t
 end
 
@@ -39,6 +40,12 @@ end
 
 val vc : GCL.t -> BExpr.t
 val induce_gpl_from_tfg_path : GPL.G.t -> TFG.V.t list -> GPL.G.t
+
+module Concrete : sig
+  (*Counter-Example Guided Path Exploration*)
+  val slice : Model.t -> GCL.t -> GCL.t option
+end
+
 
 module Exploder : sig
   type t

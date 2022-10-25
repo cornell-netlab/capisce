@@ -48,42 +48,46 @@ type t =
 
 let rec to_smtlib = function
   | BV (n,w) ->
-  Printf.sprintf "(_ bv%s %d)" (Bigint.to_string n) w
+    Printf.sprintf "(_ bv%s %d)" (Bigint.to_string n) w
   | Var v ->
-     Var.str v
+    Var.str v
   | BinOp (op, e1, e2) ->
-     Printf.sprintf "(%s %s %s)"
-       (bop_to_smtlib op)
-       (to_smtlib e1)
-       (to_smtlib e2)
+    Printf.sprintf "(%s %s %s)"
+      (bop_to_smtlib op)
+      (to_smtlib e1)
+      (to_smtlib e2)
   | UnOp (op,e) ->
-     Printf.sprintf "(%s %s)" (uop_to_smtlib op) (to_smtlib e)
+    Printf.sprintf "(%s %s)" (uop_to_smtlib op) (to_smtlib e)
+
+let bv n w = BV (Bigint.(n % pow (succ one) (of_int w)), w)
+let bvi n w = bv (Bigint.of_int n) w
+
 
 let eval2 op e1 e2 =
   match e1, e2 with
   | BV(v1, w1), BV (v2, w2) ->
   begin match op with
       | BAnd ->
-         BV (Bigint.(v1 land v2), w1)
+        bv Bigint.(v1 land v2) w1
       | BOr ->
-         BV (Bigint.(v1 lor v2), w1)
+        bv Bigint.(v1 lor v2) w1
       | BAdd ->
-        BV (Bigint.(v1 + v2), w1)     
+        bv Bigint.(v1 + v2) w1
       | BMul ->
-         BV (Bigint.(v1 * v2), w1)     
+        bv Bigint.(v1 * v2) w1
       | BSub ->
-         BV (Bigint.(v1 - v2), w1)     
+        bv Bigint.(v1 - v2) w1
       | BXor ->
-         BV (Bigint.(v1 lxor v2), w1)     
+        bv Bigint.(v1 lxor v2) w1
       | BConcat ->
-         BV (Bigint.((shift_left v1 w2) + v2), w1 + w2)     
+        bv Bigint.((shift_left v1 w2) + v2) (w1 + w2)
       | BShl ->
-         BV (Bigint.(shift_left v1 (to_int_exn v2)), w1)
+        bv Bigint.(shift_left v1 (to_int_exn v2)) w1
       | BAshr ->
-         BV (Bigint.(v1 asr (to_int_exn v2)), w1)
+        bv Bigint.(v1 asr (to_int_exn v2)) w1
       | BLshr ->
-         (* WARNING -- is this the right shift?*)
-         BV (Bigint.(shift_right v1 (to_int_exn v2)), w1)
+        (* WARNING -- is this the right shift?*)
+        bv Bigint.(shift_right v1 (to_int_exn v2)) w1
   end
   | _ -> BinOp(op, e1, e2)
 
@@ -92,12 +96,48 @@ let eval1 op e1 =
   | BV(v1, w1) ->
      begin match op with
      | UNot ->
-        BV (Bigint.(lnot v1), w1)
+        bv Bigint.(lnot v1) w1
      | USlice (lo,hi) ->
-        BV (Bigint.((shift_right v1 lo) % (((of_int 2) ** of_int hi) - one)), hi - lo)
+       (* make [hi] exclusive for easier math *)
+       let hi = hi + 1 in
+       let width = hi - lo in
+       let ones = Bigint.(((of_int 2) ** of_int width) - one) in
+       bv Bigint.((shift_right v1 lo) land ones) (hi - lo)
      end
   | _ -> UnOp(op, e1)
-    
+
+let get_value_exn = function
+  | BV (v, w) -> (v,w)
+  | e -> failwithf "Couldnt get value from non-BV expression: %s" (to_smtlib e) ()
+
+
+let eval (model : Model.t) expr : (Bigint.t * int) option =
+  let rec loop e =
+    let open Option.Let_syntax in
+    match e with
+    | BV (v,w) -> Some (v,w)
+    | Var x ->
+      begin match Model.lookup model x with
+        | None ->
+          Log.error "Model:\n%s" @@ lazy (Model.to_string model);
+          Log.error "is missing: %s" @@ lazy (Var.str x);
+          failwithf "Failed to evaluate expression:%s" (to_smtlib expr) ()
+        | Some v ->
+          Log.debug_s @@ Printf.sprintf "\t{ %s |--> %s }" (Var.str x) (Bigint.to_string (fst v));
+          Some v
+      end
+    | UnOp (op, e) ->
+      let%map v,w = loop e in
+      eval1 op (bv v w)
+      |> get_value_exn
+    | BinOp (op, e1, e2) ->
+      let%bind v1,w1 = loop e1 in
+      let%map  v2,w2 = loop e2 in
+      eval2 op (bv v1 w1) (bv v2 w2)
+      |> get_value_exn
+  in
+  loop expr
+
 let rec get_width = function
   | BV (_,w) -> w
   | Var x -> Var.size x
@@ -113,8 +153,6 @@ let rec get_width = function
      | UNot -> get_width e
      | USlice (lo,hi) -> hi - lo
           
-let bv n w = BV(Bigint.(n % pow (succ one) (of_int w)), w)
-let bvi n w = bv (Bigint.of_int n) w
 let var v = Var v
 let is_var = function
   | Var _ -> true
@@ -159,7 +197,8 @@ let fold_consts_default e =
      (* Log.print @@ lazy( Printf.sprintf "[constant_folding] started with %s, got %s"
       *                      (to_smtlib e) (to_smtlib e'));  *)
      e'
-     
+
+
 let band e1 e2 =
   match e1, e2 with
   | BV(i,w), _ | _, BV(i,w)->

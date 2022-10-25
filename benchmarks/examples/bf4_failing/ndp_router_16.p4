@@ -206,16 +206,23 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         size = 2;
     }
     apply {
-        if (hdr.ipv4.isValid() && hdr.ipv4.ttl > 8w0) {
+        if (hdr.ipv4.isValid()) {
+          if (hdr.ipv4.ttl > 8w0) {
             ipv4_lpm.apply();
-            if (hdr.ndp.isValid() && hdr.ndp.flags > 16w1) {
+            if (hdr.ndp.isValid()) {
+              if (hdr.ndp.flags > 16w1) {
                 directtoprio.apply();
-            }
-            else {
+              } else {
                 readbuffersense.apply();
                 setprio.apply();
+              }
+            }
+            else {
+              readbuffersense.apply();
+              setprio.apply();
             }
             forward.apply();
+          }
         }
     }
 }

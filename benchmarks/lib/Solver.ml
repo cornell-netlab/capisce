@@ -23,7 +23,7 @@ let run_proc_file p str =
   let in_chan, out_chan = Core_unix.open_process (Printf.sprintf "%s -in" p) in
   Out_channel.fprintf out_chan "%s\n%!" str; Out_channel.flush out_chan;
   let strs = In_channel.input_lines in_chan in
-  Log.smt "%s" @@ lazy "Got a result";
+  Log.smt "Got a result:\n%s" @@ lazy (String.concat strs ~sep:"\n");
   Core_unix.close_process (in_chan, out_chan) |> ignore;
   Log.smt "%s" @@ lazy "Closed processes";
   String.concat strs ~sep:"\n"
@@ -85,7 +85,13 @@ let check_unsat ?(timeout=None) consts phi =
   |> Smt.check_sat ~timeout consts
   |> run_z3 
   |> Smt.is_unsat 
-  
+
+let check_sat_model ?(timeout=None) consts phi =
+  BExpr.to_smtlib phi
+  |> Smt.check_sat_model ~timeout consts
+  |> run_z3
+  |> Smt.extract_model consts
+
   
 let check_iff (b1 : BExpr.t) (b2 : BExpr.t) : bool =
   let smtlib_exp = BExpr.equivalence b1 b2

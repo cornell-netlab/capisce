@@ -16,7 +16,6 @@ module Make (P : Primitive) = struct
     module PHash_set = Hash_set.Make (P)
     module PHashtbl = Hashtbl.Make (P)
 
-    
     let assume phi = Prim (P.assume phi)
     let assert_ phi = Prim (P.assert_ phi)
     let skip = Prim (P.assume BExpr.true_)
@@ -109,26 +108,26 @@ module Make (P : Primitive) = struct
       | _, _ ->
         sequence [c1; c2]
 
-    let rec trivial_branch_comparisons cs (comps : Expr.t list Var.Map.t) =
-      let open Option.Let_syntax in
-      match cs with
-      | [] -> Some comps
-      | Prim p::cs ->
-        let%bind comps' = P.comparisons p in
-        List.fold comps' ~init:comps
-          ~f:(fun acc (key,data) -> Var.Map.add_multi acc ~key ~data)
-        |> trivial_branch_comparisons cs
-      | _ ->
-        None
+    (* let rec trivial_branch_comparisons cs (comps : Expr.t list Var.Map.t) = *)
+    (*   let open Option.Let_syntax in *)
+    (*   match cs with *)
+    (*   | [] -> Some comps *)
+    (*   | Prim p::cs -> *)
+    (*     let%bind comps' = P.comparisons p in *)
+    (*     List.fold comps' ~init:comps *)
+    (*       ~f:(fun acc (key,data) -> Var.Map.add_multi acc ~key ~data) *)
+    (*     |> trivial_branch_comparisons cs *)
+    (*   | _ -> *)
+    (*     None *)
 
-    let can_collapse_total_trivial_branch cs =
-      match trivial_branch_comparisons cs Var.Map.empty with
-      | None -> false
-      | Some comps ->
-        List.length (Var.Map.keys comps) = 1
-        && Var.Map.for_alli comps ~f:(fun ~key ~data ->
-            String.is_suffix (Var.str key) ~suffix:"$action"
-            && List.for_all data ~f:(fun e -> Option.is_some (Expr.get_const e)))
+    (* let can_collapse_total_trivial_branch cs = *)
+    (*   match trivial_branch_comparisons cs Var.Map.empty with *)
+    (*   | None -> false *)
+    (*   | Some comps -> *)
+    (*     List.length (Var.Map.keys comps) = 1 *)
+    (*     && Var.Map.for_alli comps ~f:(fun ~key ~data -> *)
+    (*         String.is_suffix (Var.str key) ~suffix:"$action" *)
+    (*         && List.for_all data ~f:(fun e -> Option.is_some (Expr.get_const e))) *)
 
     let choices cs : t =
       if List.is_empty cs then
@@ -140,9 +139,10 @@ module Make (P : Primitive) = struct
           dead
         else if List.exists cs ~f:(is_add_annihil) then
           abort
-        else if can_collapse_total_trivial_branch cs then
-          skip
         else
+        (* if can_collapse_total_trivial_branch cs then *)
+        (*   skip *)
+        (* else *)
           begin
             match List.dedup_and_sort cs ~compare with
             | [c] -> c
@@ -501,6 +501,17 @@ module Make (P : Primitive) = struct
       let contains vtx ((head, rst) : t) =
         G.V.equal vtx head
         || List.exists rst ~f:(G.V.equal vtx)
+
+      let to_string (pi : t) : string =
+        let rec loop (head, rst) =
+          match rst with
+          | [] ->
+            Printf.sprintf "%d%!" (V.get_id head)
+          | x::rst ->
+            loop (x, rst)
+            |> Printf.sprintf "%d,%s" (V.get_id head)
+        in
+        Printf.sprintf "%s" (loop pi)
     end
 
     let feasible_edge (e : G.edge) g =
@@ -557,28 +568,28 @@ module Make (P : Primitive) = struct
       let module P = Graph.Prim.Make (G) (WEdge) in
       let str = lazy (Printf.sprintf "%d and %d" (snd src) (snd snk)) in
       (* Log.debug "generating path between %s" @@ str; *)
-      Log.path_gen_s "the full graph";
-      Log.path_gen_dot (print_graph g) "graph";
+      Log.tree_s "the full graph";
+      Log.tree_dot (print_graph g) "graph";
       assert (G.mem_vertex g snk);
       let fwd = induce_graph_between g src snk in
       assert (G.mem_vertex fwd snk);
-      Log.path_gen "forward graph between %s" str;
-      Log.path_gen_dot (print_graph fwd) "fwd_graph";
+      Log.tree "forward graph between %s" str;
+      Log.tree_dot (print_graph fwd) "fwd_graph";
       let bwd = O.mirror fwd in
-      Log.path_gen "backward graph between %s" str;
-      Log.path_gen_dot (print_graph bwd) "bwd_graph";
+      Log.tree "backward graph between %s" str;
+      Log.tree_dot (print_graph bwd) "bwd_graph";
       let fwd_span_edges = P.spanningtree_from fwd src in
       let fwd_span = edges_to_graph fwd_span_edges in
-      Log.path_gen "forward spanning tree between %s" str;
-      Log.path_gen_dot (print_graph fwd_span) "fwd_span";
+      Log.tree "forward spanning tree between %s" str;
+      Log.tree_dot (print_graph fwd_span) "fwd_span";
       assert (G.mem_vertex bwd snk);
       let bwd_span_edges = P.spanningtree_from bwd snk in
       let bwd_span = O.mirror (edges_to_graph bwd_span_edges) in
-      Log.path_gen "backward spanning tree between %s" str;
-      Log.path_gen_dot (print_graph bwd_span) "bwd_span";
+      Log.tree "backward spanning tree between %s" str;
+      Log.tree_dot (print_graph bwd_span) "bwd_span";
       let spans = O.intersect fwd_span bwd_span in
-      Log.path_gen "Span graph between %s" str;
-      Log.path_gen_dot (print_graph spans) "spans";
+      Log.tree "Span graph between %s" str;
+      Log.tree_dot (print_graph spans) "spans";
       let slice_graph =
         G.fold_edges (fun src dst slice_graph ->
             if G.mem_vertex slice_graph src && G.mem_vertex slice_graph dst then
@@ -628,27 +639,48 @@ module Make (P : Primitive) = struct
       let memo_table = VTbl.create () in
       fun src ->
         let rec loop worklist =
-        match worklist with
-        | [] -> failwith "could not find a join point"
-        | pi::worklist ->
-          let vtx = Path.peek pi in
-          if List.for_all worklist ~f:(Path.contains vtx) then
-            vtx
-          else
-            List.rev worklist
-            |> G.fold_succ (fun vtx -> List.cons (Path.add vtx pi)) g vtx
-            |> List.rev
-            |> loop
-      in
-      match VTbl.find memo_table src with
-      | None ->
-        let jp = loop (List.map (G.succ g src) ~f:Path.singleton)in
-        (* Log.print @@ lazy (Printf.sprintf "Found %d" (snd jp)); *)
-        VTbl.set memo_table ~key:src ~data:jp;
-        jp
-      | Some jp ->
-        (* Log.print @@ lazy (Printf.sprintf "Found Cached %d" (snd jp)); *)
-        jp
+          Log.graph "\tWORKLIST from : %s" @@ lazy (V.to_string src);
+          List.iter worklist ~f:(fun path ->
+              Log.graph "\t\t%s" @@ lazy (Path.to_string path)
+            );
+          match worklist with
+          | [] -> failwith "could not find a join point"
+          | pi::worklist ->
+            let vtx = Path.peek pi in
+            if List.for_all worklist ~f:(Path.contains vtx) then begin
+              Log.graph "---------%s is in all worklist elements" @@ lazy (V.to_string vtx);
+              vtx
+            end else begin
+              let succs = G.succ g vtx in
+              let new_worklist =
+                if List.is_empty succs then begin
+                  Log.graph "\t no successors for path %s" @@ lazy (Path.to_string pi);
+                  worklist @ [pi]
+                end else
+                  List.rev worklist
+                  |> G.fold_succ (fun vtx ->
+                      Log.graph "\tadding vertex %d" @@ lazy (V.get_id vtx);
+                      Log.graph "\t   to path %s" @@ lazy (Path.to_string pi);
+                      List.cons (Path.add vtx pi)) g vtx
+                  |> List.rev
+              in
+              Log.graph "\tUPDATED WORKLIST from : %s" @@ lazy (V.to_string src);
+              List.iter new_worklist ~f:(fun path ->
+                  Log.graph "\t\t%s" @@ lazy (Path.to_string path)
+                );
+              loop new_worklist
+            end
+        in
+        match VTbl.find memo_table src with
+        | None ->
+          Log.graph_s @@ List.to_string (G.succ g src) ~f:V.to_string;
+          let jp = loop (List.map (G.succ g src) ~f:Path.singleton) in
+          (* Log.print @@ lazy (Printf.sprintf "Found %d" (snd jp)); *)
+          VTbl.set memo_table ~key:src ~data:jp;
+          jp
+        | Some jp ->
+          Log.graph "----------Found Cached JP %d" @@ lazy (snd jp);
+          jp
 
 
     let of_graph (g : G.t) : t =
@@ -658,7 +690,7 @@ module Make (P : Primitive) = struct
         | Some join_point when (snd curr) = (snd join_point) ->
           skip
         | Some join_point when (snd curr) > (snd join_point) ->
-          failwith "passed the predetermined join point"
+          failwithf "[ERROR] %s is past the predetermined join point %s" (V.to_string curr) (V.to_string join_point) ()
         | _ ->
           match G.succ g curr with
           | [] -> prim (fst curr)
@@ -666,7 +698,9 @@ module Make (P : Primitive) = struct
             loop join_point_opt next
             |> seq (prim (fst curr))
           | succs ->
+            Log.graph "searching for join point from %s" @@ lazy (V.to_string curr);
             let join_point = g_join_point_finder curr in
+            Log.graph "Found join point %s" @@ lazy (V.to_string join_point);
             let branches = List.map succs ~f:(loop (Some join_point)) in
             sequence [prim (fst curr);
                       choices branches;
@@ -683,7 +717,15 @@ module Make (P : Primitive) = struct
       | Seq cs -> sequence @@ List.map cs ~f
       | Choice cs -> choices @@ List.map cs ~f
 
-
+    let vars c =
+      let sorted_concat xss =
+        List.concat xss
+        |> Var.sort
+      in
+      maps c
+        ~prim:(Fn.compose Var.sort P.vars)
+        ~sequence:sorted_concat
+        ~choices:sorted_concat
 
     (* Monoids *)
     let zero = dead
@@ -703,10 +745,15 @@ module GCL = struct
 
   let table (tbl_name, keys, (actions : (Var.t list * Action.t list) list)) =
     let open Pipeline in
-    table tbl_name keys actions
-    |> explode
-    |> Util.mapmap ~f:(fun a -> prim (to_active_exn a))
-    |> choice_seqs
+    let table =
+      table tbl_name keys actions
+      |> explode
+      |> Util.mapmap ~f:(fun a -> prim (to_active_exn a))
+      |> choice_seqs
+    in
+    if String.(tbl_name = "acl") then
+      Log.debug "ACL:\n%s\n---------" @@ lazy (to_string table);
+    table
 
   let rec wp c phi =
     let open BExpr in
@@ -761,9 +808,9 @@ module PassiveGCL = struct
     let rec loop (ctx : Context.t) (c : GCL.t) : Context.t * t =
       match c with
       | Prim (Assign (x,e)) ->
+        let e' = Expr.label ctx e in
         let ctx = Context.increment ctx x in
         let x' = Context.label ctx x in
-        let e' = Expr.label ctx e in
         (ctx, assume (BExpr.eq_ (Expr.var x') e'))
       | Prim (Passive (Assert b)) ->
         (ctx, assert_ (BExpr.label ctx b))
@@ -810,6 +857,13 @@ module PassiveGCL = struct
     wrong c
     |> BExpr.not_
     |> BExpr.simplify
+
+  let remove_asserts (c : t) =
+    maps c ~choices ~sequence
+      ~prim:(function
+          | Assert _ -> skip
+          | Assume phi -> assume phi
+        )
 
 end
 
@@ -969,6 +1023,69 @@ end
 
 let induce_gpl_from_tfg_path (g : GPL.G.t) : TFG.V.t list -> GPL.G.t = GPL.induce g
 
+
+module Concrete = struct
+  open GCL
+
+  let slice (model : Model.t) (psv : t) : t option =
+    (* Log.path_gen "slicing the following program:\n %s" @@ lazy (to_string gcl); *)
+    let msg = Printf.sprintf "Couldn't evaluate: %s" in
+    let rec loop model psv : (t * Model.t) option =
+      match psv with
+      | Prim (Assign (x,e)) as p ->
+        Log.debug "Evaluating %s" @@ lazy (to_string p);
+        let v =
+          Expr.eval model e
+          |> Option.value_exn ~message:(msg (Expr.to_smtlib e))
+        in
+        Some (p, Model.update model x v)
+      | Prim (Passive (Assume phi)) as p ->
+        (* Log.debug "model:\n %s" @@ lazy (Model.to_string model); *)
+        let reachable =
+          BExpr.eval model phi
+          |> Option.value_exn ~message:(msg (BExpr.to_smtlib phi))
+          (* |> Option.value ~default:true *)
+        in
+        if reachable then
+          Some (p, model)
+        else begin
+          Log.debug "dead node %s" @@ lazy (to_string p);
+          None
+        end
+      | Prim _ as p ->  Some (p, model)
+      | Choice cs ->
+        begin match List.filter_map cs ~f:(loop model) with
+          | [cm_opt] ->
+            Some cm_opt
+          | [] ->
+            Log.error "%s" @@ lazy (Model.to_string model);
+            List.iter cs ~f:(fun c ->
+                Log.error "%s\n-------------[]------------\n" @@
+                  lazy (to_string c)
+              );
+            failwith "Couldn't find choice that satisfied model, path is impossibly infeasible"
+          | choices ->
+            List.iter choices ~f:(fun (c,_) ->
+                Log.error "%s\n-------------[]------------\n" @@
+                lazy (to_string c)
+              );
+            failwithf "Got %d choices, expected 1"  (List.length choices) ()
+            (* Util.choose_exn choices |> Option.some *)
+        end
+      | Seq cs ->
+        List.fold cs ~init:(Some (skip, model))
+          ~f:(fun acc c ->
+              let open Option.Let_syntax in
+              let%bind cs, model = acc in
+              let%map (c', model') = loop model c in
+              (seq cs c', model')
+          )
+    in
+    loop model psv
+    |> Option.map ~f:fst
+
+end
+
 module Exploder = struct
   module H = Hashtbl.Make (String)
   type t = (int * (Var.t list * Action.t list)) Stack.t H.t
@@ -1000,10 +1117,13 @@ module Exploder = struct
               match Stack.pop stack with
               | None -> None
               | Some (idx, act) ->
-                let phi, acts = Action.symbolize tbl.name (Table.act_size tbl) idx act in
-                List.map acts ~f:(fun a -> prim (Pipeline.action a))
-                |> List.cons (assume phi)
-                |> sequence
-                |> Option.return
+                let phi, acts = Action.symbolize tbl.name ~num_actions:(List.length tbl.actions) ~act_size:(Table.act_size tbl) ~idx act in
+                let gpl_act =
+                  List.map acts ~f:(fun a -> prim (Pipeline.action a))
+                  |> List.cons (assume phi)
+                  |> sequence
+                in
+                Some gpl_act
+
          )
 end

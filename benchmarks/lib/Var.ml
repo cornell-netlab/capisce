@@ -92,6 +92,8 @@ module V = struct
         with Failure _ ->
           None
 
+  let sort = List.dedup_and_sort ~compare
+
   let quickcheck_generator =
     let open Base_quickcheck.Generator in
     let open Quickcheck.Generator in

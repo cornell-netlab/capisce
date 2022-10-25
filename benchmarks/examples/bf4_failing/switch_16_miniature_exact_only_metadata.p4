@@ -551,6 +551,11 @@ struct metadata {
     security_metadata_t      security_metadata;
     @name(".tunnel_metadata") 
     tunnel_metadata_t        tunnel_metadata;
+    // added metadata
+    bool vlan_tag_0_valid;
+    bool vlan_tag_1_valid;
+    bool ipv4_valid;
+    bool ipv6_valid;
 }
 
 struct headers {
@@ -1074,12 +1079,14 @@ control process_vlan_decap(inout headers hdr, inout metadata meta, inout standar
             remove_vlan_double_tagged;
         }
         key = {
-            hdr.vlan_tag_[1w0].isValid(): exact;
-            hdr.vlan_tag_[1w1].isValid(): exact;
+            meta.vlan_tag_0_valid: exact;
+            meta.vlan_tag_1_valid: exact;
         }
         size = 1024;
     }
     apply {
+        meta.vlan_tag_0_valid = hdr.vlan_tag_[1w0].isValid();
+        meta.vlan_tag_1_valid = hdr.vlan_tag_[1w1].isValid();
         vlan_decap.apply();
     }
 }
@@ -1173,7 +1180,7 @@ control process_mac_rewrite(inout headers hdr, inout metadata meta, inout standa
             ipv4_unicast_rewrite;
         }
         key = {
-            hdr.ipv4.isValid()     : exact;
+            meta.ipv4_valid        : exact;
             hdr.ipv4.dstAddr[31:28]: exact @name("ipv4.dstAddr") ;
         }
     }
@@ -1188,6 +1195,7 @@ control process_mac_rewrite(inout headers hdr, inout metadata meta, inout standa
     }
     apply {
         if (meta.egress_metadata.routed == 1w1) {
+            meta.ipv4_valid = hdr.ipv4.isValid();
             l3_rewrite.apply();
             smac_rewrite.apply();
         }
@@ -1212,12 +1220,14 @@ control process_mtu(inout headers hdr, inout metadata meta, inout standard_metad
         }
         key = {
             meta.l3_metadata.mtu_index: exact;
-            hdr.ipv4.isValid()        : exact;
-            hdr.ipv6.isValid()        : exact;
+            meta.ipv4_valid        : exact;
+            meta.ipv6_valid        : exact;
         }
         size = 1024;
     }
     apply {
+        meta.ipv4_valid = hdr.ipv4.isValid();
+        meta.ipv6_valid = hdr.ipv6.isValid();
         mtu.apply();
     }
 }
@@ -1508,15 +1518,17 @@ control process_validate_outer_header(inout headers hdr, inout metadata meta, in
             set_valid_outer_broadcast_packet_qinq_tagged;
         }
         key = {
-            hdr.ethernet.srcAddr      : exact;
-            hdr.ethernet.dstAddr      : exact;
-            hdr.vlan_tag_[1w0].isValid(): exact;
-            hdr.vlan_tag_[1w1].isValid(): exact;
+            hdr.ethernet.srcAddr  : exact;
+            hdr.ethernet.dstAddr  : exact;
+            meta.vlan_tag_0_valid : exact;
+            meta.vlan_tag_1_valid : exact;
         }
         size = 512;
     }
     @name(".validate_outer_ipv4_header") validate_outer_ipv4_header() validate_outer_ipv4_header_0;
     apply {
+        meta.vlan_tag_0_valid = hdr.vlan_tag_[1w0].isValid();
+        meta.vlan_tag_1_valid = hdr.vlan_tag_[1w1].isValid();
         switch (validate_outer_ethernet.apply().action_run) {
             malformed_outer_ethernet_packet: {
             }
@@ -1584,16 +1596,18 @@ control process_port_vlan_mapping(inout headers hdr, inout metadata meta, inout 
             port_vlan_mapping_miss;
         }
         key = {
-            meta.ingress_metadata.ifindex: exact;
-            hdr.vlan_tag_[1w0].isValid()   : exact;
+            meta.ingress_metadata.ifindex  : exact;
+            meta.vlan_tag_0_valid          : exact;
             hdr.vlan_tag_[1w0].vid         : exact;
-            hdr.vlan_tag_[1w1].isValid()   : exact;
+            meta.vlan_tag_1_valid          : exact;
             hdr.vlan_tag_[1w1].vid         : exact;
         }
         size = 4096;
         implementation = bd_action_profile;
     }
     apply {
+        meta.vlan_tag_0_valid = hdr.vlan_tag_[1w0].isValid();
+        meta.vlan_tag_1_valid = hdr.vlan_tag_[1w1].isValid();
         port_vlan_mapping.apply();
     }
 }
@@ -2534,47 +2548,47 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         process_spanning_tree_0.apply(hdr, meta, standard_metadata);
         process_ip_sourceguard_0.apply(hdr, meta, standard_metadata);
         process_tunnel_0.apply(hdr, meta, standard_metadata);
-        // if (meta.ingress_metadata.port_type != 2w1) {
-        //     process_validate_packet_0.apply(hdr, meta, standard_metadata);
-        //     process_mac_0.apply(hdr, meta, standard_metadata);
-        //     if (meta.l3_metadata.lkp_ip_type == 2w0) {
-        //         process_mac_acl_0.apply(hdr, meta, standard_metadata);
-        //     } else {
-        //         process_ip_acl_0.apply(hdr, meta, standard_metadata);
-        //     }
-        //     process_qos_0.apply(hdr, meta, standard_metadata);
-        //     switch (rmac.apply().action_run) {
-        //         rmac_miss: {
-        //         }
-        //         default: {
-        //             if (meta.ingress_metadata.bypass_lookups & 16w0x2 == 16w0) {
-        //                 if (meta.l3_metadata.lkp_ip_type == 2w1 && meta.ipv4_metadata.ipv4_unicast_enabled == 1w1) {
-        //                     process_ipv4_racl_0.apply(hdr, meta, standard_metadata);
-        //                     process_ipv4_urpf_0.apply(hdr, meta, standard_metadata);
-        //                     process_ipv4_fib_0.apply(hdr, meta, standard_metadata);
-        //                 } else {
-        //                     if (meta.l3_metadata.lkp_ip_type == 2w2 && meta.ipv6_metadata.ipv6_unicast_enabled == 1w1) {
-        //                     }
-        //                 }
-        //                 process_urpf_bd_0.apply(hdr, meta, standard_metadata);
-        //             }
-        //         }
-        //    }
-        // }
-        // process_hashes_0.apply(hdr, meta, standard_metadata);
-        // if (meta.ingress_metadata.port_type != 2w1) {
-        //     process_fwd_results_0.apply(hdr, meta, standard_metadata);
-        //     process_nexthop_0.apply(hdr, meta, standard_metadata);
-        //     assert(meta.ingress_metadata.hit_fwd_result == 1w1 && meta.ingress_metadata.hit_nexthop == 1w1 || (meta.ingress_metadata.hit_fwd_result == 1w0) && (meta.ingress_metadata.hit_nexthop == 1w0));
-        //     if (meta.ingress_metadata.egress_ifindex == 16w65535) {
-        //     } else {
-        //          process_lag_0.apply(hdr, meta, standard_metadata);
-        //     }
-        //     process_mac_learning_0.apply(hdr, meta, standard_metadata);
-        // }
-        // if (meta.ingress_metadata.port_type != 2w1) {
-        //     process_system_acl_0.apply(hdr, meta, standard_metadata);
-        // }
+        if (meta.ingress_metadata.port_type != 2w1) {
+            process_validate_packet_0.apply(hdr, meta, standard_metadata);
+            process_mac_0.apply(hdr, meta, standard_metadata);
+            if (meta.l3_metadata.lkp_ip_type == 2w0) {
+                process_mac_acl_0.apply(hdr, meta, standard_metadata);
+            } else {
+                process_ip_acl_0.apply(hdr, meta, standard_metadata);
+            }
+            process_qos_0.apply(hdr, meta, standard_metadata);
+            switch (rmac.apply().action_run) {
+                rmac_miss: {
+                }
+                default: {
+                    if (meta.ingress_metadata.bypass_lookups & 16w0x2 == 16w0) {
+                        if (meta.l3_metadata.lkp_ip_type == 2w1 && meta.ipv4_metadata.ipv4_unicast_enabled == 1w1) {
+                            process_ipv4_racl_0.apply(hdr, meta, standard_metadata);
+                            process_ipv4_urpf_0.apply(hdr, meta, standard_metadata);
+                            process_ipv4_fib_0.apply(hdr, meta, standard_metadata);
+                        } else {
+                            if (meta.l3_metadata.lkp_ip_type == 2w2 && meta.ipv6_metadata.ipv6_unicast_enabled == 1w1) {
+                            }
+                        }
+                        process_urpf_bd_0.apply(hdr, meta, standard_metadata);
+                    }
+                }
+           }
+        }
+        process_hashes_0.apply(hdr, meta, standard_metadata);
+        if (meta.ingress_metadata.port_type != 2w1) {
+            process_fwd_results_0.apply(hdr, meta, standard_metadata);
+            process_nexthop_0.apply(hdr, meta, standard_metadata);
+            assert(meta.ingress_metadata.hit_fwd_result == 1w1 && meta.ingress_metadata.hit_nexthop == 1w1 || (meta.ingress_metadata.hit_fwd_result == 1w0) && (meta.ingress_metadata.hit_nexthop == 1w0));
+            if (meta.ingress_metadata.egress_ifindex == 16w65535) {
+            } else {
+                 process_lag_0.apply(hdr, meta, standard_metadata);
+            }
+            process_mac_learning_0.apply(hdr, meta, standard_metadata);
+        }
+        if (meta.ingress_metadata.port_type != 2w1) {
+            process_system_acl_0.apply(hdr, meta, standard_metadata);
+        }
     }
 }
 

@@ -37,12 +37,19 @@ let check_sat ?(timeout=None) consts phi_str =
     (string_of_timeout timeout)
     (Var.list_to_smtlib_decls consts)
     phi_str
-    
+
+let check_sat_model ?(timeout=None) consts phi_str =
+  Printf.sprintf "%s\n(get-value (%s))"
+    (check_sat ~timeout consts phi_str)
+    (List.map consts ~f:Var.str |> String.concat ~sep:" ")
+
 let doesnt_contain_any s subs =
   List.for_all subs ~f:(fun substring -> not (String.is_substring s ~substring))
 
 let success s =
   doesnt_contain_any s ["error"; "unknown"; "UNKNOWN"; "timeout"; "Killed"]
+
+
 
 let is_sat s =
   success s
@@ -55,7 +62,38 @@ let is_unsat s =
 
 let is_unknown s =
   String.is_substring (String.lowercase s) ~substring:"unknown"
-  
 
 let qf s = doesnt_contain_any s ["forall"; "exists"]
-      
+
+let extract_model consts z3_output_str =
+  let find str = List.find consts ~f:(fun x -> String.(Var.str x = str)) in
+  if is_sat z3_output_str then
+    match String.split_lines z3_output_str with
+    | [] -> failwith "didnt get any output from Z3"
+    | sat::rst ->
+      Log.smt "Removing sat response: %s" (lazy sat);
+      let model_str = String.concat rst ~sep:"\n" in
+      match Sexp.parse model_str with
+      | Done (model,_) ->
+        begin match model with
+        | List assocs ->
+          List.fold assocs ~init:Model.empty
+            ~f:(fun model -> function
+                | List [Atom x_str; Atom value_str] ->
+                  begin match find x_str with
+                  | None -> failwithf "Got %s from Z3, couldnt find it in constants list" x_str ()
+                  | Some x ->
+                    let lint_string = String.substr_replace_first value_str ~pattern:"#" ~with_:"0" in
+                    Model.update model x (Bigint.of_string lint_string, Var.size x)
+                  end
+                | sexp ->
+                  failwithf "Expected assoc pair... Could not parse %s" (Sexp.to_string sexp) ()
+              )
+          |> Option.some
+        | _ ->
+          failwithf "Expected assoc list, could not parse model %s" (Sexp.to_string model) ()
+        end
+      | Cont _ ->
+        failwithf "Failed to parse model %s" z3_output_str ()
+  else
+    None

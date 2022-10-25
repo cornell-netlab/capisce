@@ -159,10 +159,12 @@ let check_no_quantified_vars dvs phi dvs' qf_phi =
 
 let solve_one ~qe phi : (Var.t list * string) option =
   let open Option.Let_syntax in
+  Log.qe "%s" @@ lazy ("Solve_one");
   let (dvs, _) = BExpr.vars phi in
   List.iter dvs ~f:BExpr.incr_q;
   Log.qe "%s" @@ lazy "smart constructors";
   let qphi = BExpr.(forall dvs phi |> order_all_quantifiers) in
+  Log.qe "%s" @@ lazy "solver";
   let%map qf_phi = qe (solve_wto `Z3) qphi in
   Log.qe "%s" @@ lazy "getting the vars of the result";
   let dvs', cvs = BExpr.vars qf_phi in
@@ -325,49 +327,68 @@ let write_path_results_to_file ~fn pi dur =
     FileIO.append path_json ~to_:file
 
 let implies phi1 phi2 =
-  let cond = BExpr.(and_ phi1 (not_ phi2)) in
+    let cond = BExpr.(and_ phi1 (not_ phi2)) in
   let cvs = BExpr.vars cond |> Tuple2.uncurry (@) in
   Solver.check_unsat cvs cond
     ~timeout:(Some 2000)
 
+let implies_model consts phi1 phi2 : Model.t option =
+  Log.debug "PREMISE:\n%s\n------" @@ lazy (BExpr.to_smtlib phi1);
+  Log.debug "CONSEQU:\n%s\n------" @@ lazy (BExpr.to_smtlib phi2);
+  let cond = BExpr.(and_ phi1 (not_ phi2)) in
+  Solver.check_sat_model consts cond
+    ~timeout:(Some 2000)
+
 let sufficient ~vc ~prog =
   let program_spec = vc prog in
-  Fn.flip implies program_spec
+  fun phi ->
+  implies phi program_spec
 
-let all_paths gcl =
-  let gcl_graph = GCL.construct_graph gcl in          Log.graph_dot (GCL.print_graph gcl_graph) "broken_cfg";
-  let gen = PathGenerator.create gcl_graph in         Log.path_gen "couldn't solve table-path, path-exploding the %s paths" @@ lazy (Bigint.to_string @@ PathGenerator.total_paths gen);
+let all_paths ~parserify raw_gcl =
+  let raw_gcl_graph = GCL.construct_graph raw_gcl in      Log.debug "exploring all paths for %s" @@ lazy (GCL.to_string raw_gcl);
+  let gcl = GCL.optimize (parserify raw_gcl) in           Log.graph_dot (GCL.print_graph raw_gcl_graph) "parserless_broken_cfg";
+  let gcl_graph = GCL.construct_graph gcl in              Log.graph_dot (GCL.print_graph gcl_graph) "broken_cfg";
+  let gen = PathGenerator.create gcl_graph in             Log.path_gen "couldn't solve exploded table-path, path-exploding the %s paths" @@ lazy (Bigint.to_string @@ PathGenerator.total_paths gen);
+  (* Breakpoint.set Bigint.(one < PathGenerator.total_paths gen); *)
   let paths = ref 0 in
   let sufficient = sufficient ~vc:Cmd.vc ~prog:gcl in
   let rec loop phi_agg =
     if sufficient phi_agg
-    then begin Log.debug_s "skipped"; phi_agg end
+    then begin Log.exploder_s "sufficient!"; phi_agg end
     else match PathGenerator.get_next gen with
       | None ->
-        Log.debug_s "inner paths done";
+        Log.exploder_s "inner paths done";
         phi_agg
       | Some pi ->
+        Log.path_gen "Inner Path #%d" @@ lazy !paths;
+        Log.path_gen "Paths to go %s" @@ lazy Bigint.(to_string (PathGenerator.total_paths gen -  of_int !paths));
         let pi = List.rev pi in
-        Log.debug "Inner Path #%d" @@ lazy !paths;
-        Log.debug "Paths to go %s" @@ lazy Bigint.(to_string (PathGenerator.total_paths gen -  of_int !paths));
-        let gcl = List.map pi ~f:(GCL.vertex_to_cmd) |> GCL.sequence in           (* Log.path_gen "solving path %s" @@ lazy (GCL.to_string gcl);*)
-        let phi = GCL.wp gcl BExpr.true_ |> BExpr.nnf in  (* Would be efficient with WP *)
+        let gcl = List.map pi ~f:(GCL.vertex_to_cmd) |> GCL.sequence in
+        Log.irs "solving path %s" @@ lazy (GCL.to_string gcl);
+        let phi = Cmd.vc gcl |> BExpr.nnf in
         if implies phi_agg phi
         then begin
-          Log.debug_s "Skipped; already covered!";
+          Log.exploder_s "Skipped; already covered!";
           Int.incr paths;
           loop phi_agg
         end
         else
-          let () = Log.debug_s "Gotta analyze this one" in
+          let () =
+            Log.exploder "Gotta analyze:\n%s" @@ lazy (GCL.to_string gcl);
+            Log.exploder "Formula is: \n%s" @@ lazy (BExpr.to_smtlib phi);
+          in
           match solve_one phi ~qe:BottomUpQe.optimistic_qe with
           | None ->
-            (* Log.error "%s" @@ lazy (GCL.to_string gcl); *)
-            (* Log.error "%s" @@ lazy (BExpr.to_smtlib phi); *)
+            Log.error "%s" @@ lazy (GCL.to_string gcl);
+            Log.error "%s" @@ lazy (BExpr.to_smtlib phi);
             failwith "Couldn't solve path"
           | Some (cvs,res) ->
-            let qf_psi = Solver.of_smtlib ~dvs:[] ~cvs res in Log.debug "Got %s" @@ lazy res;
-            assert (implies qf_psi phi);
+            let qf_psi = Solver.of_smtlib ~dvs:[] ~cvs res in
+            (* if not (implies qf_psi phi) then begin *)
+            (*   Log.error "CPF is %s" @@ lazy res; *)
+            (*   Log.error "PHI is %s" @@ lazy (BExpr.to_smtlib phi); *)
+            (*   failwith "CPF did not impliy PHI" *)
+            (* end; *)
             if Solver.check_unsat ~timeout:(Some 1000) cvs qf_psi then begin
               Printf.eprintf "Inner path Failed %s\n%!"  (GCL.to_string gcl);
               Printf.eprintf "Formulae was %s\n%!" res;
@@ -380,73 +401,157 @@ let all_paths gcl =
   let phi = loop BExpr.true_ in
   BExpr.simplify phi
 
-let rec explode_tables ~parserify exploder gpl phi_agg =
-  let tables = GPL.tables gpl in
-  match Util.choose tables with
-  | None ->
-    Log.exploder_s "Ran out of things to explode..... trying paths";
-    all_paths (parserify (GPL.encode_tables gpl))
-  | Some tbl ->
-    Exploder.arm exploder tbl;
-    let rec loop phi_agg =
-    match Exploder.pop exploder gpl with
-    | None -> phi_agg
-    | Some piece_gpl ->
-      let gcl = GPL.encode_tables piece_gpl in
-      let phi = parserify gcl |> PassiveGCL.passify |> snd |> PassiveGCL.vc in
-      Log.exploder_s "solving.....";
-      match solve_one phi ~qe:BottomUpQe.optimistic_qe with
+
+let rec orelse thunks ~input =
+  match thunks with
+  | [] -> None
+  | thunk::more_thunks ->
+    match thunk input with
+    | None -> orelse more_thunks ~input
+    | Some x -> Some x
+
+let concolic (gcl : GCL.t) : BExpr.t =
+  Log.irs "%s" @@ lazy (GCL.to_string gcl);
+  (* Counter-Example Guided Inductive Path eXploration *)
+  let _, psv = PassiveGCL.passify gcl in
+  let all_passive_consts = PassiveGCL.vars psv in
+  let safety_condition = PassiveGCL.vc psv in
+  let normal_executions = PassiveGCL.(normal (remove_asserts psv)) in
+  let num_cexs = ref Bigint.zero in
+  let rec loop phi_agg =
+    Log.path_gen_s "checking implication";
+    (* match implies_model all_passive_consts phi_agg symbolic_semantics with *)
+    match
+      Solver.check_sat_model
+        all_passive_consts
+        (BExpr.ands_ [phi_agg;
+                      normal_executions;
+                      BExpr.not_ safety_condition])
+        ~timeout:(Some 20000)
+    with
+    | None ->
+      Log.path_gen_s "found a sufficiently strong formula";
+      phi_agg
+    | Some counterexample ->
+      (* Log.path_gen_s "failed"; *)
+      Bigint.incr num_cexs;
+      let input_packet = Model.project_inputs counterexample in
+      Log.path_gen "found counterexample no. %s" @@ lazy (Bigint.to_string !num_cexs);
+      Log.debug "%s" @@ lazy Model.(to_string input_packet);
+      match Concrete.slice input_packet gcl with
       | None ->
-        Log.exploder_s "Insufficiently exploded, trying to explode again";
-        explode_tables ~parserify exploder piece_gpl phi_agg
-        |> BExpr.and_ phi_agg
-        |> loop
-      | Some (cvs, res) ->
-        res
-        |> Solver.of_smtlib ~dvs:[] ~cvs
-        |> BExpr.and_ phi_agg
-        |> loop
-    in
-    loop phi_agg
+        Log.error "Failed to slice(GCL):\n%s\n----------" @@ lazy (GCL.to_string gcl);
+        failwith "Could not slice the counterexample"
+      | Some pi ->
+        let pi = GCL.optimize pi in
+        let pi_vc = PassiveGCL.(vc @@ snd @@ passify pi) in
+        match
+          orelse ~input:pi_vc
+            [solve_one ~qe:BottomUpQe.optimistic_qe;
+             solve_one ~qe:BottomUpQe.cnf_qe]
+        with
+        | None ->
+          Log.error "GCL:\n%s-------\n" @@ lazy (GCL.to_string pi);
+          Log.error "VC:\n%s-------\n" @@ lazy (BExpr.to_smtlib pi_vc);
+          failwith "COULD NOT SOLVE PATH"
+        | Some (cvs, cpf_str) ->
+          let cpf = Solver.of_smtlib ~dvs:[] ~cvs cpf_str in
+          let sat = Solver.check_sat cvs cpf in
+          if sat then
+            loop (BExpr.and_ cpf phi_agg)
+          else begin
+            Log.warn "Uncontrollable path:%s" @@ lazy (GCL.to_string pi);
+            BExpr.false_
+          end
+  in
+  loop BExpr.true_
+
+let rec explode_tables ~sufficient ~parserify exploder gpl phi_agg =
+  if sufficient phi_agg
+  then phi_agg
+  else
+    let tables = GPL.tables gpl in
+    match Util.choose tables with
+    | None ->
+      Log.exploder_s "Ran out of things to explode..... trying paths";
+      let gcl = GPL.encode_tables gpl in
+      Log.irs "GCL %s" @@ lazy (GCL.to_string gcl);
+      (* let parsered = parserify gcl in *)
+      (* Log.irs "Parsered GCL %s" @@ lazy (GCL.to_string parsered); *)
+      let phi = all_paths ~parserify gcl in
+      Log.irs "Single-path CPI: %s" @@ lazy (BExpr.to_smtlib phi);
+      phi
+    | Some tbl ->
+      Exploder.arm exploder tbl;
+      let rec loop phi_agg =
+        if sufficient phi_agg
+        then phi_agg
+        else match Exploder.pop exploder gpl with
+          | None -> phi_agg
+          | Some piece_gpl ->
+            let gcl = GPL.encode_tables piece_gpl in
+            let phi = parserify gcl |> PassiveGCL.passify |> snd |> PassiveGCL.vc in
+            Log.exploder_s "solving.....";
+            match solve_one phi ~qe:BottomUpQe.optimistic_qe with
+            (* match None with *)
+            | None ->
+              Log.exploder_s "Insufficiently exploded, trying to explode again";
+              explode_tables ~sufficient ~parserify exploder piece_gpl phi_agg
+              |> BExpr.and_ phi_agg
+              |> loop
+            | Some (cvs, res) ->
+              res
+              |> Solver.of_smtlib ~dvs:[] ~cvs
+              |> BExpr.and_ phi_agg
+              |> loop
+      in
+      loop phi_agg
 
 (** THE MAIN LOOP *)
-let search_generator ~parserify ~statusbar gpl_graph gen phi_agg =
+let search_generator ~sufficient ~parserify ~statusbar gpl_graph gen phi_agg =
   let rec loop gen gpl_graph (phi_agg : BExpr.t) =
-  let inducer = GPL.induce gpl_graph in
-  (* if sufficient phi_agg phi_prog then *)
-  (*   phi_agg *)
-  (* else *)
-  let paths = ref Bigint.zero in
-  match GPLGen.get_next gen with
-  | None -> phi_agg
-  | Some pi ->                                          Log.debug "STATUS: %s" @@ statusbar gen pi paths;
-    let induced_graph = inducer pi in                   Log.path_gen_dot (GPL.print_graph induced_graph) "induced_graph";
-    let gpl = GPL.of_graph induced_graph in             Log.irs "GPL:\n%s\n%!" @@ lazy (GPL.to_string gpl);
-    let gcl = GPL.encode_tables gpl in                  Log.irs "GCL:\n%s\n%!" @@ lazy (GCL.to_string gcl);
-    let full_gcl = parserify gcl in                     Log.irs "GCL w/ Parser (Optimized):\n%s\n%!" @@ lazy (GCL.to_string gcl);
-    let psv = PassiveGCL.(passify full_gcl) |> snd in
-    let phi = PassiveGCL.vc psv in
-    (* if sufficient phi_agg phi then                      let () = Log.debug_s "\tSkipped for sufficiency!;\n%!" in *)
-    (*   loop phi_agg *)
-    (* else                                                let () = Log.debug_s "solving" in *)
-    Log.path_gen_s "solving...";
-    match solve_one phi ~qe:BottomUpQe.optimistic_qe with
-    | None ->
-      Log.path_gen_s "couldn't solve path!\n"; Log.irs "%s\n" @@ lazy (GCL.to_string full_gcl);
-      explode_tables ~parserify (Exploder.create ()) gpl phi_agg
-    | Some (cvs, res) ->
-      let qf_psi = Solver.of_smtlib ~dvs:[] ~cvs res in
-      let sat = Solver.check_sat cvs qf_psi in
-      if not sat then handle_failure
-          ~pi ~gpl ~gcl ~psv
-          ~gpl_graph ~induced_graph;
-      Bigint.incr paths;                                Log.smt "Path condition: \n%s\n%!" @@ lazy (BExpr.to_smtlib phi);
-      loop gen gpl_graph (BExpr.and_ qf_psi phi_agg)
+    if sufficient phi_agg
+    then phi_agg
+    else
+      let inducer = GPL.induce gpl_graph in
+      (* if sufficient phi_agg phi_prog then *)
+      (*   phi_agg *)
+      (* else *)
+      let paths = ref Bigint.zero in
+      match GPLGen.get_next gen with
+      | None -> phi_agg
+      | Some pi ->                                          Log.debug "STATUS: %s" @@ statusbar gen pi paths;
+        let induced_graph = inducer pi in                   Log.path_gen_dot (GPL.print_graph induced_graph) "induced_graph";
+        let gpl = GPL.of_graph induced_graph in             Log.irs "GPL:\n%s\n%!" @@ lazy (GPL.to_string gpl);
+        let gcl = GPL.encode_tables gpl in                  Log.irs "GCL:\n%s\n%!" @@ lazy (GCL.to_string gcl);
+        let full_gcl = parserify gcl in                     Log.irs "GCL w/ Parser (Optimized):\n%s\n%!" @@ lazy (GCL.to_string gcl);
+        let psv = PassiveGCL.(passify full_gcl) |> snd in
+        let phi = PassiveGCL.vc psv in
+        if implies phi_agg phi then                         let () = Log.debug_s "\tSkipped for sufficiency!;\n%!" in
+          loop gen gpl_graph phi_agg
+        else begin                                          let () = Log.debug_s "solving" in
+          Log.path_gen_s "solving...";
+          match solve_one phi ~qe:BottomUpQe.optimistic_qe with
+          (* match None with *)
+          | None ->
+            concolic full_gcl
+            (* Log.path_gen_s "couldn't solve path!\n"; Log.irs "%s\n" @@ lazy (GCL.to_string full_gcl); *)
+            (* phi_agg *)
+            (* |> explode_tables ~sufficient:(Fn.flip implies phi) ~parserify (Exploder.create ()) gpl *)
+            (* |> loop gen gpl_graph *)
+          | Some (cvs, res) ->
+            let qf_psi = Solver.of_smtlib ~dvs:[] ~cvs res in
+            let sat = Solver.check_sat cvs qf_psi in
+            if not sat then handle_failure
+                ~pi ~gpl ~gcl ~psv
+                ~gpl_graph ~induced_graph;
+            Bigint.incr paths;                                Log.smt "Path condition: \n%s\n%!" @@ lazy (BExpr.to_smtlib phi);
+            loop gen gpl_graph (BExpr.and_ qf_psi phi_agg)
+        end
   in
   loop gen gpl_graph phi_agg
 
 let table_paths ~sfreq:_ ~fn:_ ((prsr, prog) : GPL.t * GPL.t) =
-
   (* Initialize the program state*)                        Log.irs "Unoptimized GPL parser:\n%s\n" @@ lazy (GPL.to_string prsr);
   let (prsr, prog) = GPL.optimize_seq_pair (prsr, prog) in
   let gcl_prsr = GPL.encode_tables prsr in                 Log.irs "Optimized GCL parser:\n%s\n" @@ lazy (GCL.to_string gcl_prsr);
@@ -455,7 +560,10 @@ let table_paths ~sfreq:_ ~fn:_ ((prsr, prog) : GPL.t * GPL.t) =
   let tfg_graph = TFG.construct_graph tfg_prog in          Log.graph_dot (TFG.print_graph tfg_graph) "tfg";
   let gen = GPLGen.create (TFG.cast_to_gpl_graph tfg_graph) in
   (* let paths = ref Bigint.zero  in *)
-  let parserify gcl = GCL.(optimize (seq gcl_prsr gcl)) in
+  (* let parserify gcl = GCL.(optimize (seq gcl_prsr gcl)) in *)
+  let parserify gcl =
+    GCL.seq gcl_prsr gcl
+  in
   let clock = Clock.start () in
   let statusbar gen pi paths  = lazy (
     let time_s = Float.(Clock.stop clock / 1000.0) in
@@ -470,7 +578,10 @@ let table_paths ~sfreq:_ ~fn:_ ((prsr, prog) : GPL.t * GPL.t) =
     ^
     Printf.sprintf "estimated time to completion: %s\n" (completion_time (Bigint.to_float tot_paths) paths time_s))
   in
-  search_generator ~parserify ~statusbar gpl_graph gen BExpr.true_
+  let sufficient =
+    sufficient ~vc:(Cmd.vc) ~prog:(GPL.(seq prsr prog |> encode_tables))
+  in
+  search_generator ~sufficient ~parserify ~statusbar gpl_graph gen BExpr.true_
 
 
 let check_for_parser prsr gpl_prsr=
@@ -485,6 +596,12 @@ let preprocess ~prsr gpl_pair =
   |> Tuple2.map_fst ~f:(check_for_parser prsr)
   |> Tuple2.map     ~f:(GPL.normalize_names)
 
-let table_infer ~sfreq ~prsr ~fn gpl_pair =
-  preprocess ~prsr gpl_pair
-  |> table_paths ~sfreq ~fn
+let table_infer ~sfreq:_ ~prsr ~fn:_ gpl_pair =
+  Log.qe "%s" @@ lazy "starting concolic loop";
+  let prsr, pipe = preprocess ~prsr gpl_pair in
+  let gcl_pipe = GPL.encode_tables pipe in
+  let gcl_prsr = GPL.encode_tables prsr in
+  let parserify = GCL.(Fn.compose optimize (seq gcl_prsr)) in
+  concolic (parserify gcl_pipe)
+  (* all_paths ~parserify gcl_pipe *)
+ (* table_paths ~sfreq ~fn (prsr, pipe) *)

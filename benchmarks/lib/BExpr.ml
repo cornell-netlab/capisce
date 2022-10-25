@@ -1033,7 +1033,70 @@ let rec fun_subst_lvar f b =
 
 let subst_lvar x b0 =
   fun_subst_lvar (fun y -> if String.(x = y) then b0 else lvar y)
-    
+
+let eval_comp c (v1,w1) (v2,w2) =
+  begin match c with
+  | Slt | Sle | Sge | Sgt ->
+    lazy (to_smtlib @@ get_smart_comp c (Expr.bv v1 w1) (Expr.bv v2 w2))
+    |> Log.warn "Warning. implementing signed as unsigned: %s"
+  | _ ->()
+  end;
+  match c with
+  | Eq  -> Bigint.(=)  v1 v2
+  | Ult -> Bigint.(<)  v1 v2
+  | Ule -> Bigint.(<=) v1 v2
+  | Uge -> Bigint.(>=) v1 v2
+  | Ugt -> Bigint.(>)  v1 v2
+  | Slt -> Bigint.(<)  v1 v2
+  | Sle -> Bigint.(<=) v1 v2
+  | Sgt -> Bigint.(>)  v1 v2
+  | Sge -> Bigint.(>=) v1 v2
+
+let rec eval_op op bs : bool =
+  match op with
+  | LAnd -> List.for_all   bs ~f:Fn.id
+  | LOr  -> List.exists    bs ~f:Fn.id
+  | LIff -> List.all_equal bs  ~equal:Bool.equal
+            |> Option.is_some
+  | LArr ->
+    match List.rev bs with
+    | []  -> failwith "cannot compute => of empty list"
+    | [_] -> failwith "cannot compute => of singleton list"
+    | b::bs ->
+      (*=> bs b ==== (/\bs) => b ==== b \/ ~(/\bs) *)
+      b || not (eval_op LAnd bs)
+
+let rec eval (model : Model.t) (phi : t) : bool option =
+  let open Option.Let_syntax in
+  match phi with
+  | TFalse -> Some false
+  | TTrue -> Some true
+  | TComp (c, e1, e2) ->
+    let%bind v1 = Expr.eval model e1 in
+    let%map  v2 = Expr.eval model e2 in
+    begin match c with
+      | Eq ->
+        Log.debug_s "evaluating (=)";
+        Log.debug "\te1 was %s" @@ lazy (Expr.to_smtlib e1);
+        Log.debug "\te1  is %s" @@ lazy (Bigint.to_string (fst v1));
+        Log.debug "\te2 was %s" @@ lazy (Expr.to_smtlib e2);
+        Log.debug "\te2  is %s" @@ lazy (Bigint.to_string (fst v2));
+        let b = eval_comp c v1 v2 in
+        Log.debug "\t==== %b"   @@ lazy b;
+        b
+      | _ -> eval_comp c v1 v2
+    end
+  | TNary (op, bs) ->
+    List.map ~f:(eval model) bs
+    |> Util.commute
+    >>| eval_op op
+  | TNot b ->
+    let%map v = eval model b in
+    not v
+  | LVar _ -> failwith "Don't have evaluation for LVars"
+  | Forall _  | Exists _ ->
+    failwith "Dont have evaluation for quantifiers"
+
 
 let get_equality b =
   match b with

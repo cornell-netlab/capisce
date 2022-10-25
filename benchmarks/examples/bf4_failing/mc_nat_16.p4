@@ -95,6 +95,7 @@ control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t
     }
     apply {
         nat_table.apply();
+        // standard_metadata.egress_spec = 9w5;
     }
 }
 

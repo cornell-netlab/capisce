@@ -29,6 +29,8 @@ val is_sym_of : sym:t -> data:t -> bool
 val list_to_smtlib_quant : t list -> string
 val list_to_smtlib_decls : t list -> string
 
+val sort : t list -> t list
+
 val index : t -> int -> t
 val unindex : t -> (t * int) option
 (* [unindex x] is Some (y,i) when (str x) == y$_$i *)
