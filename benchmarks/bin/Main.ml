@@ -15,7 +15,7 @@ let compile : Command.t =
        unroll_opt = flag "-u" (optional int) ~doc:"how much to_unroll the parser"
        in
        fun () ->
-       let open Cmd in
+       let open ASTs in
        BExpr.enable_smart_constructors := `On;
        Log.parse_flags "vgi";
        let gas = Option.value gas_opt ~default:1000 in
@@ -109,7 +109,7 @@ let table_infer : Command.t =
         Log.compiler "%s" @@ lazy "compiling to gpl...";
         let gpl = Tuple2.map ~f:(Translate.gcl_to_gpl) coq_gcl in
         let st = Clock.start () in
-        let gpl = Tuple2.map_snd ~f:Cmd.GPL.optimize gpl in
+        let gpl = Tuple2.map_snd ~f:ASTs.GPL.optimize gpl in
         let cpf = Qe.table_infer ~sfreq ~prsr ~fn gpl in
         Printf.printf "Result:\n%s\n%!Computedin %f:\n%!" (BExpr.to_smtlib cpf) (Clock.stop st)
     ]
@@ -125,12 +125,11 @@ let infer : Command.t =
          gas_opt = flag "-g" (optional int) ~doc:"how much gas to pass the compiler" and
          unroll_opt = flag "-u" (optional int) ~doc:"how much to unroll the parser" and
          no_smart = flag "--disable-smart" no_arg ~doc:"disable smart constructors" and
-         iter = flag "--iter" no_arg ~doc:"use iterative solution" and
          solvers = flag "-s" (listed string) ~doc:"solving order" and
       disable_header_validity = flag "--no-hv" (no_arg) ~doc:"disable header validity checks"
          in
          fun () ->
-         let open Cmd in
+         let open ASTs in
          Printexc.record_backtrace true;
          Log.parse_flags (String.concat verbosity);
          if debug then Log.override ();
@@ -157,10 +156,6 @@ let infer : Command.t =
                |  _ -> failwith "unrecognized qe solver" ) in
          let (inf_dur, inf_res, _, _) =
            (* Bench.z3_infer false (cmd, BExpr.true_) *)
-           if iter then
-             (Qe.solving_all_paths (cmd, BExpr.true_))
-           else
-             (* Qe.cvc4_z3_fix fix solvers false (cmd, BExpr.true_) *)
              Qe.subsolving (cmd, BExpr.true_)
          in
          Printf.printf "Done in %fms with calling the solver in inference phase. Got: \n%s\n%!"
@@ -178,12 +173,12 @@ let verify : Command.t =
          unroll_opt = flag "-u" (optional int) ~doc:"how much to unroll the parser"
      in
          fun () ->
-         let open Cmd in
+         let open ASTs in
          let gas = Option.value gas_opt ~default:1000 in
          let unroll = Option.value unroll_opt ~default:10 in
          let cmd = P4Parse.as_cmd_from_file includes source gas unroll false true in
          let cmd_o = GCL.optimize cmd in
-         let vc = Cmd.vc cmd_o in
+         let vc = passive_vc cmd_o in
          let (dvs, cvs) = BExpr.vars vc in
          if (Solver.check_unsat (cvs @ dvs) (BExpr.not_ vc)) then
            Printf.printf "valid\n%!"
@@ -192,7 +187,6 @@ let verify : Command.t =
    ]
 
 let graph : Command.t =
-  let open Cmd in
   let open Command.Let_syntax in
   Command.basic ~summary:"Generate the CFG graph"
     [%map_open
@@ -204,19 +198,20 @@ let graph : Command.t =
          tables = flag "--tables" no_arg ~doc:"only show tables"
      in
          fun () ->
+         let open ASTs in
          let gas = Option.value gas_opt ~default:1000 in
          let unroll = Option.value unroll_opt ~default:10 in
          let gcl = P4Parse.tbl_abstraction_from_file includes source gas unroll false false in
          let gpl = Tuple.T2.map ~f:(Translate.gcl_to_gpl) gcl |> Util.uncurry GPL.seq in
          if tables then
            let tfg = TFG.project gpl in
-           let grf = TFG.construct_graph tfg in
-           TFG.print_graph grf filename;
-           Printf.printf "%s has %s table-paths\n%!" source (TFG.count_cfg_paths grf |> Bigint.to_string)
+           let grf = Qe.TFG_G.construct_graph tfg in
+           Qe.TFG_G.print_graph grf filename;
+           Printf.printf "%s has %s table-paths\n%!" source (Qe.TFG_G.count_cfg_paths grf |> Bigint.to_string)
          else
-           let grf = GPL.construct_graph gpl in
-           GPL.print_graph grf filename;
-           Printf.printf "%s" (GPL.print_key grf);
+           let grf = Qe.GPL_G.construct_graph gpl in
+           Qe.GPL_G.print_graph grf filename;
+           Printf.printf "%s" (Qe.GPL_G.print_key grf);
    ]
 
 let smtlib : Command.t =

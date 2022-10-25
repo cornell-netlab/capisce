@@ -1,52 +1,52 @@
 open Core
-open Cmd
+open ASTs
 
 
-let vc prog asst =
-  vc (GCL.(seq prog (assert_ asst)))
+(* let vc prog asst = *)
+(*   vc (GCL.(seq prog (assert_ asst))) *)
 
-let qe solver simpl body c =
-  let (dvs,cvs) = BExpr.vars body in
-  let phi =  BExpr.forall dvs body in
-  let phi = if simpl then BExpr.simplify phi else phi in
-  let size = -1 in
-  if BExpr.qf phi then
-    let res = BExpr.to_smtlib phi in
-    let dur = Clock.stop c in
-    (dur, res, size, false)
-  else    
-    (* let phi_str = BExpr.to_smtlib phi in *)
-    let res = solver dvs cvs phi in
-    let dur = Clock.stop c in
-    (dur, res, size, true)
+(* let qe solver simpl body c = *)
+(*   let (dvs,cvs) = BExpr.vars body in *)
+(*   let phi =  BExpr.forall dvs body in *)
+(*   let phi = if simpl then BExpr.simplify phi else phi in *)
+(*   let size = -1 in *)
+(*   if BExpr.qf phi then *)
+(*     let res = BExpr.to_smtlib phi in *)
+(*     let dur = Clock.stop c in *)
+(*     (dur, res, size, false) *)
+(*   else     *)
+(*     (\* let phi_str = BExpr.to_smtlib phi in *\) *)
+(*     let res = solver dvs cvs phi in *)
+(*     let dur = Clock.stop c in *)
+(*     (dur, res, size, true) *)
 
-let exp_inner stringifier runner simpl (prog, asst) =
-  let c = Clock.start () in
-  let body = vc prog asst in
-  let solver _ cvs phi = runner (stringifier cvs (BExpr.to_smtlib phi)) in
-  qe solver simpl body c
+(* let exp_inner stringifier runner simpl (prog, asst) = *)
+(*   let c = Clock.start () in *)
+(*   let body = vc prog asst in *)
+(*   let solver _ cvs phi = runner (stringifier cvs (BExpr.to_smtlib phi)) in *)
+(*   qe solver simpl body c *)
 
-let cvc4_infer = exp_inner Smt.simplify Solver.run_cvc4
-let cvc4_check = exp_inner Smt.check_sat Solver.run_cvc4 
-let z3_check = exp_inner Smt.check_sat Solver.run_z3              
-let z3_infer = exp_inner Smt.assert_apply Solver.run_z3
-let princess_infer = exp_inner Smt.simplify Solver.run_princess
+(* let cvc4_infer = exp_inner Smt.simplify Solver.run_cvc4 *)
+(* let cvc4_check = exp_inner Smt.check_sat Solver.run_cvc4  *)
+(* let z3_check = exp_inner Smt.check_sat Solver.run_z3               *)
+(* let z3_infer = exp_inner Smt.assert_apply Solver.run_z3 *)
+(* let princess_infer = exp_inner Smt.simplify Solver.run_princess *)
 
-let cvc4_z3_infer simpl (prog, asst) =
-  let (dur, res, size, use_solver) = cvc4_infer simpl (prog, asst) in
-  let (dvs,cvs) = BExpr.vars (vc prog asst) in  
-  if Smt.qf res then
-    (dur,res,size,use_solver)
-  else
-    let c = Clock.start () in
-    let uneliminated_dvs = List.filter dvs ~f:(fun v -> String.is_substring res ~substring:(Var.str v)) in
-    let quantified_res = Printf.sprintf "(forall (%s) %s)" (Var.list_to_smtlib_quant uneliminated_dvs) res in 
-    let res = Solver.run_z3 (Smt.assert_apply cvs quantified_res) in
-    let z3_dur = Clock.stop c in 
-    (Float.(dur + z3_dur), res, size, true)
+(* let cvc4_z3_infer simpl (prog, asst) = *)
+(*   let (dur, res, size, use_solver) = cvc4_infer simpl (prog, asst) in *)
+(*   let (dvs,cvs) = BExpr.vars (vc prog asst) in   *)
+(*   if Smt.qf res then *)
+(*     (dur,res,size,use_solver) *)
+(*   else *)
+(*     let c = Clock.start () in *)
+(*     let uneliminated_dvs = List.filter dvs ~f:(fun v -> String.is_substring res ~substring:(Var.str v)) in *)
+(*     let quantified_res = Printf.sprintf "(forall (%s) %s)" (Var.list_to_smtlib_quant uneliminated_dvs) res in  *)
+(*     let res = Solver.run_z3 (Smt.assert_apply cvs quantified_res) in *)
+(*     let z3_dur = Clock.stop c in  *)
+(*     (Float.(dur + z3_dur), res, size, true) *)
 
-let var_still_used smtstring var =
-  String.is_substring smtstring ~substring:(Var.str var)
+(* let var_still_used smtstring var = *)
+(*   String.is_substring smtstring ~substring:(Var.str var) *)
 
 let solve_wto solver ?(with_timeout:int option) cvs smt =
   match solver, with_timeout with
@@ -59,56 +59,56 @@ let solve_wto solver ?(with_timeout:int option) cvs smt =
   | `CVC4,_ ->
     Solver.run_cvc4 (Smt.simplify cvs smt)
 
-let solve solver cvs smt = solve_wto solver cvs smt     
+(* let solve solver cvs smt = solve_wto solver cvs smt      *)
 
-let normalize solver dvs cvs res =
-  if Smt.success res then
-      match solver with
-      | `Z3 | `Z3Light ->
-         let goals = BExpr.to_smtlib (Solver.of_smtlib ~dvs ~cvs res) in
-         if String.is_substring goals ~substring:":precision" then
-           "true"
-         else
-           goals
-      | `CVC4 ->
-         let dvs' = List.filter dvs ~f:(var_still_used res) in
-         if List.is_empty dvs' then
-           res
-         else
-           Printf.sprintf "(forall (%s) %s)" (Var.list_to_smtlib_quant dvs') res
-  else
-    begin
-      Printf.eprintf "Solver failed:\n %s" res;
-      exit (-1)
-    end
-      
-let rec solver_fixpoint_str gas solvers dvs cvs (smt : string) : string =
-  if gas <= 0 then smt else
-    let dvs' = List.filter dvs ~f:(var_still_used smt) in
-    let cvs' = List.filter cvs ~f:(var_still_used smt) in
-    match solvers with
-    | [] ->
-       failwith "Ran out of solvers to try"
-    | solver :: solvers' ->
-       let res = normalize solver dvs cvs' (solve solver cvs' smt) in
-       if Smt.qf res then
-         res
-       else
-         solver_fixpoint_str (gas-1) (solvers'@[solver]) dvs' cvs' res
+(* let normalize solver dvs cvs res = *)
+(*   if Smt.success res then *)
+(*       match solver with *)
+(*       | `Z3 | `Z3Light -> *)
+(*          let goals = BExpr.to_smtlib (Solver.of_smtlib ~dvs ~cvs res) in *)
+(*          if String.is_substring goals ~substring:":precision" then *)
+(*            "true" *)
+(*          else *)
+(*            goals *)
+(*       | `CVC4 -> *)
+(*          let dvs' = List.filter dvs ~f:(var_still_used res) in *)
+(*          if List.is_empty dvs' then *)
+(*            res *)
+(*          else *)
+(*            Printf.sprintf "(forall (%s) %s)" (Var.list_to_smtlib_quant dvs') res *)
+(*   else *)
+(*     begin *)
+(*       Printf.eprintf "Solver failed:\n %s" res; *)
+(*       exit (-1) *)
+(*     end *)
 
-let solver_fixpoint gas solvers dvs cvs phi =
-  BExpr.to_smtlib phi
-  |> solver_fixpoint_str gas solvers dvs cvs
+(* let rec solver_fixpoint_str gas solvers dvs cvs (smt : string) : string = *)
+(*   if gas <= 0 then smt else *)
+(*     let dvs' = List.filter dvs ~f:(var_still_used smt) in *)
+(*     let cvs' = List.filter cvs ~f:(var_still_used smt) in *)
+(*     match solvers with *)
+(*     | [] -> *)
+(*        failwith "Ran out of solvers to try" *)
+(*     | solver :: solvers' -> *)
+(*        let res = normalize solver dvs cvs' (solve solver cvs' smt) in *)
+(*        if Smt.qf res then *)
+(*          res *)
+(*        else *)
+(*          solver_fixpoint_str (gas-1) (solvers'@[solver]) dvs' cvs' res *)
 
-let cvc4_z3_fix gas solvers simpl (prog, asst) =
-  let c = Clock.start () in
-  let body = vc prog asst in
-  qe (solver_fixpoint gas solvers) simpl body c
+(* let solver_fixpoint gas solvers dvs cvs phi = *)
+(*   BExpr.to_smtlib phi *)
+(*   |> solver_fixpoint_str gas solvers dvs cvs *)
+
+(* let cvc4_z3_fix gas solvers simpl (prog, asst) = *)
+(*   let c = Clock.start () in *)
+(*   let body = vc prog asst in *)
+(*   qe (solver_fixpoint gas solvers) simpl body c *)
 
 let subsolving (prog, asst) =
   let c = Clock.start () in
   Log.qe "%s" @@ lazy "computing vc";
-  let phi = vc prog asst in
+  let phi = passive_vc (GCL.(seq prog (assert_ asst))) in
   Log.qe "%s" @@ lazy "getting vars";
   let (dvs, _) = BExpr.vars phi in
   (* let dvs = List.dedup_and_sort dvs ~compare:(fun a b -> Int.compare (Var.size b) (Var.size a)) in *)
@@ -121,7 +121,7 @@ let subsolving (prog, asst) =
   Log.qe "The sorted dataplane variables:%s\n" @@ lazy (List.to_string sorted_dvs ~f:Var.str);
   (* sort and re-sort by number of occurences *)
   let qf_phi = List.fold_left sorted_dvs ~init:phi
-                 ~f:(fun qf_phi x -> 
+                 ~f:(fun qf_phi x ->
                    Log.qe "running the bottom up solver for %s" @@ lazy (Var.str x);
                    let soln = BottomUpQe.cnf_qe (solve_wto `Z3) (BExpr.forall [x] qf_phi) |> Option.value_exn in
                    if List.exists (fst (BExpr.vars soln)) ~f:(fun y -> String.(Var.str x = Var.str y)) then begin
@@ -138,7 +138,7 @@ let subsolving (prog, asst) =
       Printf.printf "ERROR Not QF:\n vars: %s \n form: %s\n%!" (List.to_string dvs' ~f:(Var.str)) (BExpr.to_smtlib qf_phi);
       failwith "QF Failed when it said it succeeded"
     end
-  else 
+  else
     Log.qe "No dataplane variables, only control vars: %s" @@ lazy (List.to_string cvs ~f:(Var.str));
   Log.qe "%s" @@ lazy "using z3 to simplify";
   let qf_phi_str = Solver.run_z3 (Smt.simplify cvs (BExpr.to_smtlib (BExpr.simplify qf_phi))) in
@@ -175,55 +175,73 @@ let solve_one ~qe phi : (Var.t list * string) option =
   (cvs, qf_phi_str)
 
 
-let solving_all_paths_inner (prog, asst) =
-  let (_, passive) = PassiveGCL.passify GCL.(seq prog (assume asst))  in
-  let path_optimized = PassiveGCL.assume_disjuncts passive in
-  let pis = PassiveGCL.paths path_optimized in
-  let completed = ref Bigint.zero in
-  Sequence.fold pis ~init:[] ~f:(fun acc pi ->
-      let _, qf_phi_str = PassiveGCL.vc pi |> solve_one ~qe:BottomUpQe.cnf_qe |> Option.value_exn in
-      Bigint.incr completed;
-      acc @ [qf_phi_str])
-
 (* let solving_all_paths_inner (prog, asst) = *)
-(*   let prog = GCL.(seq prog (assume asst)) in *)
-(*   let passive = PassiveGCL.passify prog in *)
+(*   let (_, passive) = PassiveGCL.passify GCL.(seq prog (assume asst))  in *)
 (*   let path_optimized = PassiveGCL.assume_disjuncts passive in *)
-(*   Breakpoint.set true; *)
 (*   let pis = PassiveGCL.paths path_optimized in *)
 (*   let completed = ref Bigint.zero in *)
 (*   Sequence.fold pis ~init:[] ~f:(fun acc pi -> *)
-(*       Log.print @@ lazy (Printf.sprintf "Computing WP for path:\n%s \n" (PassiveGCL.to_string pi)); *)
-(*       let phi = PassiveGCL.(wrong (seq pi (assert_ asst))) in *)
-(*       let (dvs, _) = BExpr.vars phi in *)
-(*       List.iter dvs ~f:BExpr.incr_q; *)
-(*       Log.print @@ lazy "smart constructors"; *)
-(*       let qphi = BExpr.(forall dvs phi |> order_all_quantifiers) in *)
-(*       let qf_phi = BottomUpQe.qe (solve_wto `Z3) qphi in *)
-(*       Log.print @@ lazy "getting the vars of the result"; *)
-(*       let dvs', cvs = BExpr.vars qf_phi in *)
-(*       Log.print @@ lazy (Printf.sprintf "checking all dataplane variables have been eliminated from %s" (BExpr.to_smtlib qf_phi)); *)
-(*       if not (List.is_empty dvs') then begin *)
-(*         Printf.printf "started with:\n vars: %s \n form: %s\n%!" (List.to_string dvs ~f:(Var.str)) (BExpr.to_smtlib phi); *)
-(*         Printf.printf "ERROR Not QF:\n vars: %s \n form: %s\n%!" (List.to_string dvs' ~f:(Var.str)) (BExpr.to_smtlib qf_phi); *)
-(*         failwith "QF Failed when it said it succeeded" *)
-(*       end *)
-(*       else *)
-(*         Log.print @@ lazy (Printf.sprintf "No dataplane variables, only control vars: %s" (List.to_string cvs ~f:(Var.str))); *)
-(*       Log.print @@ lazy "using z3 to simplify"; *)
-(*       let qf_phi_str = Solver.run_z3 (Smt.simplify cvs (BExpr.to_smtlib (BExpr.simplify qf_phi))) in *)
-(*       Log.print @@ lazy "done"; *)
+(*       let _, qf_phi_str = PassiveGCL.vc pi |> solve_one ~qe:BottomUpQe.cnf_qe |> Option.value_exn in *)
 (*       Bigint.incr completed; *)
-(*       Printf.printf "%s paths solved\n" (Bigint.to_string !completed); *)
 (*       acc @ [qf_phi_str]) *)
 
+(* (\* let solving_all_paths_inner (prog, asst) = *\) *)
+(* (\*   let prog = GCL.(seq prog (assume asst)) in *\) *)
+(* (\*   let passive = PassiveGCL.passify prog in *\) *)
+(* (\*   let path_optimized = PassiveGCL.assume_disjuncts passive in *\) *)
+(* (\*   Breakpoint.set true; *\) *)
+(* (\*   let pis = PassiveGCL.paths path_optimized in *\) *)
+(* (\*   let completed = ref Bigint.zero in *\) *)
+(* (\*   Sequence.fold pis ~init:[] ~f:(fun acc pi -> *\) *)
+(* (\*       Log.print @@ lazy (Printf.sprintf "Computing WP for path:\n%s \n" (PassiveGCL.to_string pi)); *\) *)
+(* (\*       let phi = PassiveGCL.(wrong (seq pi (assert_ asst))) in *\) *)
+(* (\*       let (dvs, _) = BExpr.vars phi in *\) *)
+(* (\*       List.iter dvs ~f:BExpr.incr_q; *\) *)
+(* (\*       Log.print @@ lazy "smart constructors"; *\) *)
+(* (\*       let qphi = BExpr.(forall dvs phi |> order_all_quantifiers) in *\) *)
+(* (\*       let qf_phi = BottomUpQe.qe (solve_wto `Z3) qphi in *\) *)
+(* (\*       Log.print @@ lazy "getting the vars of the result"; *\) *)
+(* (\*       let dvs', cvs = BExpr.vars qf_phi in *\) *)
+(* (\*       Log.print @@ lazy (Printf.sprintf "checking all dataplane variables have been eliminated from %s" (BExpr.to_smtlib qf_phi)); *\) *)
+(* (\*       if not (List.is_empty dvs') then begin *\) *)
+(* (\*         Printf.printf "started with:\n vars: %s \n form: %s\n%!" (List.to_string dvs ~f:(Var.str)) (BExpr.to_smtlib phi); *\) *)
+(* (\*         Printf.printf "ERROR Not QF:\n vars: %s \n form: %s\n%!" (List.to_string dvs' ~f:(Var.str)) (BExpr.to_smtlib qf_phi); *\) *)
+(* (\*         failwith "QF Failed when it said it succeeded" *\) *)
+(* (\*       end *\) *)
+(* (\*       else *\) *)
+(* (\*         Log.print @@ lazy (Printf.sprintf "No dataplane variables, only control vars: %s" (List.to_string cvs ~f:(Var.str))); *\) *)
+(* (\*       Log.print @@ lazy "using z3 to simplify"; *\) *)
+(* (\*       let qf_phi_str = Solver.run_z3 (Smt.simplify cvs (BExpr.to_smtlib (BExpr.simplify qf_phi))) in *\) *)
+(* (\*       Log.print @@ lazy "done"; *\) *)
+(* (\*       Bigint.incr completed; *\) *)
+(* (\*       Printf.printf "%s paths solved\n" (Bigint.to_string !completed); *\) *)
+(* (\*       acc @ [qf_phi_str]) *\) *)
 
-let solving_all_paths (prog,asst) =
-  let c    = Clock.start () in
-  let phis = solving_all_paths_inner (prog, asst) in
-  let time = Clock.stop c in
-  let phi_str = String.concat ~sep:"\n\n" phis in
-  (time, phi_str, -1, true)
+
+(* let solving_all_paths (prog,asst) = *)
+(*   let c    = Clock.start () in *)
+(*   let phis = solving_all_paths_inner (prog, asst) in *)
+(*   let time = Clock.stop c in *)
+(*   let phi_str = String.concat ~sep:"\n\n" phis in *)
+(*   (time, phi_str, -1, true) *)
+
+module GPL_G =
+  CFG.Make (struct
+    module Prim = Primitives.Pipeline
+    module S = GPL
+  end)
+
+module GCL_G =
+  CFG.Make (struct
+    module Prim = Primitives.Active
+    module S = GCL
+  end)
+
+module TFG_G =
+  CFG.Make (struct
+    module Prim = TFG.T
+    module S = TFG
+  end)
 
 
 module RandomStack (V : sig type t [@@deriving sexp, compare] end) =
@@ -242,26 +260,18 @@ end
 module GPLGen =
   Generator.Make
     (VStack)
-    (GPL.V)
-    (struct
-      include GPL.G
-      let find_source = GPL.find_source
-      let count_cfg_paths = GPL.count_cfg_paths
-    end)
+    (GPL_G.V)
+    (GPL_G)
 
 module PathGenerator =
   Generator.Make
     (RandomStack)
-    (GCL.V)
-    (struct
-      include GCL.G
-      let find_source = GCL.find_source
-      let count_cfg_paths = GCL.count_cfg_paths
-    end)
+    (GCL_G.V)
+    (GCL_G)
 
-let table_path_to_string (pi : GPL.V.t list) : string =
+let table_path_to_string (pi : GPL_G.V.t list) : string =
   List.rev pi
-  |> List.map ~f:GPL.V.to_string
+  |> List.map ~f:GPL_G.V.to_string
   |> String.concat ~sep:" --> "
 
 let handle_failure ~pi ~gpl ~gcl ~psv ~gpl_graph ~induced_graph =
@@ -269,15 +279,9 @@ let handle_failure ~pi ~gpl ~gcl ~psv ~gpl_graph ~induced_graph =
   Log.irs "GPL:%s\n%!" @@ lazy (GPL.to_string gpl);
   Log.irs "GCL:%s\n%!" @@ lazy (GCL.to_string gcl);
   Log.irs "PSV:%s\n%!" @@ lazy (PassiveGCL.to_string psv);
-  Log.graph_dot (GPL.print_graph gpl_graph) "gpl";
-  Log.path_gen_dot (GPL.print_graph induced_graph) "induced_graph";
+  Log.graph_dot (GPL_G.print_graph gpl_graph) "gpl";
+  Log.path_gen_dot (GPL_G.print_graph induced_graph) "induced_graph";
   raise (Failure "Found unsolveable path")
-
-let passive_vc prog =
-  GPL.encode_tables prog
-  |> PassiveGCL.passify
-  |> snd
-  |> PassiveGCL.vc
 
 let paths_per_second paths time_s =  Float.((Bigint.to_float !paths) / time_s)
 
@@ -318,8 +322,8 @@ let write_path_results_to_file ~fn pi dur =
   | None -> ()
   | Some file ->
     let path = List.map pi ~f:(fun vtx ->
-        let cmd = TFG.vertex_to_cmd vtx in
-        let idx = TFG.V.get_id vtx in
+        let cmd = TFG_G.vertex_to_cmd vtx in
+        let idx = TFG_G.V.get_id vtx in
         Printf.sprintf "{\"cmd\": \"%s\", \"idx\": %d}"
           (TFG.to_string cmd) idx
       ) |> String.concat ~sep:"," in
@@ -345,13 +349,13 @@ let sufficient ~vc ~prog =
   implies phi program_spec
 
 let all_paths ~parserify raw_gcl =
-  let raw_gcl_graph = GCL.construct_graph raw_gcl in      Log.debug "exploring all paths for %s" @@ lazy (GCL.to_string raw_gcl);
-  let gcl = GCL.optimize (parserify raw_gcl) in           Log.graph_dot (GCL.print_graph raw_gcl_graph) "parserless_broken_cfg";
-  let gcl_graph = GCL.construct_graph gcl in              Log.graph_dot (GCL.print_graph gcl_graph) "broken_cfg";
+  let raw_gcl_graph = GCL_G.construct_graph raw_gcl in      Log.debug "exploring all paths for %s" @@ lazy (GCL.to_string raw_gcl);
+  let gcl = GCL.optimize (parserify raw_gcl) in           Log.graph_dot (GCL_G.print_graph raw_gcl_graph) "parserless_broken_cfg";
+  let gcl_graph = GCL_G.construct_graph gcl in              Log.graph_dot (GCL_G.print_graph gcl_graph) "broken_cfg";
   let gen = PathGenerator.create gcl_graph in             Log.path_gen "couldn't solve exploded table-path, path-exploding the %s paths" @@ lazy (Bigint.to_string @@ PathGenerator.total_paths gen);
   (* Breakpoint.set Bigint.(one < PathGenerator.total_paths gen); *)
   let paths = ref 0 in
-  let sufficient = sufficient ~vc:Cmd.vc ~prog:gcl in
+  let sufficient = sufficient ~vc:passive_vc ~prog:gcl in
   let rec loop phi_agg =
     if sufficient phi_agg
     then begin Log.exploder_s "sufficient!"; phi_agg end
@@ -363,9 +367,9 @@ let all_paths ~parserify raw_gcl =
         Log.path_gen "Inner Path #%d" @@ lazy !paths;
         Log.path_gen "Paths to go %s" @@ lazy Bigint.(to_string (PathGenerator.total_paths gen -  of_int !paths));
         let pi = List.rev pi in
-        let gcl = List.map pi ~f:(GCL.vertex_to_cmd) |> GCL.sequence in
+        let gcl = List.map pi ~f:(GCL_G.vertex_to_cmd) |> GCL.sequence in
         Log.irs "solving path %s" @@ lazy (GCL.to_string gcl);
-        let phi = Cmd.vc gcl |> BExpr.nnf in
+        let phi = passive_vc gcl |> BExpr.nnf in
         if implies phi_agg phi
         then begin
           Log.exploder_s "Skipped; already covered!";
@@ -513,7 +517,7 @@ let search_generator ~sufficient ~parserify ~statusbar gpl_graph gen phi_agg =
     if sufficient phi_agg
     then phi_agg
     else
-      let inducer = GPL.induce gpl_graph in
+      let inducer = GPL_G.induce gpl_graph in
       (* if sufficient phi_agg phi_prog then *)
       (*   phi_agg *)
       (* else *)
@@ -521,8 +525,8 @@ let search_generator ~sufficient ~parserify ~statusbar gpl_graph gen phi_agg =
       match GPLGen.get_next gen with
       | None -> phi_agg
       | Some pi ->                                          Log.debug "STATUS: %s" @@ statusbar gen pi paths;
-        let induced_graph = inducer pi in                   Log.path_gen_dot (GPL.print_graph induced_graph) "induced_graph";
-        let gpl = GPL.of_graph induced_graph in             Log.irs "GPL:\n%s\n%!" @@ lazy (GPL.to_string gpl);
+        let induced_graph = inducer pi in                   Log.path_gen_dot (GPL_G.print_graph induced_graph) "induced_graph";
+        let gpl = GPL_G.to_prog induced_graph in            Log.irs "GPL:\n%s\n%!" @@ lazy (GPL.to_string gpl);
         let gcl = GPL.encode_tables gpl in                  Log.irs "GCL:\n%s\n%!" @@ lazy (GCL.to_string gcl);
         let full_gcl = parserify gcl in                     Log.irs "GCL w/ Parser (Optimized):\n%s\n%!" @@ lazy (GCL.to_string gcl);
         let psv = PassiveGCL.(passify full_gcl) |> snd in
@@ -551,37 +555,37 @@ let search_generator ~sufficient ~parserify ~statusbar gpl_graph gen phi_agg =
   in
   loop gen gpl_graph phi_agg
 
-let table_paths ~sfreq:_ ~fn:_ ((prsr, prog) : GPL.t * GPL.t) =
-  (* Initialize the program state*)                        Log.irs "Unoptimized GPL parser:\n%s\n" @@ lazy (GPL.to_string prsr);
-  let (prsr, prog) = GPL.optimize_seq_pair (prsr, prog) in
-  let gcl_prsr = GPL.encode_tables prsr in                 Log.irs "Optimized GCL parser:\n%s\n" @@ lazy (GCL.to_string gcl_prsr);
-  let gpl_graph = GPL.construct_graph prog in              Log.graph "Constructing Graph For Optimized GPL:%s\n%!\n\n" @@ lazy (GPL.to_string prog);
-  let tfg_prog = TFG.project prog in                       Log.graph "%s" @@ lazy (GPL.print_key gpl_graph); Log.graph_dot (GPL.print_graph gpl_graph) "gpl";
-  let tfg_graph = TFG.construct_graph tfg_prog in          Log.graph_dot (TFG.print_graph tfg_graph) "tfg";
-  let gen = GPLGen.create (TFG.cast_to_gpl_graph tfg_graph) in
-  (* let paths = ref Bigint.zero  in *)
-  (* let parserify gcl = GCL.(optimize (seq gcl_prsr gcl)) in *)
-  let parserify gcl =
-    GCL.seq gcl_prsr gcl
-  in
-  let clock = Clock.start () in
-  let statusbar gen pi paths  = lazy (
-    let time_s = Float.(Clock.stop clock / 1000.0) in
-    let tot_paths = GPLGen.total_paths gen in
-    Printf.sprintf "\n %s\n" (table_path_to_string pi)
-    ^
-    Printf.sprintf "[%fs] ^Path #%s\n" time_s (Bigint.to_string !paths)
-    ^
-    Printf.sprintf "There are %s paths\n" (Bigint.to_string tot_paths)
-    ^
-    Printf.sprintf "current rate is %f paths per second\n" (paths_per_second paths time_s)
-    ^
-    Printf.sprintf "estimated time to completion: %s\n" (completion_time (Bigint.to_float tot_paths) paths time_s))
-  in
-  let sufficient =
-    sufficient ~vc:(Cmd.vc) ~prog:(GPL.(seq prsr prog |> encode_tables))
-  in
-  search_generator ~sufficient ~parserify ~statusbar gpl_graph gen BExpr.true_
+(* let table_paths ~sfreq:_ ~fn:_ ((prsr, prog) : GPL.t * GPL.t) = *)
+(*   (\* Initialize the program state*\)                        Log.irs "Unoptimized GPL parser:\n%s\n" @@ lazy (GPL.to_string prsr); *)
+(*   let (prsr, prog) = GPL.optimize_seq_pair (prsr, prog) in *)
+(*   let gcl_prsr = GPL.encode_tables prsr in                 Log.irs "Optimized GCL parser:\n%s\n" @@ lazy (GCL.to_string gcl_prsr); *)
+(*   let gpl_graph = GPL_G.construct_graph prog in              Log.graph "Constructing Graph For Optimized GPL:%s\n%!\n\n" @@ lazy (GPL.to_string prog); *)
+(*   let tfg_prog = TFG.project prog in                       Log.graph "%s" @@ lazy (GPL_G.print_key gpl_graph); Log.graph_dot (GPL_G.print_graph gpl_graph) "gpl"; *)
+(*   let tfg_graph = TFG_G.construct_graph tfg_prog in          Log.graph_dot (TFG_G.print_graph tfg_graph) "tfg"; *)
+(*   let gen = GPLGen.create (TFG_G.cast_to_gpl_graph tfg_graph) in *)
+(*   (\* let paths = ref Bigint.zero  in *\) *)
+(*   (\* let parserify gcl = GCL.(optimize (seq gcl_prsr gcl)) in *\) *)
+(*   let parserify gcl = *)
+(*     GCL.seq gcl_prsr gcl *)
+(*   in *)
+(*   let clock = Clock.start () in *)
+(*   let statusbar gen pi paths  = lazy ( *)
+(*     let time_s = Float.(Clock.stop clock / 1000.0) in *)
+(*     let tot_paths = GPLGen.total_paths gen in *)
+(*     Printf.sprintf "\n %s\n" (table_path_to_string pi) *)
+(*     ^ *)
+(*     Printf.sprintf "[%fs] ^Path #%s\n" time_s (Bigint.to_string !paths) *)
+(*     ^ *)
+(*     Printf.sprintf "There are %s paths\n" (Bigint.to_string tot_paths) *)
+(*     ^ *)
+(*     Printf.sprintf "current rate is %f paths per second\n" (paths_per_second paths time_s) *)
+(*     ^ *)
+(*     Printf.sprintf "estimated time to completion: %s\n" (completion_time (Bigint.to_float tot_paths) paths time_s)) *)
+(*   in *)
+(*   let sufficient = *)
+(*     sufficient ~vc:passive_vc ~prog:(GPL.(seq prsr prog |> encode_tables)) *)
+(*   in *)
+(*   search_generator ~sufficient ~parserify ~statusbar gpl_graph gen BExpr.true_ *)
 
 
 let check_for_parser prsr gpl_prsr=

@@ -66,7 +66,7 @@ let as_cmd_from_file (includes : string list) p4file gas unroll verbose hv =
     | Ok (prsr, pipe) ->
       let prsr = Translate.gcl_to_cmd prsr in
       let pipe = Translate.gcl_to_cmd pipe in
-      Cmd.GCL.(normalize_names (seq prsr pipe))
+      ASTs.GCL.(normalize_names (seq prsr pipe))
 
 let tbl_abstraction_from_file (includes : string list) p4file gas unroll verbose hv =
   let p4cub = as_p4cub_from_file includes p4file verbose in

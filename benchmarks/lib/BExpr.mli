@@ -83,7 +83,7 @@ val subst_lvar : string -> t -> t -> t
 val fun_subst_lvar : (string -> t) -> t -> t    
 (** [fun_subst f b] substitutes b according to function [f] *)  
 
-val eval : Model.t -> t -> bool option
+val eval : Model.t -> t -> bool
 
 val one_point_rule : Expr.t -> Expr.t -> t -> t
   

@@ -33,7 +33,7 @@ val bnot : t -> t
 val bcast : int -> t -> t
 val bslice : int -> int -> t -> t
 
-val eval : Model.t -> t -> (Bigint.t * int) option
+val eval : Model.t -> t -> (Bigint.t * int)
 
 val static_eq : t -> t -> bool option
 val reassociate_bors : Var.t -> t -> (Var.t * t ) option  

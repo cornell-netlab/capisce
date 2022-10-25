@@ -1,55 +1,75 @@
+open Core
 open Primitives
 
-module GCL : sig
-  include Cmd_intf.S
-  val assign : Var.t -> Expr.t -> t
-  val wp : t -> BExpr.t -> BExpr.t
-  val const_prop : t -> t
-  val vc : t -> BExpr.t
-end
+module Make : functor (P : Primitive) ->
+ sig
+  type t [@@deriving quickcheck, eq, sexp, compare]
+  val assume : BExpr.t -> t
+  val assert_ : BExpr.t -> t
+  val skip : t
+  val pass : t
+  val dead : t
+  val abort : t
+  val zero : t
+  val one : t
+  val prim : P.t -> t
+  val ( + ) : t -> t -> t
+  val ( * ) : t -> t -> t
+  val is_mult_unit : t -> bool
+  val is_mult_annihil : t -> bool
+  val is_add_unit : t -> bool
+  val is_add_annihil : t -> bool
+  val contra : t -> t -> bool
+  val to_string_aux : int -> t -> string
+  val to_string : t -> string
+  val count_asserts_aux : t -> int -> int
+  val count_asserts : t -> int
+  val size : t -> int
+  val seq : t -> t -> t
+  val sequence : t list -> t
+  val sequence_opt : t option list -> t option
+  val choice : t -> t -> t
+  val choices : t list -> t
+  val choices_opt : t option list -> t option
+  val choice_seq : t list -> t list -> t
+  val choice_seqs : t list list -> t
+  val is_primitive : t -> bool
+  val subst : Var.t -> Expr.t -> t -> t
+  val normalize_names : t -> t
+  val dnf : t -> t
+  val count_paths : t -> Bigint.t
+  val paths : t -> t Sequence.t
+  val vars : t -> Var.t list
 
-module PassiveGCL : sig
-  include Cmd_intf.S
-  val normal : t -> BExpr.t
-  val wrong : t -> BExpr.t
-  val passify : GCL.t -> Context.t * t
-  val assume_disjuncts : t -> t
-  val remove_asserts : t -> t
-  val vc : t -> BExpr.t
-end
+  val bottom_up :
+    prim:(P.t -> 'a) ->
+    sequence:('a list -> 'a) ->
+    choices:('a list -> 'a)
+    -> t
+    -> 'a
 
-module GPL : sig
-  include Cmd_intf.S
-  val assign : Var.t -> Expr.t -> t
-  val table : string -> Var.t list -> (Var.t list * (Action.t list)) list -> t
-  val tables : t -> Table.t list
-  val symbolize : t -> t
-  val encode_tables : t -> GCL.t
-  val induce : G.t -> (V.t list) -> G.t
-  val print_key : G.t -> string
-end
+  val top_down :
+    init:'a ->
+    prim:('a -> P.t -> 'a) ->
+    sequence:('a -> t list -> ('a -> t -> 'a) -> 'a) ->
+    choices:('a -> t list -> ('a -> t -> 'a) -> 'a)
+    -> t
+    -> 'a
 
-module TFG : sig
-  include Cmd_intf.S
-  val project : GPL.t -> t
-  val inject : t -> GPL.t
-  val print_key : G.t -> string
-  val explode_random : t -> G.t option
-  val cast_to_gpl_graph : G.t -> GPL.G.t
-end
+  val forward :
+    init:'a ->
+    prim:('a -> P.t -> 'a) ->
+    choices:('a list -> 'a)
+    -> t
+    -> 'a
 
-val vc : GCL.t -> BExpr.t
-val induce_gpl_from_tfg_path : GPL.G.t -> TFG.V.t list -> GPL.G.t
+  val backward :
+    init:'a ->
+    prim:(P.t -> 'a -> 'a) ->
+    choices:('a list -> 'a)
+    -> t
+    -> 'a
 
-module Concrete : sig
-  (*Counter-Example Guided Path Exploration*)
-  val slice : Model.t -> GCL.t -> GCL.t option
-end
-
-
-module Exploder : sig
-  type t
-  val create : unit -> t
-  val arm : t -> Table.t -> unit
-  val pop : t -> GPL.t -> GPL.t option
+  val optimize : t -> t
+  val optimize_seq_pair : (t * t) -> (t * t)
 end

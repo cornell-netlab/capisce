@@ -111,11 +111,10 @@ let get_value_exn = function
   | e -> failwithf "Couldnt get value from non-BV expression: %s" (to_smtlib e) ()
 
 
-let eval (model : Model.t) expr : (Bigint.t * int) option =
+let eval (model : Model.t) expr : (Bigint.t * int) =
   let rec loop e =
-    let open Option.Let_syntax in
     match e with
-    | BV (v,w) -> Some (v,w)
+    | BV (v,w) -> (v,w)
     | Var x ->
       begin match Model.lookup model x with
         | None ->
@@ -124,15 +123,15 @@ let eval (model : Model.t) expr : (Bigint.t * int) option =
           failwithf "Failed to evaluate expression:%s" (to_smtlib expr) ()
         | Some v ->
           Log.debug_s @@ Printf.sprintf "\t{ %s |--> %s }" (Var.str x) (Bigint.to_string (fst v));
-          Some v
+          v
       end
     | UnOp (op, e) ->
-      let%map v,w = loop e in
+      let v,w = loop e in
       eval1 op (bv v w)
       |> get_value_exn
     | BinOp (op, e1, e2) ->
-      let%bind v1,w1 = loop e1 in
-      let%map  v2,w2 = loop e2 in
+      let v1,w1 = loop e1 in
+      let  v2,w2 = loop e2 in
       eval2 op (bv v1 w1) (bv v2 w2)
       |> get_value_exn
   in

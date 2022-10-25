@@ -1066,14 +1066,13 @@ let rec eval_op op bs : bool =
       (*=> bs b ==== (/\bs) => b ==== b \/ ~(/\bs) *)
       b || not (eval_op LAnd bs)
 
-let rec eval (model : Model.t) (phi : t) : bool option =
-  let open Option.Let_syntax in
+let rec eval (model : Model.t) (phi : t) : bool =
   match phi with
-  | TFalse -> Some false
-  | TTrue -> Some true
+  | TFalse -> false
+  | TTrue -> true
   | TComp (c, e1, e2) ->
-    let%bind v1 = Expr.eval model e1 in
-    let%map  v2 = Expr.eval model e2 in
+    let v1 = Expr.eval model e1 in
+    let v2 = Expr.eval model e2 in
     begin match c with
       | Eq ->
         Log.debug_s "evaluating (=)";
@@ -1088,10 +1087,9 @@ let rec eval (model : Model.t) (phi : t) : bool option =
     end
   | TNary (op, bs) ->
     List.map ~f:(eval model) bs
-    |> Util.commute
-    >>| eval_op op
+    |> eval_op op
   | TNot b ->
-    let%map v = eval model b in
+    let v = eval model b in
     not v
   | LVar _ -> failwith "Don't have evaluation for LVars"
   | Forall _  | Exists _ ->

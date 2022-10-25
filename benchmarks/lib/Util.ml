@@ -87,3 +87,10 @@ let mapmap ~f xss =
   let%map xs = xss in
   let%map x = xs in
   f x
+
+
+let fold_right1 ~init ~f xs =
+  match List.rev xs with
+  | [] -> failwith "Cannot fold_right1 on an empty list"
+  | x::xs ->
+    List.fold_right (List.rev xs) ~f ~init:(init x)
