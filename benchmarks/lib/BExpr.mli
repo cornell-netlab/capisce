@@ -90,7 +90,7 @@ val one_point_rule : Expr.t -> Expr.t -> t -> t
 val vars : t -> Var.t list * Var.t list
 val compute_vars : t -> Var.t list * Var.t list  
                   
-val index_subst : Subst.t option -> t -> t
+(* val index_subst : Subst.t option -> t -> t *)
 
 val simplify : t -> t
 val nnf : t -> t

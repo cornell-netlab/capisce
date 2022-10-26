@@ -43,8 +43,6 @@ val vars : t -> Var.t list * Var.t list
 val to_smtlib : t -> string
 val coerce_types : TypeContext.t -> t -> t  
 
-val index_subst : Subst.t option -> t -> t
-
 val normalize_names : t -> t  
 
 val uelim : [`Neq | `Eq] -> Var.t list -> t -> t -> bool

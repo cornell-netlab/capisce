@@ -666,15 +666,6 @@ let simplify b =
   let b' = simplify_inner b in
   enable_smart_constructors := tmp;
   b'
-            
-let index_subst s_opt t : t =
-  match s_opt with
-  | None -> t    
-  | Some s -> 
-     Subst.to_vsub_list s
-     |> List.fold ~init:t
-          ~f:(fun t (x,x') -> subst x (Expr.var x') t)
-
 
 let rec label (ctx : Context.t) (b : t) : t =
   match b with

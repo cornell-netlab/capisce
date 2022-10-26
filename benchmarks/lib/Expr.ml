@@ -350,15 +350,7 @@ let rec vars e : (Var.t list * Var.t list) =
   | BinOp (_, e1, e2) ->
      Util.pairs_app_dedup ~dedup:Var.dedup (vars e1) (vars e2)
   | UnOp (_,e) ->
-     vars e    
-
-let index_subst s_opt e =
-  match s_opt with
-  | None -> e    
-  | Some s -> 
-     Subst.to_vsub_list s
-     |> List.fold ~init:e
-          ~f:(fun e (x,x') -> subst x (var x') e)
+     vars e
 
 let rec well_formed = function
   | BV (_,i) -> i > 0
