@@ -54,18 +54,6 @@ module Make (P : Primitive) = struct
 
     let to_string = to_string_aux 0
 
-    let rec count_asserts_aux c n =
-      match c with
-      | Prim p ->
-        n + P.count_asserts p
-      | Seq cs
-      | Choice cs ->
-        List.fold cs ~init:n ~f:(fun n c ->
-            count_asserts_aux c n
-          )
-
-    let count_asserts c = count_asserts_aux c 0
-
     let rec size = function
       | Prim p -> P.size p
       | Seq cs
@@ -152,158 +140,6 @@ module Make (P : Primitive) = struct
       | Prim _ -> true
       | _ -> false
 
-    (* PRE: x is not an lvalue in c *)
-    let rec subst x e c =
-      match c with
-      | Prim p -> Prim (P.subst x e p)
-      | Seq cs ->
-        List.map cs ~f:(subst x e) |> sequence
-      | Choice cs ->
-        List.map cs ~f:(subst x e) |> choices
-
-    let rec normalize_names (c : t) : t =
-      match c with
-      | Prim p -> Prim (P.normalize_names p)
-      | Seq cs ->
-        List.map cs ~f:normalize_names |> sequence
-      | Choice cs ->
-        List.map cs ~f:normalize_names
-        |> choices
-
-    let dnf (c : t) : t =
-      let rec loop c : t =
-        match c with
-        | Prim p -> Prim p
-        | Choice chxs ->
-          List.fold chxs ~init:dead ~f:(fun acc c -> choice acc (loop c))
-        | Seq [] -> skip
-        | Seq (s::sqs) -> begin
-            match loop s, loop (sequence sqs) with
-            | Choice chxs, Choice chxs_rec ->
-              List.cartesian_product chxs chxs_rec
-              |> List.map ~f:(Util.uncurry seq)
-              |> choices
-            | Choice chxs, c_rec ->
-              List.map chxs ~f:(fun chx -> seq chx c_rec)
-              |> choices
-            | c, Choice chxs_rec ->
-              List.map chxs_rec ~f:(fun chx_rec -> seq c chx_rec)
-              |> choices
-            | c, c_rec ->
-              seq c c_rec
-          end
-      in
-      loop c
-
-    let rec count_paths c : Bigint.t =
-      match c with
-      | Prim _ ->
-        Bigint.one
-      | Seq cs ->
-        List.fold cs ~init:Bigint.one
-          ~f:(fun paths_so_far c -> Bigint.(paths_so_far * count_paths c))
-      | Choice cs ->
-        List.map cs ~f:(count_paths)
-        |> List.reduce_exn ~f:(Bigint.(+))
-
-    let paths (c : t) : t Sequence.t =
-      Log.path_gen "building the squence of %s paths" @@ lazy (count_paths c |> Bigint.to_string);
-      let rec loop (c : t) : t Sequence.t =
-        let open Sequence in
-        match c with
-        | Prim _ ->
-          return c
-        | Seq cs ->
-          of_list cs
-          |> fold ~init:(Sequence.singleton skip)
-            ~f:(fun sequence_of_paths c ->
-                loop c
-                |> cartesian_product sequence_of_paths
-                |> map ~f:(fun (s1,s2) -> seq s1 s2))
-        | Choice cs ->
-          of_list cs
-          |> map ~f:loop
-          |> concat
-      in
-      loop c
-
-    let rec const_prop_inner f c : Facts.t * t =
-      match c with
-      | Prim p ->
-        let (f, p) = P.const_prop f p in
-        (f, Prim p)
-      | Seq cs ->
-        let fs, cs =
-          List.fold cs ~init:(f, [])
-            ~f:(fun (f, cs) c ->
-                let f, c = const_prop_inner f c in
-                (f, cs @ [c])) in
-        (fs, sequence cs)
-      | Choice [] ->
-        failwith "Choice of no alternatives"
-      | Choice (c::cs) ->
-        List.fold cs
-          ~init:(const_prop_inner f c)
-          ~f:(fun (fs, cs) c1 ->
-              let f1, c1 = const_prop_inner f c1 in
-              let fs = Facts.merge fs f1 in
-              (fs , choice c1 cs))
-
-    let const_prop c : t =
-      Log.compiler_s "constant propagation";
-      const_prop_inner Facts.empty c |> snd
-
-    let rec dead_code_elim_inner reads c : (Var.Set.t * t) =
-      match c with
-      | Prim (p) ->
-        begin match P.dead_code_elim reads p with
-          | None ->
-            (reads, skip)
-          | Some (reads, p) ->
-            (reads, prim p)
-        end
-      | Choice [] -> failwith "cannot have 0-ary choice"
-      | Choice (c::cs) ->
-        List.fold cs
-          ~init:(dead_code_elim_inner reads c)
-          ~f:(fun (read_by_cs, cs) c ->
-              let read_by_c, c = dead_code_elim_inner reads c in
-              (Var.Set.union read_by_cs read_by_c, choice cs c))
-      | Seq cs ->
-        let (reads, cs) =
-          List.fold (List.rev cs) ~init:(reads, [])
-            ~f:(fun (reads, cs) c ->
-                let reads, c = dead_code_elim_inner reads c in
-                (reads, c::cs)) in
-        (reads, sequence cs)
-
-    let dead_code_elim c =
-      Log.compiler_s "dead code elim";
-      Util.fix ~equal
-        (fun c -> snd (dead_code_elim_inner Var.Set.empty c))
-        c
-
-    let optimize c =
-      Log.compiler_s "optimizing...";
-      let o c = dead_code_elim (const_prop c) in
-      Util.fix ~equal o c
-
-    let optimize_seq_pair (c1,c2) =
-      let dce (c1,c2) =
-        let (reads, c2) = dead_code_elim_inner Var.Set.empty c2 in
-        let (_, c1) = dead_code_elim_inner reads c1 in
-        (c1, c2)
-      in
-      let cp (c1, c2)=
-        let (facts, c1) = const_prop_inner Facts.empty c1 in
-        let (_    , c2) = const_prop_inner facts       c2 in
-        (c1, c2)
-      in
-      let equal (c1,c2) (c1',c2') = equal c1 c1' && equal c2 c2' in
-      let o (c1,c2) = dce (cp (c1,c2)) in
-      Util.fix ~equal o (c1,c2)
-
-
     let rec bottom_up ~prim ~sequence ~choices (c : t) =
       let f = bottom_up ~prim ~sequence ~choices in
       match c with
@@ -345,14 +181,11 @@ module Make (P : Primitive) = struct
 
 
     let vars c =
-      let sorted_concat xss =
-        List.concat xss
-        |> Var.sort
-      in
       bottom_up c
-        ~prim:(Fn.compose Var.sort P.vars)
-        ~sequence:sorted_concat
-        ~choices:sorted_concat
+        ~prim:(Fn.compose Var.Set.of_list P.vars)
+        ~sequence:Var.Set.union_list
+        ~choices:Var.Set.union_list
+      |> Var.Set.to_list
 
     (* Monoids *)
     let zero = dead

@@ -486,7 +486,6 @@ module Table = struct
 
   let vars _ = failwith "dont get the variables of a table, you should probably encode it first"
 
-
 end
 
 module Pipeline = struct

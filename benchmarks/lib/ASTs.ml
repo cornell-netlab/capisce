@@ -1,9 +1,8 @@
 open Core
 open Primitives
-open Cmd
 
 module GCL = struct
-  include Make (Active)
+  include Cmd.Make (Active)
 
   let assign x e = prim (Active.assign x e)
 
@@ -22,8 +21,8 @@ module GCL = struct
 
 end
 
-module PassiveGCL = struct
-  include Make (Passive)
+module Psv = struct
+  include Cmd.Make (Passive)
 
   let normal (c : t) : BExpr.t =
     let open Passive in
@@ -54,18 +53,6 @@ module PassiveGCL = struct
               )
 
         )
-    (* let open BExpr in *)
-    (* match c with *)
-    (* | Prim (Assert b) -> not_ b *)
-    (* | Prim (Assume _) -> false_ *)
-    (* | Seq [] -> false_ *)
-    (* | Seq (c1::cs) -> *)
-    (*   let c2 = sequence cs in *)
-    (*   let w1 = wrong c1 in *)
-    (*   let w2 = and_ (normal c1) (wrong c2) in *)
-    (*   or_ w1 w2 *)
-    (* | Choice cs -> *)
-    (*   List.map cs ~f:wrong |> ors_ *)
 
   let rec update_resid x curr tgt resid =
     if curr >= tgt then
@@ -116,7 +103,7 @@ module PassiveGCL = struct
 end
 
 module GPL = struct
-  include Make (Pipeline)
+  include Cmd.Make (Pipeline)
   let assign x e = prim (Active (Active.assign x e))
   let table name keys actions = prim (Table {name; keys; actions})
 
@@ -132,8 +119,8 @@ module GPL = struct
 
   let symbolize (c : t) =
     let gcl = encode_tables c in
-    let (ctx, psv) = PassiveGCL.passify gcl in
-    let symbolic_parser = PassiveGCL.normal psv in
+    let (ctx, psv) = Psv.passify gcl in
+    let symbolic_parser = Psv.normal psv in
     let symbolic_parser = BExpr.erase_max_label ctx symbolic_parser in
     assume symbolic_parser
 
@@ -155,7 +142,7 @@ module TFG = struct
       | Table _ -> true
       | _ -> false
   end
-  include Make(T)
+  include Cmd.Make(T)
 
   let project (gpl : GPL.t) : t =
     GPL.bottom_up gpl ~choices ~sequence ~prim:(fun p ->
@@ -389,7 +376,7 @@ end
 
 
 let passive_vc (c : GCL.t) : BExpr.t =
-  PassiveGCL.passify c
+  Psv.passify c
   |> snd
-  |> PassiveGCL.wrong
+  |> Psv.wrong
   |> BExpr.not_

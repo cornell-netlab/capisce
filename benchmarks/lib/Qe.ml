@@ -278,7 +278,7 @@ let handle_failure ~pi ~gpl ~gcl ~psv ~gpl_graph ~induced_graph =
   Log.path_gen "Table list:\n\t%s\n" @@ lazy (table_path_to_string pi);
   Log.irs "GPL:%s\n%!" @@ lazy (GPL.to_string gpl);
   Log.irs "GCL:%s\n%!" @@ lazy (GCL.to_string gcl);
-  Log.irs "PSV:%s\n%!" @@ lazy (PassiveGCL.to_string psv);
+  Log.irs "PSV:%s\n%!" @@ lazy (Psv.to_string psv);
   Log.graph_dot (GPL_G.print_graph gpl_graph) "gpl";
   Log.path_gen_dot (GPL_G.print_graph induced_graph) "induced_graph";
   raise (Failure "Found unsolveable path")
@@ -417,10 +417,10 @@ let rec orelse thunks ~input =
 let concolic (gcl : GCL.t) : BExpr.t =
   Log.irs "%s" @@ lazy (GCL.to_string gcl);
   (* Counter-Example Guided Inductive Path eXploration *)
-  let _, psv = PassiveGCL.passify gcl in
-  let all_passive_consts = PassiveGCL.vars psv in
-  let safety_condition = PassiveGCL.vc psv in
-  let normal_executions = PassiveGCL.(normal (remove_asserts psv)) in
+  let _, psv = Psv.passify gcl in
+  let all_passive_consts = Psv.vars psv in
+  let safety_condition = Psv.vc psv in
+  let normal_executions = Psv.(normal (remove_asserts psv)) in
   let num_cexs = ref Bigint.zero in
   let rec loop phi_agg =
     Log.path_gen_s "checking implication";
@@ -448,7 +448,7 @@ let concolic (gcl : GCL.t) : BExpr.t =
         failwith "Could not slice the counterexample"
       | Some pi ->
         let pi = GCL.optimize pi in
-        let pi_vc = PassiveGCL.(vc @@ snd @@ passify pi) in
+        let pi_vc = Psv.(vc @@ snd @@ passify pi) in
         match
           orelse ~input:pi_vc
             [solve_one ~qe:BottomUpQe.optimistic_qe;
@@ -494,7 +494,7 @@ let rec explode_tables ~sufficient ~parserify exploder gpl phi_agg =
           | None -> phi_agg
           | Some piece_gpl ->
             let gcl = GPL.encode_tables piece_gpl in
-            let phi = parserify gcl |> PassiveGCL.passify |> snd |> PassiveGCL.vc in
+            let phi = parserify gcl |> Psv.passify |> snd |> Psv.vc in
             Log.exploder_s "solving.....";
             match solve_one phi ~qe:BottomUpQe.optimistic_qe with
             (* match None with *)
@@ -529,8 +529,8 @@ let search_generator ~sufficient ~parserify ~statusbar gpl_graph gen phi_agg =
         let gpl = GPL_G.to_prog induced_graph in            Log.irs "GPL:\n%s\n%!" @@ lazy (GPL.to_string gpl);
         let gcl = GPL.encode_tables gpl in                  Log.irs "GCL:\n%s\n%!" @@ lazy (GCL.to_string gcl);
         let full_gcl = parserify gcl in                     Log.irs "GCL w/ Parser (Optimized):\n%s\n%!" @@ lazy (GCL.to_string gcl);
-        let psv = PassiveGCL.(passify full_gcl) |> snd in
-        let phi = PassiveGCL.vc psv in
+        let psv = Psv.(passify full_gcl) |> snd in
+        let phi = Psv.vc psv in
         if implies phi_agg phi then                         let () = Log.debug_s "\tSkipped for sufficiency!;\n%!" in
           loop gen gpl_graph phi_agg
         else begin                                          let () = Log.debug_s "solving" in

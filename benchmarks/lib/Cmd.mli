@@ -1,4 +1,3 @@
-open Core
 open Primitives
 
 module Make : functor (P : Primitive) ->
@@ -34,11 +33,7 @@ module Make : functor (P : Primitive) ->
   val choice_seq : t list -> t list -> t
   val choice_seqs : t list list -> t
   val is_primitive : t -> bool
-  val subst : Var.t -> Expr.t -> t -> t
-  val normalize_names : t -> t
   val dnf : t -> t
-  val count_paths : t -> Bigint.t
-  val paths : t -> t Sequence.t
   val vars : t -> Var.t list
 
   val bottom_up :

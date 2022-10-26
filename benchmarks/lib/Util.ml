@@ -94,3 +94,6 @@ let fold_right1 ~init ~f xs =
   | [] -> failwith "Cannot fold_right1 on an empty list"
   | x::xs ->
     List.fold_right (List.rev xs) ~f ~init:(init x)
+
+let app_on ~f x =
+  (x, f x)
