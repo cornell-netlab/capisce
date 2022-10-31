@@ -35,8 +35,7 @@ let vc_egress_spec () =
   (* EXPECTED TO FAIL *)
   let open BExpr in
   let open Expr in
-  let open Cmd in
-  let open GCL in
+  let open ASTs.GCL in
   let out = Var.make "standard_metadata.egress_spec" 9 in
   let port = Var.make "_symb$fwd$ipv4_fwd$arg$port$_$0" 9 in
   let ethertype = Var.make "hdr.ethernet.etherType" 16 in
@@ -80,8 +79,7 @@ let const_prop_for_parser () =
   (* EXPECTED TO FAIL *)
   let open BExpr in
   let open Expr in
-  let open Cmd in
-  let open GCL in
+  let open ASTs.GCL in
   let _start_next = Var.make "_state$start$next" 1 in
   let _parse_ipv4_next = Var.make "_state$parse_ipv4$next" 1 in
   let _accept_next = Var.make "_state$accept$next" 1 in
@@ -107,12 +105,11 @@ let const_prop_for_parser () =
                              ];
                              [assume (not_ (eq_ (var _parse_ipv4_next) (bvi 1 1)))]]
     ] in
-  Alcotest.(check gcl) "literal equivalence" skip (GCL.const_prop c)
+  Alcotest.(check gcl) "literal equivalence" skip (const_prop c)
 
 
 let rec ifelse cases base =
-  let open Cmd in
-  let open GCL in
+  let open ASTs.GCL in
   let open BExpr in
   match cases with
   | [] -> base
@@ -122,11 +119,10 @@ let rec ifelse cases base =
      [assume (not_ cond);
       ifelse cases base]
   
-let cost_prop_parser () =
-  let open Cmd in 
+let const_prop_parser () =
   let open BExpr in
   let open Expr in
-  let open GCL in
+  let open ASTs.GCL in
   let ethertype = Var.make "hdr.ethernet.etherType" 16 in
   let _state_parse_llc_header_next = Var.make "_state$parse_llc_header$next" 1 in
   let _state_parse_fabric_header_next = Var.make "_state$parse_fabric_header$next" 1 in
@@ -169,37 +165,12 @@ let cost_prop_parser () =
     (sequence [assign ethertype (bvi 2048 16); assign _state_parse_ipv4_next (bvi 1 1)])
     (const_prop c)
 
-
-let small_switch_is_assumed () =
-  let open Cmd in
-  let open PassiveGCL in
-  let open BExpr in
-  let open Expr in
-  let x_eq v = eq_ (var (Var.make "x" 2)) (bvi v 2) in
-  let y_eq v = eq_ (var (Var.make "y" 2)) (bvi v 2) in
-  let asm bs = List.map bs ~f:assume |> sequence in
-  let c = choices [
-      asm [x_eq 0; y_eq 1];
-      asm [x_eq 1; y_eq 1];
-      asm [x_eq 2; y_eq 2];
-      asm [x_eq 3; y_eq 2]
-    ] |> seq (assume (y_eq 0)) in
-  Alcotest.(check psv) "literal equivalence"
-    (assume (ors_ [ands_ [x_eq 0; y_eq 1];
-                   ands_ [x_eq 1; y_eq 1];
-                   ands_ [x_eq 2; y_eq 2];
-                   ands_ [x_eq 3; y_eq 2]
-                  ] )
-     |> seq (assume (y_eq 0)))
-    (assume_disjuncts c)
-
 let tests =
   [
-    Alcotest.test_case "[assume_disjuncts] small switch is assumed" `Quick small_switch_is_assumed;
     Alcotest.test_case "cnf foils" `Quick cnf_foils;
     Alcotest.test_case "qc cnf_equiv" `Slow cnf_equiv;
     Alcotest.test_case "egress_spec vc" `Quick vc_egress_spec;
-    Alcotest.test_case "const prop" `Quick cost_prop_parser;
+    Alcotest.test_case "const prop" `Quick const_prop_parser;
   ]
 
   

@@ -2,7 +2,7 @@ open Primitives
 
 module Make : functor (P : Primitive) ->
  sig
-  type t [@@deriving quickcheck, eq, sexp, compare]
+  type t [@@deriving quickcheck, eq, sexp, compare, hash]
   val assume : BExpr.t -> t
   val assert_ : BExpr.t -> t
   val skip : t

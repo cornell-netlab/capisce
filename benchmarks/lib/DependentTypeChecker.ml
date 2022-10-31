@@ -1,90 +1,96 @@
 open Core
-open Primitives
 
-module Hornet : Primitive = struct
+module DepPrim = struct
+  module Cmd = ASTs.GPL
 
-  type t =
-    | Pipeline of Pipeline.t
-    | DepAsst of { heap_variable: string;
-                   index : int;
-                   refinement : Assert.t }
+  type t = { precondition : BExpr.t;
+             cmd : Cmd.t;
+             postcondition : BExpr.t }
   [@@deriving quickcheck, sexp, eq, compare, hash]
 
-  let assume phi = Pipeline (Pipeline.assume phi)
-  let assert_ phi = Pipeline (Pipeline.assert_ phi)
-  let contra c1 c2 =
-    match c1, c2 with
-    | Pipeline p1, Pipeline p2 -> Pipeline.contra p1 p2
-    | _, _ -> false
+  let assume phi =
+    { precondition = BExpr.true_;
+      cmd = Cmd.assume phi;
+      postcondition = BExpr.true_ }
 
-  let to_smtlib = function
-    | Pipeline p -> Pipeline.to_smtlib p
-    | DepAsst x ->
-      Printf.sprintf "{ %s | %s }"
-        x.heap_variable
-        (Assert.to_smtlib x.refinement)
+  let assert_ phi =
+    { precondition = BExpr.true_;
+      cmd = Cmd.assert_ phi;
+      postcondition = BExpr.true_ }
 
-  let size = function
-    | Pipeline p -> Pipeline.size p
-    | DepAsst asst ->
-      1 + Assert.size asst.refinement
+  let contra _ _ = false
 
-  let vars = function
-    | Pipeline p -> Pipeline.vars p
-    | DepAsst _ -> []
+  let to_smtlib {precondition; cmd; postcondition} =
+      Printf.sprintf "{ %s } %s { %s }"
+        (BExpr.to_smtlib precondition)
+        (Cmd.to_string cmd)
+        (BExpr.to_smtlib postcondition)
 
-  (* let name = function *)
-  (*   | Pipeline p -> Pipeline.name p *)
-  (*   | DepAsst asst -> Printf.sprintf "DEPASST %s" asst.heap_variable *)
+  let size {precondition; cmd; postcondition} =
+    BExpr.size precondition
+      + Cmd.size cmd
+      + BExpr.size postcondition
 
-  (* let subst x e = function *)
-  (*   | Pipeline p -> *)
-  (*     Pipeline (Pipeline.subst x e p) *)
-  (*   | DepAsst asst -> *)
-  (*     DepAsst {asst with *)
-  (*              refinement = BExpr.subst x e asst.refinement *)
-  (*             } *)
+  let vars {precondition; cmd; postcondition} =
+    let allvars phi = phi |> BExpr.vars |> Tuple2.uncurry (@) in
+    allvars precondition
+    @ Cmd.vars cmd
+    @ allvars postcondition
+    |> Var.dedup
 
-  (* let const_prop facts = function *)
-  (*   | Pipeline p -> *)
-  (*     let facts, p = Pipeline.const_prop facts p in *)
-  (*     (facts, Pipeline p) *)
-  (*   | DepAsst asst -> *)
-  (*     facts, *)
-  (*     DepAsst { *)
-  (*       asst with *)
-  (*       refinement = *)
-  (*         BExpr.fun_subst (Facts.lookup facts) asst.refinement *)
-  (*         |> BExpr.simplify *)
-  (*     } *)
+  let vc {precondition; cmd; postcondition} =
+    let open ASTs in
+    let index_map, passive =
+      cmd
+      |> GPL.encode_tables
+      |> Psv.passify
+    in
+    let precondition  = BExpr.label Context.empty precondition in
+    let passive_phi   = Psv.vc passive in
+    let postcondition = BExpr.label index_map postcondition in
+    BExpr.imps_ [
+      precondition;
+      passive_phi;
+      postcondition
+    ]
 
-  (* let explode c = *)
-  (*   match c with *)
-  (*   | Pipeline p -> *)
-  (*     Pipeline.explode p *)
-  (*     |> Util.mapmap ~f:(fun p -> Pipeline p) *)
-  (*   | DepAsst _ -> *)
-  (*     [[c]] *)
+end
 
-  (* let dead_code_elim reads c = *)
-  (*   let open Option.Let_syntax in *)
-  (*   match c with *)
-  (*   | Pipeline p -> *)
-  (*     let%map reads, p = Pipeline.dead_code_elim reads p in *)
-  (*     (reads, Pipeline p) *)
-  (*   | DepAsst {heap_variable=_; index=_; refinement} -> *)
-  (*     let reads = Var.Set.of_list @@ Assert.vars refinement in *)
-  (*     Some (reads, c) *)
+module HoareNet = struct
+  module Pack = struct
+    include Cmd.Make(DepPrim)
 
-  (* let normalize_names = function *)
-  (*   | Pipeline p -> *)
-  (*     Pipeline (Pipeline.normalize_names p) *)
-  (*   | DepAsst {heap_variable; index; refinement}-> *)
-  (*     DepAsst { *)
-  (*       heap_variable; *)
-  (*       index; *)
-  (*       refinement = *)
-  (*         BExpr.normalize_names refinement *)
-  (*     } *)
+    let check (cmd : t) =
+      let all = List.for_all ~f:Fn.id in
+      bottom_up cmd ~sequence:all ~choices:all
+        ~prim:(fun (triple : DepPrim.t) ->
+            let phi = DepPrim.vc triple in
+            let vars = BExpr.vars phi |> Tuple2.uncurry (@) in
+            BExpr.not_ phi
+            |> Solver.check_unsat vars ~timeout:(Some 2000))
 
+    let assign x e =
+      prim ({ precondition = BExpr.true_;
+              cmd = ASTs.GPL.assign x e;
+              postcondition = BExpr.true_})
+
+    let table ?(pre = BExpr.true_) ?(post = BExpr.true_) (name, keys, actions) =
+      prim ({ precondition = pre;
+              cmd = ASTs.GPL.table name keys actions;
+              postcondition = post})
+
+
+
+    let infer (cmd:t) =
+      bottom_up cmd ~sequence:BExpr.ands_ ~choices:BExpr.ands_
+        ~prim:(fun (triple : DepPrim.t) ->
+            let open ASTs in
+            let pre = GCL.assume triple.precondition in
+            let cmd = GPL.encode_tables triple.cmd in
+            let post = GCL.assert_ triple.postcondition in
+            GCL.sequence [ pre; cmd; post ]
+            |> Qe.concolic
+          )
+  end
+  include Pack
 end

@@ -20,6 +20,13 @@ module GCL = struct
       table
   end
 
+  module CP = Transform.ConstProp (struct
+      module P = Active
+      include Pack
+      let prim_const_prop = Active.const_prop
+    end)
+  let const_prop = CP.propagate_exn
+  
   module O = Transform.Optimizer (struct
       module P = Active
       include Pack
@@ -168,11 +175,8 @@ module GPL = struct
       let prim_dead_code_elim = Pipeline.dead_code_elim
       let prim_const_prop = Pipeline.const_prop
       end)
-
   let optimize = O.optimize
-
   include Pack
-
 end
 
 module TFG = struct

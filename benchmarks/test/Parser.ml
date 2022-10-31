@@ -7,9 +7,6 @@ let quant b = BExpr.forall (fst (BExpr.vars b)) b
 
 let roundtrip b =
   let dvs, cvs = BExpr.vars b in
-  Log.print @@ lazy (Printf.sprintf "Got %d vars in %s" (List.length (dvs @ cvs)) (BExpr.to_smtlib b));
-  Log.print @@ lazy (Printf.sprintf "roundtripping with vars :\n control %s,\n data %s\n%!"
-                 (List.to_string cvs ~f:Var.str) (List.to_string cvs ~f:Var.str));
   b |> BExpr.to_smtlib |> Solver.of_smtlib ~cvs ~dvs
   
 let check_roundtrip b = Alcotest.(check smt_equiv) "parser roundtrips" (quant b) (roundtrip (quant b))

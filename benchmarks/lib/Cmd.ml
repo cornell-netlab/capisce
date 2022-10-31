@@ -8,7 +8,7 @@ module Make (P : Primitive) = struct
       | Prim of P.t
       | Seq of t list
       | Choice of t list
-    [@@deriving quickcheck, eq, sexp, compare]
+    [@@deriving quickcheck, eq, sexp, compare, hash]
 
 
     module PSet = Set.Make (P)

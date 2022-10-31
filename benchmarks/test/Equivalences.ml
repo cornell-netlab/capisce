@@ -1,9 +1,8 @@
 open Core
 open Base_quickcheck
 open Pbench
-open Cmd
+open ASTs
 
-   
 let log_eq b1 b2 =
   let res = Solver.check_iff_str ~timeout:(Some 1000) b1 b2 in
   Smt.is_unsat res || Smt.is_unknown res
@@ -23,7 +22,7 @@ let bigint = Alcotest.testable
 
 let smt_equiv = Alcotest.testable (Fmt.of_to_string BExpr.to_smtlib) (log_eq)
 let gcl = Alcotest.testable (Fmt.of_to_string GCL.to_string) (GCL.equal)
-let psv = Alcotest.testable (Fmt.of_to_string PassiveGCL.to_string) (PassiveGCL.equal)
+let psv = Alcotest.testable (Fmt.of_to_string Psv.to_string) (Psv.equal)
 let var = Alcotest.testable (Fmt.of_to_string Var.str) (Var.equal)
         
 let z3_config =
