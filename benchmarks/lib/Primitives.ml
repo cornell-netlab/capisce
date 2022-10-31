@@ -7,19 +7,16 @@ module type Primitive = sig
   val assert_ : BExpr.t -> t
   val contra : t -> t -> bool
   val to_smtlib : t -> string
-  val count_asserts : t -> int
   val size : t -> int
-  val subst : Var.t -> Expr.t -> t -> t
-  val normalize_names : t -> t
-  val comparisons : t -> (Var.t * Expr.t) list option
-  val is_node : t -> bool
-  val name : t -> string
-  val is_table : t -> bool
-  val const_prop : Facts.t -> t -> (Facts.t * t)
-  val dead_code_elim : Var.Set.t -> t -> (Var.Set.t * t) option
-  val explode : t -> t list list
   val vars : t -> Var.t list
 end
+
+let substitution_of facts x =
+  match Var.Map.find facts x with
+  | None -> Expr.var x
+  | Some e -> e
+
+
 
 module Assert = struct
   type t = BExpr.t
@@ -39,9 +36,9 @@ module Assert = struct
   let is_table (_:t) = false
   let vars b = BExpr.vars b |> Tuple2.uncurry (@)
 
-  let const_prop f b =
-    let b = BExpr.fun_subst (Facts.lookup f) b |> BExpr.simplify in
-    (f, assert_ b)
+  let const_prop facts b : t * Expr.t Var.Map.t =
+    let b = BExpr.fun_subst (substitution_of facts) b |> BExpr.simplify in
+    (assert_ b, facts)
 
   let dead_code_elim reads b =
     let read_by_b = Var.Set.of_list (Util.concat (BExpr.vars b)) in
@@ -49,7 +46,6 @@ module Assert = struct
     Some (Var.Set.union reads read_by_b, assert_ b)
 
   let explode b = [[b]]
-
 
 end
 
@@ -132,15 +128,16 @@ module Passive = struct
     | Assume _ -> false
     | Assert a -> Assert.is_table a
 
-  let const_prop f : t -> (Facts.t * t)= function
+  let const_prop f : t -> (t * Expr.t Var.Map.t) = function
     | Assert a ->
-      let f, a = Assert.const_prop f a in
-      (f, assert_ a)
+      let a, f = Assert.const_prop f a in
+      (assert_ a, f)
     | Assume b ->
-      let f, b = Assume.const_prop f b in
-      (f, assume b)
+      let b, f = Assume.const_prop f b in
+      (assume b, f)
 
-  let dead_code_elim reads = function
+  let dead_code_elim c reads =
+    match c with
     | Assert b ->
       let%map reads, b = Assert.dead_code_elim reads b in
       (reads, assert_ b)
@@ -184,12 +181,12 @@ module Assign = struct
 
   let is_table (_:t) = false
 
-  let const_prop (f : Facts.t) (x,e) =
-    let e = Expr.fun_subst (Facts.lookup f) e in
-    let f = Facts.update f x e in
-    (f, assign x e)
+  let const_prop (facts : Expr.t Var.Map.t) (x,e) =
+    let e = Expr.fun_subst (substitution_of facts) e in
+    let f = Var.Map.set facts ~key:x ~data:e in
+    (assign x e, f)
 
-  let dead_code_elim (reads : Var.Set.t) (x,e) =
+  let dead_code_elim (x,e) (reads : Var.Set.t) =
     if Var.Set.exists reads ~f:(Var.(=) x) then
       let read_by_e = Var.Set.of_list (Util.concat (Expr.vars e)) in
       let reads_minus_x = Var.Set.remove reads x in
@@ -207,7 +204,6 @@ module Assign = struct
     |> List.cons x
 
 end
-
 
 module Action = struct
   type t =
@@ -253,17 +249,18 @@ module Action = struct
   let is_node (_ : t) = true
   let is_table (_:t) = false
 
-  let const_prop f = function
+  let const_prop f : t -> (t * Expr.t Var.Map.t) = function
     | Assign a ->
-      let (f, a) = Assign.const_prop f a in
-      (f, Assign a)
+      let (a, f) = Assign.const_prop f a in
+      (Assign a, f)
     | Assert a ->
-      let (f, a) = Assert.const_prop f a in
-      (f, Assert a)
+      let (a, f) = Assert.const_prop f a in
+      (Assert a, f)
 
-  let dead_code_elim reads = function
+  let dead_code_elim c reads : (Var.Set.t * t) option =
+    match c with
     | Assign a ->
-      let%map (reads, (x,e)) = Assign.dead_code_elim reads a in
+      let%map (reads, (x,e)) = Assign.dead_code_elim a reads in
       (reads, assign x e)
     | Assert a ->
       let%map (reads, a) = Assert.dead_code_elim reads a in
@@ -358,18 +355,19 @@ module Active = struct
 
   let const_prop f = function
     | Passive p ->
-      let f, p = Passive.const_prop f p in
-      (f, Passive p)
+      let p, f = Passive.const_prop f p in
+      (Passive p, f)
     | Assign a ->
-      let f , a = Assign.const_prop f a in
-      (f, Assign a)
+      let a, f = Assign.const_prop f a in
+      (Assign a, f)
 
-  let dead_code_elim reads = function
+  let dead_code_elim c reads =
+    match c with
     | Passive p ->
-      let%map reads, p = Passive.dead_code_elim reads p in
+      let%map reads, p = Passive.dead_code_elim p reads in
       (reads, passive p)
     | Assign a ->
-      let%map reads, a = Assign.dead_code_elim reads a in
+      let%map reads, a = Assign.dead_code_elim a reads in
       (reads, assign_ a)
 
   let explode = function
@@ -433,28 +431,38 @@ module Table = struct
 
   let const_prop f0 t =
     (* WARNING: keys are not used *)
-    let (f, actions) = List.fold t.actions  ~init:(None, [])
-      ~f:(fun (f, acts) (vars, action) ->
-          let f1, rev_action =
-            List.fold action ~init:(f0, []) ~f:(fun (f, action) a ->
-                let (f, a) = Action.const_prop f a in
-                (f, a::action)
-              ) in
+    let (actions, f) =
+      List.fold t.actions  ~init:([], None)
+      ~f:(fun (acts, f) (vars, action) ->
+          let rev_action, f1 =
+            List.fold action ~init:([], f0) ~f:(fun (action, f) a ->
+                let (a, f) = Action.const_prop f a in
+                (a::action, f))
+          in
           let action = List.rev rev_action in
           match f with
-          | None -> (Some f1, [(vars, action)])
+          | None -> ([(vars, action)], Some f1)
           | Some f ->
-            (Some (Facts.merge f f1), acts@[vars, action])
+            let facts =
+              Var.Map.merge f f1
+                ~f:(fun ~key:_ -> function
+                    | `Left _ | `Right _ ->
+                      None
+                    | `Both (a,b) ->
+                      Option.some_if (Expr.equal a b) a
+                  )
+            in
+            (acts@[vars, action], Some facts)
         )
     in
-    (Option.value_exn f, {t with actions})
+    ({t with actions}, Option.value_exn f)
 
-  let dead_code_elim reads t : (Var.Set.t * t) option =
-    let dead_code_elim_action reads body =
+  let dead_code_elim (t : t) (reads : Var.Set.t) : (Var.Set.t * t) option =
+    let dead_code_elim_action (body : Action.t list) (reads : Var.Set.t) =
       List.fold (List.rev body)
         ~init:(reads, [])
         ~f:(fun (reads, acts) act_stmt ->
-            match Action.dead_code_elim reads act_stmt with
+            match Action.dead_code_elim act_stmt reads with
             | None ->
               (reads, acts)
             | Some (reads, a) ->
@@ -463,7 +471,7 @@ module Table = struct
     in
     let (reads, actions) =
       List.fold t.actions ~init:None ~f:(fun acc_opt (params, body) ->
-          let (reads, body) = dead_code_elim_action reads body in
+          let (reads, body) = dead_code_elim_action body reads in
           let reads = Var.Set.diff reads (Var.Set.of_list params) in
           match acc_opt with
           | None -> Some (reads, [(params, body)])
@@ -544,18 +552,19 @@ module Pipeline = struct
 
     let const_prop f = function
       | Active a ->
-        let f, a = Active.const_prop f a in
-        (f, Active a)
+        let a, f = Active.const_prop f a in
+        (Active a, f)
       | Table t ->
-        let f, t = Table.const_prop f t in
-        (f, Table t)
+        let t, f = Table.const_prop f t in
+        (Table t, f)
 
-    let dead_code_elim reads = function
+    let dead_code_elim c reads =
+      match c with
       | Active a ->
-        let%map reads, a = Active.dead_code_elim reads a in
+        let%map reads, a = Active.dead_code_elim a reads in
         (reads, Active a)
       | Table t ->
-        let%map reads, t = Table.dead_code_elim reads t in
+        let%map reads, t = Table.dead_code_elim t reads in
         (reads, Table t)
 
     let explode : t -> t list list = function

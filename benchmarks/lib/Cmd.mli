@@ -14,15 +14,8 @@ module Make : functor (P : Primitive) ->
   val prim : P.t -> t
   val ( + ) : t -> t -> t
   val ( * ) : t -> t -> t
-  val is_mult_unit : t -> bool
-  val is_mult_annihil : t -> bool
-  val is_add_unit : t -> bool
-  val is_add_annihil : t -> bool
   val contra : t -> t -> bool
-  val to_string_aux : int -> t -> string
   val to_string : t -> string
-  val count_asserts_aux : t -> int -> int
-  val count_asserts : t -> int
   val size : t -> int
   val seq : t -> t -> t
   val sequence : t list -> t
@@ -33,7 +26,6 @@ module Make : functor (P : Primitive) ->
   val choice_seq : t list -> t list -> t
   val choice_seqs : t list list -> t
   val is_primitive : t -> bool
-  val dnf : t -> t
   val vars : t -> Var.t list
 
   val bottom_up :
@@ -64,7 +56,4 @@ module Make : functor (P : Primitive) ->
     choices:('a list -> 'a)
     -> t
     -> 'a
-
-  val optimize : t -> t
-  val optimize_seq_pair : (t * t) -> (t * t)
 end

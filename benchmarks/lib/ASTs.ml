@@ -2,22 +2,42 @@ open Core
 open Primitives
 
 module GCL = struct
-  include Cmd.Make (Active)
+  module Pack = struct
+    include Cmd.Make (Active)
 
-  let assign x e = prim (Active.assign x e)
+    let assign x e = prim (Active.assign x e)
 
-  let table (tbl_name, keys, (actions : (Var.t list * Action.t list) list)) =
-    let open Pipeline in
-    let table =
-      table tbl_name keys actions
-      |> explode
-      |> Util.mapmap ~f:(fun a -> prim (to_active_exn a))
-      |> choice_seqs
-    in
-    if String.(tbl_name = "acl") then
-      Log.debug "ACL:\n%s\n---------" @@ lazy (to_string table);
-    table
+    let table (tbl_name, keys, (actions : (Var.t list * Action.t list) list)) =
+      let open Pipeline in
+      let table =
+        table tbl_name keys actions
+        |> explode
+        |> Util.mapmap ~f:(fun a -> prim (to_active_exn a))
+        |> choice_seqs
+      in
+      if String.(tbl_name = "acl") then
+        Log.debug "ACL:\n%s\n---------" @@ lazy (to_string table);
+      table
+  end
 
+  module O = Transform.Optimizer (struct
+      module P = Active
+      include Pack
+      let prim_dead_code_elim = Active.dead_code_elim
+      let prim_const_prop = Active.const_prop
+    end
+    )
+
+  module N = Transform.Normalize ( struct
+      module P = Active
+      include Pack
+      let normalize_prim = P.normalize_names
+    end)
+
+  let optimize = O.optimize
+  let normalize_names = N.normalize
+
+  include Pack
 
 end
 
@@ -103,35 +123,55 @@ module Psv = struct
 end
 
 module GPL = struct
-  include Cmd.Make (Pipeline)
-  let assign x e = prim (Active (Active.assign x e))
-  let table name keys actions = prim (Table {name; keys; actions})
+  module Pack = struct
+    include Cmd.Make (Pipeline)
+    let assign x e = prim (Active (Active.assign x e))
+    let table name keys actions = prim (Table {name; keys; actions})
 
-  let encode_tables: t -> GCL.t =
-    bottom_up
-      ~sequence:GCL.sequence
-      ~choices:GCL.choices
-      ~prim:(function
-          | Table {name;keys;actions} ->
-            GCL.table (name, keys, actions)
-          | Active a -> GCL.prim a
-        )
+    let encode_tables: t -> GCL.t =
+      bottom_up
+        ~sequence:GCL.sequence
+        ~choices:GCL.choices
+        ~prim:(function
+            | Table {name;keys;actions} ->
+              GCL.table (name, keys, actions)
+            | Active a -> GCL.prim a
+          )
 
-  let symbolize (c : t) =
-    let gcl = encode_tables c in
-    let (ctx, psv) = Psv.passify gcl in
-    let symbolic_parser = Psv.normal psv in
-    let symbolic_parser = BExpr.erase_max_label ctx symbolic_parser in
-    assume symbolic_parser
+    let symbolize (c : t) =
+      let gcl = encode_tables c in
+      let (ctx, psv) = Psv.passify gcl in
+      let symbolic_parser = Psv.normal psv in
+      let symbolic_parser = BExpr.erase_max_label ctx symbolic_parser in
+      assume symbolic_parser
 
-  let tables (c : t) : Table.t list =
-    bottom_up c
-      ~sequence:List.concat
-      ~choices:List.concat
-      ~prim:(function
-          | Table tbl -> [tbl]
-          | _ -> []
-        ) |> List.dedup_and_sort ~compare:Table.compare
+    let tables (c : t) : Table.t list =
+      bottom_up c
+        ~sequence:List.concat
+        ~choices:List.concat
+        ~prim:(function
+            | Table tbl -> [tbl]
+            | _ -> []
+          ) |> List.dedup_and_sort ~compare:Table.compare
+  end
+
+  module N = Transform.Normalize (struct
+      module P = Pipeline
+      include Pack
+      let normalize_prim = Pipeline.normalize_names
+    end)
+  let normalize_names = N.normalize
+
+  module O = Transform.Optimizer (struct
+      module P = Pipeline
+      include Pack
+      let prim_dead_code_elim = Pipeline.dead_code_elim
+      let prim_const_prop = Pipeline.const_prop
+      end)
+
+  let optimize = O.optimize
+
+  include Pack
 
 end
 

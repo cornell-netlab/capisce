@@ -142,7 +142,7 @@ end
 
 module DeadCodeElim (Cmd : sig
     include Cmd_bwd
-    val prim_dead_code_elim : P.t -> Var.Set.t -> (Var.Set.t * P.t)
+    val prim_dead_code_elim : P.t -> Var.Set.t -> (Var.Set.t * P.t) option
   end) = struct
 
   open Cmd
@@ -151,9 +151,10 @@ module DeadCodeElim (Cmd : sig
     backward c
       ~init:(reads, skip)
       ~prim:(fun p (reads, acc) ->
-          let reads, p = prim_dead_code_elim p reads in
-          reads,
-          sequence [prim p; acc]
+          match prim_dead_code_elim p reads with
+          | None -> (reads, acc)
+          | Some (reads, p) ->
+            (reads, sequence [prim p; acc])
         )
       ~choices:(fun results ->
           Util.fold_right1 results
@@ -171,7 +172,7 @@ end
 module Optimizer ( Cmd : sig
     include Cmd_fwd_bwd
     val equal : t -> t -> bool
-    val prim_dead_code_elim : P.t -> Var.Set.t -> (Var.Set.t * P.t)
+    val prim_dead_code_elim : P.t -> Var.Set.t -> (Var.Set.t * P.t) option
     val prim_const_prop : Expr.t Var.Map.t -> P.t -> (P.t * Expr.t Var.Map.t)
   end ) = struct
 
@@ -180,7 +181,6 @@ module Optimizer ( Cmd : sig
 
   let optimize : Cmd.t -> Cmd.t =
     Log.compiler_s "optimizing...";
-    let open Option in
     let o c = DC.elim (CP.propagate_exn c) in
     Util.fix ~equal:Cmd.equal o
 
