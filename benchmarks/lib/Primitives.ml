@@ -16,14 +16,13 @@ let substitution_of facts x =
   | None -> Expr.var x
   | Some e -> e
 
-
-
 module Assert = struct
   type t = BExpr.t
   [@@deriving quickcheck, eq, hash, sexp, compare]
 
   let assert_ b = b
-  let contra b1 b2 = BExpr.equal b1 (BExpr.not_ b2) || BExpr.equal b2 (BExpr.not_ b2)
+  let contra b1 b2 =
+    BExpr.equal b1 (BExpr.not_ b2) || BExpr.equal b2 (BExpr.not_ b2)
   let to_smtlib b =
     Printf.sprintf "assert %s" (BExpr.to_smtlib b)
   let name _ = Printf.sprintf "assert"
@@ -504,6 +503,7 @@ module Pipeline = struct
     [@@deriving quickcheck, eq, hash, sexp, compare]
 
     let active a = Active a
+    let assign x e = active @@ Active.assign x e
 
     let action (a : Action.t) = Active (Active.of_action a)
 

@@ -129,7 +129,7 @@ module Psv = struct
 
 end
 
-module GPL = struct
+ module GPL = struct
   module Pack = struct
     include Cmd.Make (Pipeline)
     let assign x e = prim (Active (Active.assign x e))
@@ -176,6 +176,7 @@ module GPL = struct
       let prim_const_prop = Pipeline.const_prop
       end)
   let optimize = O.optimize
+  let optimize_seq_pair = O.optimize_seq_pair
   include Pack
 end
 

@@ -60,15 +60,6 @@ module HoareNet = struct
   module Pack = struct
     include Cmd.Make(DepPrim)
 
-    let check (cmd : t) =
-      let all = List.for_all ~f:Fn.id in
-      bottom_up cmd ~sequence:all ~choices:all
-        ~prim:(fun (triple : DepPrim.t) ->
-            let phi = DepPrim.vc triple in
-            let vars = BExpr.vars phi |> Tuple2.uncurry (@) in
-            BExpr.not_ phi
-            |> Solver.check_unsat vars ~timeout:(Some 2000))
-
     let assign x e =
       prim ({ precondition = BExpr.true_;
               cmd = ASTs.GPL.assign x e;
@@ -79,7 +70,14 @@ module HoareNet = struct
               cmd = ASTs.GPL.table name keys actions;
               postcondition = post})
 
-
+    let check (cmd : t) =
+      let all = List.for_all ~f:Fn.id in
+      bottom_up cmd ~sequence:all ~choices:all
+        ~prim:(fun (triple : DepPrim.t) ->
+            let phi = DepPrim.vc triple in
+            let vars = BExpr.vars phi |> Tuple2.uncurry (@) in
+            BExpr.not_ phi
+            |> Solver.check_unsat vars ~timeout:(Some 2000))
 
     let infer (cmd:t) =
       bottom_up cmd ~sequence:BExpr.ands_ ~choices:BExpr.ands_

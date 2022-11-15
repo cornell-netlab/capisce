@@ -109,7 +109,9 @@ let table_infer : Command.t =
         Log.compiler "%s" @@ lazy "compiling to gpl...";
         let gpl = Tuple2.map ~f:(Translate.gcl_to_gpl) coq_gcl in
         let st = Clock.start () in
-        let gpl = Tuple2.map_snd ~f:ASTs.GPL.optimize gpl in
+        Log.compiler_s "optimizing...";
+        let gpl = ASTs.GPL.optimize_seq_pair gpl in
+        Log.compiler_s "done optimizing; starting inference";
         let cpf = Qe.table_infer ~sfreq ~prsr ~fn gpl in
         Printf.printf "Result:\n%s\n%!Computedin %f:\n%!" (BExpr.to_smtlib cpf) (Clock.stop st)
     ]

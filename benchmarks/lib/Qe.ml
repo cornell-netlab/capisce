@@ -348,18 +348,19 @@ let sufficient ~vc ~prog =
   fun phi ->
   implies phi program_spec
 
-let all_paths ~parserify raw_gcl =
-  let raw_gcl_graph = GCL_G.construct_graph raw_gcl in      Log.debug "exploring all paths for %s" @@ lazy (GCL.to_string raw_gcl);
-  let gcl = GCL.optimize (parserify raw_gcl) in           Log.graph_dot (GCL_G.print_graph raw_gcl_graph) "parserless_broken_cfg";
-  let gcl_graph = GCL_G.construct_graph gcl in              Log.graph_dot (GCL_G.print_graph gcl_graph) "broken_cfg";
+let all_paths gcl =
+  Log.graph_s "Constructing graph";
+  let gcl_graph = GCL_G.construct_graph gcl in            Log.graph_dot (GCL_G.print_graph gcl_graph) "broken_cfg";
   let gen = PathGenerator.create gcl_graph in             Log.path_gen "couldn't solve exploded table-path, path-exploding the %s paths" @@ lazy (Bigint.to_string @@ PathGenerator.total_paths gen);
   (* Breakpoint.set Bigint.(one < PathGenerator.total_paths gen); *)
   let paths = ref 0 in
-  let sufficient = sufficient ~vc:passive_vc ~prog:gcl in
+  (* let sufficient = sufficient ~vc:passive_vc ~prog:gcl in *)
   let rec loop phi_agg =
-    if sufficient phi_agg
-    then begin Log.exploder_s "sufficient!"; phi_agg end
-    else match PathGenerator.get_next gen with
+    Log.debug_s "looping";
+    (* if sufficient phi_agg *)
+    (* then begin Log.exploder_s "sufficient!"; phi_agg end *)
+    (* else *)
+    match PathGenerator.get_next gen with
       | None ->
         Log.exploder_s "inner paths done";
         phi_agg
@@ -370,13 +371,13 @@ let all_paths ~parserify raw_gcl =
         let gcl = List.map pi ~f:(GCL_G.vertex_to_cmd) |> GCL.sequence in
         Log.irs "solving path %s" @@ lazy (GCL.to_string gcl);
         let phi = passive_vc gcl |> BExpr.nnf in
-        if implies phi_agg phi
-        then begin
-          Log.exploder_s "Skipped; already covered!";
-          Int.incr paths;
-          loop phi_agg
-        end
-        else
+        (* if implies phi_agg phi *)
+        (* then begin *)
+        (*   Log.exploder_s "Skipped; already covered!"; *)
+        (*   Int.incr paths; *)
+        (*   loop phi_agg *)
+        (* end *)
+        (* else *)
           let () =
             Log.exploder "Gotta analyze:\n%s" @@ lazy (GCL.to_string gcl);
             Log.exploder "Formula is: \n%s" @@ lazy (BExpr.to_smtlib phi);
@@ -402,6 +403,7 @@ let all_paths ~parserify raw_gcl =
               loop (BExpr.and_ phi_agg qf_psi)
             end
   in
+  Log.path_gen_s "starting loop";
   let phi = loop BExpr.true_ in
   BExpr.simplify phi
 
@@ -482,7 +484,7 @@ let rec explode_tables ~sufficient ~parserify exploder gpl phi_agg =
       Log.irs "GCL %s" @@ lazy (GCL.to_string gcl);
       (* let parsered = parserify gcl in *)
       (* Log.irs "Parsered GCL %s" @@ lazy (GCL.to_string parsered); *)
-      let phi = all_paths ~parserify gcl in
+      let phi = all_paths (parserify gcl) in
       Log.irs "Single-path CPI: %s" @@ lazy (BExpr.to_smtlib phi);
       phi
     | Some tbl ->
@@ -512,11 +514,11 @@ let rec explode_tables ~sufficient ~parserify exploder gpl phi_agg =
       loop phi_agg
 
 (** THE MAIN LOOP *)
-let search_generator ~sufficient ~parserify ~statusbar gpl_graph gen phi_agg =
+let search_generator ~sufficient:_ ~parserify ~statusbar gpl_graph gen phi_agg =
   let rec loop gen gpl_graph (phi_agg : BExpr.t) =
-    if sufficient phi_agg
-    then phi_agg
-    else
+    (* if sufficient phi_agg *)
+    (* then phi_agg *)
+    (* else *)
       let inducer = GPL_G.induce gpl_graph in
       (* if sufficient phi_agg phi_prog then *)
       (*   phi_agg *)
@@ -531,14 +533,15 @@ let search_generator ~sufficient ~parserify ~statusbar gpl_graph gen phi_agg =
         let full_gcl = parserify gcl in                     Log.irs "GCL w/ Parser (Optimized):\n%s\n%!" @@ lazy (GCL.to_string gcl);
         let psv = Psv.(passify full_gcl) |> snd in
         let phi = Psv.vc psv in
-        if implies phi_agg phi then                         let () = Log.debug_s "\tSkipped for sufficiency!;\n%!" in
-          loop gen gpl_graph phi_agg
-        else begin                                          let () = Log.debug_s "solving" in
+        (* if implies phi_agg phi then                         let () = Log.debug_s "\tSkipped for sufficiency!;\n%!" in *)
+        (*   loop gen gpl_graph phi_agg *)
+        (* else begin                                          let () = Log.debug_s "solving" in *)
           Log.path_gen_s "solving...";
           match solve_one phi ~qe:BottomUpQe.optimistic_qe with
           (* match None with *)
           | None ->
-            concolic full_gcl
+            (* concolic full_gcl *)
+            all_paths full_gcl
             (* Log.path_gen_s "couldn't solve path!\n"; Log.irs "%s\n" @@ lazy (GCL.to_string full_gcl); *)
             (* phi_agg *)
             (* |> explode_tables ~sufficient:(Fn.flip implies phi) ~parserify (Exploder.create ()) gpl *)
@@ -551,7 +554,7 @@ let search_generator ~sufficient ~parserify ~statusbar gpl_graph gen phi_agg =
                 ~gpl_graph ~induced_graph;
             Bigint.incr paths;                                Log.smt "Path condition: \n%s\n%!" @@ lazy (BExpr.to_smtlib phi);
             loop gen gpl_graph (BExpr.and_ qf_psi phi_agg)
-        end
+        (* end *)
   in
   loop gen gpl_graph phi_agg
 
@@ -601,11 +604,15 @@ let preprocess ~prsr gpl_pair =
   |> Tuple2.map     ~f:(GPL.normalize_names)
 
 let table_infer ~sfreq:_ ~prsr ~fn:_ gpl_pair =
-  Log.qe "%s" @@ lazy "starting concolic loop";
+  Log.qe "%s" @@ lazy "preprocessing";
   let prsr, pipe = preprocess ~prsr gpl_pair in
   let gcl_pipe = GPL.encode_tables pipe in
   let gcl_prsr = GPL.encode_tables prsr in
-  let parserify = GCL.(Fn.compose optimize (seq gcl_prsr)) in
-  concolic (parserify gcl_pipe)
-  (* all_paths ~parserify gcl_pipe *)
+  Log.qe "%s" @@ lazy "sequencing";
+  let gcl_prog = GCL.seq gcl_prsr gcl_pipe in
+  Log.qe "%s" @@ lazy "optimizing";
+  let gcl_prog = GCL.optimize gcl_prog in
+  Log.qe "%s" @@ lazy "starting inference";
+  (* concolic (parserify gcl_pipe) *)
+  all_paths gcl_prog
  (* table_paths ~sfreq ~fn (prsr, pipe) *)

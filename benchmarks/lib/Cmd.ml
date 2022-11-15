@@ -61,7 +61,16 @@ module Make (P : Primitive) = struct
         List.fold cs ~init:(List.length cs - 1)
           ~f:(fun n c -> n + size c)
 
+    let flatten_seqs cs : t list =
+      let open List.Let_syntax in
+      let%bind c = cs in
+      match c with
+      | Choice _  | Prim _ ->
+        return c
+      | Seq cs -> cs
+
     let sequence cs =
+      let cs = flatten_seqs cs in
       let cs = List.filter cs ~f:(Fn.non is_mult_unit) in
       let cs = List.remove_consecutive_duplicates cs ~which_to_keep:`First ~equal in
       match List.find cs ~f:is_mult_annihil with
@@ -157,24 +166,40 @@ module Make (P : Primitive) = struct
       | Choice cs ->
         choices init cs f
 
-    let forward ~(init:'a) ~(prim : 'a -> P.t -> 'a) ~(choices:'a list -> 'a) (c:t) =
-      let rec loop acc c =
-      match c with
-      | Prim p -> prim acc p
-      | Seq cs ->
-        List.fold_left cs ~init:acc ~f:loop
-      | Choice cs ->
-        List.map cs ~f:(loop acc) |> choices
-      in
-      loop init c
+    let forward ~(init:'a) ~(prim : 'a -> P.t -> 'a) ~(choices:'a list -> 'a) (c : t) =
+      top_down c
+        ~init
+        ~prim
+        ~choices:(fun acc cs recursive_call ->
+            List.map cs ~f:(recursive_call acc)
+            |> choices
+          )
+        ~sequence:(fun acc cs recursive_call ->
+            List.fold cs ~init:acc ~f:(fun acc c ->
+                recursive_call acc c
+              )
+          )
+      (* let rec loop acc c = *)
+      (* match c with *)
+      (* | Prim p -> prim acc p *)
+      (* | Seq cs -> *)
+      (*   List.fold_left cs ~init:acc ~f:loop *)
+      (* | Choice cs -> *)
+      (*   List.map cs ~f:(loop acc) |> choices *)
+      (* in *)
+      (* loop init c *)
 
     let backward ~(init:'a) ~(prim : P.t -> 'a -> 'a ) ~(choices: 'a list -> 'a) (c:t) : 'a =
       let rec loop (c : t) (acc : 'a) : 'a =
         match c with
-        | Prim p -> prim p acc
+        | Prim p ->
+          Log.debug "[backward] prim %s" @@ lazy (P.to_smtlib p);
+          prim p acc
         | Seq cs ->
+          Log.debug_s "[sequence]";
           List.fold_right cs ~init:acc ~f:loop
         | Choice cs ->
+          Log.debug_s "[choice]";
           List.map cs ~f:(fun c -> loop c acc) |> choices
       in
       loop c init
