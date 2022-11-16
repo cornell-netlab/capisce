@@ -738,42 +738,42 @@ control LookupMdInit(in parsed_headers_t hdr, out lookup_metadata_t lkp_md) {
     apply {
         lkp_md.is_ipv4 = false;
         lkp_md.ipv4_src = 32w0;
-        // lkp_md.ipv4_dst = 32w0;
-        // lkp_md.ip_proto = 8w0;
-        // lkp_md.l4_sport = 16w0;
-        // lkp_md.l4_dport = 16w0;
-        // lkp_md.icmp_type = 8w0;
-        // lkp_md.icmp_code = 8w0;
+        lkp_md.ipv4_dst = 32w0;
+        lkp_md.ip_proto = 8w0;
+        lkp_md.l4_sport = 16w0;
+        lkp_md.l4_dport = 16w0;
+        lkp_md.icmp_type = 8w0;
+        lkp_md.icmp_code = 8w0;
         if (hdr.inner_ipv4.isValid()) {
             lkp_md.is_ipv4 = true;
-            // lkp_md.ipv4_src = hdr.inner_ipv4.src_addr;
-            // lkp_md.ipv4_dst = hdr.inner_ipv4.dst_addr;
-            // lkp_md.ip_proto = hdr.inner_ipv4.protocol;
-            // if (hdr.inner_tcp.isValid()) {
-            //     lkp_md.l4_sport = hdr.inner_tcp.sport;
-            //     lkp_md.l4_dport = hdr.inner_tcp.dport;
-            // } else if (hdr.inner_udp.isValid()) {
-            //     lkp_md.l4_sport = hdr.inner_udp.sport;
-            //     lkp_md.l4_dport = hdr.inner_udp.dport;
-            // } else if (hdr.inner_icmp.isValid()) {
-            //     lkp_md.icmp_type = hdr.inner_icmp.icmp_type;
-            //     lkp_md.icmp_code = hdr.inner_icmp.icmp_code;
-            // }
+            lkp_md.ipv4_src = hdr.inner_ipv4.src_addr;
+            lkp_md.ipv4_dst = hdr.inner_ipv4.dst_addr;
+            lkp_md.ip_proto = hdr.inner_ipv4.protocol;
+            if (hdr.inner_tcp.isValid()) {
+                lkp_md.l4_sport = hdr.inner_tcp.sport;
+                lkp_md.l4_dport = hdr.inner_tcp.dport;
+            } else if (hdr.inner_udp.isValid()) {
+                lkp_md.l4_sport = hdr.inner_udp.sport;
+                lkp_md.l4_dport = hdr.inner_udp.dport;
+            } else if (hdr.inner_icmp.isValid()) {
+                lkp_md.icmp_type = hdr.inner_icmp.icmp_type;
+                lkp_md.icmp_code = hdr.inner_icmp.icmp_code;
+            }
         } else if (hdr.ipv4.isValid()) {
             lkp_md.is_ipv4 = true;
-            // lkp_md.ipv4_src = hdr.ipv4.src_addr;
-            // lkp_md.ipv4_dst = hdr.ipv4.dst_addr;
-            // lkp_md.ip_proto = hdr.ipv4.protocol;
-            // if (hdr.tcp.isValid()) {
-            //     lkp_md.l4_sport = hdr.tcp.sport;
-            //     lkp_md.l4_dport = hdr.tcp.dport;
-            // } else if (hdr.udp.isValid()) {
-            //     lkp_md.l4_sport = hdr.udp.sport;
-            //     lkp_md.l4_dport = hdr.udp.dport;
-            // } else if (hdr.icmp.isValid()) {
-            //     lkp_md.icmp_type = hdr.icmp.icmp_type;
-            //     lkp_md.icmp_code = hdr.icmp.icmp_code;
-            // }
+            lkp_md.ipv4_src = hdr.ipv4.src_addr;
+            lkp_md.ipv4_dst = hdr.ipv4.dst_addr;
+            lkp_md.ip_proto = hdr.ipv4.protocol;
+            if (hdr.tcp.isValid()) {
+                lkp_md.l4_sport = hdr.tcp.sport;
+                lkp_md.l4_dport = hdr.tcp.dport;
+            } else if (hdr.udp.isValid()) {
+                lkp_md.l4_sport = hdr.udp.sport;
+                lkp_md.l4_dport = hdr.udp.dport;
+            } else if (hdr.icmp.isValid()) {
+                lkp_md.icmp_type = hdr.icmp.icmp_type;
+                lkp_md.icmp_code = hdr.icmp.icmp_code;
+            }
         }
     }
 }
@@ -887,16 +887,16 @@ control FabricVerifyChecksum(inout parsed_headers_t hdr, inout fabric_metadata_t
 parser FabricParser(packet_in packet, out parsed_headers_t hdr, inout fabric_metadata_t fabric_metadata, inout standard_metadata_t standard_metadata) {
     bit<6> last_ipv4_dscp = 6w0;
     state start {
-        transition accept;
-        // transition select(standard_metadata.ingress_port) {
-        //     9w510: check_packet_out;
-        //     default: parse_ethernet;
-        // }
+        // transition accept;
+        transition select(standard_metadata.ingress_port) {
+            9w510: check_packet_out;
+            default: parse_ethernet;
+        }
     }
     state check_packet_out {
-        // packet_out_header_t tmp = packet.lookahead<packet_out_header_t>();
-        // transition select(tmp.do_forwarding) {
-        transition select((packet.lookahead<bit<1>>()[0:0])) {
+        packet_out_header_t tmp = packet.lookahead<packet_out_header_t>();
+        transition select(tmp.do_forwarding) {
+        // transition select((packet.lookahead<bit<1>>()[0:0])) {
             1w0: parse_packet_out_and_accept;
             default: strip_packet_out;
         }
@@ -971,12 +971,12 @@ parser FabricParser(packet_in packet, out parsed_headers_t hdr, inout fabric_met
         packet.extract(hdr.udp);
         fabric_metadata.l4_sport = hdr.udp.sport;
         fabric_metadata.l4_dport = hdr.udp.dport;
-        // gtpu_t gtpu = packet.lookahead<gtpu_t>();
-        // transition select(hdr.udp.dport, gtpu.version, gtpu.msgtype) {
-        //     (16w2152, 3w0x1, 8w0xff): parse_gtpu;
-        //     default: accept;
-        // }
-        transition accept;
+        gtpu_t gtpu = packet.lookahead<gtpu_t>();
+        transition select(hdr.udp.dport, gtpu.version, gtpu.msgtype) {
+            (16w2152, 3w0x1, 8w0xff): parse_gtpu;
+            default: accept;
+        }
+        // transition accept;
     }
     state parse_icmp {
         packet.extract(hdr.icmp);
@@ -1062,20 +1062,20 @@ control FabricIngress(inout parsed_headers_t hdr, inout fabric_metadata_t fabric
     IngressQos() qos;
     apply {
         lkp_md_init.apply(hdr, fabric_metadata.lkp);
-        // pkt_io_ingress.apply(hdr, fabric_metadata, standard_metadata);
-        // slice_tc_classifier.apply(hdr, fabric_metadata, standard_metadata);
-        // filtering.apply(hdr, fabric_metadata, standard_metadata);
-        // if (fabric_metadata.skip_forwarding == false) {
-        //     forwarding.apply(hdr, fabric_metadata, standard_metadata);
-        // }
-        // if (fabric_metadata.skip_next == false) {
-        //     pre_next.apply(hdr, fabric_metadata);
-        // }
-        // acl.apply(hdr, fabric_metadata, standard_metadata);
-        // if (fabric_metadata.skip_next == false) {
-        //     next.apply(hdr, fabric_metadata, standard_metadata);
-        // }
-        // qos.apply(fabric_metadata, standard_metadata);
+        pkt_io_ingress.apply(hdr, fabric_metadata, standard_metadata);
+        slice_tc_classifier.apply(hdr, fabric_metadata, standard_metadata);
+        filtering.apply(hdr, fabric_metadata, standard_metadata);
+        if (fabric_metadata.skip_forwarding == false) {
+            forwarding.apply(hdr, fabric_metadata, standard_metadata);
+        }
+        if (fabric_metadata.skip_next == false) {
+            pre_next.apply(hdr, fabric_metadata);
+        }
+        acl.apply(hdr, fabric_metadata, standard_metadata);
+        if (fabric_metadata.skip_next == false) {
+            next.apply(hdr, fabric_metadata, standard_metadata);
+        }
+        qos.apply(fabric_metadata, standard_metadata);
     }
 }
 
@@ -1084,10 +1084,10 @@ control FabricEgress(inout parsed_headers_t hdr, inout fabric_metadata_t fabric_
     EgressNextControl() egress_next;
     EgressDscpRewriter() dscp_rewriter;
     apply {
-        // pkt_io_egress.apply(hdr, fabric_metadata, standard_metadata);
-        // egress_next.apply(hdr, fabric_metadata, standard_metadata);
-        // dscp_rewriter.apply(hdr, fabric_metadata, standard_metadata);
-        // standard_metadata.egress_spec = 9w511;
+        pkt_io_egress.apply(hdr, fabric_metadata, standard_metadata);
+        egress_next.apply(hdr, fabric_metadata, standard_metadata);
+        dscp_rewriter.apply(hdr, fabric_metadata, standard_metadata);
+        standard_metadata.egress_spec = 9w511;
     }
 }
 

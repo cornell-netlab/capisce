@@ -265,7 +265,8 @@ module GPLGen =
 
 module PathGenerator =
   Generator.Make
-    (RandomStack)
+    (* (RandomStack) *)
+    (VStack)
     (GCL_G.V)
     (GCL_G)
 
@@ -356,21 +357,25 @@ let all_paths gcl =
   let paths = ref 0 in
   (* let sufficient = sufficient ~vc:passive_vc ~prog:gcl in *)
   let rec loop phi_agg =
-    Log.debug_s "looping";
+    let clock = Clock.start () in
+    (* Log.path_gen_s "----------------looping--------------------"; *)
     (* if sufficient phi_agg *)
     (* then begin Log.exploder_s "sufficient!"; phi_agg end *)
     (* else *)
-    match PathGenerator.get_next gen with
+    let next_path = PathGenerator.get_next gen in
+    (* Log.path_gen "Got next path in %fms" @@ lazy (Clock.stop clock); *)
+    match next_path with
       | None ->
         Log.exploder_s "inner paths done";
         phi_agg
       | Some pi ->
-        Log.path_gen "Inner Path #%d" @@ lazy !paths;
-        Log.path_gen "Paths to go %s" @@ lazy Bigint.(to_string (PathGenerator.total_paths gen -  of_int !paths));
+        (* Log.path_gen "Inner Path #%d" @@ lazy !paths; *)
+        (* Log.path_gen "Paths to go %s" @@ lazy Bigint.(to_string (PathGenerator.total_paths gen -  of_int !paths)); *)
+        Log.path_gen "%f" @@ lazy (Float.((Clock.stop clock * 1000.0)/ of_int !paths));
         let pi = List.rev pi in
         let gcl = List.map pi ~f:(GCL_G.vertex_to_cmd) |> GCL.sequence in
         Log.irs "solving path %s" @@ lazy (GCL.to_string gcl);
-        let phi = passive_vc gcl |> BExpr.nnf in
+        let phi = passive_vc gcl (*|> BExpr.nnf*) in
         (* if implies phi_agg phi *)
         (* then begin *)
         (*   Log.exploder_s "Skipped; already covered!"; *)
@@ -382,26 +387,27 @@ let all_paths gcl =
             Log.exploder "Gotta analyze:\n%s" @@ lazy (GCL.to_string gcl);
             Log.exploder "Formula is: \n%s" @@ lazy (BExpr.to_smtlib phi);
           in
-          match solve_one phi ~qe:BottomUpQe.optimistic_qe with
+          match Some ([], BExpr.true_) with
+          (* match solve_one phi ~qe:BottomUpQe.optimistic_qe with*)
           | None ->
             Log.error "%s" @@ lazy (GCL.to_string gcl);
             Log.error "%s" @@ lazy (BExpr.to_smtlib phi);
             failwith "Couldn't solve path"
-          | Some (cvs,res) ->
-            let qf_psi = Solver.of_smtlib ~dvs:[] ~cvs res in
+          | Some (_, qf_psi) ->
+            (* let qf_psi = Solver.of_smtlib ~dvs:[] ~cvs res in *)
             (* if not (implies qf_psi phi) then begin *)
             (*   Log.error "CPF is %s" @@ lazy res; *)
             (*   Log.error "PHI is %s" @@ lazy (BExpr.to_smtlib phi); *)
             (*   failwith "CPF did not impliy PHI" *)
             (* end; *)
-            if Solver.check_unsat ~timeout:(Some 1000) cvs qf_psi then begin
-              Printf.eprintf "Inner path Failed %s\n%!"  (GCL.to_string gcl);
-              Printf.eprintf "Formulae was %s\n%!" res;
-              failwith "unsolveable"
-            end else begin
-              Int.incr paths;
-              loop (BExpr.and_ phi_agg qf_psi)
-            end
+            (* if Solver.check_unsat ~timeout:(Some 1000) cvs qf_psi then begin *)
+            (*   Printf.eprintf "Inner path Failed %s\n%!"  (GCL.to_string gcl); *)
+            (*   Printf.eprintf "Formulae was %s\n%!" res; *)
+            (*   failwith "unsolveable" *)
+            (* end else begin *)
+            Int.incr paths;
+            loop (BExpr.and_ phi_agg qf_psi)
+            (* end *)
   in
   Log.path_gen_s "starting loop";
   let phi = loop BExpr.true_ in
@@ -610,8 +616,8 @@ let table_infer ~sfreq:_ ~prsr ~fn:_ gpl_pair =
   let gcl_prsr = GPL.encode_tables prsr in
   Log.qe "%s" @@ lazy "sequencing";
   let gcl_prog = GCL.seq gcl_prsr gcl_pipe in
-  Log.qe "%s" @@ lazy "optimizing";
-  let gcl_prog = GCL.optimize gcl_prog in
+  (* Log.qe "%s" @@ lazy "optimizing"; *)
+  (* let gcl_prog = GCL.optimize gcl_prog in *)
   Log.qe "%s" @@ lazy "starting inference";
   (* concolic (parserify gcl_pipe) *)
   all_paths gcl_prog

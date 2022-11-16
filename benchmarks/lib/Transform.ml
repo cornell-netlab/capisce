@@ -52,8 +52,6 @@ module Substitutor (Cmd : sig
             ~f:(fun acc c ->
                 let%bind (acc_c, _) = acc in
                 let%map  (c', subst) = recursive_call acc c in
-                Printf.printf "FROM:%s" @@ Cmd.to_string c;
-                Printf.printf "  TO:%s" @@ Cmd.to_string c';
                 (sequence [acc_c; c'], subst)
               )
         )

@@ -48,7 +48,8 @@ module Make
 
   let total_paths (state : t) = state.total_paths
 
-  let rec get_next (state : t) =
+
+  let rec get_next_inner (state : t) =
     match W.pop state.worklist with
     | None -> None
     | Some ([], []) ->
@@ -59,11 +60,16 @@ module Make
         Some pi
       else
         (* keep searching! *)
-        get_next state
+        get_next_inner state
     | Some (pi, c::children) ->
       W.push state.worklist (pi, children);
       W.push state.worklist (c::pi, G.succ (graph state) c);
-      get_next state
+      get_next_inner state
+
+  let get_next (state : t) =
+    let next = get_next_inner state in
+    next
+
 
 
   (* let explode_random pi : int = *)
