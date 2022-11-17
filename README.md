@@ -971,7 +971,7 @@ let rec infer prefix c : Form * GCL * Form set =
   match c with
   | c -> 
     ( true
-    , prefix; 
+    , prefix;c
     , return @@ VCGen(prefix;c))
   | {{ φₚᵣₑ }} c {{ φₚₒₛₜ }} ->
     let ψ = infer_triple φₚᵣₑ c φₚₒₛₜ in
