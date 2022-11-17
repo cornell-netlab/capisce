@@ -837,3 +837,182 @@ for `⟨0,2,4⟩` should have been
     
 In which case, the unsat-core will identify the sub-path as `⟨0,2,4⟩`, which
 correctly allows `⟨0,1,4⟩` to be generated.
+
+
+# Modularity
+
+Enumerating all `16e19` paths through the program is infeasible. Even if we were
+to take `2e-9` milliseconds per path, which is how long it takes on this machine
+to run a single switch, it would take 15.5 years of compute. Then we would have
+something on the order of `16e19` paths to reason about. This is just barely
+feasible in a computational sense, but truly infeasible in a usability sense.
+Its hard to believe that a formula with ~`16e19` conjuncts is more useful than
+the quantified formula we can derive from the program itself (`p4v` Liu et al,
+'18).
+
+Our solution is controlled modularity. We can manually annotate the program with
+hoare triples to simulatenously do modular verification and inference. Consider
+the following table.
+
+``` c++
+table t {
+  keys = { h.isValid: exact; 
+           h.x : ternary}
+  actions = {a_0; a_1}
+}
+```
+
+Let's say we want to infer the control plane property that uses this table
+without triggering an invalid read on `h` in the second table key. We can start
+by making no assumptions about the surrounding code and just checking this
+property on the single table itself.
+
+``` c++
+code_before
+{{ true }} t.apply {{ true }}
+code_after
+```
+
+The intrumentation pass will translate this into
+
+``` c++
+code_before
+{{ true }}
+  assume ($symb_t_key_0 = h.isValid());
+  if (not $symb_t_key_1_DONTCARE) {
+    assert (h.isValid());
+    assume (symb_t_key_1 = h.x);
+  }
+     { assume $symb_t_action = 0; a_0() } 
+  [] { assume $symb_t_action = 1; a_1() }
+{{ true }}
+code_after
+```
+
+We'll then infer a control-plane formula that validate the hoare triple:
+
+``` common-lisp
+(or $symb_key_t_0 $symb_t_key_1_DONTCARE)
+```
+
+However, we could write down a stronger precondition here, let's say
+`h.isValid()`. We'd write this as follows:
+
+``` c++
+code_before
+{{ h.isValid() }}
+  assume ($symb_t_key_0 = h.isValid());
+  if (not $symb_t_key_1_DONTCARE) {
+    assert (h.isValid());
+    assume (symb_t_key_1 = h.x);
+  }
+     { assume $symb_t_action = 0; a_0() } 
+  [] { assume $symb_t_action = 1; a_1() }
+{{ true }}
+code_after
+```
+
+Now the new CPF is
+
+``` common-lisp
+(true)
+```
+
+However, the work has now shifted. We must now show that `code_before`
+universally validates the `h` header. In other words, we must prove the following hoare triple:
+
+``` c++
+{{ true }} code_before {{ h.isValid() }}
+```
+
+which we'll do by treating `h.isValid()` as a classic `assert` statement and checking the validity of the following
+
+``` common-lisp
+code_before;
+assert h.isValid();
+```
+
+## Grammar
+
+We can write down the grammar for GPL with hoare triples as follows. Let `c` be
+a metavariable ranging over programs in GCL. Let `φ` range over formulae. Then
+our grammar is
+
+``` 
+c ∈ GCL
+h ∈ Hoare-GCL
+h ::= c
+    | {{ φ }} c {{ φ }} 
+    | h [] h
+    | h ; h
+```
+
+
+The key aspect here is that CPF inference can only within hoare triples. That is the following program
+
+``` c++
+t.apply()
+```
+
+with no hoare-triple annotation will _not_ trigger computation of a CPF.
+
+## Verification Algorithm
+
+The verification algorithm relies on two sub-routines, `verify : Form → Bool`,
+which verifies a given formula, and `infer_triple : Form → Hoare-GCL → Form →
+Form`, which infers a CPF over the hoare triple. We also assume a `VCGen : GCL →
+Form` procedure for GCL.
+
+We can then write down the verification algorithm as follows:
+
+``` ocaml
+
+let rec infer prefix c : Form * GCL * Form set =
+  match c with
+  | c -> 
+    ( true
+    , prefix; 
+    , return @@ VCGen(prefix;c))
+  | {{ φₚᵣₑ }} c {{ φₚₒₛₜ }} ->
+    let ψ = infer_triple φₚᵣₑ c φₚₒₛₜ in
+    ( ψ 
+    , prefix; assume φₚᵣₑ ∧ φₚₒₛₜ; (* Assumes Passive Form *)
+    , return @@ VCGen (prefix; assert φₚᵣₑ))
+  | h₁ [] h₂ -> 
+    let ψ₁, prefix₁, checks₁ = infer prefix h₁ in
+    let ψ₂, prefix₂, checks₂ = infer prefix h₂ in
+    (ψ₁ ∧ ψ₂
+    , prefix₁ [] prefix₂
+    , checks₁ ∪ checks₂)
+    
+  | h₁ ;  h₂ -> 
+    let ψ₁, prefix₁, checks₁ = infer prefix  h₁ in
+    let ψ₂, prefix₂, checks₂ = infer prefix₁ h₂ in
+    (ψ₁, prefix₂, checks₁ ∪ checks₂)
+    
+
+let cpi c =
+  let ψ, _, checks = infer skip c in 
+  match find checks @@ Fn.non verify with
+  | None   -> Ok ψ
+  | Some ϕ -> Error ϕ 
+```
+
+The `infer c` function returns a tuple of three elements `(ψ, prefix, checks)`,
+where:
+* `ψ` is the CPF that we've computed by running `infer_triple` on each of the
+hoare triples,
+* `prefix` is the program `c` with each hoare triple replaced with the
+  relational semantics indicated by each hoare triple.
+* `checks` is a set of side conditions that need to be checked. Each `φ ∈
+  checks` is a formula corresponding to the validity of an unannotated GCL
+  program `c` or to the correctness of the precondition of a hoare triple. That
+  is `φ` corresponds to some program `c₁; {{ φₚᵣₑ }} c₂ {{ φₚₒₛₜ }}` and shows
+  that `VCGen(c₁) ⇒ φₚᵣₑ`. This check enforces the soundness of our annotations.
+  
+  *Remark.* If we want to enforce the completeness of our annotations, we can
+  check can adjust this check to `VCGEN(c₁) ⇔ φₚᵣₑ`.
+
+
+
+
