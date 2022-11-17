@@ -1011,8 +1011,121 @@ hoare triples,
   that `VCGen(c₁) ⇒ φₚᵣₑ`. This check enforces the soundness of our annotations.
   
   *Remark.* If we want to enforce the completeness of our annotations, we can
-  check can adjust this check to `VCGEN(c₁) ⇔ φₚᵣₑ`.
+  can adjust this check to equality:  `VCGEN(c₁) ⇔ φₚᵣₑ`.
 
 
+## Example Two-Table Property
 
+Lets say we want to enforce the validate-read condition that the BF4 paper uses
+as its example two-table property. Here table `t1` is going to set the validity
+of header `h` only in action `v`. Table `t2` is going to ternary-match on header
+`h`'s `f`-field in its key. We want to enforce the property that either `t1` runs action `v`
+or `t2` wild-cards out the nondeterministic read of `h.f`.
 
+Here's table `t1`:
+
+``` c++
+table t₁ {
+  keys = { meta.x : exact}
+  actions = {v ; nop};
+}
+```
+
+Here `meta.x` is a predefined metadata field, `nop` is an action that does
+nothing., and action `v` is defined as follows:
+
+``` c++
+action v () {
+  h.setValid();
+}
+```
+
+Here's table `t2`.
+
+``` c++
+table t₂ {
+  keys = { h.f : ternary }
+  actions = { assign_x }
+}
+```
+Where the action assign_x assigns the metadata field `meta.x` to the value of the action data:
+
+``` c++
+action assign_x(bit<8> x){
+  meta.x = x
+}
+```
+
+We want to check the property with the following, trivial annotation:
+
+``` c++
+{{ true }} 
+  t₁.apply();
+  t₂.apply();
+{{ true }}
+```
+
+If we run this, we will, get the following property:
+
+``` common-lisp 
+(or (= symb_t₁_action 0) symb_t₂_key_0_DONT_CARE)
+```
+where `0` is action ID for action `v` in table `t₁`.
+
+Now, if, for some reason, we see that this formula is too complicated for our
+tool to compute, we can increase the modularity by adding annotations.
+
+For instance, we might add trivial annotations around each table:
+
+``` c++
+{{ true }}
+  t₁.apply();
+{{ true }};
+{{ true }}
+  t₂.apply();
+{{ true }}
+```
+
+Then we'll infer a slightly different formula. Suddenly, the action that's run
+in table `t₁` is logically isolated from the read in table `t₂`. So we infer the
+following, stronger property:
+
+``` common-lisp
+symb_t₂_key_0_DONTCARE
+```
+
+which says that we must wild-card the ternary read in table `t₂`. However, this
+is too strong for our purposes, and nearly turns table `t₂` into a constant
+function. So, we can iterate on our annotations, to infer a more-useful CPI:
+
+``` c++
+{{ true }}
+  t₁.apply();
+{{ (=> (= symb_t₁_action 0) h.isValid()) }};
+{{ (=> (= symb_t₁_action 0) h.isValid()) }}
+  t₂.apply();
+{{ true }}
+```
+
+And now we infer our original constraint on table `t₂`:
+
+``` 
+(or (= symb_t₁_action 0) symb_t₂_key_0_DONT_CARE)
+```
+
+We also have to check the side condition that the following condition is valid,
+which is trivial by reflexivity of implication:
+
+``` common-lisp
+(=> 
+  (=> (= symb_t₁_action 0) h.isValid())
+  (=> (= symb_t₁_action 0) h.isValid()))
+```
+
+and we're done!
+
+*Remark.* We had to use the symbolic ghost state in writing down the conditions.
+This isn't great. If we didn't we'd be stuck with the too-strong conditions. Is
+there some iterative weakening procedure (like in the dillig max spec paper), by
+which we iteratively strengthen the annotations to weaken the inferred
+conditions?
