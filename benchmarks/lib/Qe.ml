@@ -355,15 +355,14 @@ let all_paths gcl =
   let gen = PathGenerator.create gcl_graph in             Log.path_gen "couldn't solve exploded table-path, path-exploding the %s paths" @@ lazy (Bigint.to_string @@ PathGenerator.total_paths gen);
   (* Breakpoint.set Bigint.(one < PathGenerator.total_paths gen); *)
   let paths = ref 0 in
-  (* let sufficient = sufficient ~vc:passive_vc ~prog:gcl in *)
+  let sufficient = sufficient ~vc:passive_vc ~prog:gcl in
   let rec loop phi_agg =
     let clock = Clock.start () in
-    (* Log.path_gen_s "----------------looping--------------------"; *)
-    (* if sufficient phi_agg *)
-    (* then begin Log.exploder_s "sufficient!"; phi_agg end *)
-    (* else *)
+    Log.path_gen_s "----------------looping--------------------";
+    if sufficient phi_agg
+    then begin Log.exploder_s "sufficient!"; phi_agg end
+    else
     let next_path = PathGenerator.get_next gen in
-    (* Log.path_gen "Got next path in %fms" @@ lazy (Clock.stop clock); *)
     match next_path with
       | None ->
         Log.exploder_s "inner paths done";
@@ -376,38 +375,38 @@ let all_paths gcl =
         let gcl = List.map pi ~f:(GCL_G.vertex_to_cmd) |> GCL.sequence in
         Log.irs "solving path %s" @@ lazy (GCL.to_string gcl);
         let phi = passive_vc gcl (*|> BExpr.nnf*) in
-        (* if implies phi_agg phi *)
-        (* then begin *)
-        (*   Log.exploder_s "Skipped; already covered!"; *)
-        (*   Int.incr paths; *)
-        (*   loop phi_agg *)
-        (* end *)
-        (* else *)
+        if implies phi_agg phi
+        then begin
+          Log.exploder_s "Skipped; already covered!";
+          Int.incr paths;
+          loop phi_agg
+        end
+        else
           let () =
             Log.exploder "Gotta analyze:\n%s" @@ lazy (GCL.to_string gcl);
             Log.exploder "Formula is: \n%s" @@ lazy (BExpr.to_smtlib phi);
           in
-          match Some ([], BExpr.true_) with
-          (* match solve_one phi ~qe:BottomUpQe.optimistic_qe with*)
+          (* match Some ([], BExpr.true_) with *)
+          match solve_one phi ~qe:BottomUpQe.optimistic_qe with
           | None ->
             Log.error "%s" @@ lazy (GCL.to_string gcl);
             Log.error "%s" @@ lazy (BExpr.to_smtlib phi);
             failwith "Couldn't solve path"
-          | Some (_, qf_psi) ->
-            (* let qf_psi = Solver.of_smtlib ~dvs:[] ~cvs res in *)
-            (* if not (implies qf_psi phi) then begin *)
-            (*   Log.error "CPF is %s" @@ lazy res; *)
-            (*   Log.error "PHI is %s" @@ lazy (BExpr.to_smtlib phi); *)
-            (*   failwith "CPF did not impliy PHI" *)
-            (* end; *)
-            (* if Solver.check_unsat ~timeout:(Some 1000) cvs qf_psi then begin *)
-            (*   Printf.eprintf "Inner path Failed %s\n%!"  (GCL.to_string gcl); *)
-            (*   Printf.eprintf "Formulae was %s\n%!" res; *)
-            (*   failwith "unsolveable" *)
-            (* end else begin *)
-            Int.incr paths;
-            loop (BExpr.and_ phi_agg qf_psi)
-            (* end *)
+          | Some (cvs, res) ->
+            let qf_psi = Solver.of_smtlib ~dvs:[] ~cvs res in
+            if not (implies qf_psi phi) then begin
+              Log.error "CPF is %s" @@ lazy res;
+              Log.error "PHI is %s" @@ lazy (BExpr.to_smtlib phi);
+              failwith "CPF did not impliy PHI"
+            end;
+            if Solver.check_unsat ~timeout:(Some 1000) cvs qf_psi then begin
+              Printf.eprintf "Inner path Failed %s\n%!"  (GCL.to_string gcl);
+              Printf.eprintf "Formulae was %s\n%!" res;
+              failwith "unsolveable"
+            end else begin
+              Int.incr paths;
+              loop (BExpr.and_ phi_agg qf_psi)
+            end
   in
   Log.path_gen_s "starting loop";
   let phi = loop BExpr.true_ in
@@ -423,15 +422,18 @@ let rec orelse thunks ~input =
     | Some x -> Some x
 
 let concolic (gcl : GCL.t) : BExpr.t =
-  Log.irs "%s" @@ lazy (GCL.to_string gcl);
-  (* Counter-Example Guided Inductive Path eXploration *)
   let _, psv = Psv.passify gcl in
+  Log.debug "[concolic] Passive :\n%s" @@ lazy (Psv.to_string psv);
   let all_passive_consts = Psv.vars psv in
   let safety_condition = Psv.vc psv in
   let normal_executions = Psv.(normal (remove_asserts psv)) in
   let num_cexs = ref Bigint.zero in
   let rec loop phi_agg =
-    Log.path_gen_s "checking implication";
+    Log.debug_s "checking implication...";
+    Log.debug "current cpf is %s" @@ lazy (BExpr.to_smtlib phi_agg);
+    Log.debug "normal_execs : %s" @@ lazy (BExpr.to_smtlib normal_executions);
+    Log.debug_s "=>";
+    Log.debug "safety_condition: %s" @@ lazy (BExpr.to_smtlib safety_condition);
     (* match implies_model all_passive_consts phi_agg symbolic_semantics with *)
     match
       Solver.check_sat_model
@@ -442,7 +444,7 @@ let concolic (gcl : GCL.t) : BExpr.t =
         ~timeout:(Some 20000)
     with
     | None ->
-      Log.path_gen_s "found a sufficiently strong formula";
+      Log.debug_s "found a sufficiently strong formula";
       phi_agg
     | Some counterexample ->
       (* Log.path_gen_s "failed"; *)

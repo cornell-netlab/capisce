@@ -86,8 +86,10 @@ module HoareNet = struct
             let pre = GCL.assume triple.precondition in
             let cmd = GPL.encode_tables triple.cmd in
             let post = GCL.assert_ triple.postcondition in
-            GCL.sequence [ pre; cmd; post ]
-            |> Qe.concolic
+            let prog = GCL.sequence [ pre; cmd; post ] in
+            Log.debug "%s" @@ lazy (GCL.to_string prog);
+            (* Qe.concolic prog *)
+            Qe.all_paths prog
           )
   end
   include Pack

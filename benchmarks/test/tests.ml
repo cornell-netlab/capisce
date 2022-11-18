@@ -13,6 +13,6 @@ let test_suites : unit Alcotest.test list = [
 
 let () =
   Pbench.Log.override ();
-  Pbench.Log.parse_flags "d";
+  Pbench.Log.parse_flags "dz";
   Pbench.BExpr.enable_smart_constructors := `On;
   Alcotest.run "Inference" test_suites

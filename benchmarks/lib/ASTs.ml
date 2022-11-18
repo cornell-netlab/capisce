@@ -116,7 +116,7 @@ module Psv = struct
           | Active.Passive (Assert b) ->
             (ctx, seq acc @@ assert_ (BExpr.label ctx b))
           | Active.Passive (Assume b) ->
-            (ctx, assume (BExpr.label ctx b))
+            (ctx, seq acc @@ assume (BExpr.label ctx b))
         )
       ~choices:(
           Util.fold_right1
@@ -130,9 +130,10 @@ module Psv = struct
               (ctx, choice rc_acc rc))
             )
   let vc (c : t) : BExpr.t =
-    wrong c
-    |> BExpr.not_
-    |> BExpr.simplify
+    let phi = wrong c in
+    Log.debug "wrong_execs: %s" @@ lazy (BExpr.to_smtlib phi);
+    BExpr.not_ phi
+    (* |> BExpr.simplify *)
 
   let remove_asserts (c : t) =
     bottom_up c ~choices ~sequence
