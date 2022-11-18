@@ -616,8 +616,8 @@ let table_infer ~sfreq:_ ~prsr ~fn:_ gpl_pair =
   let gcl_prsr = GPL.encode_tables prsr in
   Log.qe "%s" @@ lazy "sequencing";
   let gcl_prog = GCL.seq gcl_prsr gcl_pipe in
-  (* Log.qe "%s" @@ lazy "optimizing"; *)
-  (* let gcl_prog = GCL.optimize gcl_prog in *)
+  Log.qe "%s" @@ lazy "optimizing";
+  let gcl_prog = GCL.optimize gcl_prog in
   Log.qe "%s" @@ lazy "starting inference";
   (* concolic (parserify gcl_pipe) *)
   all_paths gcl_prog

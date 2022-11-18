@@ -6,7 +6,9 @@ module type Cmd_core = sig
   end
   type t
   val to_string : t -> string
+  val size : t -> int
   val skip : t
+  val dead : t
   val prim : P.t -> t
   val choices : t list -> t
   val sequence : t list -> t
@@ -44,14 +46,15 @@ module Substitutor (Cmd : sig
       ~init:(Some (skip, subst))
       ~prim:(fun opt p ->
           let%map (_, subst) = opt in
-          let  p, subst = psubst subst p in
-          prim p, subst
+          let  p', subst = psubst subst p in
+          prim p', subst
         )
       ~sequence:(fun acc cs recursive_call ->
-          List.fold_left ~init:acc cs
+          let%bind (_, subst) = acc in
+          List.fold_left ~init:(Some (skip, subst)) cs
             ~f:(fun acc c ->
-                let%bind (acc_c, _) = acc in
-                let%map  (c', subst) = recursive_call acc c in
+                let%bind (acc_c, subst) = acc in
+                let%map  (c', subst) = recursive_call (Some (skip, subst)) c in
                 (sequence [acc_c; c'], subst)
               )
         )
@@ -105,6 +108,7 @@ module ConstProp (Cmd : sig
       include Cmd
       type elt = Expr.t
       let psubst = psubst
+
       let merge = merge
     end)
 
@@ -128,26 +132,27 @@ module DeadCodeElim (Cmd : sig
   let elim_with_reads reads c =
     top_down c
       ~init:(reads, skip)
-      ~prim:(fun (reads, acc) p ->
+      ~prim:(fun (reads, _) p ->
           match prim_dead_code_elim p reads with
-          | None -> (reads, acc)
+          | None -> (reads, skip)
           | Some (reads, p) ->
-            (reads, sequence [prim p; acc])
+            (reads, prim p)
         )
       ~choices:(fun reads cs recursive_call ->
           let f = recursive_call reads in
-          Util.fold_right1 cs
-            ~init:f
-            ~f:(fun c (reads_acc, c_acc) ->
-                let reads, c = f c in
-                Var.Set.union reads reads_acc,
-                choices [c; c_acc])
+          List.map cs ~f
+          |> List.fold ~init:(Var.Set.empty, Cmd.dead)
+            ~f:(fun (r_acc, c_acc) (r, c) ->
+                (Var.Set.union r_acc r,
+                 choices [c; c_acc]
+                )
+              )
         )
-      ~sequence:(fun acc cs recursive_call ->
-          List.fold_right cs ~init:acc
+      ~sequence:(fun (reads,_) cs recursive_call ->
+          List.fold_right cs ~init:(reads, skip)
             ~f:(fun c (reads, cs) ->
                 let reads, c = recursive_call (reads, skip) c in
-                reads, sequence [c; cs]
+                reads, sequence [c;cs]
               )
 
         )
@@ -170,8 +175,26 @@ module Optimizer ( Cmd : sig
     Log.compiler_s "optimizing...";
     let o c =
       Log.debug_s "FIX";
-      DC.elim (CP.propagate_exn c) in
-    Util.fix ~equal:Cmd.equal o
+      let opt = DC.elim (CP.propagate_exn c) in
+      if Cmd.size opt > Cmd.size c then begin
+        let () = Log.irs "PRE: %s\n" @@ lazy (Cmd.to_string c) in
+        let () = Log.irs "POST: %s\n" @@ lazy (Cmd.to_string opt) in
+        failwithf "GOT BIGGER, from %d to %d" (Cmd.size c) (Cmd.size opt) ()
+      end;
+      opt
+
+    in
+    let equal c1 c2 =
+      if Cmd.equal c1 c2 then
+        true
+      else
+        let () = Log.irs "PRE: %s\n" @@ lazy (Cmd.to_string c1) in
+        let () = Log.irs "POST: %s\n" @@ lazy (Cmd.to_string c2) in
+        let () = Breakpoint.set true in
+        false
+    in
+
+    Util.fix ~equal o
 
   let optimize_seq_pair (c1,c2) =
     (* let open Option.Let_syntax in *)
@@ -193,7 +216,7 @@ module Optimizer ( Cmd : sig
     let cp (c1, c2) = cp_o (c1,c2) |> Option.value_exn ~message:"[optimize_seq_pair] constant_propagation failed" in
     let equal (c1,c2) (c1',c2') = Cmd.equal c1 c1' && Cmd.equal c2 c2' in
     let o (c1,c2) =
-      Log.debug_s "FIX";
+      Log.debug "FIX:\n%s" @@ lazy (Cmd.to_string c1);
       dce @@ cp (c1,c2)  in
     Util.fix ~equal o (c1,c2)
 

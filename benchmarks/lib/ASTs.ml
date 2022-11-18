@@ -23,15 +23,29 @@ module GCL = struct
   module CP = Transform.ConstProp (struct
       module P = Active
       include Pack
-      let prim_const_prop = Active.const_prop
+      let prim_const_prop m p =
+        Log.debug "\tSTART:%s" @@ lazy (Active.to_smtlib p);
+        let p,m = Active.const_prop m p in
+        Log.debug "\t  END:%s" @@ lazy (Active.to_smtlib p);
+        p,m
     end)
   let const_prop = CP.propagate_exn
   
   module O = Transform.Optimizer (struct
       module P = Active
       include Pack
-      let prim_dead_code_elim = Active.dead_code_elim
-      let prim_const_prop = Active.const_prop
+      let prim_dead_code_elim p reads =
+        let open Option.Let_syntax in
+        Log.compiler "\tSTART:%s" @@ lazy (Active.to_smtlib p);
+        let%map reads, p = Active.dead_code_elim p reads in
+        Log.compiler "\t  END:%s" @@ lazy (Active.to_smtlib p);
+        reads, p
+
+      let prim_const_prop m p =
+        Log.debug "\tSTART:%s" @@ lazy (Active.to_smtlib p);
+        let p,m = Active.const_prop m p in
+        Log.debug "\t  END:%s" @@ lazy (Active.to_smtlib p);
+        Active.const_prop m p
     end
     )
 
@@ -173,7 +187,11 @@ end
       module P = Pipeline
       include Pack
       let prim_dead_code_elim = Pipeline.dead_code_elim
-      let prim_const_prop = Pipeline.const_prop
+      let prim_const_prop m p =
+        Log.debug "\t%s" @@ lazy (Pipeline.to_smtlib p);
+        let p, m = Pipeline.const_prop m p in
+        Log.debug "\t%s" @@ lazy (Pipeline.to_smtlib p);
+        p, m
       end)
   let optimize = O.optimize
   let optimize_seq_pair = O.optimize_seq_pair

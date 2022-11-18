@@ -182,8 +182,12 @@ module Assign = struct
 
   let const_prop (facts : Expr.t Var.Map.t) (x,e) =
     let e = Expr.fun_subst (substitution_of facts) e in
-    let f = Var.Map.set facts ~key:x ~data:e in
-    (assign x e, f)
+    let vars = Expr.vars e |> Tuple2.uncurry (@) in
+    if List.exists vars ~f:(Var.(=) x) then
+      (assign x e, facts)
+    else
+      let facts = Var.Map.set facts ~key:x ~data:e in
+      (assign x e, facts)
 
   let dead_code_elim (x,e) (reads : Var.Set.t) =
     if Var.Set.exists reads ~f:(Var.(=) x) then
