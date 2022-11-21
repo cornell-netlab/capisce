@@ -209,9 +209,6 @@ module Optimizer ( Cmd : sig
     let cp_o (c1, c2) =
       Log.compiler_s "CP";
       Some (c1,c2)
-      (* let%bind (c1, facts) = CP.propagate_with_map Var.Map.empty c1 in *)
-      (* let%bind (c2, _    ) = CP.propagate_with_map facts c2 in *)
-      (* return (c1, c2) *)
     in
     let cp (c1, c2) = cp_o (c1,c2) |> Option.value_exn ~message:"[optimize_seq_pair] constant_propagation failed" in
     let equal (c1,c2) (c1',c2') = Cmd.equal c1 c1' && Cmd.equal c2 c2' in

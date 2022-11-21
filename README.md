@@ -1129,3 +1129,39 @@ This isn't great. If we didn't we'd be stuck with the too-strong conditions. Is
 there some iterative weakening procedure (like in the dillig max spec paper), by
 which we iteratively strengthen the annotations to weaken the inferred
 conditions?
+
+## Maximal Modular Synthesis
+
+The key conclusion we can draw from the preceeding example is the following
+
+> The _weakest CPF_ doesn't need the strongest assumptions
+
+With simply the assumption `(=> (= symb_t₁_action 0) h.isValid())` we're able to
+infer the weakest CPF for t₂ and t₁. This is much simpler than the full VC which
+would involve terms for both actions and both keys. As computer scientists, we
+the natural instinct is to ask "Can we automate this human task?". Let's try to
+delve deeper into the mechanics.
+
+Lets say we're given a program with fixed modular boundaries, but no types, for
+instance in our example, we would have something like the following:
+
+``` c++
+{{ _ }}
+  t₁.apply()
+{{ _ }};
+{{ _ }}
+  t₂.apply()
+{{ _ }}
+```
+
+Here the underscores indicate that we should infer the logical predicates. From
+the standard Hoare logic composition rule, we must have `P`, `Q` and `R` such
+that the following two judgements hold
+
+```
+⊢ {{ P }} t₁.apply() {{ Q }}
+⊢ {{ Q }} t₂.apply() {{ R }}
+```
+
+
+

@@ -1,3 +1,4 @@
+open Core
 open Pbench
 open Equivalences
 open DependentTypeChecker
@@ -241,6 +242,71 @@ let annotated_inference () =
     )
 
 
+let infer_annotations () =
+  let open Primitives in
+  let vlan = Var.make "hdr.vlan.id" 8 in
+  let egress = Var.make "egress" 9 in
+  let validity = Var.make "h.valid" 1 in
+  let read = Var.make "h.x" 8 in
+  let dont_care = Var.make "_symb$t2$match_0$DONTCARE" 1 in
+  let symbolic_read     = Var.make "_symb$t2$match_1" 8 in
+  let t2 =
+    let open ASTs.GPL in
+    sequence [
+      choice_seqs [
+        [assume (BExpr.eq_ (Expr.var dont_care) (Expr.bvi 1 1))];
+        [assume (BExpr.eq_ (Expr.var dont_care) (Expr.bvi 0 1));
+         assert_ (BExpr.eq_ (Expr.var validity) (Expr.bvi 1 1));
+         assume (BExpr.eq_ (Expr.var symbolic_read) (Expr.var read));
+        ]
+      ];
+      table "t2"
+        [symbolic_read]
+        [ ([], [Action.Assign (egress, Expr.bvi 511 9)]);
+          ([], [Action.Assign (vlan, Expr.bvi 11 8)])
+        ]
+    ]
+  in
+  let prog =
+    let phi =
+      BExpr.(
+        imps_ [
+          (eq_ (Expr.var @@ Var.make "_symb$t1$match_0" 8) (Expr.var vlan) );
+          ands_ [
+            imps_ [(eq_
+                      (Expr.var @@ Var.make "_symb$t1$action" 2)
+                      (Expr.bvi 0 2));
+                    (eq_
+                       (Expr.var @@ Var.make "h.valid" 1)
+                       (Expr.bvi 1 1))
+                  ];
+            imps_ [(ugt_
+                      (Expr.var @@ Var.make "_symb$t1$action" 2)
+                      (Expr.bvi 0 2));
+                    (eq_
+                       (Expr.var @@ Var.make "h.valid" 1)
+                       (Expr.bvi 0 1))]]]) in
+    let qf_phi =
+      phi
+      |> BExpr.forall [Var.make "_symb$t1$match_0" 8; vlan]
+      |> BottomUpQe.optimistic_qe (Qe.solve_wto `Z3)
+      |> Option.value_exn ~message:"QE FAILED"
+    in
+    HoareNet.prim ( {
+        precondition = qf_phi;
+        cmd = t2;
+        postcondition = BExpr.true_
+      } )
+  in
+  HoareNet.infer prog
+  |> Alcotest.(check smt_equiv) "produces equivalent CPF"
+    BExpr.(
+      (or_
+         (eq_ (Expr.var (Var.make "_symb$t2$match_0$DONTCARE$_$0" 1)) (Expr.bvi 1 1))
+         (ugt_ (Expr.bvi 1 2) (Expr.var (Var.make "_symb$t1$action$_$0" 2)) ))
+    )
+
+
 let tests =
   [
     Alcotest.test_case "Modular Safe Example from Pi4 paper" `Quick passing_table_example;
@@ -249,4 +315,5 @@ let tests =
     Alcotest.test_case "Bf4 multitable heuristic" `Quick bf4_heuristic_inference;
     Alcotest.test_case "Single-table-only produces too-strong conditions" `Quick modular_heuristic_inference;
     Alcotest.test_case "annotations recover weaker conditions" `Quick annotated_inference;
+    Alcotest.test_case "infer annotations" `Quick infer_annotations
   ]
