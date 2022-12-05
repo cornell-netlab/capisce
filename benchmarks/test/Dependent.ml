@@ -12,8 +12,8 @@ let passing_table_example () =
   let key = Var.make "_symb$vlan$match_0" 8 in
   sequence [
     table
-      ~pre:(BExpr.(eq_ (Expr.var vlan) (Expr.var ghost_vlan)))
-      ~post:(BExpr.(eq_ (Expr.var vlan) (Expr.var ghost_vlan)))
+      ~pre:(Some BExpr.(eq_ (Expr.var vlan) (Expr.var ghost_vlan)))
+      ~post:(Some BExpr.(eq_ (Expr.var vlan) (Expr.var ghost_vlan)))
       ("vlan", [key], [
           ([], [Action.Assign (egress, Expr.bvi 511 9)]);
           ([], [Action.Assign (egress, Expr.bvi 11  9)])
@@ -31,8 +31,8 @@ let failing_table_example () =
   let key = Var.make "_symb$vlan$match_0" 8 in
   sequence [
     table
-      ~pre:(BExpr.(eq_ (Expr.var vlan) (Expr.var ghost_vlan)))
-      ~post:(BExpr.(eq_ (Expr.var vlan) (Expr.var ghost_vlan)))
+      ~pre:(Some BExpr.(eq_ (Expr.var vlan) (Expr.var ghost_vlan)))
+      ~post:(Some BExpr.(eq_ (Expr.var vlan) (Expr.var ghost_vlan)))
       ("vlan", [key], [
           ([], [Action.Assign (egress, Expr.bvi 511 9)]);
           ([], [Action.Assign (vlan, Expr.bvi 11 9)])
@@ -70,9 +70,9 @@ let safe_p4_validity_inference () =
     ]
   in
   let prog =
-    HoareNet.prim ( { precondition = BExpr.true_;
+    HoareNet.prim ( { precondition = Some BExpr.true_;
             cmd = t;
-            postcondition = BExpr.true_;
+            postcondition = Some BExpr.true_;
            } )
 
   in
@@ -114,9 +114,9 @@ let bf4_heuristic_inference () =
     ]
   in
   let prog =
-    HoareNet.prim ( { precondition = BExpr.true_;
+    HoareNet.prim ( { precondition = Some BExpr.true_;
             cmd = tables;
-            postcondition = BExpr.true_;
+            postcondition = Some BExpr.true_;
            } )
 
   in
@@ -164,14 +164,14 @@ let modular_heuristic_inference () =
   let prog =
     HoareNet.sequence [
       HoareNet.prim ( {
-          precondition = BExpr.true_;
+          precondition = Some BExpr.true_;
           cmd = t1;
-          postcondition = BExpr.true_;
+          postcondition = Some BExpr.true_;
         } );
       HoareNet.prim ( {
-          precondition = BExpr.true_;
+          precondition = Some BExpr.true_;
           cmd = t2;
-          postcondition = BExpr.true_
+          postcondition = Some BExpr.true_
         } )
     ]
   in
@@ -222,14 +222,14 @@ let annotated_inference () =
     in
     HoareNet.sequence [
       HoareNet.prim ( {
-          precondition = BExpr.true_;
+          precondition = Some BExpr.true_;
           cmd = t1;
-          postcondition = phi;
+          postcondition = Some phi;
         } );
       HoareNet.prim ( {
-          precondition = phi;
+          precondition = Some phi;
           cmd = t2;
-          postcondition = BExpr.true_
+          postcondition = Some BExpr.true_
         } )
     ]
   in
@@ -240,7 +240,6 @@ let annotated_inference () =
          (eq_ (Expr.var (Var.make "_symb$t2$match_0$DONTCARE$_$0" 1)) (Expr.bvi 1 1))
          (ugt_ (Expr.bvi 1 2) (Expr.var (Var.make "_symb$t1$action$_$0" 2)) ))
     )
-
 
 let infer_annotations () =
   let open Primitives in
@@ -293,9 +292,9 @@ let infer_annotations () =
       |> Option.value_exn ~message:"QE FAILED"
     in
     HoareNet.prim ( {
-        precondition = qf_phi;
+        precondition = Some qf_phi;
         cmd = t2;
-        postcondition = BExpr.true_
+        postcondition = Some BExpr.true_
       } )
   in
   HoareNet.infer prog
@@ -306,6 +305,34 @@ let infer_annotations () =
          (ugt_ (Expr.bvi 1 2) (Expr.var (Var.make "_symb$t1$action$_$0" 2)) ))
     )
 
+let check_out_of_scope () =
+  let x = Var.make "x" 8 in
+  let y = Var.make "y" 8 in
+  let pre =
+    HoareNet.assign x @@ Expr.bvi 4 8
+  in
+  let post =
+    HoareNet.assert_ BExpr.(not_ (eq_ (Expr.var y) @@ Expr.bvi 5 8))
+  in
+  let cond =
+    HoareNet.prim ( {
+        precondition = Some BExpr.(uge_ (Expr.var x) (Expr.bvi 0 8));
+        cmd = ASTs.GPL.skip;
+        postcondition = Some BExpr.(eq_ (Expr.var y) (Expr.bvi 5 8));
+      } )
+  in
+  let prog =
+    HoareNet.sequence [
+      pre;
+      cond;
+      post;
+    ]
+  in
+  HoareNet.check_annotations prog
+  |> Alcotest.(check bool) "annotation check passes" true
+
+
+
 
 let tests =
   [
@@ -315,5 +342,6 @@ let tests =
     Alcotest.test_case "Bf4 multitable heuristic" `Quick bf4_heuristic_inference;
     Alcotest.test_case "Single-table-only produces too-strong conditions" `Quick modular_heuristic_inference;
     Alcotest.test_case "annotations recover weaker conditions" `Quick annotated_inference;
-    Alcotest.test_case "infer annotations" `Quick infer_annotations
+    Alcotest.test_case "infer annotations of preceeding WP" `Quick infer_annotations;
+    Alcotest.test_case "check between annotations" `Quick check_out_of_scope;
   ]
