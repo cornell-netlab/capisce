@@ -606,6 +606,15 @@ extern void truncate(in bit<32> length);
  */
 extern void assert(in bool check);
 
+
+/***
+ *  ADDED FOR INSTRUMENTATION PURPOSES
+ *  hopen(i, check) -- OPENs Hoare scope with index i and provides precondtion check
+ *  hclose(i, check) -- CLOSEs Hoare scope with index i and provides postcondition check
+ */
+extern void hopen(in bit<8> idx, in bool check);
+extern void hclose(in bit<8> idx, in bool check);
+
 /***
  * For the purposes of compiling and executing P4 programs on a target
  * device, assert and assume are identical, including the use of the

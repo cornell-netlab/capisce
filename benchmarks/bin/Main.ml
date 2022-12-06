@@ -4,9 +4,51 @@ module Qe = Qe
 
 let () = Memtrace.trace_if_requested ~context:"icecap" ()
 
+
+
+
+let hoare : Command.t =
+  let open Command.Let_syntax in
+  Command.basic ~summary:"Modular Inference of control plane constraints"
+    [%map_open
+      let
+      source = anon ("p4 source file" %: string) and
+      includes = flag "-I" (listed string) ~doc:"includes directories" and
+      debug = flag "-DEBUG" no_arg ~doc:"allow pure debug messages" and
+      verbosity = flag "-v" (listed string) ~doc:"verbosity" and
+      gas_opt = flag "-g" (optional int) ~doc:"how much gas to pass the compiler" and
+      unroll_opt = flag "-u" (optional int) ~doc:"how much to unroll the parser" and
+      no_smart = flag "--disable-smart" no_arg ~doc:"disable smart constructors" and
+      disable_header_validity = flag "--no-hv" (no_arg) ~doc:"disable header validity checks" and
+      disable_soundness_check = flag "--unsound" (no_arg) ~doc:"disable soundness check"
+      in fun () ->
+        let open DependentTypeChecker in
+        Printexc.record_backtrace true;
+        Log.parse_flags (String.concat verbosity);
+        if debug then Log.override ();
+        BExpr.enable_smart_constructors := if no_smart then `Off else `On;
+        let gas = Option.value gas_opt ~default:1000 in
+        let unroll = Option.value unroll_opt ~default:10 in
+        Log.compiler "gas %d" @@ lazy gas;
+        Log.compiler "unroll %d" @@ lazy unroll;
+        let coq_gcl = P4Parse.tbl_abstraction_from_file includes source gas unroll false (not disable_header_validity) in
+        Log.compiler "%s" @@ lazy "compiling to gpl...";
+        let hoarenet = Tuple2.(map ~f:(Translate.gcl_to_hoare) coq_gcl |> uncurry HoareNet.seq) in
+        let st = Clock.start () in
+        (*First, check the soundness of the annotations*)
+        if disable_soundness_check || HoareNet.check_annotations hoarenet then begin
+          Printf.printf "Checked annotations in %fms\n%!" (Clock.stop st);
+          let st = Clock.start () in
+          let psi = HoareNet.infer hoarenet in
+          Printf.printf "Inferred in %f ms\n%!" (Clock.stop st);
+          Printf.printf "Got:\n%s\n%!" (BExpr.to_smtlib psi)
+        end else
+          Printf.printf "Soundness check failed in %fms" (Clock.stop st);
+    ]
+
 let compile : Command.t =
   let open Command.Let_syntax in
-  Command.basic ~summary:"Infers control plane constraint from data plane"
+  Command.basic ~summary:"Compiles the program to GCL"
     [%map_open
      let
        source = anon ("p4 source file" %: string) and       
@@ -232,6 +274,7 @@ let smtlib : Command.t =
 let main =
   Command.group ~summary:"research toy for exploring verification & synthesis of p4 programs"
     [("infer", infer);
+     ("hoare", hoare);
      ("table", table_infer);
      ("verify", verify);
      ("graph", graph);

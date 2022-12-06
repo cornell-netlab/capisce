@@ -4,6 +4,7 @@ open GCL (* Annoying. Can we fix this? *)
 open ToGCL
 open Primitives
 open ASTs
+open DependentTypeChecker
 
 open Core
 
@@ -133,7 +134,7 @@ let rec gcl_to_cmd (t : target) : GCL.t =
      assume (form_to_bexpr phi)
   | GAssert phi ->
      assert_ (form_to_bexpr phi)
-  | GExternVoid ("assert",[phi]) ->
+  | GExternVoid ("assert",[Datatypes.Coq_inr phi]) ->
      assert_ (BExpr.eq_ (bv_to_expr phi) (Expr.bvi 1 1))
   | GExternVoid _ | GExternAssn _ ->
      failwith "Externs should have been eliminated"
@@ -178,7 +179,7 @@ let make_act table (act_name, act) : Var.t list * (Action.t list) =
       let phi = form_to_bexpr phi in
       let params', phi = parameterize phi in
       params @ params', [Action.assert_ phi]
-    | GExternVoid ("assert",[phi]) ->
+    | GExternVoid ("assert", [Datatypes.Coq_inr phi]) ->
       let phi = BExpr.eq_ (bv_to_expr phi) (Expr.bvi 1 1) in
       let params', phi = parameterize phi in
       params@params', [Action.assert_ phi]
@@ -214,7 +215,7 @@ let rec gcl_to_gpl (t : target) : GPL.t =
     GPL.assume (form_to_bexpr phi)
   | GAssert phi ->
     GPL.assert_ (form_to_bexpr phi)
-  | GExternVoid ("assert",[phi]) ->
+  | GExternVoid ("assert",[Datatypes.Coq_inr phi]) ->
     GPL.assert_ (BExpr.eq_ (bv_to_expr phi) (Expr.bvi 1 1))
   | GTable (table, keys, actions) ->
     let keys = List.map keys ~f:(fun (k,_) -> bv_to_expr k |> Expr.get_var) in
@@ -223,3 +224,120 @@ let rec gcl_to_gpl (t : target) : GPL.t =
   | GExternAssn _
   | GExternVoid _ ->
     failwith "Externs should have been eliminated"
+
+module DyckHoareStack = struct
+  type elt = {idx : int;
+              pre : BExpr.t;
+              cmd : HoareNet.t;
+             } [@@deriving eq]
+  type t = elt list [@@deriving eq]
+
+  let push (stk : t) (idx, pre, cmd) : t =
+    {idx; pre; cmd} :: stk
+
+  let init =
+    push [] (-1, BExpr.true_, HoareNet.skip)
+
+
+  let is_empty : t -> bool = function
+    | [] -> false
+    | _  -> true
+
+  let pop (stck : t) : elt * t =
+    match stck with
+    | [] ->
+      failwith "[DyckHoareStack.pop] cannot pop from empty stack"
+    | elt::stck ->
+      elt, stck
+
+  let finish stck =
+    match pop stck with
+    | {idx;pre;cmd}, [] ->
+      if idx = -1 && BExpr.(pre = true_) then
+        cmd
+      else
+        failwithf "[finish] ill-formed stack state, initial index was %d and \
+                   initial condition was %s " idx (BExpr.to_smtlib pre) ()
+    | _, stck ->
+      failwithf "[finish] nonempty stack state: %d elements after popping" (List.length stck) ()
+
+  let choice stck1 stck2 =
+    match stck1, stck2 with
+    | elt1::stck1, elt2::stck2 ->
+      if elt1.idx = elt2.idx && BExpr.equal elt1.pre elt2.pre && equal stck1 stck2 then
+        {elt1 with cmd = HoareNet.choice elt1.cmd elt2.cmd}
+        :: stck1
+      else
+        failwith "Dyck environment did not match after choice"
+    | _, _ ->
+      failwith "Dyck environments were different lengths after choice"
+
+  let seq (stck : t) suffix : t =
+    let ({idx;pre;cmd}, stck) = pop stck in
+    let cmd = HoareNet.seq cmd suffix in
+    push stck (idx, pre, cmd)
+
+  let close (stck : t) (closing_idx, post) : t =
+    let ({idx=current_idx;pre;cmd}, stck) = pop stck in
+    if closing_idx = current_idx then
+      HoareNet.triple pre cmd post
+      |> seq stck
+    else
+      failwithf "Tried to close scope %d but was in scope %d" closing_idx current_idx ()
+
+end
+
+let gcl_to_hoare (t : target) : HoareNet.t =
+  let rec loop t stack : DyckHoareStack.t=
+    match t with
+    | GSkip ->
+      stack
+    | GAssign (typ, var, bv)  ->
+      HoareNet.assign (make_var typ var) (bv_to_expr bv)
+      |> DyckHoareStack.seq stack
+    | GSeq (g1,g2) ->
+      stack
+      |> loop g1
+      |> loop g2
+    | GChoice (g1,g2) ->
+      let stack1 = loop g1 stack in
+      let stack2 = loop g2 stack in
+      DyckHoareStack.choice stack1 stack2
+    | GAssume phi ->
+      HoareNet.assume (form_to_bexpr phi)
+      |> DyckHoareStack.seq stack
+    | GAssert phi ->
+      HoareNet.assert_ (form_to_bexpr phi)
+      |> DyckHoareStack.seq stack
+    | GExternVoid ("hopen",[Datatypes.Coq_inr idx; Datatypes.Coq_inl phi]) ->
+      let phi = form_to_bexpr phi in
+      let idx = bv_to_expr idx |> Expr.get_const |> Option.value_exn ~message:"Invalid hopen index" in
+      DyckHoareStack.push stack (Bigint.to_int_exn idx, phi, HoareNet.skip)
+    | GExternVoid ("hopen", _) ->
+      failwith "unsupported arguments to hopen"
+    | GExternVoid ("hclose", [Datatypes.Coq_inr idx; Datatypes.Coq_inl phi]) ->
+      let phi = form_to_bexpr phi in
+      let idx = bv_to_expr idx |> Expr.get_const |> Option.value_exn ~message:"Invalid hopen index" in
+      DyckHoareStack.close stack (Bigint.to_int_exn idx, phi)
+    | GExternVoid ("hclose", _) ->
+      failwith "unsupported arguments to hclose"
+    | GExternVoid ("assert",[Datatypes.Coq_inr phi]) ->
+      HoareNet.assert_ (BExpr.eq_ (bv_to_expr phi) (Expr.bvi 1 1))
+      |> DyckHoareStack.seq stack
+    | GExternVoid ("assert", [Datatypes.Coq_inl phi]) ->
+      HoareNet.assert_ (form_to_bexpr phi)
+      |> DyckHoareStack.seq stack
+    | GExternVoid ("assert",_) ->
+      failwith "unsupported arguments to assert"
+    | GTable (table, keys, actions) ->
+      let keys = List.map keys ~f:(fun (k,_) -> bv_to_expr k |> Expr.get_var) in
+      let actions = List.map actions ~f:(make_act table) in
+      HoareNet.table (table, keys, actions)
+      |> DyckHoareStack.seq stack
+    | GExternAssn _
+    | GExternVoid _ ->
+      failwith "Externs should have been eliminated"
+  in
+  DyckHoareStack.init
+  |> loop t
+  |> DyckHoareStack.finish

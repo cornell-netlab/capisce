@@ -9,14 +9,14 @@ module DepPrim = struct
   [@@deriving quickcheck, sexp, eq, compare, hash]
 
   let assume phi =
-    { precondition = Some BExpr.true_;
+    { precondition = None;
       cmd = Cmd.assume phi;
-      postcondition = Some BExpr.true_ }
+      postcondition = None}
 
   let assert_ phi =
-    { precondition = Some BExpr.true_;
+    { precondition = None;
       cmd = Cmd.assert_ phi;
-      postcondition = Some BExpr.true_ }
+      postcondition = None; }
 
   let contra _ _ = false
 
@@ -76,6 +76,25 @@ module HoareNet = struct
       prim ({ precondition = pre;
               cmd = ASTs.GPL.table name keys actions;
               postcondition = post})
+
+    let flatten cmd = bottom_up cmd
+        ~sequence:ASTs.GPL.sequence
+        ~choices:ASTs.GPL.choices
+        ~prim:(fun p ->
+            match p.precondition, p.postcondition with
+            | None, None ->
+              p.cmd
+            | _, _ ->
+              Log.error "Found hoare annotation in %s" @@ lazy (to_string cmd);
+              failwithf "[HoareNet.flatten] Cannot flatten command wtih Hoare annotations" ())
+
+    let triple (pre : BExpr.t) (cmd : t) (post : BExpr.t) =
+      let gpl = flatten cmd in
+      prim ({precondition = Some pre;
+             cmd = gpl;
+             postcondition = Some post;
+            })
+
 
     let check (cmd : t) =
       let all = List.for_all ~f:Fn.id in
