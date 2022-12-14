@@ -93,7 +93,8 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         }
     }
     apply {
-      hopen(8w1, true);
+      hopen(8w1, hdr.ethernet.etherType != 16w0x800 || hdr.ipv4.isValid());
+      // hopen(8w1, hdr.ipv4.isValid());
       ethernet.apply();
       fwd.apply();
       hclose(8w1, true);

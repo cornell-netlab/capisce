@@ -34,6 +34,8 @@ let hoare : Command.t =
         let coq_gcl = P4Parse.tbl_abstraction_from_file includes source gas unroll false (not disable_header_validity) in
         Log.compiler "%s" @@ lazy "compiling to gpl...";
         let hoarenet = Tuple2.(map ~f:(Translate.gcl_to_hoare) coq_gcl |> uncurry HoareNet.seq) in
+        let hoarenet = HoareNet.normalize_names hoarenet in
+        let hoarenet = HoareNet.optimize hoarenet in
         let st = Clock.start () in
         (*First, check the soundness of the annotations*)
         if disable_soundness_check || HoareNet.check_annotations hoarenet then begin
@@ -43,7 +45,7 @@ let hoare : Command.t =
           Printf.printf "Inferred in %f ms\n%!" (Clock.stop st);
           Printf.printf "Got:\n%s\n%!" (BExpr.to_smtlib psi)
         end else
-          Printf.printf "Soundness check failed in %fms" (Clock.stop st);
+          Printf.printf "Soundness check failed in %fms\n%!" (Clock.stop st);
     ]
 
 let compile : Command.t =

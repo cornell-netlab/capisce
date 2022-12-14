@@ -178,15 +178,29 @@ end
   end
 
   module N = Transform.Normalize (struct
-      module P = Pipeline
       include Pack
+      module P = Pipeline
       let normalize_prim = Pipeline.normalize_names
     end)
   let normalize_names = N.normalize
 
-  module O = Transform.Optimizer (struct
-      module P = Pipeline
+  module D = Transform.DeadCodeElim(struct
       include Pack
+      module P = Pipeline
+      let prim_dead_code_elim = Pipeline.dead_code_elim
+    end)
+  let dead_code_elim = D.elim_with_reads
+
+  module C = Transform.ConstProp(struct
+      include Pack
+      module P = Pipeline
+      let prim_const_prop = Pipeline.const_prop
+    end)
+  let const_prop = C.propagate_with_map
+
+  module O = Transform.Optimizer (struct
+      include Pack
+      module P = Pipeline
       let prim_dead_code_elim = Pipeline.dead_code_elim
       let prim_const_prop m p =
         Log.debug "\t%s" @@ lazy (Pipeline.to_smtlib p);

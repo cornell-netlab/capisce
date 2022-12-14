@@ -61,6 +61,46 @@ module DepPrim = struct
       BExpr.imps_ [p; passive_phi; q]
     | _, _ ->
       failwith "[DepPrim.to_smtlib] in {P} c {Q}, P or Q was None and the other, Some. "
+
+  let normalize_names ({precondition; cmd; postcondition} : t) : t =
+    { precondition = Option.map precondition ~f:BExpr.normalize_names;
+      cmd = Cmd.normalize_names cmd;
+      postcondition = Option.map postcondition ~f:BExpr.normalize_names;
+    }
+
+  let dead_code_elim {precondition; cmd; postcondition} reads : (Var.Set.t * t) option =
+    match precondition, postcondition with
+    | None, None ->
+      let reads, cmd = Cmd.dead_code_elim reads cmd in
+      Some (reads, {precondition; cmd; postcondition})
+    | Some p, Some q ->
+      (*just moves the some around, `Assert.dce` necessarily produces `Some` *)
+      let typeshift opt = let (r,p) = Option.value_exn opt in (r, Some p) in
+      let reads, postcondition = Primitives.Assert.dead_code_elim reads q |> typeshift in
+      let reads, cmd = Cmd.dead_code_elim reads cmd in
+      let reads, precondition  = Primitives.Assert.dead_code_elim reads p |> typeshift in
+      Some (reads, {precondition; cmd; postcondition})
+    | _, _ ->
+      failwith "[DepPrim.to_smtlib] in {P} c {Q}, P or Q was None and the other, Some. "
+
+
+  let const_prop facts {precondition; cmd; postcondition} : (t * Expr.t Var.Map.t) option =
+    let open Option.Let_syntax in
+    match precondition, postcondition with
+    | None, None ->
+      let%map cmd, facts = Cmd.const_prop facts cmd in
+      ({precondition; cmd; postcondition}, facts)
+    | Some p, Some q ->
+      (*just moves the some around, `Assert.dce` necessarily produces `Some` *)
+      let typeshift (p,f) = (Some p, f) in
+      let postcondition, facts = Primitives.Assert.const_prop facts q |> typeshift in
+      let%map cmd, facts = Cmd.const_prop facts cmd in
+      let precondition, facts  = Primitives.Assert.const_prop facts p |> typeshift in
+      ({precondition; cmd; postcondition}, facts)
+    | _, _ ->
+      failwith "[DepPrim.to_smtlib] in {P} c {Q}, P or Q was None and the other, Some. "
+
+
 end
 
 module HoareNet = struct
@@ -136,10 +176,20 @@ module HoareNet = struct
                 Log.debug "checking %s" @@ lazy (to_string prog);
                 let phi = vc prog in
                 let vars = BExpr.vars phi |> Tuple2.uncurry (@) in
-                BExpr.not_ phi
-                |> Solver.check_unsat vars ~timeout:(Some 2000)
-                |> Fn.flip Option.some_if @@
-                assume q
+                let optional_model =
+                  (* Fn.flip Option.some_if Model.empty @@ *)
+                  (* Solver.check_unsat *)
+                  Solver.check_sat_model vars ~timeout:(Some 2000) @@
+                  BExpr.not_ phi
+                in
+                begin match optional_model with
+                  | None ->
+                    (* ¬φ was not satisfiable so precondition is valid. assume postcondition q *)
+                    Some (assume q)
+                  | Some model ->
+                    Log.debug "Soundness check failed got model:\n%s" @@ lazy (Model.to_string model);
+                    None
+                end
               | None, None ->
                 Log.debug_s "skipping... added it to prefix";
                 Some (sequence [prefix; prim triple])
@@ -179,5 +229,25 @@ module HoareNet = struct
               BExpr.true_
             )
   end
+
+  module Normalizer = Transform.Normalize(struct
+      include Pack
+      module P = DepPrim
+      let normalize_prim = DepPrim.normalize_names
+    end)
+
+  module Optimizer = Transform.Optimizer(struct
+      include Pack
+      module P = DepPrim
+      let prim_dead_code_elim =
+        DepPrim.dead_code_elim
+      let prim_const_prop facts prim =
+        DepPrim.const_prop facts prim
+        |> Option.value_exn ~message:"DepPrim constant propagation failed"
+
+    end)
   include Pack
+
+  let normalize_names = Normalizer.normalize
+  let optimize = Optimizer.optimize
 end
