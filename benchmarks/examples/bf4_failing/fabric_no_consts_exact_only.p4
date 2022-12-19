@@ -1055,21 +1055,36 @@ control FabricIngress(inout parsed_headers_t hdr, inout fabric_metadata_t fabric
     IngressSliceTcClassifier() slice_tc_classifier;
     IngressQos() qos;
     apply {
+        hopen(8w1, hdr.ethernet.isValid());
         lkp_md_init.apply(hdr, fabric_metadata.lkp);
         pkt_io_ingress.apply(hdr, fabric_metadata, standard_metadata);
         slice_tc_classifier.apply(hdr, fabric_metadata, standard_metadata);
+        hclose(8w1, hdr.ethernet.isValid());
+        hopen(8w1, hdr.ethernet.isValid() && hdr.vlan_tag.isValid());
         filtering.apply(hdr, fabric_metadata, standard_metadata);
+        hclose(8w1, hdr.ethernet.isValid());
+        hopen(8w1, hdr.ethernet.isValid());
         if (fabric_metadata.skip_forwarding == false) {
             forwarding.apply(hdr, fabric_metadata, standard_metadata);
         }
+        hclose(8w1, hdr.ethernet.isValid());
+        hopen(8w1, hdr.ethernet.isValid());
         if (fabric_metadata.skip_next == false) {
             pre_next.apply(hdr, fabric_metadata);
         }
+        hclose(8w1, hdr.ethernet.isValid());
+        // SOUNDNESS GAP!!
+        hopen(8w1, hdr.ethernet.isValid() && hdr.vlan_tag.isValid() && hdr.eth_type.isValid() && hdr.icmp.isValid());
         acl.apply(hdr, fabric_metadata, standard_metadata);
+        hclose(8w1, hdr.ethernet.isValid());
+        hopen(8w1, hdr.ethernet.isValid());
         if (fabric_metadata.skip_next == false) {
             next.apply(hdr, fabric_metadata, standard_metadata);
         }
+        hclose(8w1, hdr.ethernet.isValid());
+        hopen(8w1, hdr.ethernet.isValid());
         qos.apply(fabric_metadata, standard_metadata);
+        hclose(8w1, hdr.ethernet.isValid());
     }
 }
 
@@ -1078,9 +1093,16 @@ control FabricEgress(inout parsed_headers_t hdr, inout fabric_metadata_t fabric_
     EgressNextControl() egress_next;
     EgressDscpRewriter() dscp_rewriter;
     apply {
+        hopen(8w1, hdr.ethernet.isValid() && standard_metadata.egress_spec != 9w511);
         pkt_io_egress.apply(hdr, fabric_metadata, standard_metadata);
+        hclose(8w1, true);
+        // SOUNDNESS GAP!
+        hopen(8w1, hdr.eth_type.isValid() && hdr.vlan_tag.isValid());
         egress_next.apply(hdr, fabric_metadata, standard_metadata);
+        hclose(8w1, true);
+        hopen(8w1, true);
         dscp_rewriter.apply(hdr, fabric_metadata, standard_metadata);
+        hclose(8w1, true);
         standard_metadata.egress_spec = 9w511;
     }
 }

@@ -249,6 +249,8 @@ let and_ =
         b1
       else if b1 = false_ || b2 = false_ then
         false_
+      else if b1 = b2 then
+        b1
       else
         match b1, b2 with
         | TNot (TComp(Eq, e11, e12)),

@@ -387,7 +387,7 @@ let all_paths gcl =
             Log.exploder "Formula is: \n%s" @@ lazy (BExpr.to_smtlib phi);
           in
           (* match Some ([], BExpr.true_) with *)
-          match solve_one phi ~qe:BottomUpQe.optimistic_qe with
+          match solve_one phi ~qe:BottomUpQe.cnf_qe with
           | None ->
             Log.error "%s" @@ lazy (GCL.to_string gcl);
             Log.error "%s" @@ lazy (BExpr.to_smtlib phi);

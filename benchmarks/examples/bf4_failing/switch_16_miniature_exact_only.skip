@@ -2528,12 +2528,14 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
     @name(".process_mac_learning") process_mac_learning() process_mac_learning_0;
     @name(".process_system_acl") process_system_acl() process_system_acl_0;
     apply {
+        hopen(8w1,true);
         process_ingress_port_mapping_0.apply(hdr, meta, standard_metadata);
         process_global_params_0.apply(hdr, meta, standard_metadata);
         process_port_vlan_mapping_0.apply(hdr, meta, standard_metadata);
-        process_spanning_tree_0.apply(hdr, meta, standard_metadata);
-        process_ip_sourceguard_0.apply(hdr, meta, standard_metadata);
-        process_tunnel_0.apply(hdr, meta, standard_metadata);
+        hclose(8w1,true);
+        // process_spanning_tree_0.apply(hdr, meta, standard_metadata);
+        // process_ip_sourceguard_0.apply(hdr, meta, standard_metadata);
+        // process_tunnel_0.apply(hdr, meta, standard_metadata);
         // if (meta.ingress_metadata.port_type != 2w1) {
         //     process_validate_packet_0.apply(hdr, meta, standard_metadata);
         //     process_mac_0.apply(hdr, meta, standard_metadata);
