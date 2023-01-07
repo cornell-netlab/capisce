@@ -190,7 +190,6 @@ module Optimizer ( Cmd : sig
       else
         let () = Log.irs "PRE: %s\n" @@ lazy (Cmd.to_string c1) in
         let () = Log.irs "POST: %s\n" @@ lazy (Cmd.to_string c2) in
-        let () = Breakpoint.set true in
         false
     in
 

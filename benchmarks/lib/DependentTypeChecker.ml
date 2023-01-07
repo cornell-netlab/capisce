@@ -93,9 +93,9 @@ module DepPrim = struct
     | Some p, Some q ->
       (*just moves the some around, `Assert.dce` necessarily produces `Some` *)
       let typeshift (p,f) = (Some p, f) in
-      let postcondition, facts = Primitives.Assert.const_prop facts q |> typeshift in
-      let%map cmd, facts = Cmd.const_prop facts cmd in
       let precondition, facts  = Primitives.Assert.const_prop facts p |> typeshift in
+      let%map cmd, facts = Cmd.const_prop facts cmd in
+      let postcondition, facts = Primitives.Assert.const_prop facts q |> typeshift in
       ({precondition; cmd; postcondition}, facts)
     | _, _ ->
       failwith "[DepPrim.to_smtlib] in {P} c {Q}, P or Q was None and the other, Some. "
@@ -160,57 +160,106 @@ module HoareNet = struct
       |> snd
       |> Psv.vc
 
-    let check_annotations cmd : bool =
-      let open Option.Let_syntax  in
-      (* None represents failure, Some c represents that theres been no failure
-         so far and that `c` isthe prefix of the current command *)
-      top_down cmd
-          ~init:(Some skip)
-          ~prim:(fun prefix_opt (triple : DepPrim.t) ->
-              Log.debug "PRIM: %s" @@ lazy (DepPrim.to_smtlib triple);
-              let%bind prefix = prefix_opt in
-              Log.debug "PREFIX: %s" @@ lazy (to_string prefix);
-              match triple.precondition, triple.postcondition with
-              | Some p, Some q ->
-                let prog = sequence [prefix; assert_ p] in
-                Log.debug "checking %s" @@ lazy (to_string prog);
-                let phi = vc prog in
-                let vars = BExpr.vars phi |> Tuple2.uncurry (@) in
-                let optional_model =
-                  (* Fn.flip Option.some_if Model.empty @@ *)
-                  (* Solver.check_unsat *)
-                  Solver.check_sat_model vars ~timeout:(Some 2000) @@
-                  BExpr.not_ phi
-                in
-                begin match optional_model with
-                  | None ->
-                    (* ¬φ was not satisfiable so precondition is valid. assume postcondition q *)
-                    Some (assume q)
-                  | Some model ->
-                    Log.debug "Soundness check failed got model:\n%s" @@ lazy (Model.to_string model);
-                    None
-                end
+    let check_annotations (cmd : t) : bool =
+      let open ASTs in
+      let validate phi =
+        let vars = BExpr.vars phi |> Tuple2.uncurry (@) in
+        Solver.check_unsat vars phi
+      in
+      let phi =
+        top_down cmd
+          ~init:BExpr.true_
+          ~prim:(fun postcond prim ->
+              match prim.precondition, prim.postcondition with
               | None, None ->
-                Log.debug_s "skipping... added it to prefix";
-                Some (sequence [prefix; prim triple])
+                GPL.wp prim.cmd postcond
+              | Some p, Some q ->
+                let phi = BExpr.(and_ q @@ not_ postcond) in
+                if validate phi then
+                  p
+                else begin
+                  Log.error "Could not validate postcondition for %s" @@ lazy (GPL.to_string prim.cmd);
+                  Log.error "Annotated Post: %s" @@ lazy (BExpr.to_smtlib q);
+                  Log.error "Computed  Post: %s" @@ lazy (BExpr.to_smtlib postcond);
+                  failwith "Invalid Annotations"
+                end
               | _, _ ->
-                failwith "[HoareNet.check_annotations] in {P} c {Q}, P or Q was None and the other, Some. "
+                failwith "P & Q must be both some or both none"
             )
-          ~sequence:(fun prefix cs recursive_call ->
-              Log.debug "PREFIX: %s" @@ lazy (Option.value_map ~f:to_string prefix ~default:"None");
-              Log.debug_s "Sequence:";
-              List.iter cs ~f:(fun c ->
-                  Log.debug "-\t %s" @@ lazy (to_string c);
-              );
-              List.fold_left cs ~init:prefix
-                ~f:recursive_call
+          ~sequence:(fun postcond cs check_backwards ->
+              List.fold_right cs
+                ~init:postcond
+                ~f:(Fn.flip check_backwards)
             )
-          ~choices:(fun prefix cs recursive_call ->
-              List.map ~f:(recursive_call prefix) cs
-              |> Util.commute
-              |> Option.map ~f:(choices)
+          ~choices:(fun postcond cs check_backwards ->
+              BExpr.ands_ @@
+              List.map cs ~f:(check_backwards postcond)
             )
-      |> Option.is_some
+      in
+      if validate @@ BExpr.not_ phi then
+        true
+      else
+        begin
+          Log.error_s "Could not validate precondition";
+          (* Log.error "Computed pre: %s" @@ lazy (BExpr.to_smtlib phi); *)
+          (* let model = Solver.check_sat_model (BExpr.vars phi |> Tuple2.uncurry (@)) phi in *)
+          (* Log.error "counterexample:\n%s" @@ lazy (Model.to_string @@ Option.value_exn model); *)
+          failwith "Invalid Annotations"
+        end
+
+
+
+    (* let check_annotations cmd : bool = *)
+    (*   let open Option.Let_syntax  in *)
+    (*   (\* None represents failure, Some c represents that theres been no failure *)
+    (*      so far and that `c` isthe prefix of the current command *\) *)
+    (*   top_down cmd *)
+    (*       ~init:(Some skip) *)
+    (*       ~prim:(fun prefix_opt (triple : DepPrim.t) -> *)
+    (*           Log.debug "PRIM: %s" @@ lazy (DepPrim.to_smtlib triple); *)
+    (*           let%bind prefix = prefix_opt in *)
+    (*           Log.debug "PREFIX: %s" @@ lazy (to_string prefix); *)
+    (*           match triple.precondition, triple.postcondition with *)
+    (*           | Some p, Some q -> *)
+    (*             let prog = sequence [prefix; assert_ p] in *)
+    (*             Log.debug "checking %s" @@ lazy (to_string prog); *)
+    (*             let phi = vc prog in *)
+    (*             let vars = BExpr.vars phi |> Tuple2.uncurry (@) in *)
+    (*             let optional_model = *)
+    (*               (\* Fn.flip Option.some_if Model.empty @@ *\) *)
+    (*               (\* Solver.check_unsat *\) *)
+    (*               Solver.check_sat_model vars ~timeout:(Some 2000) @@ *)
+    (*               BExpr.not_ phi *)
+    (*             in *)
+    (*             begin match optional_model with *)
+    (*               | None -> *)
+    (*                 (\* ¬φ was not satisfiable so precondition is valid. assume postcondition q *\) *)
+    (*                 Some (assume q) *)
+    (*               | Some model -> *)
+    (*                 Log.debug "Soundness check failed got model:\n%s" @@ lazy (Model.to_string model); *)
+    (*                 None *)
+    (*             end *)
+    (*           | None, None -> *)
+    (*             Log.debug_s "skipping... added it to prefix"; *)
+    (*             Some (sequence [prefix; prim triple]) *)
+    (*           | _, _ -> *)
+    (*             failwith "[HoareNet.check_annotations] in {P} c {Q}, P or Q was None and the other, Some. " *)
+    (*         ) *)
+    (*       ~sequence:(fun prefix cs recursive_call -> *)
+    (*           Log.debug "PREFIX: %s" @@ lazy (Option.value_map ~f:to_string prefix ~default:"None"); *)
+    (*           Log.debug_s "Sequence:"; *)
+    (*           List.iter cs ~f:(fun c -> *)
+    (*               Log.debug "-\t %s" @@ lazy (to_string c); *)
+    (*           ); *)
+    (*           List.fold_left cs ~init:prefix *)
+    (*             ~f:recursive_call *)
+    (*         ) *)
+    (*       ~choices:(fun prefix cs recursive_call -> *)
+    (*           List.map ~f:(recursive_call prefix) cs *)
+    (*           |> Util.commute *)
+    (*           |> Option.map ~f:(choices) *)
+    (*         ) *)
+    (*   |> Option.is_some *)
 
     let infer (cmd:t) =
       bottom_up cmd ~sequence:BExpr.ands_ ~choices:BExpr.ands_

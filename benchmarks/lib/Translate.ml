@@ -221,9 +221,10 @@ let rec gcl_to_gpl (t : target) : GPL.t =
     let keys = List.map keys ~f:(fun (k,_) -> bv_to_expr k |> Expr.get_var) in
     let actions = List.map actions ~f:(make_act table) in
     GPL.table table keys actions
-  | GExternAssn _
-  | GExternVoid _ ->
-    failwith "Externs should have been eliminated"
+  | GExternAssn (_,s,_)
+  | GExternVoid (s,_) ->
+    Log.warn "Extern %s unrecognized, being replaced with skip" @@ lazy s;
+    GPL.skip
 
 module DyckHoareStack = struct
   type elt = {idx : int;

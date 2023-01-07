@@ -630,4 +630,4 @@ let translate ~cvs ~dvs term =
   let b, gamma, _ = infer_type gamma term Bool
                     |> expect_bool "infered the outermost type to be a bitvector when it should be a boolean type" in
   to_bexpr gamma ~cvs ~dvs b
-    
+  |> BExpr.simplify

@@ -33,7 +33,10 @@ let hoare : Command.t =
         Log.compiler "unroll %d" @@ lazy unroll;
         let coq_gcl = P4Parse.tbl_abstraction_from_file includes source gas unroll false (not disable_header_validity) in
         Log.compiler "%s" @@ lazy "compiling to gpl...";
-        let hoarenet = Tuple2.(map ~f:(Translate.gcl_to_hoare) coq_gcl |> uncurry HoareNet.seq) in
+        let (hprsr, hpipe) = Tuple2.map ~f:(Translate.gcl_to_hoare) coq_gcl in
+        Log.irs "Parser:\n%s" @@ lazy (HoareNet.to_string hprsr);
+        Log.irs "Pipeline:\n%s" @@ lazy (HoareNet.to_string hpipe);
+        let hoarenet =  HoareNet.seq hprsr hpipe in
         let hoarenet = HoareNet.normalize_names hoarenet in
         let hoarenet = HoareNet.optimize hoarenet in
         let st = Clock.start () in
@@ -67,12 +70,13 @@ let compile : Command.t =
        let coq_pair = P4Parse.tbl_abstraction_from_file includes source gas unroll false true in
        let (gpl_prsr, gpl_pipe) = Tuple2.map ~f:Translate.gcl_to_gpl coq_pair in
        Log.irs "RAW parser:\n%s\n" @@ lazy (GPL.to_string gpl_prsr);
-       Log.irs "RAW pipeline: \n%s" @@ lazy (GPL.to_string gpl_pipe);
-       (* let (gpl_prsr_o, gpl_pipe_o) = GPL.optimize_seq_pair (gpl_prsr, gpl_pipe) in *)
-       (* let (gcl_prsr_o, gcl_pipe_o) = Tuple2.map ~f:GPL.encode_tables (gpl_prsr_o, gpl_pipe_o) in *)
-       Log.irs "%s" @@ lazy ("compiling from scratch");
-       let cmd = P4Parse.as_cmd_from_file includes source gas unroll false true in
-       Log.irs "RAW FULL PROGRAM:\n%s" @@ lazy (GCL.to_string cmd);
+       Log.irs "RAW pipeline:\n%s\n" @@ lazy (GPL.to_string gpl_pipe)
+       (* Log.irs "RAW pipeline: \n%s" @@ lazy (GPL.to_string gpl_pipe); *)
+       (* (\* let (gpl_prsr_o, gpl_pipe_o) = GPL.optimize_seq_pair (gpl_prsr, gpl_pipe) in *\) *)
+       (* (\* let (gcl_prsr_o, gcl_pipe_o) = Tuple2.map ~f:GPL.encode_tables (gpl_prsr_o, gpl_pipe_o) in *\) *)
+       (* Log.irs "%s" @@ lazy ("compiling from scratch"); *)
+       (* let cmd = P4Parse.as_cmd_from_file includes source gas unroll false true in *)
+       (* Log.irs "RAW FULL PROGRAM:\n%s" @@ lazy (GCL.to_string cmd); *)
        (* let cmd_o = Cmd.GCL.optimize cmd in *)
 
        (* let parse_graph = GCL.construct_graph gcl_prsr_o in *)

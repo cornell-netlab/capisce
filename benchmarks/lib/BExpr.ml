@@ -169,7 +169,8 @@ let ctor1 ~default ~smart a =
      default a
 let ctor2 ~default ~smart a b =
   match !enable_smart_constructors with
-  | `On -> smart default a b
+  | `On ->
+    smart default a b
   | `Off ->
     default a b
 (* let rec ctor2rec ~default ~smart a b =
@@ -265,12 +266,14 @@ let and_ =
            else
              default b1 b2
         | TNary(LAnd, bs1), TNary(LAnd, bs2) ->
-           let bs = bs1@bs2 in
-           TNary(LAnd, bs)
+          Log.rewrites "%s" @@ lazy "SUBAND";
+          TNary(LAnd, bs1@bs2)
         | TNary(LAnd, bs1), b2 ->
-           TNary(LAnd, bs1@[b2])
+          Log.rewrites "%s" @@ lazy "LEFT_AND";
+          TNary(LAnd, bs1@[b2])
         | b1, TNary(LAnd, bs2) ->
-           TNary(LAnd, b1::bs2)
+          Log.rewrites "%s" @@ lazy "RIGHT_AND";
+          TNary(LAnd, b1::bs2)
         | _ -> default b1 b2)
 
 let ands_ = List.fold ~init:true_ ~f:and_
@@ -663,10 +666,10 @@ let rec simplify_inner = function
 let simplify b =
   (* Log.size (size b); *)
   (* Log.print @@ lazy "simplify"; *)
-  let tmp = !enable_smart_constructors in
-  enable_smart_constructors := `On;
+  (* let tmp = !enable_smart_constructors in *)
+  (* enable_smart_constructors := `On; *)
   let b' = simplify_inner b in
-  enable_smart_constructors := tmp;
+  (* enable_smart_constructors := tmp; *)
   b'
 
 let rec label (ctx : Context.t) (b : t) : t =

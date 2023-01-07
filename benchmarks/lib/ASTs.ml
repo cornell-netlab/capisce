@@ -15,9 +15,31 @@ module GCL = struct
         |> Util.mapmap ~f:(fun a -> prim (to_active_exn a))
         |> choice_seqs
       in
-      if String.(tbl_name = "acl") then
-        Log.debug "ACL:\n%s\n---------" @@ lazy (to_string table);
+      if String.(tbl_name = "egress_vlan") then
+        Log.debug "egress_vlan:\n%s\n---------" @@ lazy (to_string table);
       table
+
+    let wp cmd phi =
+      top_down cmd ~init:phi
+        ~prim:(fun postcond cmd ->
+            match cmd with
+            | Passive (Assume phi) ->
+              BExpr.imp_ phi postcond
+            | Passive (Assert phi) ->
+              BExpr.and_ phi postcond
+            | Assign (x,e) ->
+              BExpr.subst x e postcond
+          )
+        ~sequence:(fun postcond cs wp_rec ->
+            List.fold_right cs
+              ~init:postcond
+              ~f:(Fn.flip wp_rec)
+          )
+        ~choices:(fun postcond cs wp_rec ->
+            List.map cs ~f:(wp_rec postcond)
+            |> BExpr.ands_
+          )
+
   end
 
   module CP = Transform.ConstProp (struct
@@ -159,6 +181,10 @@ end
               GCL.table (name, keys, actions)
             | Active a -> GCL.prim a
           )
+
+    let wp cmd phi =
+      let gcl = encode_tables cmd in
+      GCL.wp gcl phi
 
     let symbolize (c : t) =
       let gcl = encode_tables c in

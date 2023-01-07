@@ -19,6 +19,7 @@ let is_small_enough old new_ =
      (BExpr.false_, false)
 
 let timeout_solver (solver : ?with_timeout:int -> Var.t list -> string -> string) vars phi =
+  let () = Log.qe "%s" @@ (lazy "timeout_solver") in
   let phi_str =
     let avars = BExpr.abstract_qvars phi in
     let phi_str = BExpr.to_smtlib phi in
@@ -34,16 +35,20 @@ let timeout_solver (solver : ?with_timeout:int -> Var.t list -> string -> string
 
 let unrestricted_solver (solver : ?with_timeout:int -> Var.t list -> string -> string) cvs x phi =
   let open BExpr in
+  Log.qe "%s" @@ (lazy "checking satisfiability");
   if Solver.check_unsat cvs phi then begin
+    Log.qe "%s" @@ (lazy "unsatisfiable, turn form to false");
     (* unsat formulae are = to false *)
     decr_q x "z3-unsat";
     false_
     end
-  else   
+  else begin
+    Log.qe "%s" @@ (lazy "satisfiable, try qe");
     let res = solver cvs (to_smtlib phi) in
     decr_q x @@ Printf.sprintf "z3,%d" (size phi);
     Log.smt "%s" @@ lazy res;
     Solver.of_smtlib ~dvs:[] ~cvs res
+  end
 
   
 let try_cnfing body : BExpr.t =
@@ -56,6 +61,7 @@ let try_cnfing body : BExpr.t =
 
   
 let rec cnf_qe (solver : ?with_timeout:int -> Var.t list -> string -> string)  b : BExpr.t option =
+  Log.qe "%s" @@ lazy ("recursively cnfing");
   let open Option.Let_syntax in
   let open BExpr in
   (* Log.size (size b); *)
@@ -90,22 +96,23 @@ let rec cnf_qe (solver : ?with_timeout:int -> Var.t list -> string -> string)  b
           end
         else begin (* TRY CNFING *)
             Log.qe "trying to cnf something of size %d" @@ lazy (BExpr.size body);
-            Log.qe "%s" @@ lazy (Smt.assert_apply vars (BExpr.to_smtlib b'));
+            (* Log.qe "%s" @@ lazy (Smt.assert_apply vars (BExpr.to_smtlib b')); *)
             let body = try_cnfing body in
-            if size body >= size b'' then
+            if size body > size b'' then
               (*if cnfing only made it worse, use the original z3-provided response*)
-              Some b''
-            else
-            begin match BExpr.forall [x'] body |> simplify with
-            | Forall (x'', _) as phi when Var.equal x' x'' ->
-               (* Log.size (size body); *)
-               (*If it had no effect, we are out of things to try*)               
-               Some (unrestricted_solver solver vars x phi)
-            | b'' ->
-               (* Log.size (size b''); *)
-               if qf b'' then
-                 Some b''
-               else cnf_qe solver b''
+              Some (unrestricted_solver solver vars x b')
+            else begin
+              match BExpr.forall [x'] body |> simplify with
+              | Forall (x'', _) as phi when Var.equal x' x'' ->
+                (* Log.size (size body); *)
+                (*If it had no effect, we are out of things to try*)
+                Some (unrestricted_solver solver vars x phi)
+              | b'' ->
+                (* Log.size (size b''); *)
+                Log.qe "FORALL MOVED: %s" @@ lazy (Var.str x');
+                if qf b'' then
+                  Some b''
+                else cnf_qe solver b''
             end
           end
      | b' ->

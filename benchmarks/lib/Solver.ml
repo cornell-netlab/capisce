@@ -68,7 +68,13 @@ let of_smtlib ~cvs ~dvs smt : BExpr.t =
   with except ->
     Printf.eprintf "Failed to parse:\n%s\n%!" smt;
     raise except
-  
+
+let equisat_cnf phi =
+  let dvs, cvs = BExpr.vars phi in
+  Smt.tseitin (dvs @ cvs) (BExpr.to_smtlib phi)
+  |> run_z3
+  |> of_smtlib ~cvs ~dvs
+
 let z3_simplify dvs cvs phi =
   Smt.simplify dvs (BExpr.to_smtlib phi)
   |> run_z3 

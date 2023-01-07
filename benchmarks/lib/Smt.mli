@@ -1,5 +1,6 @@
 val simplify : Var.t list -> string -> string
-val assert_apply : ?timeout:int -> Var.t list -> string -> string 
+val tseitin : Var.t list -> string -> string
+val assert_apply : ?timeout:int -> Var.t list -> string -> string
 val assert_apply_light : Var.t list -> string -> string
 val check_sat : ?timeout:int option -> Var.t list -> string -> string
 val check_sat_model : ?timeout:int option -> Var.t list -> string -> string

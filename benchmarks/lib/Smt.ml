@@ -9,6 +9,9 @@ let simplify consts str =
     (Var.list_to_smtlib_decls consts)
     str
 
+let tseitin consts =
+  Printf.sprintf "(set-logic UFBV)%s\n\n(assert %s)\n(apply tseitin-cnf)"
+    (Var.list_to_smtlib_decls consts)
 
 let assert_apply ?timeout consts phi_str =
   let open Printf in

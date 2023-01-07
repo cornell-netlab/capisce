@@ -347,12 +347,14 @@ let implies_model consts phi1 phi2 : Model.t option =
 let sufficient ~vc ~prog =
   let program_spec = vc prog in
   fun phi ->
+  Log.path_gen_s "Checking sufficiency";
   implies phi program_spec
 
 let all_paths gcl =
   Log.graph_s "Constructing graph";
+  Log.debug "GCL program to explore:\n%s\n-------------" @@ lazy (GCL.to_string gcl);
   let gcl_graph = GCL_G.construct_graph gcl in            Log.graph_dot (GCL_G.print_graph gcl_graph) "broken_cfg";
-  let gen = PathGenerator.create gcl_graph in             Log.path_gen "couldn't solve exploded table-path, path-exploding the %s paths" @@ lazy (Bigint.to_string @@ PathGenerator.total_paths gen);
+  let gen = PathGenerator.create gcl_graph in             Log.path_gen "path-exploding the %s paths" @@ lazy (Bigint.to_string @@ PathGenerator.total_paths gen);
   (* Breakpoint.set Bigint.(one < PathGenerator.total_paths gen); *)
   let paths = ref 0 in
   let sufficient = sufficient ~vc:passive_vc ~prog:gcl in
@@ -360,7 +362,7 @@ let all_paths gcl =
     let clock = Clock.start () in
     Log.path_gen_s "----------------looping--------------------";
     if sufficient phi_agg
-    then begin Log.exploder_s "sufficient!"; phi_agg end
+    then begin Log.path_gen_s "sufficient!"; phi_agg end
     else
     let next_path = PathGenerator.get_next gen in
     match next_path with
@@ -375,9 +377,10 @@ let all_paths gcl =
         let gcl = List.map pi ~f:(GCL_G.vertex_to_cmd) |> GCL.sequence in
         Log.irs "solving path %s" @@ lazy (GCL.to_string gcl);
         let phi = passive_vc gcl (*|> BExpr.nnf*) in
+        Log.path_gen_s "Checking whether current path is covered";
         if implies phi_agg phi
         then begin
-          Log.exploder_s "Skipped; already covered!";
+          Log.path_gen_s "Skipped; already covered!";
           Int.incr paths;
           loop phi_agg
         end

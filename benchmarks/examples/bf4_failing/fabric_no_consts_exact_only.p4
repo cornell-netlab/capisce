@@ -330,7 +330,7 @@ control Filtering(inout parsed_headers_t hdr, inout fabric_metadata_t fabric_met
         key = {
             standard_metadata.ingress_port: exact @name("ig_port") ;
             hdr.vlan_tag.isValid()        : exact @name("vlan_is_valid") ;
-            hdr.vlan_tag.vlan_id          : exact @name("vlan_id") ;
+            hdr.vlan_tag.vlan_id          : ternary @name("vlan_id") ;
         }
         actions = {
             deny();
@@ -508,19 +508,20 @@ control Acl(inout parsed_headers_t hdr, inout fabric_metadata_t fabric_md, inout
     }
     table acl {
         key = {
-            standard_metadata.ingress_port: exact @name("ig_port") ;
-            hdr.ethernet.dst_addr         : exact @name("eth_dst") ;
-            hdr.ethernet.src_addr         : exact @name("eth_src") ;
-            hdr.vlan_tag.vlan_id          : exact @name("vlan_id") ;
-            hdr.eth_type.value            : exact @name("eth_type") ;
-            fabric_md.lkp.ipv4_src        : exact @name("ipv4_src") ;
-            fabric_md.lkp.ipv4_dst        : exact @name("ipv4_dst") ;
-            fabric_md.lkp.ip_proto        : exact @name("ip_proto") ;
-            hdr.icmp.icmp_type            : exact @name("icmp_type") ;
-            hdr.icmp.icmp_code            : exact @name("icmp_code") ;
-            fabric_md.lkp.l4_sport        : exact @name("l4_sport") ;
-            fabric_md.lkp.l4_dport        : exact @name("l4_dport") ;
-            fabric_md.port_type           : exact @name("port_type") ;
+            // try operational masking
+            standard_metadata.ingress_port: ternary @name("ig_port") ;
+            hdr.ethernet.dst_addr         : ternary @name("eth_dst") ;
+            hdr.ethernet.src_addr         : ternary @name("eth_src") ;
+            hdr.vlan_tag.vlan_id          : ternary @name("vlan_id") ;
+            hdr.eth_type.value            : ternary @name("eth_type") ;
+            fabric_md.lkp.ipv4_src        : ternary @name("ipv4_src") ;
+            fabric_md.lkp.ipv4_dst        : ternary @name("ipv4_dst") ;
+            fabric_md.lkp.ip_proto        : ternary @name("ip_proto") ;
+            hdr.icmp.icmp_type            : ternary @name("icmp_type") ;
+            hdr.icmp.icmp_code            : ternary @name("icmp_code") ;
+            fabric_md.lkp.l4_sport        : ternary @name("l4_sport") ;
+            fabric_md.lkp.l4_dport        : ternary @name("l4_dport") ;
+            fabric_md.port_type           : ternary @name("port_type") ;
         }
         actions = {
             set_next_id_acl;
@@ -644,11 +645,11 @@ control EgressNextControl(inout parsed_headers_t hdr, inout fabric_metadata_t fa
         hdr.eth_type.value = ETHERTYPE_MPLS;
     }
     @hidden action push_outer_vlan() {
-        hdr.vlan_tag.setValid();
-        hdr.vlan_tag.cfi = fabric_metadata.vlan_cfi;
-        hdr.vlan_tag.pri = fabric_metadata.vlan_pri;
-        hdr.vlan_tag.eth_type = ETHERTYPE_VLAN;
-        hdr.vlan_tag.vlan_id = fabric_metadata.vlan_id;
+        // hdr.vlan_tag.setValid();
+        // hdr.vlan_tag.cfi = fabric_metadata.vlan_cfi;
+        // hdr.vlan_tag.pri = fabric_metadata.vlan_pri;
+        // hdr.vlan_tag.eth_type = ETHERTYPE_VLAN;
+        // hdr.vlan_tag.vlan_id = fabric_metadata.vlan_id;
     }
     direct_counter(CounterType.packets_and_bytes) egress_vlan_counter;
     action push_vlan() {
@@ -678,6 +679,7 @@ control EgressNextControl(inout parsed_headers_t hdr, inout fabric_metadata_t fa
         size = 1024;
     }
     apply {
+        hopen(8w1, hdr.eth_type.isValid());
         if (fabric_metadata.is_multicast == true && standard_metadata.ingress_port == standard_metadata.egress_port) {
             mark_to_drop(standard_metadata);
         }
@@ -702,6 +704,7 @@ control EgressNextControl(inout parsed_headers_t hdr, inout fabric_metadata_t fa
                 }
             }
         }
+        hclose(8w1, true);
     }
 }
 
@@ -905,6 +908,7 @@ parser FabricParser(packet_in packet, out parsed_headers_t hdr, inout fabric_met
     }
     state parse_ethernet {
         packet.extract(hdr.ethernet);
+        // transition accept;
         fabric_metadata.vlan_id = DEFAULT_VLAN_ID;
         transition select((packet.lookahead<bit<16>>())[15:0]) {
             ETHERTYPE_QINQ: parse_vlan_tag;
@@ -1055,36 +1059,37 @@ control FabricIngress(inout parsed_headers_t hdr, inout fabric_metadata_t fabric
     IngressSliceTcClassifier() slice_tc_classifier;
     IngressQos() qos;
     apply {
-        hopen(8w1, hdr.ethernet.isValid());
+        hopen(8w1, hdr.packet_out.isValid() || (hdr.ethernet.isValid() && hdr.eth_type.isValid()));
         lkp_md_init.apply(hdr, fabric_metadata.lkp);
         pkt_io_ingress.apply(hdr, fabric_metadata, standard_metadata);
         slice_tc_classifier.apply(hdr, fabric_metadata, standard_metadata);
-        hclose(8w1, hdr.ethernet.isValid());
-        hopen(8w1, hdr.ethernet.isValid() && hdr.vlan_tag.isValid());
-        filtering.apply(hdr, fabric_metadata, standard_metadata);
-        hclose(8w1, hdr.ethernet.isValid());
-        hopen(8w1, hdr.ethernet.isValid());
-        if (fabric_metadata.skip_forwarding == false) {
-            forwarding.apply(hdr, fabric_metadata, standard_metadata);
+        hclose(8w1, fabric_metadata.is_controller_packet_out == true || (hdr.ethernet.isValid() && hdr.eth_type.isValid()));
+        if (fabric_metadata.is_controller_packet_out == false) {
+          hopen(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid());
+          filtering.apply(hdr, fabric_metadata, standard_metadata);
+          hclose(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid());
+          hopen(8w1, hdr.ethernet.isValid()  && hdr.eth_type.isValid());
+          if (fabric_metadata.skip_forwarding == false) {
+              forwarding.apply(hdr, fabric_metadata, standard_metadata);
+          }
+          hclose(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid() && (fabric_metadata.skip_forwarding == true || hdr.icmp.isValid()));
+          hopen (8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid() && (fabric_metadata.skip_forwarding == true || hdr.icmp.isValid()));
+          if (fabric_metadata.skip_next == false) {
+              pre_next.apply(hdr, fabric_metadata);
+          }
+          hclose(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid() && (fabric_metadata.skip_forwarding == true || hdr.icmp.isValid()));
+          hopen (8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid() && (fabric_metadata.skip_forwarding == true || hdr.icmp.isValid()));
+          acl.apply(hdr, fabric_metadata, standard_metadata);
+          hclose(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid());
+          hopen (8w1, hdr.ethernet.isValid()  && hdr.eth_type.isValid());
+          if (fabric_metadata.skip_next == false) {
+              next.apply(hdr, fabric_metadata, standard_metadata);
+          }
+          hclose(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid());
+          hopen (8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid());
+          qos.apply(fabric_metadata, standard_metadata);
+          hclose(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid());
         }
-        hclose(8w1, hdr.ethernet.isValid());
-        hopen(8w1, hdr.ethernet.isValid());
-        if (fabric_metadata.skip_next == false) {
-            pre_next.apply(hdr, fabric_metadata);
-        }
-        hclose(8w1, hdr.ethernet.isValid());
-        // SOUNDNESS GAP!!
-        hopen(8w1, hdr.ethernet.isValid() && hdr.vlan_tag.isValid() && hdr.eth_type.isValid() && hdr.icmp.isValid());
-        acl.apply(hdr, fabric_metadata, standard_metadata);
-        hclose(8w1, hdr.ethernet.isValid());
-        hopen(8w1, hdr.ethernet.isValid());
-        if (fabric_metadata.skip_next == false) {
-            next.apply(hdr, fabric_metadata, standard_metadata);
-        }
-        hclose(8w1, hdr.ethernet.isValid());
-        hopen(8w1, hdr.ethernet.isValid());
-        qos.apply(fabric_metadata, standard_metadata);
-        hclose(8w1, hdr.ethernet.isValid());
     }
 }
 
@@ -1093,16 +1098,15 @@ control FabricEgress(inout parsed_headers_t hdr, inout fabric_metadata_t fabric_
     EgressNextControl() egress_next;
     EgressDscpRewriter() dscp_rewriter;
     apply {
-        hopen(8w1, hdr.ethernet.isValid() && standard_metadata.egress_spec != 9w511);
+        hopen(8w1, fabric_metadata.is_controller_packet_out == true || (hdr.ethernet.isValid() && hdr.eth_type.isValid()));
         pkt_io_egress.apply(hdr, fabric_metadata, standard_metadata);
-        hclose(8w1, true);
-        // SOUNDNESS GAP!
-        hopen(8w1, hdr.eth_type.isValid() && hdr.vlan_tag.isValid());
-        egress_next.apply(hdr, fabric_metadata, standard_metadata);
-        hclose(8w1, true);
-        hopen(8w1, true);
-        dscp_rewriter.apply(hdr, fabric_metadata, standard_metadata);
-        hclose(8w1, true);
+        hclose(8w1, fabric_metadata.is_controller_packet_out == true || (hdr.eth_type.isValid()));
+        if (fabric_metadata.is_controller_packet_out == false) {
+          egress_next.apply(hdr, fabric_metadata, standard_metadata);
+          hopen(8w1, true);
+          dscp_rewriter.apply(hdr, fabric_metadata, standard_metadata);
+          hclose(8w1, true);
+        }
         standard_metadata.egress_spec = 9w511;
     }
 }

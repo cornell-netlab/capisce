@@ -396,7 +396,13 @@ module Table = struct
 
   let make name keys actions = {name; keys; actions}
 
-  let to_smtlib tbl = Printf.sprintf "%s.apply()" tbl.name
+  let to_smtlib tbl = Printf.sprintf "%s.apply(){%s}" tbl.name @@
+    List.fold tbl.actions ~init:"" ~f:(fun acc (params, commands) ->
+        Printf.sprintf "%s\n\t\\%s -> {%s\t}" acc (Var.list_to_smtlib_quant params) @@
+        List.fold commands ~init:"\n" ~f:(fun acc a ->
+            Printf.sprintf "%s\t\t%s\n" acc (Action.to_smtlib a)
+          )
+      )
 
   let name tbl = tbl.name
 

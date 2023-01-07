@@ -96,6 +96,7 @@ let log flag fmt colors a : unit =
 
 
 let error fmt   = log FLAGS.error     fmt [red]
+let error_s s = error "%s" (lazy s)
 let warn fmt    = log FLAGS.warn      fmt [yellow; Bold]
 let measure fmt = log FLAGS.measure   fmt []
 let smt fmt      = log FLAGS.smt      fmt [green]

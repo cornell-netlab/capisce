@@ -19,10 +19,9 @@ end
 val parse_flags : String.t -> unit
 val override : unit -> unit
 
-
-
-val warn : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
 val error :  ('a -> unit, unit, string, string, string, unit) format6  -> 'a lazy_t -> unit
+val error_s : string -> unit
+val warn : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
 
 val smt      : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
 val measure  : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
