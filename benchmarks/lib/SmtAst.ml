@@ -486,16 +486,12 @@ let rec to_either_b_expr_inner gamma ~cvs ~dvs term : (BExpr.t, Expr.t) Either.t
      Expr.bv v w
      |> Second 
   | Id (x,_) ->
-     begin match List.find cvs ~f:(fun c -> String.(Var.str c = x)) with
-     | Some x_var ->
-        Expr.var x_var |> Second
-     | None ->
-        match List.find dvs ~f:(fun d -> String.(Var.str d = x)) with
-        | Some x_var ->
-           Expr.var x_var |> Second
-        | None ->
-           failwith (Printf.sprintf "Couldn't identify variable %s" x)
-     end
+     (* begin match List.find (cvs @ dvs) ~f:(fun c -> String.(Var.str c = x)) with *)
+     (* | Some x_var -> *)
+     Var.make x (-1) |> Expr.var |> Second
+     (* | None -> *)
+     (*   failwith (Printf.sprintf "Couldn't identify variable %s from:\n%s" x (Var.list_to_smtlib_decls (cvs @ dvs))) *)
+     (* end *)
   | Forall (xs, b) ->
      to_either_b_expr_inner gamma ~cvs ~dvs:(dvs @ xs) b
      |> fst_map @@ BExpr.forall xs

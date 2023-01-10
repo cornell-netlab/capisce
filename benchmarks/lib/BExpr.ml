@@ -1183,3 +1183,19 @@ let erase_max_label (ctx : Context.t) : t ->  t =
       failwith "Cannot erase max label under quantifiers"
   in
   loop
+
+let check (phi : t) (m : Model.t) : bool =
+  let sigma x =
+    match Model.lookup m x with
+    | Some (v, sz) -> Expr.bv v sz
+    | None ->
+      failwithf "Couldn't find value for %s in model" (Var.str x) ()
+  in
+  let phi = fun_subst sigma phi |> simplify  in
+  match phi with
+  | TFalse -> false
+  | TTrue -> true
+  | _ ->
+    Log.error "After substituting with:\n%s\n------ " @@ lazy (Model.to_string m);
+    Log.error "Got:\n%s\n--------" @@ lazy (to_smtlib phi);
+    failwith "[check_one_model] Couldn't simplify model"

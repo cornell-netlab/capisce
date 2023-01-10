@@ -174,7 +174,7 @@ module Optimizer ( Cmd : sig
   let optimize : Cmd.t -> Cmd.t =
     Log.compiler_s "optimizing...";
     let o c =
-      Log.debug_s "FIX";
+      Log.compiler_s "FIX";
       let opt = DC.elim (CP.propagate_exn c) in
       if Cmd.size opt > Cmd.size c then begin
         let () = Log.irs "PRE: %s\n" @@ lazy (Cmd.to_string c) in

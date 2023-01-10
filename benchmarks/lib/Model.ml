@@ -18,6 +18,15 @@ let update m x v =
 
 let lookup m x = Var.Map.find m x
 
+let disjoint_union m1 m2 =
+  Var.Map.merge m1 m2
+    ~f:(fun ~key:_ -> function
+        | `Left x | `Right x ->
+          Some x
+        | `Both _ ->
+          failwith "union not disjoint"
+      )
+
 let project_inputs (passive_model : t) : t =
   Log.debug "Projecting passive_model: \n%s" @@ lazy (to_string passive_model);
   let keys =

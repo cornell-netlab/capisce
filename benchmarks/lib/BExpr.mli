@@ -91,7 +91,7 @@ val vars : t -> Var.t list * Var.t list
 val compute_vars : t -> Var.t list * Var.t list  
                   
 (* val index_subst : Subst.t option -> t -> t *)
-
+val check : t -> Model.t -> bool
 val simplify : t -> t
 val nnf : t -> t
 val cnf : t -> t  
@@ -125,7 +125,9 @@ val order_all_quantifiers : t -> t
 val predicate_abstraction : t -> t
 val abstract_qvars : t -> string
 
-  val qf_quickcheck_generator : t Generator.t
+
+
+val qf_quickcheck_generator : t Generator.t
   
   
 (* FOR TESTING PURPOSES ONLY *)
