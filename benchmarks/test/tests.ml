@@ -15,6 +15,6 @@ let test_suites : unit Alcotest.test list = [
 (* let%test_unit "identity" = SmartConstructors.identity () *)
 
 let () =
-  Pbench.Log.parse_flags "dz";
+  Pbench.Log.parse_flags "dzo";
   Pbench.BExpr.enable_smart_constructors := `On;
   Alcotest.run "Inference" test_suites

@@ -1189,7 +1189,8 @@ let check (phi : t) (m : Model.t) : bool =
     match Model.lookup m x with
     | Some (v, sz) -> Expr.bv v sz
     | None ->
-      failwithf "Couldn't find value for %s in model" (Var.str x) ()
+      Log.error "Model %s" @@ lazy (Model.to_string m);
+      failwithf "Couldn't find value for %s<%d> in model" (Var.str x) (Var.size x) ()
   in
   let phi = fun_subst sigma phi |> simplify  in
   match phi with

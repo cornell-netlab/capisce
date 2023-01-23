@@ -2,7 +2,7 @@ open Core
 
 
 module V = struct
-  type t = String.t * int [@@deriving compare, hash, sexp]
+  type t = String.t * int [@@deriving hash, compare, sexp]
 
   let make s i : t =
     if String.length s = 0 then

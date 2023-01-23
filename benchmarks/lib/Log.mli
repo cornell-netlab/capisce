@@ -51,6 +51,8 @@ val graph_dot    : (string option -> unit) -> string -> unit
 val path_gen_dot : (string option -> unit) -> string -> unit
 val tree_dot : (string option -> unit) -> string -> unit
 
-
 val debug    : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
 val debug_s  : string -> unit
+
+val monitor   : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
+val monitor_s : string -> unit

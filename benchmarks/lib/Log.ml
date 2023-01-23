@@ -44,6 +44,9 @@ module FLAGS = struct
   let qe = ref Off
   (* printfs messages regarding top-level quantifier elimination *)
 
+  let monitor = ref Off
+  (* printfs messages regarding runtime CP monitor  *)
+
   let exploder = ref Off
 
   let tree = ref Off
@@ -81,7 +84,8 @@ let parse_flags verbosity =
   parse FLAGS.rewrites 'r';       (* Rewrites *)
   parse FLAGS.qe 'q';             (* Quantifier elimination *)
   parse FLAGS.exploder 'e';       (* Exploder *)
-  parse FLAGS.tree 't'            (* spanning Tree logging *)
+  parse FLAGS.tree 't';           (* spanning Tree logging *)
+  parse FLAGS.monitor 'o'         (* Runtime mOnitor *)
 
   (* let size d = measure (Printf.sprintf "size,%f,%d" (Clock.now()) d) *)
 
@@ -108,6 +112,9 @@ let compiler_s s = compiler "%s" (lazy s)
 let smart fmt    = log FLAGS.smart    fmt []
 let rewrites fmt = log FLAGS.rewrites fmt []
 let qe fmt       = log FLAGS.qe       fmt []
+
+let monitor fmt = log FLAGS.graph     fmt [cyan; Bold]
+let monitor_s s = monitor "%s" @@ lazy s
 
 let graph fmt    = log FLAGS.graph    fmt [green]
 let graph_s s    = graph "%s" (lazy s)

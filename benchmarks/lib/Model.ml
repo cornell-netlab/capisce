@@ -27,6 +27,8 @@ let disjoint_union m1 m2 =
           failwith "union not disjoint"
       )
 
+let of_alist_exn alist = Var.Map.of_alist_exn alist
+
 let project_inputs (passive_model : t) : t =
   Log.debug "Projecting passive_model: \n%s" @@ lazy (to_string passive_model);
   let keys =
