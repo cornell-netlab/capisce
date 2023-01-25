@@ -32,10 +32,10 @@ val list_to_smtlib_decls : t list -> string
 val sort : t list -> t list
 
 val index : t -> int -> t
+val is_indexed : t -> bool
 val unindex : t -> (t * int) option
 (* [unindex x] is Some (y,i) when (str x) == y$_$i *)
 
-  
 val quickcheck_generator : t Generator.t
 val quickcheck_observer : t Observer.t
 val quickcheck_shrinker : t Shrinker.t

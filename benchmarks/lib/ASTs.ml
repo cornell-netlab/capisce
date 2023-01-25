@@ -15,8 +15,6 @@ module GCL = struct
         |> Util.mapmap ~f:(fun a -> prim (to_active_exn a))
         |> choice_seqs
       in
-      if String.(tbl_name = "egress_vlan") then
-        Log.debug "egress_vlan:\n%s\n---------" @@ lazy (to_string table);
       table
 
     let wp cmd phi =

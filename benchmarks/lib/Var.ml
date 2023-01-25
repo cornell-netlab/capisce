@@ -23,6 +23,7 @@ module V = struct
   let ghost = "$"
   let is_ghost (s,_) = String.is_prefix s ~prefix:ghost
   let make_ghost id k =
+    Log.warn "%s" @@ lazy ("WARNING [make_symbRow] IS DEPRECATED");
     let x = Printf.sprintf "%s%s_%d" ghost (str k) id in
     let w = size k in
     make x w
@@ -30,11 +31,13 @@ module V = struct
   let symbRow = "_symb"
   let is_symbRow (s,_) = String.is_substring s ~substring:symbRow
   let make_symbRow id k =
+    Log.warn "%s" @@ lazy ("WARNING [make_symbRow] IS DEPRECATED");
     let x = Printf.sprintf "%s%s_%d" symbRow (str k) id in
     let w = size k in
     make x w
 
   let make_symbRow_str id k =
+    Log.warn "%s" @@ lazy ("WARNING [make_symbRow_str] IS DEPRECATED");
     let x = Printf.sprintf "%s%s_%s" symbRow (str k) id in
     let w = size k in
     make x w
@@ -91,6 +94,9 @@ module V = struct
           Some (rename indexed bare, Int.of_string idx)
         with Failure _ ->
           None
+
+  let is_indexed x =
+    unindex x |> Option.is_some
 
   let sort = List.dedup_and_sort ~compare
 

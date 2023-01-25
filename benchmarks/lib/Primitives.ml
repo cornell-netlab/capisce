@@ -271,19 +271,21 @@ module Action = struct
 
   let explode action = [[action]]
 
+  let cp_action name act_size = Var.make (Printf.sprintf "_symb$%s$action" name) act_size
+  let cp_data name act_idx param =
+     Var.make (Printf.sprintf  "_symb$%s$%d$%s" name act_idx (Var.str param)) (Var.size param)
+
   let symbolize
       (name : string)
       ~num_actions
       ~act_size
       ~idx
       ((params : Var.t list), (body : t list)) : (BExpr.t * t list) =
-    let cp_action = Var.make (Printf.sprintf "_symb$%s$action" name) act_size in
-    let cp_data idx param = (Var.make (Printf.sprintf  "_symb$%s$%d$%s" name idx (Var.str param)) (Var.size param)) in
     let act_choice =
       let c = if idx >= num_actions - 1 then BExpr.uge_ else BExpr.eq_ in
-      c (Expr.var cp_action) (Expr.bvi idx act_size)
+      c (cp_action name act_size |> Expr.var ) (Expr.bvi idx act_size)
     in
-    let symb param = Expr.var (cp_data idx param) in
+    let symb param = Expr.var (cp_data name idx param) in
     let symbolize body param = subst param (symb param) body in
     let f body = List.fold params ~init:body ~f:symbolize in
     (act_choice, List.map body ~f)
@@ -502,6 +504,13 @@ module Table = struct
   let explode _ = failwith "Ironically tables themselves cannot be exploded"
 
   let vars _ = failwith "dont get the variables of a table, you should probably encode it first"
+
+  let symbolic_interface tbl : Var.t list =
+    let init = Action.cp_action tbl.name (act_size tbl) :: tbl.keys in
+    List.foldi tbl.actions ~init
+      ~f:(fun i acc (vars,_) ->
+          acc @ (List.map vars ~f:(Action.cp_data tbl.name i))
+      )
 
 end
 
