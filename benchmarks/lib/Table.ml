@@ -88,9 +88,9 @@ let align table action actionlist return_var =
         let open BExpr in
         let open Expr in
         and_ phi @@
-        imp_ (eq_ (var action) (bvi act_idx (Var.size action))) @@
+        imp_ (eq_ (var action) (bvi act_idx (Var.size action - 1))) @@
         fst @@
-        List.fold params ~init:(true_, (Var.size action + 1))
+        List.fold params ~init:(true_, (Var.size action ))
           ~f:(fun (phi, slicepoint) datum ->
               let symb = Primitives.Action.cp_data table act_idx datum in
               let slice_end = slicepoint + Var.size symb in
@@ -123,7 +123,7 @@ let to_smtlib {schema; body} =
     |> Printf.sprintf "(assert (= %s (%s %s)))"
       (Var.str tableres) table;
     (* extract the action bits *)
-    Expr.(var tableres |> bslice 0 action_bits |> to_smtlib)
+    Expr.(var tableres |> bslice 0 (action_bits - 1) |> to_smtlib)
     |> Printf.sprintf "(assert (= %s %s))" (Var.str action_var);
     (* compute the alignment for action_data *)
     align table action_var schema.actions tableres

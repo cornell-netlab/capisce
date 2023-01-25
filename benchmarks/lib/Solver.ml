@@ -103,12 +103,9 @@ let check_valid_tables ?(timeout=None) consts tables phi =
     |> BExpr.to_smtlib
     |> Smt.check_sat_funs ~timeout consts @@ String.concat ~sep:"\n" funs
   in
-  if false then begin
-    Printf.printf "%s" smtlib_str;
-    false
-  end else
-    run_z3 smtlib_str
-    |> Smt.is_unsat
+  Log.smt "check_valid_tables:\n%s" @@ lazy smtlib_str;
+  run_z3 smtlib_str
+  |> Smt.is_unsat
 
 let check_sat_model ?(timeout=None) consts phi =
   BExpr.to_smtlib phi

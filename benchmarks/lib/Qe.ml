@@ -350,7 +350,7 @@ let sufficient ~vc ~prog =
   Log.path_gen_s "Checking sufficiency";
   implies phi program_spec
 
-let all_paths gcl =
+let all_paths gcl nprocs pid =
   Log.graph_s "Constructing graph";
   Log.debug "GCL program to explore:\n%s\n-------------" @@ lazy (GCL.to_string gcl);
   let gcl_graph = GCL_G.construct_graph gcl in            Log.graph_dot (GCL_G.print_graph gcl_graph) "broken_cfg";
@@ -360,12 +360,29 @@ let all_paths gcl =
   let sufficient = sufficient ~vc:passive_vc ~prog:gcl in
   let rec loop phi_agg =
     let clock = Clock.start () in
-    Log.path_gen_s "----------------looping--------------------";
-    if sufficient phi_agg
-    then begin Log.path_gen_s "sufficient!"; phi_agg end
-    else
-    let next_path = PathGenerator.get_next gen in
-    match next_path with
+    (* Log.path_gen_s "----------------looping--------------------"; *)
+    match nprocs, pid with
+    | Some nprocs, Some pid when Int.(pid <> !paths mod nprocs) ->
+      begin match PathGenerator.get_next gen with
+        | None ->
+          phi_agg
+        | _ ->
+          (* Log.path_gen_s @@ Printf.sprintf "skipping path since %d <> %d mod %d" pid !paths nprocs; *)
+          Int.incr paths;
+          loop phi_agg
+      end
+    | _ when sufficient phi_agg ->
+
+      Log.path_gen_s "sufficient!";
+      phi_agg
+    | _ ->
+      begin match pid, nprocs with
+        | Some pid, Some nprocs ->
+          Log.path_gen_s @@ Printf.sprintf "running path since %d == %d mod %d" pid !paths nprocs;
+        | _ -> ()
+      end;
+      let next_path = PathGenerator.get_next gen in
+      match next_path with
       | None ->
         Log.exploder_s "inner paths done";
         phi_agg
@@ -495,7 +512,7 @@ let rec explode_tables ~sufficient ~parserify exploder gpl phi_agg =
       Log.irs "GCL %s" @@ lazy (GCL.to_string gcl);
       (* let parsered = parserify gcl in *)
       (* Log.irs "Parsered GCL %s" @@ lazy (GCL.to_string parsered); *)
-      let phi = all_paths (parserify gcl) in
+      let phi = all_paths (parserify gcl) None None in
       Log.irs "Single-path CPI: %s" @@ lazy (BExpr.to_smtlib phi);
       phi
     | Some tbl ->
@@ -552,7 +569,7 @@ let search_generator ~sufficient:_ ~parserify ~statusbar gpl_graph gen phi_agg =
           (* match None with *)
           | None ->
             (* concolic full_gcl *)
-            all_paths full_gcl
+            all_paths full_gcl None None
             (* Log.path_gen_s "couldn't solve path!\n"; Log.irs "%s\n" @@ lazy (GCL.to_string full_gcl); *)
             (* phi_agg *)
             (* |> explode_tables ~sufficient:(Fn.flip implies phi) ~parserify (Exploder.create ()) gpl *)

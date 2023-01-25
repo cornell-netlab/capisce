@@ -12,6 +12,10 @@ module V = struct
   let str ((s,_) : t) = s
   let size ((_,i) : t) = i
 
+  let map x ~f =
+    (* extract the string, apply the function f to it and then rename the original variable *)
+    str x |> f |> rename x
+
   let well_formed ((s,i) : t) = String.length s > 0 && i > 0
   let normalize_name (s,i) =
     let open String in

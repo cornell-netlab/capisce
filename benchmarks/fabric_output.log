@@ -1,9 +1,9 @@
 (and
   (not
-    (= _symb$classifier$action$_$0 (_ bv0 2)))
+    (= _symb$classifier$action$_$0 (_ bv0 1)))
   (and
     (not
-      (= _symb$classifier$action$_$0 (_ bv0 2)))
+      (= _symb$classifier$action$_$0 (_ bv0 1)))
     (not
       (= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1)))
     (and
@@ -5882,10 +5882,10 @@
         (not
           (= _symb$acl$match_8$DONT_CARE$_$0 (_ bv1 1))))))
   (not
-    (= _symb$classifier$action$_$0 (_ bv0 2)))
+    (= _symb$classifier$action$_$0 (_ bv0 1)))
   (and
     (not
-      (= _symb$classifier$action$_$0 (_ bv0 2)))
+      (= _symb$classifier$action$_$0 (_ bv0 1)))
     (not
       (= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1)))
     (and

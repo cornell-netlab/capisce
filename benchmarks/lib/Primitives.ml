@@ -283,6 +283,8 @@ module Action = struct
       ((params : Var.t list), (body : t list)) : (BExpr.t * t list) =
     let act_choice =
       let c = if idx >= num_actions - 1 then BExpr.uge_ else BExpr.eq_ in
+      if String.(name = "classifier") then
+        Log.debug "[symbolize] classifier action_size = %d" @@ lazy act_size;
       c (cp_action name act_size |> Expr.var ) (Expr.bvi idx act_size)
     in
     let symb param = Expr.var (cp_data name idx param) in
@@ -506,7 +508,14 @@ module Table = struct
   let vars _ = failwith "dont get the variables of a table, you should probably encode it first"
 
   let symbolic_interface tbl : Var.t list =
-    let init = Action.cp_action tbl.name (act_size tbl) :: tbl.keys in
+    if String.(tbl.name = "classifier") then
+      Log.debug "[symbolic_interface] classifier action_size = %d" @@ lazy (act_size tbl);
+    let init = Action.cp_action tbl.name (act_size tbl) ::
+               List.bind tbl.keys ~f:(fun k ->
+                   [k;
+                    Var.make (Var.str k ^ "$DONT_CARE") 1
+                   ]
+                 ) in
     List.foldi tbl.actions ~init
       ~f:(fun i acc (vars,_) ->
           acc @ (List.map vars ~f:(Action.cp_data tbl.name i))
@@ -596,6 +605,7 @@ module Pipeline = struct
         (*     let symb_k = Var.make (cp_key idx) (Var.size k) in *)
         (*     BExpr.eq_ (Expr.var symb_k) (Expr.var k)) in *)
         let act_size = Table.act_size tbl in
+        if String.(tbl.name = "classifier") then Log.debug "[explode] classifier actsize = %d" @@ lazy act_size;
         let of_action_list = List.map ~f:(fun a -> (active (Active.of_action a))) in
         let num_actions = List.length tbl.actions in
         let f idx action =

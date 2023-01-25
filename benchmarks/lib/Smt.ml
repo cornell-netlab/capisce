@@ -47,8 +47,10 @@ let check_sat_funs ?(timeout=None) consts funs phi_str =
     (string_of_timeout timeout)
     (Var.list_to_smtlib_decls consts)
     funs
-    ((fun _ -> "true")
-       phi_str
+    (
+      Fn.id
+      (* (fun _ -> "true") *)
+      phi_str
     )
 
 

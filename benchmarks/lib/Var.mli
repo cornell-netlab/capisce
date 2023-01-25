@@ -13,6 +13,7 @@ val str : t -> string
 val size : t -> int
 val rename : t -> string -> t
 (* [rename x s] is a new variable named [s] with the same size as [x]*)
+val map : t -> f:(string -> string) -> t
 
 val well_formed : t -> bool 
 

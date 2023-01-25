@@ -468,7 +468,10 @@ let rec to_either_b_expr_inner gamma ~cvs ~dvs term : (BExpr.t, Expr.t) Either.t
                       ~f:(fun acc x ->
                         match acc, x with
                         | First acc, First x -> First (acc @ [x])
-                        | _, _ -> failwith "passed a Second to commute_fst")
+                        | _, Second e ->
+                          failwithf "parsed %s as an expression but expected a BEXPR" (Expr.to_smtlib e) ()
+                        | _, _ ->
+                          failwith "passed a Second to commute_fst")
   in
   let commute_snd = List.fold ~init:(Second [])
                       ~f:(fun acc x ->

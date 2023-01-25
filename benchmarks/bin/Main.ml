@@ -20,7 +20,9 @@ let hoare : Command.t =
       unroll_opt = flag "-u" (optional int) ~doc:"how much to unroll the parser" and
       no_smart = flag "--disable-smart" no_arg ~doc:"disable smart constructors" and
       disable_header_validity = flag "--no-hv" (no_arg) ~doc:"disable header validity checks" and
-      disable_soundness_check = flag "--unsound" (no_arg) ~doc:"disable soundness check"
+      disable_soundness_check = flag "--unsound" (no_arg) ~doc:"disable soundness check" and
+      nprocs = flag "--nprocs" (optional int) ~doc:"number of processes" and
+      pid = flag "--pid" (optional int) ~doc:"process id"
       in fun () ->
         let open DependentTypeChecker in
         Printexc.record_backtrace true;
@@ -44,7 +46,7 @@ let hoare : Command.t =
         if disable_soundness_check || HoareNet.check_annotations hoarenet then begin
           Printf.printf "Checked annotations in %fms\n%!" (Clock.stop st);
           let st = Clock.start () in
-          let psi = HoareNet.infer hoarenet in
+          let psi = HoareNet.infer hoarenet nprocs pid in
           Printf.printf "Inferred in %f ms\n%!" (Clock.stop st);
           Printf.printf "Got:\n%s\n%!" (BExpr.to_smtlib psi)
         end else
@@ -160,7 +162,7 @@ let table_infer : Command.t =
         Log.compiler_s "optimizing...";
         let gpl = ASTs.GPL.optimize_seq_pair gpl in
         Log.compiler_s "done optimizing; starting inference";
-        let cpf = Qe.table_infer ~sfreq ~prsr ~fn gpl in
+        let cpf = Qe.table_infer ~sfreq ~prsr ~fn gpl None None in
         Printf.printf "Result:\n%s\n%!Computedin %f:\n%!" (BExpr.to_smtlib cpf) (Clock.stop st)
     ]
 

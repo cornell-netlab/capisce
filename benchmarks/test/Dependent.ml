@@ -76,7 +76,7 @@ let safe_p4_validity_inference () =
            } )
 
   in
-  HoareNet.infer prog
+  HoareNet.infer prog None None
   |> Alcotest.(check smt_equiv) "produces equivalent CPF"
     BExpr.(
       (or_
@@ -120,7 +120,7 @@ let bf4_heuristic_inference () =
            } )
 
   in
-  HoareNet.infer prog
+  HoareNet.infer prog None None
   |> Alcotest.(check smt_equiv) "produces equivalent CPF"
     BExpr.(
       (or_
@@ -175,7 +175,7 @@ let modular_heuristic_inference () =
         } )
     ]
   in
-  HoareNet.infer prog
+  HoareNet.infer prog None None
   |> Alcotest.(check smt_equiv) "produces equivalent CPF"
     BExpr.(
       (eq_ (Expr.var (Var.make "_symb$t2$match_0$DONTCARE$_$0" 1)) (Expr.bvi 1 1))
@@ -233,7 +233,7 @@ let annotated_inference () =
         } )
     ]
   in
-  HoareNet.infer prog
+  HoareNet.infer prog None None
   |> Alcotest.(check smt_equiv) "produces equivalent CPF"
     BExpr.(
       (or_
@@ -297,7 +297,7 @@ let infer_annotations () =
         postcondition = Some BExpr.true_
       } )
   in
-  HoareNet.infer prog
+  HoareNet.infer prog None None
   |> Alcotest.(check smt_equiv) "produces equivalent CPF"
     BExpr.(
       (or_

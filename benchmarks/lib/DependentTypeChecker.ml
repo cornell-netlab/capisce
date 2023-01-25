@@ -261,7 +261,7 @@ module HoareNet = struct
     (*         ) *)
     (*   |> Option.is_some *)
 
-    let infer (cmd:t) =
+    let infer (cmd:t) nprocs pid =
       bottom_up cmd ~sequence:BExpr.ands_ ~choices:BExpr.ands_
         ~prim:(fun (triple : DepPrim.t) ->
             match triple.precondition, triple.postcondition with
@@ -273,7 +273,7 @@ module HoareNet = struct
               let prog = GCL.sequence [ pre; cmd; post ] in
               Log.debug "%s" @@ lazy (GCL.to_string prog);
               (* Qe.concolic prog *)
-              Qe.all_paths prog
+              Qe.all_paths prog nprocs pid
             | _, _ ->
               BExpr.true_
             )

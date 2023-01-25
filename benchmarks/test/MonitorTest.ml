@@ -17,16 +17,16 @@ let get_info_from_p4 source =
   let pipe = Translate.gcl_to_gpl coq_pipe in
   Log.debug_s "Computing tables";
   let tables = ASTs.GPL.(tables @@ normalize_names pipe) in
+  Log.debug_s "Computing symbolic interface";
+  let cvs =
+    List.bind tables ~f:(Primitives.Table.symbolic_interface)
+    |> List.map ~f:(fun x -> if Var.is_indexed x then x else Var.index x 0)
+  in
   Log.debug_s "passifying tables keys";
   let tables =
     let open List.Let_syntax in
     let%map t = tables in
     {t with keys = List.map t.keys ~f:(fun k -> Var.index k 0)}
-  in
-  Log.debug_s "Computing symbolic interface";
-  let cvs =
-    List.bind tables ~f:(Primitives.Table.symbolic_interface)
-    |> List.map ~f:(fun x -> if Var.is_indexed x then x else Var.index x 0)
   in
   Log.debug_s "all info got";
   (tables, cvs)
@@ -43,7 +43,7 @@ let parse_smtlib source filepath =
   (cvs, tables, cpf)
 
 let fabric () =
-  let psi = parse_smtlib "./examples/bf4_failing/fabric_no_consts.p4" "fabric_output.log" in
+  let psi = parse_smtlib "./examples/bf4_failing/fabric_no_consts.p4" "fabric_output_0.log" in
   Log.debug_s "got_cpi";
   psi
 
@@ -58,19 +58,19 @@ let empty_control_plane =
      Default ({id=(Bigint.zero, 1); data=[(Bigint.zero,3)]})
     );
     ("bridging",
-     Default ({id=(Bigint.one, 1); data=[]})
+     Default ({id=(Bigint.one, 2); data=[]})
     );
     ("mpls",
-     Default ({id=(Bigint.one, 1); data=[]})
+     Default ({id=(Bigint.one, 2); data=[]})
     );
     ("routing_v4",
      Default ({id=(Bigint.of_int 2, 2); data=[]})
     );
     ("next_mpls",
-     Default ({id=(Bigint.one, 1); data=[]})
+     Default ({id=(Bigint.one, 2); data=[]})
     );
     ("next_vlan",
-     Default ({id=(Bigint.one, 1); data=[]})
+     Default ({id=(Bigint.one, 2); data=[]})
     );
     ("acl",
      Default ({id=(Bigint.of_int 4, 3); data=[]})
@@ -82,7 +82,7 @@ let empty_control_plane =
      Default ({id=(Bigint.of_int 2, 2); data=[]})
     );
     ("multicast",
-     Default ({id=(Bigint.of_int 1, 1); data=[]})
+     Default ({id=(Bigint.of_int 1, 2); data=[]})
     );
     ("egress_vlan",
      Default ({id=(Bigint.of_int 2, 2); data=[]})
