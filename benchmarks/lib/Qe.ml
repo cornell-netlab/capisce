@@ -642,5 +642,5 @@ let table_infer ~sfreq:_ ~prsr ~fn:_ gpl_pair =
   let gcl_prog = GCL.optimize gcl_prog in
   Log.qe "%s" @@ lazy "starting inference";
   (* concolic (parserify gcl_pipe) *)
-  all_paths gcl_prog
+  all_paths gcl_prog None None
  (* table_paths ~sfreq ~fn (prsr, pipe) *)

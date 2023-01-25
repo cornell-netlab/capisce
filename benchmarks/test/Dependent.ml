@@ -331,9 +331,6 @@ let check_out_of_scope () =
   HoareNet.check_annotations prog
   |> Alcotest.(check bool) "annotation check passes" true
 
-
-
-
 let tests =
   [
     Alcotest.test_case "Modular Safe Example from Pi4 paper" `Quick passing_table_example;

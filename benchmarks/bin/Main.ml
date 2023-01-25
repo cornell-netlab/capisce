@@ -162,7 +162,7 @@ let table_infer : Command.t =
         Log.compiler_s "optimizing...";
         let gpl = ASTs.GPL.optimize_seq_pair gpl in
         Log.compiler_s "done optimizing; starting inference";
-        let cpf = Qe.table_infer ~sfreq ~prsr ~fn gpl None None in
+        let cpf = Qe.table_infer ~sfreq ~prsr ~fn gpl in
         Printf.printf "Result:\n%s\n%!Computedin %f:\n%!" (BExpr.to_smtlib cpf) (Clock.stop st)
     ]
 
