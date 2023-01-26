@@ -1054,7 +1054,7 @@ control FabricIngress(inout parsed_headers_t hdr, inout fabric_metadata_t fabric
     Filtering() filtering;
     Forwarding() forwarding;
     PreNext() pre_next;
-    Acl() acl;
+    Acal() acl;
     Next() next;
     IngressSliceTcClassifier() slice_tc_classifier;
     IngressQos() qos;

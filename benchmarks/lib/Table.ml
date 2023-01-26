@@ -5,19 +5,35 @@ module Action = struct
   type t =
     { id : Bigint.t * int;
       data : (Bigint.t * int) list;
+      dont_care : bool list;
     }
 
-  let to_smtlib {id; data} =
-    let bv = Util.uncurry Expr.bv in
-    List.fold data ~init:(bv id)
-      ~f:(fun acc d ->
-          Expr.bconcat acc (bv d)
-        )
+  let to_smtlib {id; data; dont_care} =
+    let open Expr in
+    let bv = Util.uncurry bv in
+    let action_and_data =
+      List.fold data ~init:(bv id)
+        ~f:(fun acc d -> bconcat acc (bv d))
+    in
+    let dont_care_bits =
+      let open Bigint in
+      List.foldi dont_care ~init:zero
+        ~f:(fun i bv current_bit ->
+            if current_bit then
+              (one lsl i) lor bv
+            else
+              bv)
+    in
+    List.length dont_care
+    |> Expr.bv dont_care_bits
+    |> Fn.flip bconcat action_and_data (*DONT CARE BITS COME FIRST*)
     |> Expr.to_smtlib
 
-  let typecheck {id; data} =
-    List.fold data ~init:(snd id)
-      ~f:(fun acc datum -> acc + snd datum)
+  let typecheck {id; data; dont_care} =
+    snd id
+    + List.sum (module Int) data ~f:(snd)
+    + List.length dont_care
+
 end
 
 
@@ -82,15 +98,35 @@ let make_action_var table action_bits =
   let x = Primitives.Action.cp_action table action_bits in
   Var.index x 0
 
-let align table action actionlist return_var =
-  List.foldi actionlist ~init:(BExpr.true_)
+let align_dontcares offset keys return_var =
+  let dont_care k =
+    let open Var in
+    match unindex k with
+    | Some (x, i) when Int.(i = 0) ->
+      let k_dont_care = make (str x ^ "$DONT_CARE") 1 in
+      index k_dont_care 0
+    | Some (_, i) ->
+      failwithf "[Table.align_keys] key%s was indexed with nonzero index %d" (str k) i ()
+    | None ->
+      failwithf "[Tablle.align_keys] key %s unindexed" (str k) ()
+  in
+  List.foldi keys ~init:BExpr.true_
+    ~f:(fun i acc key ->
+        BExpr.and_ acc @@
+        BExpr.eq_
+          (Expr.(bslice (offset + i) (offset + i) @@ var return_var))
+          (Expr.var @@ dont_care key)
+    )
+
+let align table actionvar actions keys return_var =
+  List.foldi actions
+    ~init:(BExpr.true_)
     ~f:(fun act_idx phi (params, _) ->
         let open BExpr in
         let open Expr in
         and_ phi @@
-        imp_ (eq_ (var action) (bvi act_idx (Var.size action - 1))) @@
-        fst @@
-        List.fold params ~init:(true_, (Var.size action ))
+        imp_ (eq_ (var actionvar) (bvi act_idx (Var.size actionvar - 1))) @@
+        fst @@ List.fold params ~init:(true_, (List.length keys + Var.size actionvar))
           ~f:(fun (phi, slicepoint) datum ->
               let symb = Primitives.Action.cp_data table act_idx datum in
               let slice_end = slicepoint + Var.size symb in
@@ -122,11 +158,13 @@ let to_smtlib {schema; body} =
     |> String.concat ~sep:" "
     |> Printf.sprintf "(assert (= %s (%s %s)))"
       (Var.str tableres) table;
+    (* Extract the dont_care bits *)
+    Printf.sprintf "(assert %s)" @@ BExpr.to_smtlib @@ align_dontcares 0 keys tableres;
     (* extract the action bits *)
-    Expr.(var tableres |> bslice 0 (action_bits - 1) |> to_smtlib)
+    Expr.(var tableres |> bslice (List.length keys) (List.length keys + Var.size action_var - 1) |> to_smtlib)
     |> Printf.sprintf "(assert (= %s %s))" (Var.str action_var);
     (* compute the alignment for action_data *)
-    align table action_var schema.actions tableres
+    align table action_var schema.actions schema.keys tableres
     |> BExpr.to_smtlib
     |> Printf.sprintf "(assert %s)"
   ]

@@ -53,51 +53,107 @@ let empty_control_plane =
   let open Table.ORG in
   String.Map.of_alist_exn [
     ("ingress_port_vlan",
-     Default ({id=(Bigint.zero, 2); data=[]}));
+     Default ({ id=(Bigint.zero, 2);
+                data=[];
+                dont_care=[true;true;true]}));
     ("fwd_classifier",
-     Default ({id=(Bigint.zero, 1); data=[(Bigint.zero,3)]})
+     Default ({id=(Bigint.zero, 1);
+               data=[(Bigint.zero,3)];
+               dont_care=[true;true;true]
+              })
     );
     ("bridging",
-     Default ({id=(Bigint.one, 2); data=[]})
+     Default ({id=(Bigint.one, 2);
+               data=[];
+               dont_care=[true;true]
+              })
     );
     ("mpls",
-     Default ({id=(Bigint.one, 2); data=[]})
+     Default ({id=(Bigint.one, 2);
+               data=[];
+               dont_care=[true]
+              })
     );
     ("routing_v4",
-     Default ({id=(Bigint.of_int 2, 2); data=[]})
+     Default ({id=(Bigint.of_int 2, 2);
+               data=[];
+               dont_care=[true];
+              })
     );
     ("next_mpls",
-     Default ({id=(Bigint.one, 2); data=[]})
+     Default ({id=(Bigint.one, 2);
+               data=[];
+               dont_care=[true]
+              })
     );
     ("next_vlan",
-     Default ({id=(Bigint.one, 2); data=[]})
+     Default ({id=(Bigint.one, 2);
+               data=[];
+               dont_care=[true]
+              })
     );
     ("acl",
-     Default ({id=(Bigint.of_int 4, 3); data=[]})
+     Default ({id=(Bigint.of_int 4, 3);
+               data=[];
+               dont_care=[true; (* standard_metadata.ingress_port*)
+                          true; (* hdr.ethernet.dst_addr *)
+                          true; (* hdr.ethernet.src_addr *)
+                          true; (* hdr.vlan_tag.vlan_id *)
+                          true; (* hdr.eth_type.value *)
+                          true; (* fabric_md.lkp.ipv4_src *)
+                          true; (* fabric_md.lkp.ipv4_dst *)
+                          true; (* fabric_md.lkp.ip_proto *)
+                          true; (* hdr.icmp.icmp_type *)
+                          true; (* hdr.icmp.icmp_code *)
+                          true; (* fabric_md.lkp.l4_sport *)
+                          true; (* fabric_md.lkp.l4_dport *)
+                          true; (* fabric_md.port_type *)
+                         ]
+              })
     );
     ("xconnect",
-     Default ({id=(Bigint.of_int 2, 2); data=[]})
+     Default ({id=(Bigint.of_int 2, 2);
+               data=[];
+               dont_care=[true;true]
+              })
     );
     ("hashed",
-     Default ({id=(Bigint.of_int 2, 2); data=[]})
+     Default ({id=(Bigint.of_int 2, 2);
+               data=[];
+               dont_care=[true;true;true;true;true;true]
+              })
     );
     ("multicast",
-     Default ({id=(Bigint.of_int 1, 2); data=[]})
+     Default ({id=(Bigint.of_int 1, 2);
+               data=[];
+               dont_care=[true]
+              })
     );
     ("egress_vlan",
-     Default ({id=(Bigint.of_int 2, 2); data=[]})
+     Default ({id=(Bigint.of_int 2, 2);
+               data=[];
+               dont_care=[true;true]
+              })
     );
     ("classifier",
-     Default ({id=(Bigint.of_int 0, 1); data=[
-         (Bigint.zero, 4); (*DEFAULT_SLICE_ID*)
-         (Bigint.zero, 2); (*DEFAULT_TC*)
-       ]})
+     Default ({id=(Bigint.of_int 0, 1);
+               data=[ (Bigint.zero, 4); (*DEFAULT_SLICE_ID*)
+                      (Bigint.zero, 2); (*DEFAULT_TC*)
+                    ];
+               dont_care=[true;true;true;true;true;true]
+       })
     );
     ("queues",
-     Default ({id=(Bigint.zero, 1); data=[(Bigint.zero, 5)]})
+     Default ({id=(Bigint.zero, 1);
+               data=[(Bigint.zero, 5)];
+               dont_care=[true;true;true];
+              })
     );
     ("rewriter",
-     Default ({id=(Bigint.of_int 2, 2); data=[]})
+     Default ({id=(Bigint.of_int 2, 2);
+               data=[];
+               dont_care=[true];
+              })
     );
   ]
 
