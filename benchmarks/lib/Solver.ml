@@ -1,4 +1,6 @@
+module P4Info = Info
 open Core
+module Info = P4Info
 
 let princess_exe = "/home/ericthewry/Downloads/princess-bin-2021-05-10/princess -inputFormat=smtlib +mostGeneralConstraint +incremental "
 (* let z3_exe = "/usr/bin/z3 -smt2 -t:30000" *)
@@ -92,10 +94,10 @@ let check_unsat ?(timeout=None) consts phi =
   |> run_z3 
   |> Smt.is_unsat
 
-let check_valid_tables ?(timeout=None) consts tables phi =
+let check_valid_tables ?(timeout=None) consts tables info phi =
   let funs = let open List.Let_syntax in
     let%map table = tables in
-    Table.to_smtlib table
+    Table.to_smtlib table info
     |> Option.value_exn ~message:"Failed to extract smt encoding of table"
   in
   let smtlib_str =

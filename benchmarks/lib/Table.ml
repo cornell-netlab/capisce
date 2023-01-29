@@ -1,4 +1,6 @@
+module P4Info = Info
 open Core
+module Info = P4Info
 
 module Action = struct
 
@@ -57,6 +59,19 @@ module ORG = struct
         (Action.to_smtlib act)
         (to_smtlib rst)
 
+  let max_width (org : t) : int =
+    let rec loop org old =
+    match org with
+    | Default action ->
+      Action.typecheck action
+      |> Int.max old
+    | Guard {key=_;act;rst} ->
+      Action.typecheck act
+      |> Int.max old
+      |> loop rst
+    in
+    loop org (-1)
+
   let rec typecheck old org =
     match org with
     | Default action ->
@@ -87,6 +102,47 @@ module ORG = struct
     loop body
     |> List.all_equal ~equal:Int.equal
 
+  let monotonize org : t =
+    let or_ acc dcs =
+      if List.is_empty acc then
+        dcs
+      else
+      if List.length acc = List.length dcs then
+        List.map2_exn acc dcs ~f:( || )
+      else
+        failwithf "[monotonize] different dont_cares in %s" (to_smtlib org) ();
+    in
+    let rec loop acc = function
+      | Default act ->
+        Default {act with dont_care = or_ acc act.dont_care}
+
+      | Guard {key; act; rst} ->
+        let act = {act with dont_care = or_ acc act.dont_care} in
+        Guard {key;
+               act;
+               rst = loop act.dont_care rst
+              }
+    in
+    loop [] org
+
+  let pad_action_data org =
+    let max_width = max_width org in
+    let pad_action action =
+        let pad_width = max_width - Action.typecheck action in
+        if pad_width > 0 then
+          {action with data = action.data @ [Bigint.zero, pad_width]}
+        else
+           action
+    in
+    let rec pad = function
+      | Default action ->
+        Default (pad_action action)
+      | Guard guard ->
+        let act = pad_action guard.act in
+        let rst = pad guard.rst in
+        Guard {guard with act; rst}
+    in
+    pad org
 end
 
 type t = {
@@ -108,7 +164,7 @@ let align_dontcares offset keys return_var =
     | Some (_, i) ->
       failwithf "[Table.align_keys] key%s was indexed with nonzero index %d" (str k) i ()
     | None ->
-      failwithf "[Tablle.align_keys] key %s unindexed" (str k) ()
+      failwithf "[Table.align_keys] key %s unindexed" (str k) ()
   in
   List.foldi keys ~init:BExpr.true_
     ~f:(fun i acc key ->
@@ -137,10 +193,17 @@ let align table actionvar actions keys return_var =
             )
       )
 
-let to_smtlib {schema; body} =
+let rename_keys table keys =
+  {table with schema = {table.schema with keys}}
+
+let to_smtlib {schema; body} info =
   let open Option.Let_syntax in
   let table = schema.name in
-  let keys = schema.keys in
+  let symbolic_keys = schema.keys in
+  let semantic_keys =
+    let table_info = Info.find_one_table_by_name info schema.name in
+    List.map table_info.match_fields ~f:(fun f -> Var.make f.name f.bitwidth)
+  in
   let%bind out_bits = ORG.typecheck None body in
   let%map action_bits = ORG.get_action_bits body in
   (* because of passive form ensure you index actionvar to 0*)
@@ -152,16 +215,16 @@ let to_smtlib {schema; body} =
     Var.list_to_smtlib_decls [tableres];
     (* Define the function*)
     Printf.sprintf "(define-fun %s (%s) (_ BitVec %d)\n %s)"
-      table (Var.list_to_smtlib_quant keys) out_bits smtlibstring;
+      table (Var.list_to_smtlib_quant semantic_keys) out_bits smtlibstring;
     (* assert that the output variable is the function output when applied to the symbolic keys *)
-    List.map keys ~f:Var.str
+    List.map symbolic_keys ~f:Var.str
     |> String.concat ~sep:" "
     |> Printf.sprintf "(assert (= %s (%s %s)))"
       (Var.str tableres) table;
     (* Extract the dont_care bits *)
-    Printf.sprintf "(assert %s)" @@ BExpr.to_smtlib @@ align_dontcares 0 keys tableres;
+    Printf.sprintf "(assert %s)" @@ BExpr.to_smtlib @@ align_dontcares 0 symbolic_keys tableres;
     (* extract the action bits *)
-    Expr.(var tableres |> bslice (List.length keys) (List.length keys + Var.size action_var - 1) |> to_smtlib)
+    Expr.(var tableres |> bslice (List.length symbolic_keys) (List.length symbolic_keys + Var.size action_var - 1) |> to_smtlib)
     |> Printf.sprintf "(assert (= %s %s))" (Var.str action_var);
     (* compute the alignment for action_data *)
     align table action_var schema.actions schema.keys tableres

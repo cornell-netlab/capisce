@@ -497,11 +497,7 @@ module Table = struct
   let act_size tbl =
     if List.length tbl.actions <= 0 then failwithf "Table %s has 0 actions" tbl.name ();
     List.length tbl.actions
-    |> Int.succ
-    |> Float.of_int
-    |> Stdlib.Float.log2
-    |> Float.round_up
-    |> Int.of_float
+    |> Util.bits_to_encode_n
 
   let explode _ = failwith "Ironically tables themselves cannot be exploded"
 

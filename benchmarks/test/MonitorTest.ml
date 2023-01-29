@@ -120,7 +120,7 @@ let empty_control_plane =
     ("hashed",
      Default ({id=(Bigint.of_int 2, 2);
                data=[];
-               dont_care=[true;true;true;true;true;true]
+               dont_care=[true] (*;true;true;true;true;true]*)
               })
     );
     ("multicast",
@@ -161,20 +161,24 @@ let valid_fabric_tables map =
   let cvs, schemata, cpf = fabric () in
   let control_plane = Table.zip schemata map in
   Log.debug_s "Checking state";
-  Monitor.check_state cvs control_plane cpf
+  Monitor.check_state cvs control_plane FabricInfo.info cpf
   |> Alcotest.(check bool) "table state is valid" true
 
 let test_case_test () =
   valid_fabric_tables empty_control_plane
 
+let fabric_ptf_bridging_0 () =
+  let module Schema = Primitives.Table in
+  Runtime.bridging_test_0
+  |> Runtime.to_control_plane FabricInfo.info empty_control_plane
+  |> valid_fabric_tables
+
 let test_routing_v4_treatment_empty () =
-  (* https://github.com/opennetworkinglab/onos/blob/master/pipelines/fabric/impl/src/test/java/org/onosproject/pipelines/fabric/impl/behaviour/FabricInterpreterTest.java#L78 *)
-  (* Routing V4: * -> NOP *)
   empty_control_plane
   |> valid_fabric_tables
 
 let tests =
   [
     Alcotest.test_case "[Fabric] CPI passes trivial test case" `Quick test_case_test;
-    Alcotest.test_case "[ONOS Test] testRoutingV4TreatmentEmpty" `Quick test_routing_v4_treatment_empty;
+    Alcotest.test_case "[fabric-ptf] bridging_0" `Quick fabric_ptf_bridging_0;
   ]

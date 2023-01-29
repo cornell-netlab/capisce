@@ -593,11 +593,11 @@ control Next(inout parsed_headers_t hdr, inout fabric_metadata_t fabric_metadata
     table hashed {
         key = {
             fabric_metadata.next_id      : exact @name("next_id") ;
-            fabric_metadata.ipv4_src_addr: exact; // selector
-            fabric_metadata.ipv4_dst_addr: exact; // selector;
-            fabric_metadata.ip_proto     : exact; // selector;
-            fabric_metadata.l4_sport     : exact; // selector;
-            fabric_metadata.l4_dport     : exact; // selector;
+            // fabric_metadata.ipv4_src_addr: exact; // selector
+            // fabric_metadata.ipv4_dst_addr: exact; // selector;
+            // fabric_metadata.ip_proto     : exact; // selector;
+            // fabric_metadata.l4_sport     : exact; // selector;
+            // fabric_metadata.l4_dport     : exact; // selector;
         }
         actions = {
             output_hashed;
