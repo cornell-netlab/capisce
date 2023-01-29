@@ -17,6 +17,11 @@ module GCL = struct
       in
       table
 
+    let ite b c1 c2 =
+      choice
+        (seq (assume b) c1)
+        (seq (assume (BExpr.not_ b)) c2)
+
     let wp cmd phi =
       top_down cmd ~init:phi
         ~prim:(fun postcond cmd ->
