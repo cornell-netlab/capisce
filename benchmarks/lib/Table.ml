@@ -103,21 +103,21 @@ module ORG = struct
     |> List.all_equal ~equal:Int.equal
 
   let monotonize org : t =
-    let or_ acc dcs =
+    let and_ acc dcs =
       if List.is_empty acc then
         dcs
       else
       if List.length acc = List.length dcs then
-        List.map2_exn acc dcs ~f:( || )
+        List.map2_exn acc dcs ~f:( && )
       else
         failwithf "[monotonize] different dont_cares in %s" (to_smtlib org) ();
     in
     let rec loop acc = function
       | Default act ->
-        Default {act with dont_care = or_ acc act.dont_care}
+        Default {act with dont_care = and_ acc act.dont_care}
 
       | Guard {key; act; rst} ->
-        let act = {act with dont_care = or_ acc act.dont_care} in
+        let act = {act with dont_care = and_ acc act.dont_care} in
         Guard {key;
                act;
                rst = loop act.dont_care rst
