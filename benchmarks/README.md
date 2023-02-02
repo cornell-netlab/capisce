@@ -8,6 +8,7 @@ icecap is a tool to generate SMTLIB expressions that verify control plane validi
 1. Install OPAM and update the package lists
     ```
     bash -c "sh <(curl -fsSL https://raw.githubusercontent.com/ocaml/opam/master/shell/install.sh)"
+    opam init
     opam update
     ```
 
@@ -30,7 +31,7 @@ icecap is a tool to generate SMTLIB expressions that verify control plane validi
 4. Clone this repository:
    ```
    git clone git@github.com:cornell-netlab/inference.git
-   cd inference/benchmark
+   cd inference/benchmarks
    ```
 
 5. Install the package dependencies

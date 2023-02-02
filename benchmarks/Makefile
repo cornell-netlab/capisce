@@ -10,6 +10,9 @@ all:
 install: all
 	rm -f ~/.local/bin/icecap && cp _build/default/bin/main.exe ~/.local/bin/icecap
 
+opaminstall: all
+	rm -f ~/.opam/4.14.0/bin/icecap && cp _build/default/bin/main.exe ~/.opam/4.14.0/bin/icecap
+
 clean:
 	rm -fr _build
 
