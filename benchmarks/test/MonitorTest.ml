@@ -32,21 +32,25 @@ let get_info_from_p4 source =
   (tables, cvs)
    (* ASTs.(GPL.(seq prsr pipe |> normalize_names |> encode_tables |> Psv.passify |> snd |> Psv.vars))) *)
 
-let parse_smtlib source filepath =
-  Log.debug "reading smtlib file from: %s " @@ lazy filepath;
+let parse_smtlib source filepaths =
+  let open List.Let_syntax in
   Log.debug "Getting vars from: %s" @@ lazy source;
   let tables, cvs = get_info_from_p4 source in
-  Log.debug "Got tables & variables: parsing smt from %s " @@ lazy filepath;
+  let%map filepath = filepaths in
+  Log.debug "reading smtlib file from: %s " @@ lazy filepath;
   let cpf_string = In_channel.read_all filepath in
   Log.debug_s "cpf read, parsing";
   let cpf = Pbench.Solver.of_smtlib ~dvs:[] ~cvs cpf_string in
-  (cvs, tables, cpf)
+  (cvs, tables, cpf, filepath)
 
-let fabric () =
-  let psi = parse_smtlib "./examples/bf4_failing/fabric_no_consts.p4" "fabric_output_0.log" in
-  Log.debug_s "got_cpi";
-  psi
-
+let fabric =
+  let psis =
+    List.init 1000 ~f:Fn.id
+    |> List.map ~f:(Printf.sprintf "fabric_output_%d.log")
+    |> parse_smtlib "./examples/bf4_failing/fabric_no_consts.p4"
+  in
+  Log.debug_s "got_cpis";
+  psis
 
 let empty_control_plane =
   let module Schema = Primitives.Table in
@@ -157,28 +161,35 @@ let empty_control_plane =
     );
   ]
 
-let valid_fabric_tables map =
-  let cvs, schemata, cpf = fabric () in
+let valid_fabric_tables name map =
+  let open List.Let_syntax in
+  let test_case_name file =  Printf.sprintf "[fabric_ptf] %s formula %s" name file in
+  let%map cvs, schemata, cpf, cpf_filepath = fabric in
   let control_plane = Table.zip schemata map in
   Log.debug_s "Checking state";
   Monitor.check_state cvs control_plane FabricInfo.info cpf
   |> Alcotest.(check bool) "table state is valid" true
+  |> Fn.const
+  |> Alcotest.test_case (test_case_name cpf_filepath) `Quick
 
-let test_case_test () =
-  valid_fabric_tables empty_control_plane
+let test_case_test =
+  valid_fabric_tables "empty" empty_control_plane
 
-let fabric_ptf_bridging_0 () =
+let fabric_ptf runtime name =
+  runtime
+  |> Runtime.to_control_plane FabricInfo.info empty_control_plane
+  |> valid_fabric_tables name
+
+let fabric_ptf_bridging_0 =
   let module Schema = Primitives.Table in
   Runtime.bridging_test_0
   |> Runtime.to_control_plane FabricInfo.info empty_control_plane
-  |> valid_fabric_tables
-
-let test_routing_v4_treatment_empty () =
-  empty_control_plane
-  |> valid_fabric_tables
+  |> valid_fabric_tables "bridging_0"
 
 let tests =
-  [
-    Alcotest.test_case "[Fabric] CPI passes trivial test case" `Quick test_case_test;
-    Alcotest.test_case "[fabric-ptf] bridging_0" `Quick fabric_ptf_bridging_0;
+  List.bind  [
+    "TEST empty control plane"
+    |> fabric_ptf [];
+    "TEST bridging_0"
+    |> fabric_ptf Runtime.bridging_test_0;
   ]
