@@ -227,5 +227,6 @@ let tests : unit Alcotest.test_case list =
     |> fabric_ptf PTFFabricGtpEndMarkerPacketOut.test_0;
     "TEST FabricGtpEndMarkerPacketOut 1"
     |> fabric_ptf PTFFabricGtpEndMarkerPacketOut.test_1;
-
+    "TEST FabricIPv4DefaultRouteTest"
+    |> fabric_ptf PTFFabricIPv4DefaultRouteTest.test;
   ]
