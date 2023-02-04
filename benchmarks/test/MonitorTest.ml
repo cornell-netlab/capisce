@@ -212,4 +212,6 @@ let tests : unit Alcotest.test_case list =
     |> fabric_ptf PTFFabricArpBroadcastTaggedTest.test;
     "TEST FabricArpBroadcastUntaggedTest"
     |> fabric_ptf PTFFabricArpBroadcastUntaggedTest.test;
+    "TEST FabricArpPacketInTest"
+    |> fabric_ptf PTFFabricArpPacketInTest.test;
   ]

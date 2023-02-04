@@ -62,9 +62,17 @@ let rec to_table_action dont_care info (table : Info.table) profiles = function
     let index,_ = List.findi_exn table.action_refs ~f:(fun _ aref -> aref.id = action_id) in
     let act_size = Util.bits_to_encode_n (List.length table.action_refs) in
     let data =
-      List.map2_exn action_decl.params args ~f:(fun param args ->
-          (args.value, param.bitwidth)
-      )
+      match
+        List.map2 action_decl.params args ~f:(fun param args ->
+          (args.value, param.bitwidth))
+      with
+      | Ok x -> x
+      | Unequal_lengths ->
+        failwithf "translating actiondata for %s.%s id %d. Got %d args, expected %d params"
+          table.name action_decl.name action_id
+          (List.length args)
+          (List.length action_decl.params)
+          ()
     in
     Table.Action.{
       id = (Bigint.of_int index, act_size);

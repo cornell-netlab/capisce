@@ -554,13 +554,7 @@ let info : t = {
     {
       name = "punt_to_cpu";
       id = 23579892;
-      params = [
-        {
-          id = 1;
-          name = "clone_id";
-          bitwidth = 32;
-        }
-      ]
+      params = []
     };
     {
       name = "set_clone_session_id";
