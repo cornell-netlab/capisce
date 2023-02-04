@@ -206,4 +206,6 @@ let tests : unit Alcotest.test_case list =
     |> fabric_ptf PTFBridging.test_10;
     "TEST bridging_11"
     |> fabric_ptf PTFBridging.test_11;
+    "TEST FabricArpBroadcastMixedTest"
+    |> fabric_ptf PTFFabricArpBroadcastMixedTest.test
   ]
