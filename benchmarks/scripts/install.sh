@@ -4,6 +4,7 @@
 cpidir=$pwd
 
 # install opam
+sudo apt install bubblewrap
 bash -c "sh <(curl -fsSL https://raw.githubusercontent.com/ocaml/opam/master/shell/install.sh)"
 
 
@@ -38,7 +39,12 @@ cd benchmarks
 
 # install opam dependencies
 opam install . --deps-only -y
-opam install ocamlgraph
+opam install -y ocamlgraph
+opam install -y memtrace
+opam install -y conf-which
+opam install -y conf-autoconfcd
+opam install -y hashcons
+
 
 # make icecap
 make opaminstall
