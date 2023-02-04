@@ -229,4 +229,10 @@ let tests : unit Alcotest.test_case list =
     |> fabric_ptf PTFFabricGtpEndMarkerPacketOut.test_1;
     "TEST FabricIPv4DefaultRouteTest"
     |> fabric_ptf PTFFabricIPv4DefaultRouteTest.test;
+    "TEST IPv4DoNotOverrideInfraTest 0"
+    |> fabric_ptf PTFFabricIPv4DoNotOverrideInfraTest.test_0;
+    "TEST IPv4DoNotOverrideInfraTest 1"
+    |> fabric_ptf PTFFabricIPv4DoNotOverrideInfraTest.test_1;
+    "TEST IPv4DoNotOverrideInfraTest 2"
+    |> fabric_ptf PTFFabricIPv4DoNotOverrideInfraTest.test_2;
   ]

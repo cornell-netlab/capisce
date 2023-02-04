@@ -86,8 +86,17 @@ let rec to_table_action dont_care info (table : Info.table) profiles = function
   | Profile { action_profile_member_id } ->
     let action_profile_decl = Info.find_profile_for_table info table in
     let action_profile = Int.Map.find_exn profiles action_profile_decl.id in
-    let member = List.find_exn action_profile.members
-        ~f:(fun {member_id;_} -> member_id = action_profile_member_id) in
+    let member =
+      match
+        List.find action_profile.members
+          ~f:(fun {member_id;_} -> member_id = action_profile_member_id)
+      with
+      | None -> failwithf "could not find member %d in action_profile id %d"
+                  action_profile_member_id
+                  action_profile.id
+                  ()
+      | Some member -> member
+    in
     (* make a recursive call to process the action *)
     to_table_action dont_care info table profiles (Action member.action)
 
