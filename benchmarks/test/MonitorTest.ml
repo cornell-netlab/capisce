@@ -217,5 +217,11 @@ let tests : unit Alcotest.test_case list =
     (* "Test FabricArpPacketOutTest" *)
     (*  No Log is generated for this test! *)
     (* |> fabric_ptf PTFFabricArpPacketOutTest.test; *)
+    "Test FabricDoubleVlanXConnectTest 0"
+    |> fabric_ptf PTFFabricDoubleVlanXConnectTest.test_0;
+    "Test FabricDoubleVlanXConnectTest 1"
+    |> fabric_ptf PTFFabricDoubleVlanXConnectTest.test_1;
+    "Test FabricDoubleVlanXConnectTest 2"
+    |> fabric_ptf PTFFabricDoubleVlanXConnectTest.test_2;
 
   ]
