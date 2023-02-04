@@ -10,6 +10,13 @@ module Action = struct
       dont_care : bool list;
     }
 
+  let to_string a =
+    let v_to_s (bi,i) = Printf.sprintf "(%s,%d)" (Bigint.to_string bi) i in
+    Printf.sprintf "{id = %s; data = %s; dont_care = %s}"
+      (v_to_s a.id)
+      (List.to_string a.data ~f:v_to_s)
+      (List.to_string a.dont_care ~f:Bool.to_string )
+
   let to_smtlib {id; data; dont_care} =
     let open Expr in
     let bv = Util.uncurry bv in
@@ -49,6 +56,16 @@ module ORG = struct
         act : Action.t;
         rst : t
       }
+
+  let rec to_string = function
+    | Default action ->
+      Action.to_string action
+      |> Printf.sprintf "Default %s"
+    | Guard {key; act; rst} ->
+      Printf.sprintf "Guard {key = %s;\nact = %s;\nrst = %s}"
+        (BExpr.to_smtlib key)
+        (Action.to_string act)
+        (to_string rst)
 
   let rec to_smtlib = function
     | Default action ->
@@ -102,26 +119,27 @@ module ORG = struct
     loop body
     |> List.all_equal ~equal:Int.equal
 
-  let monotonize org : t =
+  let monotonize org : t option =
+    let open Option.Let_syntax in
     let and_ acc dcs =
       if List.is_empty acc then
-        dcs
+        Some dcs
       else
       if List.length acc = List.length dcs then
-        List.map2_exn acc dcs ~f:( && )
+        Some (List.map2_exn acc dcs ~f:( && ))
       else
-        failwithf "[monotonize] different dont_cares in %s" (to_smtlib org) ();
+        None
     in
     let rec loop acc = function
       | Default act ->
-        Default {act with dont_care = and_ acc act.dont_care}
+        let%map dont_care = and_ acc act.dont_care in
+        Default {act with dont_care}
 
       | Guard {key; act; rst} ->
-        let act = {act with dont_care = and_ acc act.dont_care} in
-        Guard {key;
-               act;
-               rst = loop act.dont_care rst
-              }
+        let%bind dont_care = and_ acc act.dont_care in
+        let act = {act with dont_care} in
+        let%map rst = loop act.dont_care rst in
+        Guard {key; act; rst; }
     in
     loop [] org
 

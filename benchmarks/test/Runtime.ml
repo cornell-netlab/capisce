@@ -172,5 +172,11 @@ let to_control_plane info default ops =
         (profiles, add_row control_plane)
       )
   |> snd
-  |> String.Map.map ~f:(Table.ORG.monotonize)
+  |> String.Map.mapi ~f:(fun ~key:table ~data:org ->
+      match Table.ORG.monotonize org with
+      | Some org -> org
+      | None ->
+        failwithf "[to_control_plane] couldn't monotonize table %s:\n%s"
+          table (Table.ORG.to_string org) ()
+    )
   |> String.Map.map ~f:(Table.ORG.pad_action_data)

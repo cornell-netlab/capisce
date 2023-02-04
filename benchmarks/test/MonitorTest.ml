@@ -63,7 +63,7 @@ let empty_control_plane =
     ("fwd_classifier",
      Default ({id=(Bigint.zero, 1);
                data=[(Bigint.zero,3)];
-               dont_care=[true;true;true]
+               dont_care=[true;true;true;true]
               })
     );
     ("bridging",
@@ -223,5 +223,9 @@ let tests : unit Alcotest.test_case list =
     |> fabric_ptf PTFFabricDoubleVlanXConnectTest.test_1;
     "Test FabricDoubleVlanXConnectTest 2"
     |> fabric_ptf PTFFabricDoubleVlanXConnectTest.test_2;
+    "TEST FabricGtpEndMarkerPacketOut 0"
+    |> fabric_ptf PTFFabricGtpEndMarkerPacketOut.test_0;
+    "TEST FabricGtpEndMarkerPacketOut 1"
+    |> fabric_ptf PTFFabricGtpEndMarkerPacketOut.test_1;
 
   ]

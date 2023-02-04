@@ -482,7 +482,7 @@ let info : t = {
     };
     {
       name = "set_forwarding_type";
-      id = 21791748;
+      id = 25032921;
       params = [
         {
           id = 1;
@@ -505,6 +505,17 @@ let info : t = {
     {
       name = "pop_mpls_and_next";
       id = 30066030;
+      params = [
+        {
+          id = 1;
+          name = "next_id";
+          bitwidth = 32;
+        }
+      ]
+    };
+    {
+      name = "set_next_id_routing_v4";
+      id = 19792090;
       params = [
         {
           id = 1;
