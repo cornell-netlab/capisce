@@ -45,8 +45,8 @@ let parse_smtlib source filepaths =
 
 let fabric =
   let psis =
-    List.init 1000 ~f:Fn.id
-    |> List.map ~f:(Printf.sprintf "fabric_output_%d.log")
+    List.init 700 ~f:Fn.id
+    |> List.map ~f:(Printf.sprintf "fabric_cpis/slice_700_%d")
     |> parse_smtlib "./examples/bf4_failing/fabric_no_consts.p4"
   in
   Log.debug_s "got_cpis";
@@ -167,29 +167,43 @@ let valid_fabric_tables name map =
   let%map cvs, schemata, cpf, cpf_filepath = fabric in
   let control_plane = Table.zip schemata map in
   Log.debug_s "Checking state";
-  Monitor.check_state cvs control_plane FabricInfo.info cpf
-  |> Alcotest.(check bool) "table state is valid" true
-  |> Fn.const
+  begin fun () ->
+    Monitor.check_state cvs control_plane FabricInfo.info cpf
+    |> Alcotest.(check bool) "control plane is a satisfying instance" true
+  end
   |> Alcotest.test_case (test_case_name cpf_filepath) `Quick
-
-let test_case_test =
-  valid_fabric_tables "empty" empty_control_plane
 
 let fabric_ptf runtime name =
   runtime
   |> Runtime.to_control_plane FabricInfo.info empty_control_plane
   |> valid_fabric_tables name
 
-let fabric_ptf_bridging_0 =
-  let module Schema = Primitives.Table in
-  Runtime.bridging_test_0
-  |> Runtime.to_control_plane FabricInfo.info empty_control_plane
-  |> valid_fabric_tables "bridging_0"
-
-let tests =
-  List.bind  [
+let tests : unit Alcotest.test_case list =
+  List.bind ~f:Fn.id  [
     "TEST empty control plane"
     |> fabric_ptf [];
     "TEST bridging_0"
-    |> fabric_ptf Runtime.bridging_test_0;
+    |> fabric_ptf PTFBridging.test_0;
+    "TEST bridging_1"
+    |> fabric_ptf PTFBridging.test_1;
+    "TEST bridging_2"
+    |> fabric_ptf PTFBridging.test_2;
+    "TEST bridging_3"
+    |> fabric_ptf PTFBridging.test_3;
+    "TEST bridging_4"
+    |> fabric_ptf PTFBridging.test_4;
+    "TEST bridging_5"
+    |> fabric_ptf PTFBridging.test_5;
+    "TEST bridging_6"
+    |> fabric_ptf PTFBridging.test_6;
+    "TEST bridging_7"
+    |> fabric_ptf PTFBridging.test_7;
+    "TEST bridging_8"
+    |> fabric_ptf PTFBridging.test_8;
+    "TEST bridging_9"
+    |> fabric_ptf PTFBridging.test_9;
+    "TEST bridging_10"
+    |> fabric_ptf PTFBridging.test_10;
+    "TEST bridging_11"
+    |> fabric_ptf PTFBridging.test_11;
   ]
