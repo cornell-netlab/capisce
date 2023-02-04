@@ -235,4 +235,6 @@ let tests : unit Alcotest.test_case list =
     |> fabric_ptf PTFFabricIPv4DoNotOverrideInfraTest.test_1;
     "TEST IPv4DoNotOverrideInfraTest 2"
     |> fabric_ptf PTFFabricIPv4DoNotOverrideInfraTest.test_2;
+    "TEST IPv4MPLSTest"
+    |> fabric_ptf PTFFabricIPv4MPLSTest.test;
   ]
