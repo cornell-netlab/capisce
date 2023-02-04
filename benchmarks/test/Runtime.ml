@@ -49,6 +49,10 @@ type t =
       action_id : int;
       args : arg list
     }
+  | Default of {
+      table_id : int;
+      action : action;
+    }
 
 let exact_mac str =
   Ternary { value = Bigint.of_string str;
@@ -144,6 +148,19 @@ let to_row (info : Info.t) profiles op : action_profile Int.Map.t * (Table.ORG.t
            | None -> failwithf "Couldn't find table %s in control plane" table.name ()
            | Some rst -> Table.ORG.(Guard { key; act; rst })
          )
+    )
+  | Default {table_id; action } ->
+    let table = Info.find_table info table_id in
+    let dont_cares = List.map table.match_fields ~f:(Fn.const true) in
+    let default = to_table_action dont_cares info table profiles action in
+    ( profiles,
+      fun control_plane ->
+      String.Map.update control_plane table.name
+      ~f:(function
+           | None -> failwithf "Couldn't find table %s in control plane" table.name ()
+           | Some org ->
+             Table.ORG.update_default_action org default
+      )
     )
   | ActionProfileMember {action_profile_id; member_id; action_id; args} ->
     let new_member = {member_id; action = {action_id; args}} in

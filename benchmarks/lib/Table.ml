@@ -161,6 +161,12 @@ module ORG = struct
         Guard {guard with act; rst}
     in
     pad org
+
+  let rec update_default_action org default =
+    match org with
+    | Default _ -> Default default
+    | Guard guard ->
+      Guard {guard with rst = update_default_action guard.rst default }
 end
 
 type t = {
