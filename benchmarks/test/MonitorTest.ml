@@ -303,4 +303,16 @@ let tests : unit Alcotest.test_case list =
     |> fabric_ptf PTFFabricIPv4UnicastTest.test_10;
     "TEST FabricIPv4UnicastTest 11"
     |> fabric_ptf PTFFabricIPv4UnicastTest.test_11;
+    "TEST FabricIpv4UnicastFromPacketOutTest 0"
+    |> fabric_ptf PTFFabricIpv4UnicastFromPacketOutTest.test_0;
+    "TEST FabricIpv4UnicastFromPacketOutTest 1"
+    |> fabric_ptf PTFFabricIpv4UnicastFromPacketOutTest.test_1;
+    "TEST FabricIpv4UnicastFromPacketOutTest 2"
+    |> fabric_ptf PTFFabricIpv4UnicastFromPacketOutTest.test_2;
+    "TEST FabricIpv4UnicastFromPacketOutTest 3"
+    |> fabric_ptf PTFFabricIpv4UnicastFromPacketOutTest.test_3;
+    "TEST FabricIpv4UnicastFromPacketOutTest 4"
+    |> fabric_ptf PTFFabricIpv4UnicastFromPacketOutTest.test_4;
+    "TEST FabricIpv4UnicastFromPacketOutTest 5"
+    |> fabric_ptf PTFFabricIpv4UnicastFromPacketOutTest.test_5;
   ]
