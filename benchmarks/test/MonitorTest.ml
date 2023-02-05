@@ -273,5 +273,6 @@ let tests : unit Alcotest.test_case list =
     |> fabric_ptf PTFFabricIPv4UnicastGroupTestAllPortIpSrc.test_0;
     "TEST PTFFabricIPv4UnicastGroupTestAllPortIpSrc 1"
     |> fabric_ptf PTFFabricIPv4UnicastGroupTestAllPortIpSrc.test_1;
-
+    "TEST FabricIPv4UnicastGroupTestAllPortTcpDport"
+    |> fabric_ptf PTFFabricIPv4UnicastGroupTestAllPortTcpDport.test;
   ]
