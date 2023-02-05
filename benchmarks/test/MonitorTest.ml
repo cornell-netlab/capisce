@@ -237,4 +237,16 @@ let tests : unit Alcotest.test_case list =
     |> fabric_ptf PTFFabricIPv4DoNotOverrideInfraTest.test_2;
     "TEST IPv4MPLSTest"
     |> fabric_ptf PTFFabricIPv4MPLSTest.test;
+    "TEST FabricIPv4MplsDoNotOverrideTest 0"
+    |> fabric_ptf PTFFabricIPv4MplsDoNotOverrideTest.test_0;
+    "TEST FabricIPv4MplsDoNotOverrideTest 1"
+    |> fabric_ptf PTFFabricIPv4MplsDoNotOverrideTest.test_1;
+    "TEST FabricIPv4MplsDoNotOverrideTest 2"
+    |> fabric_ptf PTFFabricIPv4MplsDoNotOverrideTest.test_2;
+    "TEST FabricIPv4MplsDoNotOverrideTest 3"
+    |> fabric_ptf PTFFabricIPv4MplsDoNotOverrideTest.test_3;
+    "TEST FabricIPv4MplsDoNotOverrideTest 4"
+    |> fabric_ptf PTFFabricIPv4MplsDoNotOverrideTest.test_4;
+    "TEST FabricIPv4MplsDoNotOverrideTest 5"
+    |> fabric_ptf PTFFabricIPv4MplsDoNotOverrideTest.test_5;
   ]
