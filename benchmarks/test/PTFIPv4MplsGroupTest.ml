@@ -89,7 +89,7 @@ let test_0 = [
   TableEntry { table_id = 47960972;
                matches = [{ field_id = 1;
                             match_key = Exact { value =  Bigint.of_int 100 } }];
-               action = Profile { action_profile_member_id = 100 };
+               action = Profile { action_profile_member_id = 1 };
                priority = -1};
 
   TableEntry { table_id = 48011802;
@@ -187,7 +187,7 @@ let test_1 = [
   TableEntry { table_id = 47960972;
                matches = [{ field_id = 1;
                             match_key = Exact { value =  Bigint.of_int 100 } }];
-               action = Profile { action_profile_member_id = 100 };
+               action = Profile { action_profile_member_id = 2 };
                priority = -1};
 
   TableEntry { table_id = 48011802;
@@ -285,7 +285,7 @@ let test_2 = [
   TableEntry { table_id = 47960972;
                matches = [{ field_id = 1;
                             match_key = Exact { value =  Bigint.of_int 100 } }];
-               action = Profile { action_profile_member_id = 100 };
+               action = Profile { action_profile_member_id = 3 };
                priority = -1};
 
   TableEntry { table_id = 48011802;
@@ -382,7 +382,7 @@ let test_3 = [
   TableEntry { table_id = 47960972;
                matches = [{ field_id = 1;
                             match_key = Exact { value =  Bigint.of_int 100 } }];
-               action = Profile { action_profile_member_id = 100 };
+               action = Profile { action_profile_member_id = 4 };
                priority = -1};
 
   TableEntry { table_id = 48011802;
@@ -479,7 +479,7 @@ let test_4 = [
   TableEntry { table_id = 47960972;
                matches = [{ field_id = 1;
                             match_key = Exact { value =  Bigint.of_int 100 } }];
-               action = Profile { action_profile_member_id = 100 };
+               action = Profile { action_profile_member_id = 5 };
                priority = -1};
 
   TableEntry { table_id = 48011802;
@@ -576,7 +576,7 @@ let test_5 = [
   TableEntry { table_id = 47960972;
                matches = [{ field_id = 1;
                             match_key = Exact { value =  Bigint.of_int 100 } }];
-               action = Profile { action_profile_member_id = 100 };
+               action = Profile { action_profile_member_id = 6 };
                priority = -1};
 
   TableEntry { table_id = 48011802;

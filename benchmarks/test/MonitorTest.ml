@@ -351,5 +351,6 @@ let tests : unit Alcotest.test_case list =
     |> fabric_ptf PTFIPv4MplsGroupTest.test_4;
     "TEST PTFIPv4MplsGroupTest 5"
     |> fabric_ptf PTFIPv4MplsGroupTest.test_5;
-
+    "TEST PTFIPv4UnicastGroupTestAllPortTcpSport"
+    |> fabric_ptf PTFIPv4UnicastGroupTestAllPortTcpSport.test;
   ]
