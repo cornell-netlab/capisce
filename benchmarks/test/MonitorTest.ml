@@ -261,4 +261,6 @@ let tests : unit Alcotest.test_case list =
     |> fabric_ptf PTFFabricIPv4MplsOverrideEdgeTest.test_4;
     "TEST FabricIPv4MplsOverrideEdgeTest 5"
     |> fabric_ptf PTFFabricIPv4MplsOverrideEdgeTest.test_5;
+    "TEST FabricIPv4nicastAclOuterDropTest"
+    |> fabric_ptf PTFFabricIPv4UnicastAclOuterDropTest.test;
   ]

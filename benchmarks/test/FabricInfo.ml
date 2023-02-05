@@ -579,6 +579,11 @@ let info : t = {
       ]
     };
     {
+      id = 23570973;
+      name = "acl.drop";
+      params = []
+    };
+    {
       name = "drop";
       id = 23560973;
       params = []
