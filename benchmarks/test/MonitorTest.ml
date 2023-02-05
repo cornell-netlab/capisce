@@ -279,5 +279,28 @@ let tests : unit Alcotest.test_case list =
     |> fabric_ptf PTFFabricIPv4UnicastGtpAclInnerDropTest.test;
     "TEST FabricIPv4UnicastGtpTest"
     |> fabric_ptf PTFFabricIPv4UnicastGtpTest.test;
-
+    "TEST FabricIPv4UnicastTest 0"
+    |> fabric_ptf PTFFabricIPv4UnicastTest.test_0;
+    "TEST FabricIPv4UnicastTest 1"
+    |> fabric_ptf PTFFabricIPv4UnicastTest.test_1;
+    "TEST FabricIPv4UnicastTest 2"
+    |> fabric_ptf PTFFabricIPv4UnicastTest.test_2;
+    "TEST FabricIPv4UnicastTest 3"
+    |> fabric_ptf PTFFabricIPv4UnicastTest.test_3;
+    "TEST FabricIPv4UnicastTest 4"
+    |> fabric_ptf PTFFabricIPv4UnicastTest.test_4;
+    "TEST FabricIPv4UnicastTest 5"
+    |> fabric_ptf PTFFabricIPv4UnicastTest.test_5;
+    "TEST FabricIPv4UnicastTest 6"
+    |> fabric_ptf PTFFabricIPv4UnicastTest.test_6;
+    "TEST FabricIPv4UnicastTest 7"
+    |> fabric_ptf PTFFabricIPv4UnicastTest.test_7;
+    "TEST FabricIPv4UnicastTest 8"
+    |> fabric_ptf PTFFabricIPv4UnicastTest.test_8;
+    "TEST FabricIPv4UnicastTest 9"
+    |> fabric_ptf PTFFabricIPv4UnicastTest.test_9;
+    "TEST FabricIPv4UnicastTest 10"
+    |> fabric_ptf PTFFabricIPv4UnicastTest.test_10;
+    "TEST FabricIPv4UnicastTest 11"
+    |> fabric_ptf PTFFabricIPv4UnicastTest.test_11;
   ]
