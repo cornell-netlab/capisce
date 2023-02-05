@@ -339,4 +339,17 @@ let tests : unit Alcotest.test_case list =
     (* |> fabric_ptf PTFFabricShortIpPacketOutTest.test *)
     "TEST PTFFabricTaggedPacketInTest"
     |> fabric_ptf PTFFabricTaggedPacketInTest.test;
+    "TEST PTFIPv4MplsGroupTest 0"
+    |> fabric_ptf PTFIPv4MplsGroupTest.test_0;
+    "TEST PTFIPv4MplsGroupTest 1"
+    |> fabric_ptf PTFIPv4MplsGroupTest.test_1;
+    "TEST PTFIPv4MplsGroupTest 2"
+    |> fabric_ptf PTFIPv4MplsGroupTest.test_2;
+    "TEST PTFIPv4MplsGroupTest 3"
+    |> fabric_ptf PTFIPv4MplsGroupTest.test_3;
+    "TEST PTFIPv4MplsGroupTest 4"
+    |> fabric_ptf PTFIPv4MplsGroupTest.test_4;
+    "TEST PTFIPv4MplsGroupTest 5"
+    |> fabric_ptf PTFIPv4MplsGroupTest.test_5;
+
   ]
