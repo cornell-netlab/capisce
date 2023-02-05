@@ -319,5 +319,19 @@ let tests : unit Alcotest.test_case list =
     |> fabric_ptf PTFFabricLongIpPacketInTest.test;
     (* "TEST FabricLongIpPacketOutTest" *)
     (* |> fabric_ptf PTFFabricLongIpPacketOutTest.test; *)
+    "TEST FabricMplsSegmentRoutingTest 0"
+    |> fabric_ptf PTFFabricMplsSegmentRoutingTest.test_0;
+    "TEST FabricMplsSegmentRoutingTest 1"
+    |> fabric_ptf PTFFabricMplsSegmentRoutingTest.test_1;
+    "TEST FabricMplsSegmentRoutingTest 2"
+    |> fabric_ptf PTFFabricMplsSegmentRoutingTest.test_2;
+    "TEST FabricMplsSegmentRoutingTest 3"
+    |> fabric_ptf PTFFabricMplsSegmentRoutingTest.test_3;
+    "TEST FabricMplsSegmentRoutingTest 4"
+    |> fabric_ptf PTFFabricMplsSegmentRoutingTest.test_4;
+    "TEST FabricMplsSegmentRoutingTest 5"
+    |> fabric_ptf PTFFabricMplsSegmentRoutingTest.test_5;
+    "TEST FabricMplsSegmentRoutingTest 6"
+    |> fabric_ptf PTFFabricMplsSegmentRoutingTest.test_6;
 
   ]
