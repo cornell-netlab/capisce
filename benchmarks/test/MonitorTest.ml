@@ -315,7 +315,9 @@ let tests : unit Alcotest.test_case list =
     |> fabric_ptf PTFFabricIpv4UnicastFromPacketOutTest.test_4;
     "TEST FabricIpv4UnicastFromPacketOutTest 5"
     |> fabric_ptf PTFFabricIpv4UnicastFromPacketOutTest.test_5;
-    "TEST PTFFabricLongIpPacketInTest.ml"
+    "TEST FabricLongIpPacketInTest"
     |> fabric_ptf PTFFabricLongIpPacketInTest.test;
+    (* "TEST FabricLongIpPacketOutTest" *)
+    (* |> fabric_ptf PTFFabricLongIpPacketOutTest.test; *)
 
   ]
