@@ -335,4 +335,6 @@ let tests : unit Alcotest.test_case list =
     |> fabric_ptf PTFFabricMplsSegmentRoutingTest.test_6;
     "TEST PTFFabricShortIpPacketInTest"
     |> fabric_ptf PTFFabricShortIpPacketInTest.test;
+    (* "TEST PTFFabricShortIpPacketOutTest" *)
+    (* |> fabric_ptf PTFFabricShortIpPacketOutTest.test *)
   ]
