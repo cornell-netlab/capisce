@@ -76,7 +76,7 @@ let tbl_abstraction_from_file (includes : string list) p4file gas unroll verbose
   | Ok p4cub ->
     let instr tbl_name _ keys actions =
       let keys = List.map keys ~f:(fun ((_, k), mk) -> (k, mk)) in
-      (GCL.GCL.GTable (tbl_name, keys, actions))
+      GCL.GCL.GTable (tbl_name, keys, actions)
       |> Poulet4.Result.Result.ok
     in
     let coq_gcl = V1model.gcl_from_p4cub (P4info.dummy) instr hv gas unroll p4cub in

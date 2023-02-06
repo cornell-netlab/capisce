@@ -173,7 +173,8 @@ end
   module Pack = struct
     include Cmd.Make (Pipeline)
     let assign x e = prim (Active (Active.assign x e))
-    let table name keys actions = prim (Table {name; keys; actions})
+    let table name keys actions =
+      prim (Table {name; keys; actions})
 
     let encode_tables: t -> GCL.t =
       bottom_up

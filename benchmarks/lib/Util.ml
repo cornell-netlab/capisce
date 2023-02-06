@@ -98,8 +98,6 @@ let fold_right1 ~init ~f xs =
 let app_on ~f x =
   (x, f x)
 
-
-
 let bits_to_encode_n n =
   Int.succ n
   |> Float.of_int

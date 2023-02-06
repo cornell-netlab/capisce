@@ -141,48 +141,40 @@ let rec gcl_to_cmd (t : target) : GCL.t =
   | GTable (tbl,_,_) ->
     failwithf "Table %s was not eliminated" tbl ()
 
-let make_act table (act_name, act) : Var.t list * (Action.t list) =
-  let prefix = Printf.sprintf "_symb$%s$%s$arg$" table act_name in
-  let rename x = String.chop_prefix x ~prefix in
-  let hole_mapping vars = let open List.Let_syntax in
-    let%bind full_var = vars in
-    match String.chop_prefix (Var.str full_var) ~prefix with
-    | Some chopped_var ->
-      return (full_var, Var.rename full_var chopped_var)
-    | None -> []
+let make_act table (act_name, (params, act)) : Var.t list * (Action.t list) =
+  (* let prefix = Printf.sprintf "_symb$%s$%s$arg$" table act_name in *)
+  (* let rename x = String.chop_prefix x ~prefix in *)
+  (* let hole_mapping vars = let open List.Let_syntax in *)
+  (*   let%bind full_var = vars in *)
+  (*   match String.chop_prefix (Var.str full_var) ~prefix with *)
+  (*   | Some chopped_var -> *)
+  (*     return (full_var, Var.rename full_var chopped_var) *)
+  (*   | None -> [] *)
+  (* in *)
+  (* let parameterize phi = *)
+  (*   let (_, cvs) = BExpr.vars phi in *)
+  (*   let curr_act_holes = hole_mapping cvs in *)
+  (*   let phi = List.fold curr_act_holes ~init:phi ~f:(fun phi (old,new_) -> BExpr.subst old (Expr.var new_) phi) in *)
+  (*   let params = List.map curr_act_holes ~f:snd in *)
+  (*   params, phi *)
+  (* in *)
+  let get_var = function
+    | BitVec.BVVar (x, sz) -> Var.make x sz
+    | _ -> failwith "action parameters must be variables, got something else"
   in
-  let parameterize phi =
-    let (_, cvs) = BExpr.vars phi in
-    let curr_act_holes = hole_mapping cvs in
-    let phi = List.fold curr_act_holes ~init:phi ~f:(fun phi (old,new_) -> BExpr.subst old (Expr.var new_) phi) in
-    let params = List.map curr_act_holes ~f:snd in
-    params, phi
-  in
-  let rec loop params (act : Action.t list) prog : Var.t list * (Action.t list) =
+  let rec loop (act : Action.t list) prog : Action.t list =
     match prog with
-    | GSkip -> (params, act)
+    | GSkip -> act
     | GSeq (a1,a2) ->
-      let params, act = loop params act a1 in
-      loop params act a2
-    | GAssign (typ, var, bv) -> begin
-      match rename var with
-      | Some var ->
-        let x = make_var typ var in
-        params@[x],
-        act@[Action.assign x (bv_to_expr bv)]
-      | None ->
-        let x = make_var typ var in
-        (params,
-         act@[Action.assign x (bv_to_expr bv)])
-    end
+      let act = loop act a1 in
+      loop act a2
+    | GAssign (t, x, bv) ->
+      act@[Action.assign (make_var t x) (bv_to_expr bv)]
     | GAssert phi ->
-      let phi = form_to_bexpr phi in
-      let params', phi = parameterize phi in
-      params @ params', [Action.assert_ phi]
+      [Action.assert_ (form_to_bexpr phi)]
     | GExternVoid ("assert", [Datatypes.Coq_inr phi]) ->
       let phi = BExpr.eq_ (bv_to_expr phi) (Expr.bvi 1 1) in
-      let params', phi = parameterize phi in
-      params@params', [Action.assert_ phi]
+      [Action.assert_ phi]
     | GAssume _ ->
       failwith "actions cannot contain assume"
     | GChoice _ ->
@@ -194,8 +186,7 @@ let make_act table (act_name, act) : Var.t list * (Action.t list) =
     | GExternVoid _ ->
       failwith "externs should be factored out of actions"
   in
-  loop [] [] act
-  |> Tuple.T2.map_fst ~f:(List.dedup_and_sort ~compare:Var.compare)
+  (List.map ~f:get_var params, loop [] act)
 
 
 (* Coq target to GPL *)

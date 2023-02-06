@@ -506,16 +506,9 @@ module Table = struct
   let symbolic_interface tbl : Var.t list =
     if String.(tbl.name = "classifier") then
       Log.debug "[symbolic_interface] classifier action_size = %d" @@ lazy (act_size tbl);
-    let init = Action.cp_action tbl.name (act_size tbl) ::
-               List.bind tbl.keys ~f:(fun k ->
-                   [k;
-                    Var.make (Var.str k ^ "$DONT_CARE") 1
-                   ]
-                 ) in
-    List.foldi tbl.actions ~init
-      ~f:(fun i acc (vars,_) ->
-          acc @ (List.map vars ~f:(Action.cp_data tbl.name i))
-      )
+    Action.cp_action tbl.name (act_size tbl)
+    :: List.bind tbl.keys ~f:(fun k -> [k; Var.make (Var.str k ^ "$DONT_CARE") 1])
+    @ List.bind ~f:fst tbl.actions
 
 end
 
