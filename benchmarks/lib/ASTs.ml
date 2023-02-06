@@ -8,11 +8,10 @@ module GCL = struct
     let assign x e = prim (Active.assign x e)
 
     let table (tbl_name, keys, (actions : (Var.t list * Action.t list) list)) =
-      let open Pipeline in
       let table =
-        table tbl_name keys actions
-        |> explode
-        |> Util.mapmap ~f:(fun a -> prim (to_active_exn a))
+        Pipeline.table tbl_name keys actions
+        |> Pipeline.explode
+        |> Util.mapmap ~f:(fun a -> prim (Pipeline.to_active_exn a))
         |> choice_seqs
       in
       table

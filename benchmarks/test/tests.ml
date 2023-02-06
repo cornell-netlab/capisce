@@ -10,6 +10,7 @@ let test_suites : unit Alcotest.test list = [
   "Logic Algorithms", Algorithms.tests;
   "Traversals", Traversals.tests;
   "Dependent Type System", Dependent.tests;
+  "Util", UtilTest.tests;
 ]
           
 (* let%test_unit "identity" = SmartConstructors.identity () *)

@@ -497,7 +497,7 @@ module Table = struct
   let act_size tbl =
     if List.length tbl.actions <= 0 then failwithf "Table %s has 0 actions" tbl.name ();
     List.length tbl.actions
-    |> Util.bits_to_encode_n
+    |> Util.bits_to_encode_n_things
 
   let explode _ = failwith "Ironically tables themselves cannot be exploded"
 
@@ -594,7 +594,10 @@ module Pipeline = struct
         (*     let symb_k = Var.make (cp_key idx) (Var.size k) in *)
         (*     BExpr.eq_ (Expr.var symb_k) (Expr.var k)) in *)
         let act_size = Table.act_size tbl in
-        if String.(tbl.name = "classifier") then Log.debug "[explode] classifier actsize = %d" @@ lazy act_size;
+        if String.(tbl.name = "classifier") then begin
+          Log.debug "[explode] there are %d actions in classifier" @@ lazy (List.length tbl.actions);
+          Log.debug "[explode] classifier actsize = %d" @@ lazy act_size
+        end;
         let of_action_list = List.map ~f:(fun a -> (active (Active.of_action a))) in
         let num_actions = List.length tbl.actions in
         let f idx action =

@@ -112,14 +112,14 @@ module ORG = struct
       let act_type_opt = typecheck old (Default act) in
       typecheck act_type_opt rst
 
-  let get_action_bits body : int option =
-    let rec loop = function
-      | Default action -> [snd action.id]
-      | Guard {key=_; act; rst} ->
-        (snd act.id) :: loop rst
-    in
-    loop body
-    |> List.all_equal ~equal:Int.equal
+  (* let get_action_bits body : int option = *)
+  (*   let rec loop = function *)
+  (*     | Default action -> [snd action.id] *)
+  (*     | Guard {key=_; act; rst} -> *)
+  (*       (snd act.id) :: loop rst *)
+  (*   in *)
+  (*   loop body *)
+  (*   |> List.all_equal ~equal:Int.equal *)
 
   let monotonize org : t option =
     let open Option.Let_syntax in
@@ -234,8 +234,8 @@ let to_smtlib {schema; body} info =
     let table_info = Info.find_one_table_by_name info schema.name in
     List.map table_info.match_fields ~f:(fun f -> Var.make f.name f.bitwidth)
   in
-  let%bind out_bits = ORG.typecheck None body in
-  let%map action_bits = ORG.get_action_bits body in
+  let%map out_bits = ORG.typecheck None body in
+  let action_bits = Util.bits_to_encode_n_things (List.length schema.actions) in
   (* because of passive form ensure you index actionvar to 0*)
   let action_var = make_action_var table action_bits in
   let smtlibstring = ORG.to_smtlib body in

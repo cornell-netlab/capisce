@@ -1078,9 +1078,9 @@ control FabricIngress(inout parsed_headers_t hdr, inout fabric_metadata_t fabric
               pre_next.apply(hdr, fabric_metadata);
           }
           hclose(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid() && (fabric_metadata.skip_forwarding == true || hdr.icmp.isValid()));
-          hopen (8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid() && (fabric_metadata.skip_forwarding == true || hdr.icmp.isValid()));
+          // hopen (8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid() && (fabric_metadata.skip_forwarding == true || hdr.icmp.isValid()));
           acl.apply(hdr, fabric_metadata, standard_metadata);
-          hclose(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid());
+          // hclose(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid());
           hopen (8w1, hdr.ethernet.isValid()  && hdr.eth_type.isValid());
           if (fabric_metadata.skip_next == false) {
               next.apply(hdr, fabric_metadata, standard_metadata);

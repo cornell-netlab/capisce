@@ -98,9 +98,14 @@ let fold_right1 ~init ~f xs =
 let app_on ~f x =
   (x, f x)
 
-let bits_to_encode_n n =
-  Int.succ n
-  |> Float.of_int
-  |> Stdlib.Float.log2
-  |> Float.round_up
-  |> Int.of_float
+let bits_to_encode_number_n n =
+  if n <= 0 then 1
+  else
+    Int.succ n
+    |> Float.of_int
+    |> Stdlib.Float.log2
+    |> Float.round_up
+    |> Int.of_float
+
+let bits_to_encode_n_things n =
+  bits_to_encode_number_n (n-1)

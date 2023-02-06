@@ -64,7 +64,7 @@ let rec to_table_action dont_care info (table : Info.table) profiles = function
     let action_decl = Info.find_action info action_id in
     (* translate from [id]entifier to [i]n[d]ex *)
     let index,_ = List.findi_exn table.action_refs ~f:(fun _ aref -> aref.id = action_id) in
-    let act_size = Util.bits_to_encode_n (List.length table.action_refs) in
+    let act_size = Util.bits_to_encode_n_things (List.length table.action_refs) in
     let data =
       match
         List.map2 action_decl.params args ~f:(fun param args ->
