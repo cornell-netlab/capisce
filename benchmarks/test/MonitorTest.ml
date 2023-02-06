@@ -20,7 +20,9 @@ let get_info_from_p4 source =
   Log.debug_s "Computing symbolic interface";
   let cvs =
     List.bind tables ~f:(Primitives.Table.symbolic_interface)
-    |> List.map ~f:(fun x -> if Var.is_indexed x then x else Var.index x 0)
+    |> List.map ~f:(fun x ->
+        Printf.printf "%s" (Var.str x);
+        if Var.is_indexed x then x else Var.index x 0)
   in
   Log.debug_s "passifying tables keys";
   let tables =
@@ -62,7 +64,7 @@ let empty_control_plane =
                 dont_care=[true;true;true]}));
     ("fwd_classifier",
      Default ({id=(Bigint.zero, 1);
-               data=[(Bigint.zero,3)];
+               data=[(Bigint.zero, 3)];
                dont_care=[true;true;true;true]
               })
     );

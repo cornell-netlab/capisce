@@ -261,9 +261,18 @@ module HoareNet = struct
     (*         ) *)
     (*   |> Option.is_some *)
 
+    let ninfer = ref 0
+
     let infer (cmd:t) nprocs pid =
-      bottom_up cmd ~sequence:BExpr.ands_ ~choices:BExpr.ands_
-        ~prim:(fun (triple : DepPrim.t) ->
+      Log.path_gen "INFER CALL #%d" @@ lazy (!ninfer);
+      Breakpoint.set (!ninfer > 0);
+      Int.incr ninfer;
+      let seen = ref [] in
+      top_down cmd
+        ~init:BExpr.true_
+        ~sequence:(fun _ cs infer -> BExpr.ands_ @@ List.map ~f:(infer BExpr.true_) cs)
+        ~choices:(fun _ cs infer -> BExpr.ands_ @@ List.map ~f:(infer BExpr.true_) cs)
+        ~prim:(fun _ (triple : DepPrim.t) ->
             match triple.precondition, triple.postcondition with
             | Some p, Some q ->
               let open ASTs in
@@ -271,9 +280,14 @@ module HoareNet = struct
               let cmd = GPL.encode_tables triple.cmd in
               let post = GCL.assert_ q in
               let prog = GCL.sequence [ pre; cmd; post ] in
-              Log.debug "%s" @@ lazy (GCL.to_string prog);
-              (* Qe.concolic prog *)
-              Qe.all_paths prog nprocs pid
+              Log.path_gen "%s" @@ lazy (GCL.to_string prog);
+              if List.exists !seen ~f:(GCL.equal prog) then
+                BExpr.true_
+              else begin
+                seen := prog::!seen;
+                (* Qe.concolic prog *)
+                Qe.all_paths prog nprocs pid
+              end
             | _, _ ->
               BExpr.true_
             )

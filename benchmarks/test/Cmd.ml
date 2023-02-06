@@ -15,6 +15,14 @@ let fabric_gpl =
   |> Tuple2.uncurry (GPL.seq)
 
 
+let ast_size () =
+  let agg cs = (*(List.length cs - 1) +*) List.sum (module Int) ~f:Fn.id cs in
+  GPL.bottom_up fabric_gpl
+    ~prim:(fun _ -> 1)
+    ~choices:agg
+    ~sequence:agg
+  |> Alcotest.(check int) "equivalent" (GPL.size fabric_gpl)
+
 let tables_fwd () =
   let init = 0 in
   let prim p =
@@ -95,6 +103,7 @@ let tables_top () =
 
 let tests =
   [
+    Alcotest.test_case "Checking bottom up recursor" `Quick tables_fwd;
     Alcotest.test_case "checking fabric has 15 tables (fwd)" `Quick tables_fwd;
     Alcotest.test_case "checking fabric has 15 tables (bwd)" `Quick tables_bwd;
     Alcotest.test_case "checking fabric has 15 tables (bot)" `Quick tables_bot;

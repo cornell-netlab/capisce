@@ -21,12 +21,14 @@ module Action = struct
     let open Expr in
     let bv = Util.uncurry bv in
     let action_and_data =
-      List.fold data ~init:(bv id)
-        ~f:(fun acc d -> bconcat acc (bv d))
+      List.fold data
+        ~init:(bv id)
+        ~f:(fun acc d -> bconcat (bv d) acc)
     in
     let dont_care_bits =
       let open Bigint in
-      List.foldi dont_care ~init:zero
+      List.rev dont_care
+      |> List.foldi ~init:zero
         ~f:(fun i bv current_bit ->
             if current_bit then
               (one lsl i) lor bv
@@ -35,7 +37,7 @@ module Action = struct
     in
     List.length dont_care
     |> Expr.bv dont_care_bits
-    |> Fn.flip bconcat action_and_data (*DONT CARE BITS COME FIRST*)
+    |> bconcat action_and_data (*DONT CARE BITS COME FIRST*)
     |> Expr.to_smtlib
 
   let typecheck {id; data; dont_care} =
@@ -198,7 +200,7 @@ let align_dontcares offset keys return_var =
           (Expr.var @@ dont_care key)
     )
 
-let align table actionvar (actions : (Var.t list * Primitives.Action.t list) list) keys return_var =
+let align actionvar (actions : (Var.t list * Primitives.Action.t list) list) keys return_var =
   List.foldi actions
       ~init:(BExpr.true_)
       ~f:(fun act_idx phi (params,_) ->
@@ -208,16 +210,18 @@ let align table actionvar (actions : (Var.t list * Primitives.Action.t list) lis
           imp_ (eq_ (var actionvar) (bvi act_idx (Var.size actionvar))) @@
           fst @@ List.fold params ~init:(true_, (List.length keys + Var.size actionvar))
             ~f:(fun (phi, slicepoint) datum ->
-                let symb = Primitives.Action.cp_data table act_idx datum in
-                Log.debug "Symbolic Action Datum %s" @@ lazy (Var.str symb);
-                let slice_end = slicepoint + Var.size symb in
-                (and_ phi @@
-                 eq_ (var symb) @@ bslice slicepoint slice_end @@ var return_var,
-                 slice_end + 1
-                )
+                let datum = Var.index datum 0 in
+                let slice_end = slicepoint + Var.size datum in
+                if slice_end > Var.size return_var  then begin
+                  (phi, slice_end)
+                end else begin
+                  (and_ phi @@
+                   eq_ (var datum) @@ bslice slicepoint (slice_end - 1) @@ var return_var,
+                   slice_end
+                  )
+                end
               )
         )
-
 
 let rename_keys table keys =
   {table with schema = {table.schema with keys}}
@@ -253,7 +257,7 @@ let to_smtlib {schema; body} info =
     Expr.(var tableres |> bslice (List.length symbolic_keys) (List.length symbolic_keys + Var.size action_var - 1) |> to_smtlib)
     |> Printf.sprintf "(assert (= %s %s))" (Var.str action_var);
     let () = assert (List.length schema.actions > 0) in
-    align table action_var schema.actions schema.keys tableres
+    align action_var schema.actions schema.keys tableres
     |> BExpr.to_smtlib
     |> Printf.sprintf "(assert %s)"
   ]

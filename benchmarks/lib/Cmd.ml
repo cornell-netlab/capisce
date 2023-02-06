@@ -31,6 +31,17 @@ module Make (P : Primitive) = struct
     let is_add_unit p = equal dead p
     let is_add_annihil p = equal abort p
 
+    (* let get_prim = function *)
+    (*   | Prim p -> Some p *)
+    (*   | _ -> None *)
+
+    (* let get_seq = function *)
+    (*   | Seq cs -> Some cs *)
+    (*   | _ -> None *)
+
+    (* let get_choice = function *)
+    (*   | Choice cs -> Some cs *)
+    (*   | _ -> None *)
 
     let contra c1 c2 = match c1, c2 with
       | Prim p1, Prim p2 -> P.contra p1 p2
@@ -58,8 +69,9 @@ module Make (P : Primitive) = struct
       | Prim p -> P.size p
       | Seq cs
       | Choice cs ->
-        List.fold cs ~init:(List.length cs - 1)
-          ~f:(fun n c -> n + size c)
+        (*List.length cs - 1 + *) List.sum (module Int) ~f:size cs
+        (* List.fold cs ~init:(List.length cs - 1) *)
+        (*   ~f:(fun n c -> n + size c) *)
 
     let flatten_seqs cs : t list =
       let open List.Let_syntax in

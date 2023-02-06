@@ -213,7 +213,7 @@ let badd e1 e2 = BinOp(BAdd, e1, e2) |> fold_consts_default
 let bmul e1 e2 = BinOp(BMul, e1, e2) |> fold_consts_default
 let bsub e1 e2 = BinOp(BSub, e1, e2) |> fold_consts_default
 let bxor e1 e2 = BinOp(BXor, e1, e2) |> fold_consts_default
-let bconcat e1 e2 = BinOp (BConcat, e1, e2) |> fold_consts_default
+let bconcat e1 e2 = BinOp (BConcat, e1, e2) (*|> fold_consts_default*)
 
 let rec nary op : t list -> t = function
   | [] -> failwith "cannot bvor 0 bvs, need at least one"

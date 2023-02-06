@@ -142,7 +142,7 @@ let subsolving (prog, asst) =
     Log.qe "No dataplane variables, only control vars: %s" @@ lazy (List.to_string cvs ~f:(Var.str));
   Log.qe "%s" @@ lazy "using z3 to simplify";
   let qf_phi_str = Solver.run_z3 (Smt.simplify cvs (BExpr.to_smtlib (BExpr.simplify qf_phi))) in
-  Log.qe "%s" @@ lazy "done";
+  Log.qe "%s" @@ lazy "subsolving done";
   (Clock.stop c, qf_phi_str, -1, true)
 
 
@@ -171,7 +171,7 @@ let solve_one ~qe phi : (Var.t list * string) option =
   check_no_quantified_vars dvs phi dvs' qf_phi;
   Log.qe "%s" @@ lazy "using z3 to simplify";
   let qf_phi_str = Solver.run_z3 (Smt.simplify cvs (BExpr.to_smtlib (BExpr.simplify qf_phi))) in
-  Log.qe "%s" @@ lazy "done";
+  Log.qe "%s" @@ lazy "[solve_one} done";
   (cvs, qf_phi_str)
 
 
@@ -350,7 +350,10 @@ let sufficient ~vc ~prog =
   Log.path_gen_s "Checking sufficiency";
   implies phi program_spec
 
+let nall_paths = ref 0
+
 let all_paths gcl nprocs pid =
+  Log.path_gen "all_paths call #%d" @@ (lazy !nall_paths); Breakpoint.set (!nall_paths > 0);  Int.incr nall_paths;
   Log.graph_s "Constructing graph";
   Log.debug "GCL program to explore:\n%s\n-------------" @@ lazy (GCL.to_string gcl);
   let gcl_graph = GCL_G.construct_graph gcl in            Log.graph_dot (GCL_G.print_graph gcl_graph) "broken_cfg";
