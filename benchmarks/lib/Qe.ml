@@ -353,7 +353,7 @@ let sufficient ~vc ~prog =
 let nall_paths = ref 0
 
 let all_paths gcl nprocs pid =
-  Log.path_gen "all_paths call #%d" @@ (lazy !nall_paths); Breakpoint.set (!nall_paths > 0);  Int.incr nall_paths;
+  (* Log.path_gen "all_paths call #%d" @@ (lazy !nall_paths); Breakpoint.set (!nall_paths > 0);  Int.incr nall_paths; *)
   Log.graph_s "Constructing graph";
   Log.debug "GCL program to explore:\n%s\n-------------" @@ lazy (GCL.to_string gcl);
   let gcl_graph = GCL_G.construct_graph gcl in            Log.graph_dot (GCL_G.print_graph gcl_graph) "broken_cfg";

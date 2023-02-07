@@ -265,7 +265,7 @@ module HoareNet = struct
 
     let infer (cmd:t) nprocs pid =
       Log.path_gen "INFER CALL #%d" @@ lazy (!ninfer);
-      Breakpoint.set (!ninfer > 0);
+      (* Breakpoint.set (!ninfer > 0); *)
       Int.incr ninfer;
       let seen = ref [] in
       top_down cmd
@@ -280,7 +280,6 @@ module HoareNet = struct
               let cmd = GPL.encode_tables triple.cmd in
               let post = GCL.assert_ q in
               let prog = GCL.sequence [ pre; cmd; post ] in
-              Log.path_gen "%s" @@ lazy (GCL.to_string prog);
               if List.exists !seen ~f:(GCL.equal prog) then
                 BExpr.true_
               else begin
