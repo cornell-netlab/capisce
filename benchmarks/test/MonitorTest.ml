@@ -20,9 +20,7 @@ let get_info_from_p4 source =
   Log.debug_s "Computing symbolic interface";
   let cvs =
     List.bind tables ~f:(Primitives.Table.symbolic_interface)
-    |> List.map ~f:(fun x ->
-        Printf.printf "%s" (Var.str x);
-        if Var.is_indexed x then x else Var.index x 0)
+    |> List.map ~f:(fun x -> if Var.is_indexed x then x else Var.index x 0)
   in
   Log.debug_s "passifying tables keys";
   let tables =
@@ -36,12 +34,12 @@ let get_info_from_p4 source =
 
 let parse_smtlib source filepaths =
   let open List.Let_syntax in
-  Log.debug "Getting vars from: %s" @@ lazy source;
+  Printf.printf "Getting vars from: %s\n%!" source;
   let tables, cvs = get_info_from_p4 source in
   let%map filepath = filepaths in
-  Log.debug "reading smtlib file from: %s " @@ lazy filepath;
+  Printf.printf "reading smtlib file from: %s \n%!" filepath;
   let cpf_string = In_channel.read_all filepath in
-  Log.debug_s "cpf read, parsing";
+  Printf.printf "cpf read, parsing\n%!";
   let cpf = Pbench.Solver.of_smtlib ~dvs:[] ~cvs cpf_string in
   (cvs, tables, cpf, filepath)
 
