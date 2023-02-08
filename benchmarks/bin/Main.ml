@@ -66,16 +66,17 @@ let compile : Command.t =
        fun () ->
        let open ASTs in
        BExpr.enable_smart_constructors := `On;
-       Log.parse_flags "vgi";
+       Log.parse_flags "vgi"; Log.override ();
        let gas = Option.value gas_opt ~default:1000 in
        let unroll = Option.value unroll_opt ~default:10 in
        let coq_pair = P4Parse.tbl_abstraction_from_file includes source gas unroll false true in
        let (gpl_prsr, gpl_pipe) = Tuple2.map ~f:Translate.gcl_to_gpl coq_pair in
-       Log.irs "RAW parser:\n%s\n" @@ lazy (GPL.to_string gpl_prsr);
-       Log.irs "RAW pipeline:\n%s\n" @@ lazy (GPL.to_string gpl_pipe)
+       (* Log.irs "RAW parser:\n%s\n" @@ lazy (GPL.to_string gpl_prsr); *)
+       (* Log.irs "RAW pipeline:\n%s\n" @@ lazy (GPL.to_string gpl_pipe) *)
        (* Log.irs "RAW pipeline: \n%s" @@ lazy (GPL.to_string gpl_pipe); *)
-       (* (\* let (gpl_prsr_o, gpl_pipe_o) = GPL.optimize_seq_pair (gpl_prsr, gpl_pipe) in *\) *)
-       (* (\* let (gcl_prsr_o, gcl_pipe_o) = Tuple2.map ~f:GPL.encode_tables (gpl_prsr_o, gpl_pipe_o) in *\) *)
+       let (gpl_prsr_o, gpl_pipe_o) = GPL.optimize_seq_pair (gpl_prsr, gpl_pipe) in
+       let (gcl_prsr_o, gcl_pipe_o) = Tuple2.map ~f:GPL.encode_tables (gpl_prsr_o, gpl_pipe_o) in
+       Log.irs "%s" @@ lazy (GCL.to_string @@ GCL.seq gcl_prsr_o gcl_pipe_o)
        (* Log.irs "%s" @@ lazy ("compiling from scratch"); *)
        (* let cmd = P4Parse.as_cmd_from_file includes source gas unroll false true in *)
        (* Log.irs "RAW FULL PROGRAM:\n%s" @@ lazy (GCL.to_string cmd); *)

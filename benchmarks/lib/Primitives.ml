@@ -275,8 +275,7 @@ module Action = struct
   let cp_data name act_idx param =
      Var.make (Printf.sprintf  "_symb$%s$%d$%s" name act_idx (Var.str param)) (Var.size param)
 
-  let symbolize
-      (name : string)
+  let symbolize (name : string)
       ~num_actions
       ~act_size
       ~idx
@@ -604,7 +603,7 @@ module Pipeline = struct
           let (phi, acts) = Action.symbolize tbl.name ~num_actions ~act_size ~idx action in
           assume phi :: of_action_list acts
         in
-        List.mapi tbl.actions ~f
+        List.mapi (List.rev tbl.actions) ~f
 
     let to_active_exn = function
       | Active a -> a
