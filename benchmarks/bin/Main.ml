@@ -74,9 +74,9 @@ let compile : Command.t =
        (* Log.irs "RAW parser:\n%s\n" @@ lazy (GPL.to_string gpl_prsr); *)
        (* Log.irs "RAW pipeline:\n%s\n" @@ lazy (GPL.to_string gpl_pipe) *)
        (* Log.irs "RAW pipeline: \n%s" @@ lazy (GPL.to_string gpl_pipe); *)
-       let (gpl_prsr_o, gpl_pipe_o) = GPL.optimize_seq_pair (gpl_prsr, gpl_pipe) in
-       let (gcl_prsr_o, gcl_pipe_o) = Tuple2.map ~f:GPL.encode_tables (gpl_prsr_o, gpl_pipe_o) in
-       Log.irs "%s" @@ lazy (GCL.to_string @@ GCL.seq gcl_prsr_o gcl_pipe_o)
+       (* let (gpl_prsr_o, gpl_pipe_o) = GPL.optimize_seq_pair (gpl_prsr, gpl_pipe) in *)
+       let (_, gcl_pipe) = Tuple2.map ~f:GPL.encode_tables (gpl_prsr, gpl_pipe) in
+       Log.irs "%s" @@ lazy (GCL.to_string gcl_pipe)
        (* Log.irs "%s" @@ lazy ("compiling from scratch"); *)
        (* let cmd = P4Parse.as_cmd_from_file includes source gas unroll false true in *)
        (* Log.irs "RAW FULL PROGRAM:\n%s" @@ lazy (GCL.to_string cmd); *)

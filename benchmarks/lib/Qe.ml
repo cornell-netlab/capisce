@@ -175,55 +175,23 @@ let solve_one ~qe phi : (Var.t list * string) option =
   (cvs, qf_phi_str)
 
 
-(* let solving_all_paths_inner (prog, asst) = *)
-(*   let (_, passive) = PassiveGCL.passify GCL.(seq prog (assume asst))  in *)
-(*   let path_optimized = PassiveGCL.assume_disjuncts passive in *)
-(*   let pis = PassiveGCL.paths path_optimized in *)
-(*   let completed = ref Bigint.zero in *)
-(*   Sequence.fold pis ~init:[] ~f:(fun acc pi -> *)
-(*       let _, qf_phi_str = PassiveGCL.vc pi |> solve_one ~qe:BottomUpQe.cnf_qe |> Option.value_exn in *)
-(*       Bigint.incr completed; *)
-(*       acc @ [qf_phi_str]) *)
-
-(* (\* let solving_all_paths_inner (prog, asst) = *\) *)
-(* (\*   let prog = GCL.(seq prog (assume asst)) in *\) *)
-(* (\*   let passive = PassiveGCL.passify prog in *\) *)
-(* (\*   let path_optimized = PassiveGCL.assume_disjuncts passive in *\) *)
-(* (\*   Breakpoint.set true; *\) *)
-(* (\*   let pis = PassiveGCL.paths path_optimized in *\) *)
-(* (\*   let completed = ref Bigint.zero in *\) *)
-(* (\*   Sequence.fold pis ~init:[] ~f:(fun acc pi -> *\) *)
-(* (\*       Log.print @@ lazy (Printf.sprintf "Computing WP for path:\n%s \n" (PassiveGCL.to_string pi)); *\) *)
-(* (\*       let phi = PassiveGCL.(wrong (seq pi (assert_ asst))) in *\) *)
-(* (\*       let (dvs, _) = BExpr.vars phi in *\) *)
-(* (\*       List.iter dvs ~f:BExpr.incr_q; *\) *)
-(* (\*       Log.print @@ lazy "smart constructors"; *\) *)
-(* (\*       let qphi = BExpr.(forall dvs phi |> order_all_quantifiers) in *\) *)
-(* (\*       let qf_phi = BottomUpQe.qe (solve_wto `Z3) qphi in *\) *)
-(* (\*       Log.print @@ lazy "getting the vars of the result"; *\) *)
-(* (\*       let dvs', cvs = BExpr.vars qf_phi in *\) *)
-(* (\*       Log.print @@ lazy (Printf.sprintf "checking all dataplane variables have been eliminated from %s" (BExpr.to_smtlib qf_phi)); *\) *)
-(* (\*       if not (List.is_empty dvs') then begin *\) *)
-(* (\*         Printf.printf "started with:\n vars: %s \n form: %s\n%!" (List.to_string dvs ~f:(Var.str)) (BExpr.to_smtlib phi); *\) *)
-(* (\*         Printf.printf "ERROR Not QF:\n vars: %s \n form: %s\n%!" (List.to_string dvs' ~f:(Var.str)) (BExpr.to_smtlib qf_phi); *\) *)
-(* (\*         failwith "QF Failed when it said it succeeded" *\) *)
-(* (\*       end *\) *)
-(* (\*       else *\) *)
-(* (\*         Log.print @@ lazy (Printf.sprintf "No dataplane variables, only control vars: %s" (List.to_string cvs ~f:(Var.str))); *\) *)
-(* (\*       Log.print @@ lazy "using z3 to simplify"; *\) *)
-(* (\*       let qf_phi_str = Solver.run_z3 (Smt.simplify cvs (BExpr.to_smtlib (BExpr.simplify qf_phi))) in *\) *)
-(* (\*       Log.print @@ lazy "done"; *\) *)
-(* (\*       Bigint.incr completed; *\) *)
-(* (\*       Printf.printf "%s paths solved\n" (Bigint.to_string !completed); *\) *)
-(* (\*       acc @ [qf_phi_str]) *\) *)
+let nikolaj_please (solver : ?with_timeout:int -> Var.t list -> string -> string) phi : BExpr.t option =
+  let _, cvs = BExpr.vars phi in
+  let res = solver ~with_timeout:2000 cvs (BExpr.to_smtlib phi) in
+  if BottomUpQe.check_success res then
+    Some (Solver.of_smtlib ~dvs:[] ~cvs res)
+  else
+    let () = Log.smt "Solver failed with message:\n%s" @@ lazy res in
+    None
 
 
-(* let solving_all_paths (prog,asst) = *)
-(*   let c    = Clock.start () in *)
-(*   let phis = solving_all_paths_inner (prog, asst) in *)
-(*   let time = Clock.stop c in *)
-(*   let phi_str = String.concat ~sep:"\n\n" phis in *)
-(*   (time, phi_str, -1, true) *)
+let rec orelse thunks ~input =
+  match thunks with
+  | [] -> None
+  | thunk::more_thunks ->
+    match thunk input with
+    | None -> orelse more_thunks ~input
+    | Some x -> Some x
 
 module GPL_G =
   CFG.Make (struct
@@ -395,7 +363,6 @@ let all_paths gcl nprocs pid =
         Log.path_gen "%f" @@ lazy (Float.((Clock.stop clock * 1000.0)/ of_int !paths));
         let pi = List.rev pi in
         let gcl = List.map pi ~f:(GCL_G.vertex_to_cmd) |> GCL.sequence in
-        Log.irs "solving path %s" @@ lazy (GCL.to_string gcl);
         let phi = passive_vc gcl (*|> BExpr.nnf*) in
         Log.path_gen_s "Checking whether current path is covered";
         if implies phi_agg phi
@@ -406,17 +373,22 @@ let all_paths gcl nprocs pid =
         end
         else
           let () =
-            Log.exploder "Gotta analyze:\n%s" @@ lazy (GCL.to_string gcl);
-            Log.exploder "Formula is: \n%s" @@ lazy (BExpr.to_smtlib phi);
+            Log.exploder "solving path %s" @@ lazy (GCL.to_string gcl);
+            (* Log.exploder "Gotta analyze:\n%s" @@ lazy (GCL.to_string gcl); *)
+            (* Log.exploder "Formula is: \n%s" @@ lazy (BExpr.to_smtlib phi); *)
           in
           (* match Some ([], BExpr.true_) with *)
-          match solve_one phi ~qe:BottomUpQe.cnf_qe with
+          match orelse ~input:phi [
+              solve_one ~qe:nikolaj_please;
+              solve_one ~qe:BottomUpQe.cnf_qe;
+            ] with
           | None ->
             Log.error "%s" @@ lazy (GCL.to_string gcl);
             Log.error "%s" @@ lazy (BExpr.to_smtlib phi);
             failwith "Couldn't solve path"
           | Some (cvs, res) ->
             let qf_psi = Solver.of_smtlib ~dvs:[] ~cvs res in
+            Log.debug "got %s" @@ lazy (BExpr.to_smtlib qf_psi);
             if not (implies qf_psi phi) then begin
               Log.error "CPF is %s" @@ lazy res;
               Log.error "PHI is %s" @@ lazy (BExpr.to_smtlib phi);
@@ -434,15 +406,6 @@ let all_paths gcl nprocs pid =
   Log.path_gen_s "starting loop";
   let phi = loop BExpr.true_ in
   BExpr.simplify phi
-
-
-let rec orelse thunks ~input =
-  match thunks with
-  | [] -> None
-  | thunk::more_thunks ->
-    match thunk input with
-    | None -> orelse more_thunks ~input
-    | Some x -> Some x
 
 let concolic (gcl : GCL.t) : BExpr.t =
   let _, psv = Psv.passify gcl in

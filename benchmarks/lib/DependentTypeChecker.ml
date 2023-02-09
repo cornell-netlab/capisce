@@ -91,11 +91,15 @@ module DepPrim = struct
       let%map cmd, facts = Cmd.const_prop facts cmd in
       ({precondition; cmd; postcondition}, facts)
     | Some p, Some q ->
-      (*just moves the some around, `Assert.dce` necessarily produces `Some` *)
+      (*just moves the some around, `Assert.const_prop` necessarily produces `Some` *)
       let typeshift (p,f) = (Some p, f) in
+      Log.compiler "Precondition is %s" @@ lazy (BExpr.to_smtlib p);
       let precondition, facts  = Primitives.Assert.const_prop facts p |> typeshift in
+      Log.compiler "Precondition has become %s" @@ lazy (BExpr.to_smtlib @@ Option.value_exn precondition);
       let%map cmd, facts = Cmd.const_prop facts cmd in
+      Log.compiler "Postcondition is %s" @@ lazy (BExpr.to_smtlib q);
       let postcondition, facts = Primitives.Assert.const_prop facts q |> typeshift in
+      Log.compiler "Precondition has become %s" @@ lazy (BExpr.to_smtlib @@ Option.value_exn postcondition);
       ({precondition; cmd; postcondition}, facts)
     | _, _ ->
       failwith "[DepPrim.to_smtlib] in {P} c {Q}, P or Q was None and the other, Some. "

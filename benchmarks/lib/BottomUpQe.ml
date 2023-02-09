@@ -20,18 +20,11 @@ let is_small_enough old new_ =
 
 let timeout_solver (solver : ?with_timeout:int -> Var.t list -> string -> string) vars phi =
   let () = Log.qe "%s" @@ (lazy "timeout_solver") in
-  let phi_str =
-    let avars = BExpr.abstract_qvars phi in
-    let phi_str = BExpr.to_smtlib phi in
-    if String.length avars > 6 then
-      Printf.sprintf "(forall (%s) %s)" avars phi_str
-    else
-      phi_str
-  in
   (* optimistically try the solver with a timeout between 1s and 10s *)
   (* this threshold should void bitblasting *)
   (* solver ~with_timeout:(min (max (BExpr.size phi) 1000) 20000) vars phi_str *)
-  solver ~with_timeout:2000 vars phi_str
+  BExpr.to_smtlib phi
+  |> solver ~with_timeout:2000 vars
 
 let unrestricted_solver (solver : ?with_timeout:int -> Var.t list -> string -> string) cvs x phi =
   let open BExpr in
@@ -84,7 +77,6 @@ let rec cnf_qe (solver : ?with_timeout:int -> Var.t list -> string -> string)  b
         (* in this case, the smart constructor had no effect*)        
         (* we'll heuristically describe three strategies *)
         (* First, the raw solver with a timeout *)
-        (* let b' = BExpr.complete_predicate_abstraction x body |> Option.value ~default:b'  in *)
         let res = timeout_solver solver vars b' in
         let ok = check_success res in
         let b'' = if ok then Some (Solver.of_smtlib ~dvs:[] ~cvs:vars res) else None in

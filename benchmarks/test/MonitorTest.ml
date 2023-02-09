@@ -37,7 +37,6 @@ let parse_smtlib source filepaths =
   Printf.printf "Getting vars from: %s\n%!" source;
   let tables, cvs = get_info_from_p4 source in
   let%map filepath = filepaths in
-  fun () ->
   let cpf_string = In_channel.read_all filepath in
   let cpf = Pbench.Solver.of_smtlib ~dvs:[] ~cvs cpf_string in
   (cvs, tables, cpf, filepath)
