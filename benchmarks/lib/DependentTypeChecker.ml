@@ -245,8 +245,10 @@ module HoareNet = struct
                 BExpr.true_
               else begin
                 seen := prog::!seen;
-                (* Qe.concolic prog *)
-                Qe.all_paths prog nprocs pid
+                if false then
+                  Qe.concolic prog
+                else
+                  Qe.all_paths prog nprocs pid
               end
             | _, _ ->
               BExpr.true_

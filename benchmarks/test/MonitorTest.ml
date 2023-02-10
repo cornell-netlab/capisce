@@ -38,10 +38,12 @@ let parse_smtlib source filepaths =
   let tables, cvs = get_info_from_p4 source in
   let%map filepath = filepaths in
   let cpf_string = In_channel.read_all filepath in
+  Printf.printf "parsing %s\n%!" filepath;
   let cpf = Pbench.Solver.of_smtlib ~dvs:[] ~cvs cpf_string in
   (cvs, tables, cpf, filepath)
 
 let fabric =
+  (* let total = 700 in *)
   let total = 1 in
   let psis =
     List.init total ~f:Fn.id

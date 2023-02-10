@@ -416,10 +416,10 @@ let concolic (gcl : GCL.t) : BExpr.t =
   let num_cexs = ref Bigint.zero in
   let rec loop phi_agg =
     Log.debug_s "checking implication...";
-    Log.debug "current cpf is %s" @@ lazy (BExpr.to_smtlib phi_agg);
-    Log.debug "normal_execs : %s" @@ lazy (BExpr.to_smtlib normal_executions);
-    Log.debug_s "=>";
-    Log.debug "safety_condition: %s" @@ lazy (BExpr.to_smtlib safety_condition);
+    (* Log.debug "current cpf is %s" @@ lazy (BExpr.to_smtlib phi_agg); *)
+    (* Log.debug "normal_execs : %s" @@ lazy (BExpr.to_smtlib normal_executions); *)
+    (* Log.debug_s "=>"; *)
+    (* Log.debug "safety_condition: %s" @@ lazy (BExpr.to_smtlib safety_condition); *)
     (* match implies_model all_passive_consts phi_agg symbolic_semantics with *)
     match
       Solver.check_sat_model
