@@ -94,6 +94,12 @@ let check_unsat ?(timeout=None) consts phi =
   |> run_z3 
   |> Smt.is_unsat
 
+let check_unsat_cex ?(timeout=None) consts phi =
+  BExpr.to_smtlib phi
+  |> Smt.check_sat_model ~timeout consts
+  |> run_z3
+  |> Smt.extract_model consts
+
 let check_valid_tables ?(timeout=None) consts tables info phi =
   let funs = let open List.Let_syntax in
     let%map table = tables in

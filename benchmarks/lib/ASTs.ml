@@ -186,8 +186,8 @@ end
           )
 
     let wp cmd phi =
-      let gcl = encode_tables cmd in
-      GCL.wp gcl phi
+      let cmd = encode_tables cmd in
+      GCL.wp cmd phi
 
     let symbolize (c : t) =
       let gcl = encode_tables c in

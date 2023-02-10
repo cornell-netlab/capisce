@@ -500,7 +500,11 @@ module Table = struct
 
   let explode _ = failwith "Ironically tables themselves cannot be exploded"
 
-  let vars _ = failwith "dont get the variables of a table, you should probably encode it first"
+  let vars t =
+    t.keys @
+    List.bind t.actions ~f:(fun (params, commands) ->
+        params @ List.bind commands ~f:(Action.vars))
+    |> Var.dedup
 
   let symbolic_interface tbl : Var.t list =
     if String.(tbl.name = "classifier") then

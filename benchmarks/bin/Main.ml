@@ -21,6 +21,7 @@ let hoare : Command.t =
       no_smart = flag "--disable-smart" no_arg ~doc:"disable smart constructors" and
       disable_header_validity = flag "--no-hv" (no_arg) ~doc:"disable header validity checks" and
       disable_soundness_check = flag "--unsound" (no_arg) ~doc:"disable soundness check" and
+      check_only = flag "--check-only" (no_arg) ~doc:"only check annotations" and
       nprocs = flag "--nprocs" (optional int) ~doc:"number of processes" and
       pid = flag "--pid" (optional int) ~doc:"process id"
       in fun () ->
@@ -36,19 +37,23 @@ let hoare : Command.t =
         let coq_gcl = P4Parse.tbl_abstraction_from_file includes source gas unroll false (not disable_header_validity) in
         Log.compiler "%s" @@ lazy "compiling to gpl...";
         let (hprsr, hpipe) = Tuple2.map ~f:(Translate.gcl_to_hoare) coq_gcl in
-        Log.irs "Parser:\n%s" @@ lazy (HoareNet.to_string hprsr);
-        Log.irs "Pipeline:\n%s" @@ lazy (HoareNet.to_string hpipe);
+        (* Log.irs "Parser:\n%s" @@ lazy (HoareNet.to_string hprsr); *)
+        (* Log.irs "Pipeline:\n%s" @@ lazy (HoareNet.to_string hpipe); *)
         let hoarenet =  HoareNet.seq hprsr hpipe in
         let hoarenet = HoareNet.normalize_names hoarenet in
+        let hoarenet = HoareNet.zero_init hoarenet in
         let hoarenet = HoareNet.optimize hoarenet in
+        Log.irs "hoarenet:\n%s" @@ lazy (HoareNet.to_string hoarenet);
         let st = Clock.start () in
         (*First, check the soundness of the annotations*)
         if disable_soundness_check || HoareNet.check_annotations hoarenet then begin
           Printf.printf "Checked annotations in %fms\n%!" (Clock.stop st);
-          let st = Clock.start () in
-          let psi = HoareNet.infer hoarenet nprocs pid in
-          Printf.printf "Inferred in %f ms\n%!" (Clock.stop st);
-          Printf.printf "Got:\n%s\n%!" (BExpr.to_smtlib psi)
+          if not check_only then begin
+            let st = Clock.start () in
+            let psi = HoareNet.infer hoarenet nprocs pid in
+            Printf.printf "Inferred in %f ms\n%!" (Clock.stop st);
+            Printf.printf "Got:\n%s\n%!" (BExpr.to_smtlib psi)
+          end
         end else
           Printf.printf "Soundness check failed in %fms\n%!" (Clock.stop st);
     ]
@@ -75,8 +80,8 @@ let compile : Command.t =
        (* Log.irs "RAW pipeline:\n%s\n" @@ lazy (GPL.to_string gpl_pipe) *)
        (* Log.irs "RAW pipeline: \n%s" @@ lazy (GPL.to_string gpl_pipe); *)
        (* let (gpl_prsr_o, gpl_pipe_o) = GPL.optimize_seq_pair (gpl_prsr, gpl_pipe) in *)
-       let (_, gcl_pipe) = Tuple2.map ~f:GPL.encode_tables (gpl_prsr, gpl_pipe) in
-       Log.irs "%s" @@ lazy (GCL.to_string gcl_pipe)
+       let (gcl_parser, _) = Tuple2.map ~f:GPL.encode_tables (gpl_prsr, gpl_pipe) in
+       Log.irs "%s" @@ lazy (GCL.to_string gcl_parser)
        (* Log.irs "%s" @@ lazy ("compiling from scratch"); *)
        (* let cmd = P4Parse.as_cmd_from_file includes source gas unroll false true in *)
        (* Log.irs "RAW FULL PROGRAM:\n%s" @@ lazy (GCL.to_string cmd); *)
@@ -255,7 +260,7 @@ let graph : Command.t =
          let gas = Option.value gas_opt ~default:1000 in
          let unroll = Option.value unroll_opt ~default:10 in
          let gcl = P4Parse.tbl_abstraction_from_file includes source gas unroll false false in
-         let gpl = Tuple.T2.map ~f:(Translate.gcl_to_gpl) gcl |> Util.uncurry GPL.seq in
+         let gpl = Tuple.T2.map ~f:(Translate.gcl_to_gpl) gcl |> fst (**Util.uncurry GPL.seq in*) in
          if tables then
            let tfg = TFG.project gpl in
            let grf = Qe.TFG_G.construct_graph tfg in

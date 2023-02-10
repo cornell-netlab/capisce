@@ -171,29 +171,28 @@ module Optimizer ( Cmd : sig
   module CP = ConstProp (Cmd)
   module DC = DeadCodeElim (Cmd)
 
-  let optimize : Cmd.t -> Cmd.t =
-    Log.compiler_s "optimizing...";
-    let o c =
-      Log.compiler_s "FIX";
-      let opt = DC.elim (CP.propagate_exn c) in
-      if Cmd.size opt > Cmd.size c then begin
-        let () = Log.irs "PRE: %s\n" @@ lazy (Cmd.to_string c) in
-        let () = Log.irs "POST: %s\n" @@ lazy (Cmd.to_string opt) in
-        failwithf "GOT BIGGER, from %d to %d" (Cmd.size c) (Cmd.size opt) ()
-      end;
-      opt
+  let optimize : Cmd.t -> Cmd.t = Fn.id
+    (* Log.compiler_s "optimizing..."; *)
+    (* let o c = *)
+    (*   Log.compiler_s "FIX"; *)
+    (*   let opt = DC.elim (CP.propagate_exn c) in *)
+    (*   if Cmd.size opt > Cmd.size c then begin *)
+    (*     let () = Log.irs "PRE: %s\n" @@ lazy (Cmd.to_string c) in *)
+    (*     let () = Log.irs "POST: %s\n" @@ lazy (Cmd.to_string opt) in *)
+    (*     failwithf "GOT BIGGER, from %d to %d" (Cmd.size c) (Cmd.size opt) () *)
+    (*   end; *)
+    (*   opt *)
 
-    in
-    let equal c1 c2 =
-      if Cmd.equal c1 c2 then
-        true
-      else
-        let () = Log.irs "PRE: %s\n" @@ lazy (Cmd.to_string c1) in
-        let () = Log.irs "POST: %s\n" @@ lazy (Cmd.to_string c2) in
-        false
-    in
-
-    Util.fix ~equal o
+    (* in *)
+    (* let equal c1 c2 = *)
+    (*   if Cmd.equal c1 c2 then *)
+    (*     true *)
+    (*   else *)
+    (*     let () = Log.irs "PRE: %s\n" @@ lazy (Cmd.to_string c1) in *)
+    (*     let () = Log.irs "POST: %s\n" @@ lazy (Cmd.to_string c2) in *)
+    (*     false *)
+    (* in *)
+    (* Util.fix ~equal o *)
 
   let optimize_seq_pair (c1,c2) =
     (* let open Option.Let_syntax in *)

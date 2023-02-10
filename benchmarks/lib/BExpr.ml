@@ -91,7 +91,7 @@ let rec to_smtlib_buffer indent buff b : unit =
   | LVar a ->
      Buffer.add_string buff a
   | TNot (t) ->
-     Buffer.add_string buff "(not\n";
+     Buffer.add_string buff "(not";
      to_smtlib_buffer (indent + 1) buff t;
      Buffer.add_string buff ")";
   | TNary (b,ts) ->

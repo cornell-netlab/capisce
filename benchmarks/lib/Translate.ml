@@ -171,10 +171,10 @@ let make_act table (act_name, (params, act)) : Var.t list * (Action.t list) =
     | GAssign (t, x, bv) ->
       act@[Action.assign (make_var t x) (bv_to_expr bv)]
     | GAssert phi ->
-      [Action.assert_ (form_to_bexpr phi)]
+      act@[Action.assert_ (form_to_bexpr phi)]
     | GExternVoid ("assert", [Datatypes.Coq_inr phi]) ->
       let phi = BExpr.eq_ (bv_to_expr phi) (Expr.bvi 1 1) in
-      [Action.assert_ phi]
+      act@[Action.assert_ phi]
     | GAssume _ ->
       failwith "actions cannot contain assume"
     | GChoice _ ->
@@ -186,7 +186,9 @@ let make_act table (act_name, (params, act)) : Var.t list * (Action.t list) =
     | GExternVoid _ ->
       failwith "externs should be factored out of actions"
   in
-  (List.map ~f:get_var params, loop [] act)
+  let act = loop [] act in
+  let params = List.map ~f:get_var params in
+  (params, act)
 
 
 (* Coq target to GPL *)
