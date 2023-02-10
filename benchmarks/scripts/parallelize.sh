@@ -12,5 +12,5 @@ outfile="fabric_cpis/slice_${resolution}"
 
 for slice_id in $(seq $slice_id_lo $slice_id_hi); do
     echo "icecap hoare examples/bf4_failing/fabric_no_consts_exact_only.p4 -I examples/includes -D --nprocs ${resolution} --pid ${slice_id} > ${outfile}_${slice_id} &"
-    (icecap hoare examples/bf4_failing/fabric_no_consts_exact_only.p4 -I examples/includes -D --nprocs ${resolution} --pid ${slice_id} > ${outfile}_${slice_id}; echo "done ${slice_id}") &
+    (icecap hoare examples/bf4_failing/fabric_no_consts_exact_only.p4 -I examples/includes -D --unsound --nprocs ${resolution} --pid ${slice_id} > ${outfile}_${slice_id}; echo "done ${slice_id}") &
 done
