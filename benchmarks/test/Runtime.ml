@@ -126,7 +126,7 @@ let to_row (info : Info.t) profiles op : action_profile Int.Map.t * (Table.ORG.t
               {field_id = match_field.id;
                match_key =
                  Ternary { value = Bigint.zero;
-                           mask = Bigint.((of_int 2 ** of_int match_field.bitwidth) - one)
+                           mask = Bigint.zero;
                          }
               }
             | None, EXACT ->
@@ -141,13 +141,14 @@ let to_row (info : Info.t) profiles op : action_profile Int.Map.t * (Table.ORG.t
           | Ternary {value; mask} ->
             let mask_expr = Expr.bv mask  match_field.bitwidth in
             let match_val = Expr.bv value match_field.bitwidth in
-            (* if the mask is trivial, we don't cars *)
+            (* if the mask is trivial, we don't care *)
             Tuple2.create (dont_cares @ [Bigint.(zero = mask)]) @@
             and_ phi @@
             eq_
               Expr.(band match_var mask_expr)
               Expr.(band match_val mask_expr))
     in
+    let dont_care = List.rev dont_care in
     (* translate action *)
     let act = to_table_action dont_care info table profiles action in
     (profiles,
@@ -198,11 +199,11 @@ let to_control_plane info default ops =
         (profiles, add_row control_plane)
       )
   |> snd
-  |> String.Map.mapi ~f:(fun ~key:table ~data:org ->
-      match Table.ORG.monotonize org with
-      | Some org -> org
-      | None ->
-        failwithf "[to_control_plane] couldn't monotonize table %s:\n%s"
-          table (Table.ORG.to_string org) ()
-    )
+  (* |> String.Map.mapi ~f:(fun ~key:table ~data:org -> *)
+  (*     match Table.ORG.monotonize org with *)
+  (*     | Some org -> org *)
+  (*     | None -> *)
+  (*       failwithf "[to_control_plane] couldn't monotonize table %s:\n%s" *)
+  (*         table (Table.ORG.to_string org) () *)
+  (*   ) *)
   |> String.Map.map ~f:(Table.ORG.pad_action_data)

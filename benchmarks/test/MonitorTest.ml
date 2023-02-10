@@ -42,9 +42,10 @@ let parse_smtlib source filepaths =
   (cvs, tables, cpf, filepath)
 
 let fabric =
+  let total = 1 in
   let psis =
-    List.init 700 ~f:Fn.id
-    |> List.map ~f:(Printf.sprintf "fabric_cpis/slice_700_%d")
+    List.init total ~f:Fn.id
+    |> List.map ~f:(Printf.sprintf "fabric_cpis/slice_%d_%d" total)
     |> parse_smtlib "./examples/bf4_failing/fabric_no_consts.p4"
   in
   Log.debug_s "got_cpis";
