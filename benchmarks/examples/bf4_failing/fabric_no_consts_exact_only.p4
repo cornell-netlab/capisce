@@ -1066,43 +1066,43 @@ control FabricIngress(inout parsed_headers_t hdr, inout fabric_metadata_t fabric
     IngressSliceTcClassifier() slice_tc_classifier;
     IngressQos() qos;
     apply {
-        lkp_md_init.apply(hdr, fabric_metadata);
-        hopen(8w1, hdr.packet_out.isValid() || (hdr.ethernet.isValid() && hdr.eth_type.isValid())
-                                                && (hdr.eth_type.value != ETHERTYPE_IPV4 || hdr.ipv4.isValid())
-                                                && (!(hdr.inner_icmp.isValid() && hdr.icmp.isValid()))
-                                                && (!(hdr.eth_type.value == ETHERTYPE_IPV4 && fabric_metadata.lkp.ip_proto == PROTO_ICMP) || (hdr.icmp.isValid() || hdr.inner_icmp.isValid())));
-        pkt_io_ingress.apply(hdr, fabric_metadata, standard_metadata);
-        slice_tc_classifier.apply(hdr, fabric_metadata, standard_metadata);
-        hclose(8w1, fabric_metadata.is_controller_packet_out == true ||
-                    (hdr.ethernet.isValid() && hdr.eth_type.isValid())
-                     && (hdr.eth_type.value != ETHERTYPE_IPV4 || hdr.ipv4.isValid())
-                     && (!(hdr.inner_icmp.isValid() && hdr.icmp.isValid()))
-                     && (!(hdr.eth_type.value == ETHERTYPE_IPV4 && fabric_metadata.lkp.ip_proto == PROTO_ICMP) || (hdr.icmp.isValid() || hdr.inner_icmp.isValid())));
-        if (fabric_metadata.is_controller_packet_out == false) {
-            hopen(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid() && (!(hdr.eth_type.value == ETHERTYPE_IPV4 && fabric_metadata.lkp.ip_proto == PROTO_ICMP) || (hdr.icmp.isValid() || hdr.inner_icmp.isValid())));
-            filtering.apply(hdr, fabric_metadata, standard_metadata);
-            hclose(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid() && (!(hdr.eth_type.value == ETHERTYPE_IPV4 && fabric_metadata.lkp.ip_proto == PROTO_ICMP) || (hdr.icmp.isValid() || hdr.inner_icmp.isValid())));
-            hopen(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid() && (!(hdr.eth_type.value == ETHERTYPE_IPV4 && fabric_metadata.lkp.ip_proto == PROTO_ICMP) || (hdr.icmp.isValid() || hdr.inner_icmp.isValid())));
-            if (fabric_metadata.skip_forwarding == false) {
-                forwarding.apply(hdr, fabric_metadata, standard_metadata);
-            }
-            hclose(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid() && (!(hdr.eth_type.value == ETHERTYPE_IPV4 && fabric_metadata.lkp.ip_proto == PROTO_ICMP) || (hdr.icmp.isValid() || hdr.inner_icmp.isValid())));
-            hopen (8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid() && (!(hdr.eth_type.value == ETHERTYPE_IPV4 && fabric_metadata.lkp.ip_proto == PROTO_ICMP) || (hdr.icmp.isValid() || hdr.inner_icmp.isValid())));
-            if (fabric_metadata.skip_next == false) {
-                pre_next.apply(hdr, fabric_metadata);
-            }
-            hclose(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid() && (!(hdr.eth_type.value == ETHERTYPE_IPV4 && fabric_metadata.lkp.ip_proto == PROTO_ICMP) || (hdr.icmp.isValid() || hdr.inner_icmp.isValid())));
+        /* lkp_md_init.apply(hdr, fabric_metadata); */
+        /* hopen(8w1, hdr.packet_out.isValid() || (hdr.ethernet.isValid() && hdr.eth_type.isValid()) */
+        /*                                         && (hdr.eth_type.value != ETHERTYPE_IPV4 || hdr.ipv4.isValid()) */
+        /*                                         && (!(hdr.inner_icmp.isValid() && hdr.icmp.isValid())) */
+        /*                                         && (!(hdr.eth_type.value == ETHERTYPE_IPV4 && fabric_metadata.lkp.ip_proto == PROTO_ICMP) || (hdr.icmp.isValid() || hdr.inner_icmp.isValid()))); */
+        /* pkt_io_ingress.apply(hdr, fabric_metadata, standard_metadata); */
+        /* slice_tc_classifier.apply(hdr, fabric_metadata, standard_metadata); */
+        /* hclose(8w1, fabric_metadata.is_controller_packet_out == true || */
+        /*             (hdr.ethernet.isValid() && hdr.eth_type.isValid()) */
+        /*              && (hdr.eth_type.value != ETHERTYPE_IPV4 || hdr.ipv4.isValid()) */
+        /*              && (!(hdr.inner_icmp.isValid() && hdr.icmp.isValid())) */
+        /*              && (!(hdr.eth_type.value == ETHERTYPE_IPV4 && fabric_metadata.lkp.ip_proto == PROTO_ICMP) || (hdr.icmp.isValid() || hdr.inner_icmp.isValid()))); */
+        /* if (fabric_metadata.is_controller_packet_out == false) { */
+        /*     hopen(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid() && (!(hdr.eth_type.value == ETHERTYPE_IPV4 && fabric_metadata.lkp.ip_proto == PROTO_ICMP) || (hdr.icmp.isValid() || hdr.inner_icmp.isValid()))); */
+        /*     filtering.apply(hdr, fabric_metadata, standard_metadata); */
+        /*     hclose(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid() && (!(hdr.eth_type.value == ETHERTYPE_IPV4 && fabric_metadata.lkp.ip_proto == PROTO_ICMP) || (hdr.icmp.isValid() || hdr.inner_icmp.isValid()))); */
+        /*     hopen(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid() && (!(hdr.eth_type.value == ETHERTYPE_IPV4 && fabric_metadata.lkp.ip_proto == PROTO_ICMP) || (hdr.icmp.isValid() || hdr.inner_icmp.isValid()))); */
+        /*     if (fabric_metadata.skip_forwarding == false) { */
+        /*         forwarding.apply(hdr, fabric_metadata, standard_metadata); */
+        /*     } */
+        /*     hclose(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid() && (!(hdr.eth_type.value == ETHERTYPE_IPV4 && fabric_metadata.lkp.ip_proto == PROTO_ICMP) || (hdr.icmp.isValid() || hdr.inner_icmp.isValid()))); */
+        /*     hopen (8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid() && (!(hdr.eth_type.value == ETHERTYPE_IPV4 && fabric_metadata.lkp.ip_proto == PROTO_ICMP) || (hdr.icmp.isValid() || hdr.inner_icmp.isValid()))); */
+        /*     if (fabric_metadata.skip_next == false) { */
+        /*         pre_next.apply(hdr, fabric_metadata); */
+        /*     } */
+        /*     hclose(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid() && (!(hdr.eth_type.value == ETHERTYPE_IPV4 && fabric_metadata.lkp.ip_proto == PROTO_ICMP) || (hdr.icmp.isValid() || hdr.inner_icmp.isValid()))); */
             hopen (8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid() && (!(hdr.eth_type.value == ETHERTYPE_IPV4 && fabric_metadata.lkp.ip_proto == PROTO_ICMP) || (hdr.icmp.isValid() || hdr.inner_icmp.isValid())));
             acl.apply(hdr, fabric_metadata, standard_metadata);
             hclose(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid());
-            hopen (8w1, hdr.ethernet.isValid()  && hdr.eth_type.isValid());
-            if (fabric_metadata.skip_next == false) {
-                next.apply(hdr, fabric_metadata, standard_metadata);
-            }
-            hclose(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid());
-            hopen (8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid());
-            qos.apply(fabric_metadata, standard_metadata);
-            hclose(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid());
+            /* hopen (8w1, hdr.ethernet.isValid()  && hdr.eth_type.isValid()); */
+            /* if (fabric_metadata.skip_next == false) { */
+            /*     next.apply(hdr, fabric_metadata, standard_metadata); */
+            /* } */
+            /* hclose(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid()); */
+            /* hopen (8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid()); */
+            /* qos.apply(fabric_metadata, standard_metadata); */
+            /* hclose(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid()); */
         }
     }
 }
@@ -1112,18 +1112,18 @@ control FabricEgress(inout parsed_headers_t hdr, inout fabric_metadata_t fabric_
     EgressNextControl() egress_next;
     EgressDscpRewriter() dscp_rewriter;
     apply {
-        hopen(8w1, fabric_metadata.is_controller_packet_out == true || (hdr.ethernet.isValid() && hdr.eth_type.isValid()));
-        pkt_io_egress.apply(hdr, fabric_metadata, standard_metadata);
-        hclose(8w1, fabric_metadata.is_controller_packet_out == true || (hdr.eth_type.isValid()));
-        if (fabric_metadata.is_controller_packet_out == false) {
-          hopen(8w1, hdr.eth_type.isValid());
-          egress_next.apply(hdr, fabric_metadata, standard_metadata);
-          hclose(8w1, true);
-          hopen(8w1, true);
-          dscp_rewriter.apply(hdr, fabric_metadata, standard_metadata);
-          hclose(8w1, true);
-        }
-        standard_metadata.egress_spec = 9w511;
+        /* hopen(8w1, fabric_metadata.is_controller_packet_out == true || (hdr.ethernet.isValid() && hdr.eth_type.isValid())); */
+        /* pkt_io_egress.apply(hdr, fabric_metadata, standard_metadata); */
+        /* hclose(8w1, fabric_metadata.is_controller_packet_out == true || (hdr.eth_type.isValid())); */
+        /* if (fabric_metadata.is_controller_packet_out == false) { */
+        /*   hopen(8w1, hdr.eth_type.isValid()); */
+        /*   egress_next.apply(hdr, fabric_metadata, standard_metadata); */
+        /*   hclose(8w1, true); */
+        /*   hopen(8w1, true); */
+        /*   dscp_rewriter.apply(hdr, fabric_metadata, standard_metadata); */
+        /*   hclose(8w1, true); */
+        /* } */
+        /* standard_metadata.egress_spec = 9w511; */
     }
 }
 
