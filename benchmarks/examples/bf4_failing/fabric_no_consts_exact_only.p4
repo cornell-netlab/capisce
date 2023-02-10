@@ -1103,7 +1103,7 @@ control FabricIngress(inout parsed_headers_t hdr, inout fabric_metadata_t fabric
             /* hopen (8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid()); */
             /* qos.apply(fabric_metadata, standard_metadata); */
             /* hclose(8w1, hdr.ethernet.isValid() && hdr.eth_type.isValid()); */
-        }
+        /* } */
     }
 }
 
