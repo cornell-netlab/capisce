@@ -66,8 +66,9 @@ let compile : Command.t =
        source = anon ("p4 source file" %: string) and       
        includes = flag "-I" (listed string) ~doc:"includes directories" and
        gas_opt = flag "-g" (optional int) ~doc:"how much gas to pass the compiler" and
-       unroll_opt = flag "-u" (optional int) ~doc:"how much to_unroll the parser"
-       in
+       unroll_opt = flag "-u" (optional int) ~doc:"how much to_unroll the parser" and
+       prsr = flag "-parser" no_arg ~doc:"show the parser" and
+       pipe = flag "-pipe" no_arg ~doc:"show the pipeline" in
        fun () ->
        let open ASTs in
        BExpr.enable_smart_constructors := `On;
@@ -80,8 +81,9 @@ let compile : Command.t =
        (* Log.irs "RAW pipeline:\n%s\n" @@ lazy (GPL.to_string gpl_pipe) *)
        (* Log.irs "RAW pipeline: \n%s" @@ lazy (GPL.to_string gpl_pipe); *)
        (* let (gpl_prsr_o, gpl_pipe_o) = GPL.optimize_seq_pair (gpl_prsr, gpl_pipe) in *)
-       let (_, gcl_pipe) = Tuple2.map ~f:GPL.encode_tables (gpl_prsr, gpl_pipe) in
-       Log.irs "%s" @@ lazy (GCL.to_string gcl_pipe)
+       let (gcl_parser, gcl_pipe) = Tuple2.map ~f:GPL.encode_tables (gpl_prsr, gpl_pipe) in
+       if prsr then Log.irs "%s" @@ lazy (GCL.to_string gcl_parser);
+       if pipe then Log.irs "%s" @@ lazy (GCL.to_string gcl_pipe)
        (* Log.irs "%s" @@ lazy ("compiling from scratch"); *)
        (* let cmd = P4Parse.as_cmd_from_file includes source gas unroll false true in *)
        (* Log.irs "RAW FULL PROGRAM:\n%s" @@ lazy (GCL.to_string cmd); *)
@@ -285,6 +287,73 @@ let smtlib : Command.t =
          Printf.printf "%s\n%!" (BExpr.to_smtlib b);
     ]
 
+let micro : Command.t =
+  let open Command.Let_syntax in
+  let ternary : Command.t =
+    Command.basic ~summary:"measure the performance effect of ternary matches on solve time"
+    [%map_open
+      let verbosity = flag "-v" (listed string) ~doc:"verbosity"
+      and debug = flag "-D" no_arg ~doc:"Enable generic debug logging"
+      and bitwidth = flag "--bitwidth" (optional int) ~doc:"B The bitwidth for all variables in the benchmark (default 32)"
+      and max_keys = flag "--max-keys" (required int) ~doc:"K The maximum number of keys in any table"
+      and max_tables = flag "--max-tables" (optional int) ~doc:"T the maximum number of tables (default 1)"
+      in
+      fun () ->
+        Log.parse_flags (String.concat verbosity);
+        if debug then Log.override ();
+        let bitwidth = Option.value bitwidth ~default:32 in
+        let max_tables = Option.value max_tables ~default:1 in
+        let _ =
+          Pbench.Micro.ternary_match_benchmark ~bitwidth ~max_tables ~max_keys
+        in
+        ()]
+  in
+  let detfwd : Command.t =
+    Command.basic ~summary:"mesure the performance effect of pipeline length and the action complexity of tables"
+    [%map_open
+      let verbosity = flag "-v" (listed string) ~doc:"verbosity"
+      and debug = flag "-D" no_arg ~doc:"Enable generic debug logging"
+      and bitwidth = flag "--bitwidth" (optional int) ~doc:"B the bitwidth for all variables in the benchmark (default 32)"
+      and max_tables = flag "--max-tables" (required int) ~doc:"T the maximum number of pipelined tables"
+      and max_acts = flag "--max-acts" (required int) ~doc:"A the maximum number of actions in any table"
+      and max_assigns = flag "--max-assigns" (optional int ) ~doc:"D the maximum number of forwarding assignments (default A)"
+      in
+      fun () ->
+        Log.parse_flags (String.concat verbosity);
+        if debug then Log.override ();
+        let bitwidth = Option.value bitwidth ~default:32 in
+        let max_assigns = Option.value max_assigns ~default:max_acts in
+        let _ =
+          Pbench.Micro.determined_forwarding ~bitwidth ~max_tables ~max_acts ~max_assigns
+        in
+        ()
+    ]
+  in
+  let joins : Command.t =
+    Command.basic ~summary:"measure the performance effect of join conditions"
+    [%map_open
+      let verbosity = flag "-v" (listed string) ~doc:"verbosity"
+      and debug = flag "-D" no_arg ~doc:"Enable generic debug logging"
+      and bitwidth = flag "--bitwidth" (optional int) ~doc:"B the bitwidth for all variables in the benchmark (default 32)"
+      and max_joins = flag "--max-joins" (required int) ~doc:"J the maximum number of pipelined tables"
+      and max_join_vars = flag "--max-join-vars" (required int) ~doc:"V the maximum number of join_vars in any table"
+      in
+      fun () ->
+        Log.parse_flags (String.concat verbosity);
+        if debug then Log.override ();
+        let bitwidth = Option.value bitwidth ~default:32 in
+        let _ =
+          Pbench.Micro.join_conditions ~bitwidth ~max_joins ~max_join_vars
+        in
+        ()
+    ]
+  in
+  Command.group ~summary:"Generate microbenchmark data"
+    [ ("ternary", ternary);
+      ("detfwd", detfwd);
+      ("joins", joins)
+    ]
+
 let main =
   Command.group ~summary:"research toy for exploring verification & synthesis of p4 programs"
     [("infer", infer);
@@ -294,6 +363,7 @@ let main =
      ("graph", graph);
      ("compile", compile);
      ("smtlib", smtlib);
+     ("micro", micro)
     ]
 
 let () = Command_unix.run main    

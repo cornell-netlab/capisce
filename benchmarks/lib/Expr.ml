@@ -324,7 +324,6 @@ let neq_contra (e11,e12) (e21, e22) =
      
      Var.equal x y && Var.size x = 1 && not (Bigint.(u = v))
   | _ ->
-     Printf.printf "Skipping\n%!";
      false
                
 let rec fun_subst f e =

@@ -1,6 +1,12 @@
 #include <core.p4>
 #include <v1model.p4>
 
+#define NCIP ((!hdr.nc_hdr.isValid()) || hdr.ipv4.isValid())
+#define ETH (hdr.ethernet.isValid())
+#define TCPIP ((!hdr.tcp.isValid()) || hdr.ipv4.isValid())
+#define UDPIP ((!hdr.udp.isValid()) || hdr.ipv4.isValid())
+
+
 struct location_t {
     bit<16> index;
 }
@@ -127,12 +133,74 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
             default: accept;
         }
     }
-    @name(".parse_overlay") state parse_overlay {
-        packet.extract(hdr.overlay.next);
-        transition select(hdr.overlay.last.swip) {
+    @name(".parse_overlay0") state parse_overlay0 {
+        packet.extract(hdr.overlay[0]);
+        transition select(hdr.overlay[0].swip) {
             32w0: parse_nc_hdr;
-            default: parse_overlay;
+            default: parse_overlay1;
         }
+    }
+
+    @name(".parse_overlay1") state parse_overlay1 {
+        packet.extract(hdr.overlay[1]);
+        transition select(hdr.overlay[1].swip) {
+            32w0: parse_nc_hdr;
+            default: parse_overlay2;
+        }
+    }
+    @name(".parse_overlay2") state parse_overlay2 {
+        packet.extract(hdr.overlay[2]);
+        transition select(hdr.overlay[2].swip) {
+            32w0: parse_nc_hdr;
+            default: parse_overlay3;
+        }
+    }
+    @name(".parse_overlay3") state parse_overlay3 {
+        packet.extract(hdr.overlay[3]);
+        transition select(hdr.overlay[3].swip) {
+            32w0: parse_nc_hdr;
+            default: parse_overlay4;
+        }
+    }
+    @name(".parse_overlay4") state parse_overlay4 {
+        packet.extract(hdr.overlay[4]);
+        transition select(hdr.overlay[4].swip) {
+            32w0: parse_nc_hdr;
+            default: parse_overlay4;
+        }
+    }
+    @name(".parse_overlay5") state parse_overlay5 {
+        packet.extract(hdr.overlay[5]);
+        transition select(hdr.overlay[5].swip) {
+            32w0: parse_nc_hdr;
+            default: parse_overlay6;
+        }
+    }
+    @name(".parse_overlay6") state parse_overlay6 {
+        packet.extract(hdr.overlay[6]);
+        transition select(hdr.overlay[6].swip) {
+            32w0: parse_nc_hdr;
+            default: parse_overlay7;
+        }
+    }
+    @name(".parse_overlay7") state parse_overlay7 {
+        packet.extract(hdr.overlay[7]);
+        transition select(hdr.overlay[7].swip) {
+            32w0: parse_nc_hdr;
+            default: parse_overlay8;
+        }
+    }
+    @name(".parse_overlay8") state parse_overlay8 {
+        packet.extract(hdr.overlay[8]);
+        transition select(hdr.overlay[8].swip) {
+            32w0: parse_nc_hdr;
+            default: parse_overlay9;
+        }
+    }
+    @name(".parse_overlay9") state parse_overlay9 {
+        packet.extract(hdr.overlay[9]);
+        assume(hdr.overlay[9].swip == 32w0);
+        transition parse_nc_hdr;
     }
     @name(".parse_tcp") state parse_tcp {
         packet.extract(hdr.tcp);
@@ -142,8 +210,8 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
         packet.extract(hdr.udp);
         hdr.udp.dstPort = 16w8888;
         transition select(hdr.udp.dstPort) {
-            16w8888: parse_overlay;
-            16w8889: parse_overlay;
+            16w8888: parse_overlay0;
+            16w8889: parse_overlay0;
             default: accept;
         }
     }
@@ -182,7 +250,7 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
     }
     @name(".pop_chain_act") action pop_chain_act() {
         hdr.nc_hdr.sc = hdr.nc_hdr.sc + 8w255;
-        hdr.overlay.pop_front(1);
+        // hdr.overlay.pop_front(1);
         hdr.udp.len = hdr.udp.len + 16w65532;
         hdr.ipv4.totalLen = hdr.ipv4.totalLen + 16w65532;
     }
@@ -321,8 +389,10 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         }
     }
     apply {
+        assume(hdr.ipv4.isValid() && hdr.overlay[0].isValid() && hdr.udp.isValid());
         if (hdr.nc_hdr.isValid()) {
             get_my_address.apply();
+            hopen(8w1, ETH && hdr.nc_hdr.isValid() && hdr.ipv4.isValid() && hdr.overlay[0].isValid() && hdr.udp.isValid());
             if (hdr.ipv4.dstAddr == meta.my_md.ipaddress) {
                 find_index.apply();
                 get_sequence.apply();
@@ -351,12 +421,17 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
                     get_next_hop.apply();
                 }
             }
+            hclose(8w1, ETH && hdr.nc_hdr.isValid() && hdr.ipv4.isValid() && hdr.udp.isValid() && hdr.overlay[0].isValid());
         }
         if (hdr.nc_hdr.isValid()) {
+            hopen(8w1, ETH && hdr.nc_hdr.isValid() && hdr.ipv4.isValid() && hdr.udp.isValid() && hdr.overlay[0].isValid());
             failure_recovery.apply();
+            hclose(8w1, ETH && hdr.nc_hdr.isValid() && hdr.ipv4.isValid());
         }
         if (hdr.tcp.isValid() || hdr.udp.isValid()) {
+            hopen(8w1, ETH && hdr.ipv4.isValid());
             ipv4_route.apply();
+            hclose(8w1, ETH);
         }
     }
 }

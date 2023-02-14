@@ -152,13 +152,14 @@ control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t
         }
     }
     apply {
+        assume(standard_metadata.egress_spec != 9w511);
+        hopen(8w1, hdr.ipv4.isValid() && hdr.tcp.isValid() && hdr.ethernet.isValid());
         if (standard_metadata.instance_type == 32w0) {
             send_frame.apply();
         } else {
             send_to_cpu.apply();
         }
-        assert(standard_metadata.egress_spec != meta.meta.initial_egress_spec);
-        standard_metadata.egress_spec = 9w511;
+        hclose(8w1, true);
     }
 }
 
@@ -249,13 +250,26 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         size = 128;
     }
     apply {
-        meta.meta.initial_egress_spec = standard_metadata.egress_spec;
         if_info.apply();
+        hopen(8w1, hdr.ethernet.isValid());
         nat.apply();
-        if (meta.meta.do_forward == 1w1 && hdr.ipv4.ttl > 8w0) {
+        hclose(8w1, hdr.ethernet.isValid()
+             && (meta.meta.do_forward == 1w0 || hdr.ipv4.isValid() && hdr.tcp.isValid())
+             && (meta.meta.do_forward == 1w1 || standard_metadata.egress_spec == 9w511));
+        hopen(8w1, hdr.ethernet.isValid()
+                 && (meta.meta.do_forward == 1w0 || hdr.ipv4.isValid() && hdr.tcp.isValid())
+                 && (meta.meta.do_forward == 1w1 || standard_metadata.egress_spec == 9w511));
+        if (meta.meta.do_forward == 1w1){
+          if(hdr.ipv4.ttl > 8w0) {
             ipv4_lpm.apply();
             forward.apply();
+          }
         }
+        hclose(8w1,
+         hdr.ethernet.isValid()
+                 && (meta.meta.do_forward == 1w0 || hdr.ipv4.isValid() && hdr.tcp.isValid())
+                 && (meta.meta.do_forward == 1w1 || standard_metadata.egress_spec == 9w511)
+        );
     }
 }
 

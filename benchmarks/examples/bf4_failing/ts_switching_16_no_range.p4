@@ -127,6 +127,7 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
     }
     
     apply {
+        assume(hdr.ipv4.isValid() && hdr.rtp.isValid());
         schedule_table.apply();
     }
 }

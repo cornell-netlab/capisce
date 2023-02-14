@@ -99,7 +99,6 @@ control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t
     }
     apply {
         send_frame.apply();
-        assert(standard_metadata.egress_spec != 9w0);
     }
 }
 
@@ -122,11 +121,11 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         }
         key = {
             hdr.ipv4.dstAddr : lpm;
-            hdr.ipv4.srcAddr : exact;
-            hdr.ipv4.dstAddr : exact;
-            hdr.ipv4.protocol: exact;
-            hdr.tcp.srcPort  : exact;
-            hdr.tcp.dstPort  : exact;
+            // hdr.ipv4.srcAddr : exact;
+            // hdr.ipv4.dstAddr : exact;
+            // hdr.ipv4.protocol: exact;
+            // hdr.tcp.srcPort  : exact;
+            // hdr.tcp.dstPort  : exact;
         }
         size = 1024;
         implementation = ecmp_action_profile;
@@ -142,9 +141,11 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         size = 512;
     }
     apply {
-        if (hdr.ipv4.isValid() && hdr.ipv4.ttl > 8w0) {
+        if (hdr.ipv4.isValid()) {
+          if (hdr.ipv4.ttl > 8w0) {
             ecmp_group.apply();
             forward.apply();
+          }
         }
     }
 }

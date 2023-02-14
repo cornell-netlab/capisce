@@ -155,10 +155,12 @@ parser MyParser(packet_in packet,
     }
     state parse_srcRouting7 {
         packet.extract(hdr.srcRoutes[7]);
-        transition select(hdr.srcRoutes[7].bos) {
-            1w1       : parse_ipv4;
-            default : reject;
-        }
+        // assume(hdr.srcRoutes[7].bos == 1w1);
+        // transition parse_ipv4;
+        // transition select(hdr.srcRoutes[7].bos) {
+        //     1w1     : parse_ipv4;
+        //     default : reject;
+        // }
     }
 
 
@@ -357,6 +359,7 @@ control MyIngress(inout headers hdr,
     }
 
     apply {
+        hopen(8w1, hdr.ethernet.isValid() && (!hdr.hula.isValid() || hdr.ipv4.isValid()));
         if (hdr.hula.isValid()){
             if (hdr.hula.dir == 1w0){
                 switch(hula_fwd.apply().action_run){
@@ -375,7 +378,7 @@ control MyIngress(inout headers hdr,
                             return_hula_to_src();
                         }else{
 
-                            /* update the best path even if it has gone worse 
+                            /* update the best path even if it has gone worse
                              * so that other paths can replace it later
                              */
                             digest_t old_digest;
@@ -385,7 +388,7 @@ control MyIngress(inout headers hdr,
                             }
 
                             drop();
-                        } 
+                        }
                     }
                 }
             }else {
@@ -397,12 +400,13 @@ control MyIngress(inout headers hdr,
             }
 
         }else if (hdr.ipv4.isValid()){
+            assume(hdr.udp.isValid());
             bit<16> flow_hash;
             hash(
-                flow_hash, 
-                HashAlgorithm.crc16, 
-                16w0, 
-                { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.udp.srcPort}, 
+                flow_hash,
+                HashAlgorithm.crc16,
+                16w0,
+                { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.udp.srcPort},
                 32w65536);
 
             /* look into hula tables */
@@ -423,7 +427,7 @@ control MyIngress(inout headers hdr,
         }else {
             drop();
         }
-
+        hclose(8w1, hdr.ethernet.isValid());
         if (hdr.ipv4.isValid()){
             update_ttl();
         }
@@ -438,14 +442,17 @@ control MyEgress(inout headers hdr,
                  inout metadata meta,
                  inout standard_metadata_t standard_metadata) {
     apply {
-        if (hdr.hula.isValid() && hdr.hula.dir == 1w0){
+        assume(standard_metadata.egress_spec != 9w511);
+        if (hdr.hula.isValid()){
+          if (hdr.hula.dir == 1w0){
 
             /* pick max qdepth in hula forward path */
             if (hdr.hula.qdepth < (qdepth_t)standard_metadata.deq_qdepth){
 
                 /* update queue length */
                 hdr.hula.qdepth = (qdepth_t)standard_metadata.deq_qdepth;
-            } 
+            }
+          }
         }
     }
 }

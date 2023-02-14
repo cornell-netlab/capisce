@@ -102,7 +102,6 @@ let log flag fmt colors a : unit =
 let error fmt   = log FLAGS.error     fmt [red]
 let error_s s = error "%s" (lazy s)
 let warn fmt    = log FLAGS.warn      fmt [yellow; Bold]
-let measure fmt = log FLAGS.measure   fmt []
 let smt fmt      = log FLAGS.smt      fmt [green]
 let irs fmt      = log FLAGS.irs      fmt []
 let path_gen fmt = log FLAGS.path_gen fmt [cyan; Bold]
@@ -112,6 +111,9 @@ let compiler_s s = compiler "%s" (lazy s)
 let smart fmt    = log FLAGS.smart    fmt []
 let rewrites fmt = log FLAGS.rewrites fmt []
 let qe fmt       = log FLAGS.qe       fmt []
+
+let measure fmt = log FLAGS.measure   fmt []
+let measure_s s = measure "%s" (lazy s)
 
 let monitor fmt = log FLAGS.graph     fmt [cyan; Bold]
 let monitor_s s = monitor "%s" @@ lazy s

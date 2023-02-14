@@ -110,20 +110,31 @@ end
 module HoareNet = struct
   module Pack = struct
     include Cmd.Make(DepPrim)
+    open ASTs
 
     let assign x e =
       prim ({ precondition = None;
-              cmd = ASTs.GPL.assign x e;
+              cmd = GPL.assign x e;
               postcondition = None})
 
     let table ?(pre = None) ?(post = None) (name, keys, actions) =
       prim ({ precondition = pre;
-              cmd = ASTs.GPL.table name keys actions;
+              cmd = GPL.table name keys actions;
               postcondition = post})
 
+    let of_gpl : GPL.t -> t =
+      GPL.bottom_up
+        ~sequence
+        ~choices
+        ~prim:(fun p ->
+            prim({precondition = None;
+                  cmd = GPL.prim p;
+                  postcondition = None})
+          )
+
     let flatten cmd = bottom_up cmd
-        ~sequence:ASTs.GPL.sequence
-        ~choices:ASTs.GPL.choices
+        ~sequence:GPL.sequence
+        ~choices:GPL.choices
         ~prim:(fun p ->
             match p.precondition, p.postcondition with
             | None, None ->

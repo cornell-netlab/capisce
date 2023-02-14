@@ -95,7 +95,6 @@ control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t
     }
     apply {
         nat_table.apply();
-        // standard_metadata.egress_spec = 9w5;
     }
 }
 
@@ -117,6 +116,7 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         size = 16384;
     }
     apply {
+        assume(hdr.ipv4.isValid());
         set_mcg.apply();
     }
 }

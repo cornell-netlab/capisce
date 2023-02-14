@@ -24,8 +24,10 @@ val error_s : string -> unit
 val warn : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
 
 val smt      : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
-val measure  : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
 val irs      : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
+
+val measure   : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
+val measure_s : string -> unit
 
 val graph    : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
 val graph_s  : string -> unit

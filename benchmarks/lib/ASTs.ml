@@ -175,6 +175,12 @@ end
     let table name keys actions =
       prim (Table {name; keys; actions})
 
+    let of_gcl : GCL.t -> t =
+      GCL.bottom_up
+        ~sequence
+        ~choices
+        ~prim:(fun p -> prim (Pipeline.Active p))
+
     let encode_tables: t -> GCL.t =
       bottom_up
         ~sequence:GCL.sequence

@@ -197,6 +197,7 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         }
     }
     apply {
+        assume (hdr.tcp.isValid() && hdr.ipv4.isValid());
         flowlet.apply();
         if (meta.ingress_metadata.flow_ipg > 32w50000) {
             new_flowlet.apply();

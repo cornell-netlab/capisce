@@ -97,6 +97,9 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
         }
     }
     @name(".start") state start {
+        hdr.udp.setInvalid();
+        hdr.ipv4.setInvalid();
+        hdr.paxos.setInvalid();
         transition parse_ethernet;
     }
 }
