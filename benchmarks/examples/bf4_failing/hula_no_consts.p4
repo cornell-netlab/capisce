@@ -155,8 +155,8 @@ parser MyParser(packet_in packet,
     }
     state parse_srcRouting7 {
         packet.extract(hdr.srcRoutes[7]);
-        // assume(hdr.srcRoutes[7].bos == 1w1);
-        // transition parse_ipv4;
+        assume(hdr.srcRoutes[7].bos == 1w1);
+        transition parse_ipv4;
         // transition select(hdr.srcRoutes[7].bos) {
         //     1w1     : parse_ipv4;
         //     default : reject;

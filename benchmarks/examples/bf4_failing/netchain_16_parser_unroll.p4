@@ -1,11 +1,8 @@
 #include <core.p4>
 #include <v1model.p4>
 
-#define NCIP ((!hdr.nc_hdr.isValid()) || hdr.ipv4.isValid())
-#define ETH (hdr.ethernet.isValid())
-#define TCPIP ((!hdr.tcp.isValid()) || hdr.ipv4.isValid())
-#define UDPIP ((!hdr.udp.isValid()) || hdr.ipv4.isValid())
-
+#define ETH hdr.ethernet.isValid()
+#define PARSER hdr.nc_hdr.isValid() && hdr.ipv4.isValid() && hdr.overlay[0].isValid() && hdr.udp.isValid()
 
 struct location_t {
     bit<16> index;
@@ -392,7 +389,7 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         assume(hdr.ipv4.isValid() && hdr.overlay[0].isValid() && hdr.udp.isValid());
         if (hdr.nc_hdr.isValid()) {
             get_my_address.apply();
-            hopen(8w1, ETH && hdr.nc_hdr.isValid() && hdr.ipv4.isValid() && hdr.overlay[0].isValid() && hdr.udp.isValid());
+            hopen(8w1, ETH && PARSER);
             if (hdr.ipv4.dstAddr == meta.my_md.ipaddress) {
                 find_index.apply();
                 get_sequence.apply();
@@ -421,10 +418,10 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
                     get_next_hop.apply();
                 }
             }
-            hclose(8w1, ETH && hdr.nc_hdr.isValid() && hdr.ipv4.isValid() && hdr.udp.isValid() && hdr.overlay[0].isValid());
+            hclose(8w1, ETH && PARSER);
         }
         if (hdr.nc_hdr.isValid()) {
-            hopen(8w1, ETH && hdr.nc_hdr.isValid() && hdr.ipv4.isValid() && hdr.udp.isValid() && hdr.overlay[0].isValid());
+            hopen(8w1, ETH && PARSER);
             failure_recovery.apply();
             hclose(8w1, ETH && hdr.nc_hdr.isValid() && hdr.ipv4.isValid());
         }
