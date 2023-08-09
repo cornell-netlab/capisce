@@ -20,7 +20,8 @@ type ipv4_t = {
   protocol : Var.t;
   ttl : Var.t;
   dstAddr : Var.t;
-  srcAddr : Var.t
+  srcAddr : Var.t;
+  totalLen : Var.t
 }
 
 let ipv4 = {
@@ -29,6 +30,7 @@ let ipv4 = {
   ttl = Var.make "hdr.ipv4.ttl" 8;
   dstAddr = Var.make "hdr.ipv4.dstAddr" 32;
   srcAddr = Var.make "hdr.ipv4.srcAddr" 32;
+  totalLen = Var.make "hdr.ipv4.totalLen" 16;
 }
 
 type tcp_t = {
@@ -66,15 +68,27 @@ let paxos : paxos_t = {
   vproposal = Var.make "hdr.paxos.vproposal" 16;
 }
 
+(* used in ndp_router *)
+type ndp_t = {
+  isValid : Var.t;
+  flags : Var.t
+}
+
+let ndp : ndp_t = {
+  isValid = Var.make "hdr.ndp.isValid" 1;
+  flags = Var.make "hdr.ndp.flags" 16;
+}
+
 type hdr_t = {
   ethernet : ethernet_t;
   ipv4 : ipv4_t;
   tcp : tcp_t;
   udp : udp_t;
+  ndp : ndp_t;
   paxos : paxos_t;
 }
 
-let hdr = {ethernet; ipv4; tcp; udp; paxos}
+let hdr = {ethernet; ipv4; tcp; udp; paxos; ndp}
 
 type zombie_t = {
   parse_result : Var.t

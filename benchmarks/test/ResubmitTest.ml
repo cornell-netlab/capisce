@@ -74,7 +74,7 @@ let test_concolic () =
     BExpr.true_
 
 let tests : unit Alcotest.test_case list = [
-  Alcotest.test_case "ecmp2 annotations" `Quick test_annotations;
-  Alcotest.test_case "ecmp2 all_paths inference" `Quick test_infer;
-  Alcotest.test_case "ecmp2 concolic inference" `Quick test_concolic;
+  Alcotest.test_case "resubmit annotations" `Quick test_annotations;
+  Alcotest.test_case "resubmit all_paths inference" `Quick test_infer;
+  Alcotest.test_case "resubmit concolic inference" `Quick test_concolic;
 ]
