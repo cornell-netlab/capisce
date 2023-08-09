@@ -3,7 +3,7 @@ open Pbench
 open ASTs
 
 
-let fabric_gpl =
+let get_fabric_gpl () =
   P4Parse.tbl_abstraction_from_file
     ["./examples/includes"]
     "./examples/bf4_failing/fabric_no_consts.p4"
@@ -16,6 +16,7 @@ let fabric_gpl =
 
 
 let ast_size () =
+  let fabric_gpl = get_fabric_gpl () in
   let agg cs = (*(List.length cs - 1) +*) List.sum (module Int) ~f:Fn.id cs in
   GPL.bottom_up fabric_gpl
     ~prim:(fun _ -> 1)
@@ -24,6 +25,7 @@ let ast_size () =
   |> Alcotest.(check int) "equivalent" (GPL.size fabric_gpl)
 
 let tables_fwd () =
+  let fabric_gpl = get_fabric_gpl () in
   let init = 0 in
   let prim p =
     if Primitives.Pipeline.is_table p then
@@ -41,6 +43,7 @@ let tables_fwd () =
   Alcotest.(check int) "equivalent" 15 fwd_count
 
 let tables_bwd () =
+  let fabric_gpl = get_fabric_gpl () in
   let init = 0 in
   let prim p =
     if Primitives.Pipeline.is_table p then
@@ -58,6 +61,7 @@ let tables_bwd () =
   Alcotest.(check int) "equivalent" 15 bwd_count
 
 let tables_bot () =
+  let fabric_gpl = get_fabric_gpl () in
   let prim p =
     if Primitives.Pipeline.is_table p then
       1
@@ -74,6 +78,7 @@ let tables_bot () =
   Alcotest.(check int) "equivalent" 15 bottom_up_count
 
 let tables_top () =
+  let fabric_gpl = get_fabric_gpl () in
   let init = 0 in
   let prim p =
     if Primitives.Pipeline.is_table p then
