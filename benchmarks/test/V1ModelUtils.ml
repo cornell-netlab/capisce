@@ -122,7 +122,6 @@ let ifte_seq guard true_seqs false_seqs =
     assume (not_ guard) :: false_seqs
   ]
 
-
 let btrue = Expr.bvi 1 1
 let bfalse = Expr.bvi 0 1
 

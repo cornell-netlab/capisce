@@ -31,6 +31,8 @@ let as_cmd_from_file (includes : string list) p4file gas unroll verbose hv =
     | Error s ->
       failwith (Printf.sprintf "Compilation Error in stage [P4cub->GCL]: %s" s)
     | Ok prog ->
+      (* Translate.gcl_to_cmd prog *)
+      (* |> ASTs.GCL.normalize_names *)
       Tuple2.map ~f:Translate.gcl_to_cmd prog
       |> Util.uncurry ASTs.GCL.seq
       |> ASTs.GCL.normalize_names

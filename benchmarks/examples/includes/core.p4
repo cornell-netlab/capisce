@@ -40,8 +40,8 @@ extern packet_in {
     /// and advance the cursor.
     /// @T must be a header containing exactly 1 varbit field.
     /// May trigger errors PacketTooShort, StackOutOfBounds, or HeaderTooShort.
-    void extract<T>(out T variableSizeHeader,
-                    in bit<32> variableFieldSizeInBits);
+    /// void extract<T>(out T variableSizeHeader,
+    ///                 in bit<32> variableFieldSizeInBits);
     /// Read bits from the packet without advancing the cursor.
     /// @returns: the bits read from the packet.
     /// T may be an arbitrary fixed-size type.

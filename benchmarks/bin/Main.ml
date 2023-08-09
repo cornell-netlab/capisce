@@ -4,9 +4,6 @@ module Qe = Qe
 
 let () = Memtrace.trace_if_requested ~context:"icecap" ()
 
-
-
-
 let hoare : Command.t =
   let open Command.Let_syntax in
   Command.basic ~summary:"Modular Inference of control plane constraints"

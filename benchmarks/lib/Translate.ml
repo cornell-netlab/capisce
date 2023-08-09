@@ -111,7 +111,7 @@ let rec form_to_bexpr (phi : Form.t) : BExpr.t =
      comparison c (bv_to_expr bv1) (bv_to_expr bv2)
 
 let make_var typ var =
-  match width_of_type typ with
+  match width_of_type var typ with
   | Error s -> failwith s
   | Ok i ->
     Var.make var i

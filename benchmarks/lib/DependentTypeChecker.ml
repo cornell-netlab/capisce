@@ -150,7 +150,6 @@ module HoareNet = struct
              postcondition = Some post;
             })
 
-
     let check (cmd : t) =
       let all = List.for_all ~f:Fn.id in
       bottom_up cmd ~sequence:all ~choices:all
@@ -235,7 +234,7 @@ module HoareNet = struct
 
     let ninfer = ref 0
 
-    let infer (cmd:t) nprocs pid =
+    let infer ?(qe = `Enum) (cmd:t) nprocs pid =
       Log.path_gen "INFER CALL #%d" @@ lazy (!ninfer);
       (* Breakpoint.set (!ninfer > 0); *)
       Int.incr ninfer;
@@ -256,10 +255,9 @@ module HoareNet = struct
                 BExpr.true_
               else begin
                 seen := prog::!seen;
-                if false then
-                  Qe.concolic prog
-                else
-                  Qe.all_paths prog nprocs pid
+                match qe with
+                | `Conc -> Qe.concolic prog
+                | `Enum -> Qe.all_paths prog nprocs pid
               end
             | _, _ ->
               BExpr.true_

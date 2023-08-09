@@ -1,7 +1,11 @@
 #include <core.p4>
 #include <v1model.p4>
 
-#define PARSER (!hdr.pos_report.isValid() || hdr.lr_msg_type.isValid()) && (!hdr.pos_report.isValid() || hdr.udp.isValid()) && (!hdr.accnt_bal_req.isValid() || hdr.lr_msg_type.isValid()) && (!hdr.accnt_bal_req.isValid() || hdr.udp.isValid()) && (!hdr.expenditure_req.isValid() || hdr.udp.isValid()) && (!hdr.expenditure_req.isValid() || hdr.lr_msg_type.isValid()) && (!hdr.travel_estimate_req.isValid() || hdr.udp.isValid()) && (!hdr.travel_estimate_req.isValid() || hdr.lr_msg_type.isValid())
+#define INV hdr.ethernet.isValid() && hdr.ipv4.isValid() \
+  && (!hdr.pos_report.isValid() || (hdr.lr_msg_type.isValid() && hdr.udp.isValid()))\
+  && (!hdr.accnt_bal_req.isValid() || (hdr.lr_msg_type.isValid() && hdr.udp.isValid())) \
+  && (!hdr.expenditure_req.isValid() || (hdr.lr_msg_type.isValid() && hdr.udp.isValid())) \
+  && (!hdr.travel_estimate_req.isValid() || (hdr.lr_msg_type.isValid() && hdr.udp.isValid()))
 
 struct egress_metadata_t {
     bit<1> recirculate;
@@ -489,7 +493,7 @@ control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t
     }
     apply {
         if (hdr.ipv4.isValid()) {
-            hopen(8w1, hdr.ethernet.isValid() &&  hdr.ipv4.isValid() && PARSER);
+            hopen(8w1, INV);
             if (hdr.pos_report.isValid()) {
                 send_accident_alert.apply();
                 send_toll_notification.apply();
@@ -523,7 +527,7 @@ control egress(inout headers hdr, inout metadata meta, inout standard_metadata_t
                     }
                 }
             }
-            hclose(8w1,hdr.ethernet.isValid());
+            hclose(8w1, hdr.ethernet.isValid());
             send_frame.apply();
         }
     }
@@ -753,10 +757,10 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         }
         size = 4;
     }
-    apply {
+    apply { // INV is 31
         if (hdr.ipv4.isValid()) {
             if (hdr.pos_report.isValid()) {
-                hopen(8w1, hdr.ethernet.isValid() && hdr.ipv4.isValid() && hdr.pos_report.isValid() && PARSER);
+                hopen(8w1, hdr.pos_report.isValid() && INV);
                 update_pos_state.apply();
                 if (meta.v_state.new == 1w1 || meta.v_state.prev_seg != hdr.pos_report.seg) {
                     update_new_seg.apply();
@@ -769,33 +773,33 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
                 else {
                     loc_changed.apply();
                 }
-                hclose(8w1, hdr.ethernet.isValid() && hdr.ipv4.isValid() && hdr.pos_report.isValid() && PARSER);
-                hopen(8w1, hdr.ethernet.isValid() &&  hdr.ipv4.isValid() && hdr.pos_report.isValid() && PARSER);
+                hclose(8w1, hdr.pos_report.isValid() && INV);
+                hopen(8w1, hdr.pos_report.isValid() && INV);
                 if (meta.v_state.prev_nomove_cnt == 3w3 && meta.v_state.nomove_cnt < 3w3) {
                     dec_prev_stopped.apply();
                 }
                 if (meta.v_state.prev_nomove_cnt < 3w3 && meta.v_state.nomove_cnt == 3w3) {
                     inc_stopped.apply();
                 }
-                hclose(8w1, hdr.ethernet.isValid() &&  hdr.ipv4.isValid() && hdr.pos_report.isValid() && PARSER);
-                hopen(8w1, hdr.ethernet.isValid() &&  hdr.ipv4.isValid() && hdr.pos_report.isValid() && PARSER);
+                hclose(8w1, hdr.pos_report.isValid() && INV);
+                hopen(8w1, hdr.pos_report.isValid() && INV);
                 load_stopped_ahead.apply();
-                hclose(8w1, hdr.ethernet.isValid() &&  hdr.ipv4.isValid() && hdr.pos_report.isValid() && PARSER);
-                hopen(8w1, hdr.ethernet.isValid() &&  hdr.ipv4.isValid() && hdr.pos_report.isValid() && PARSER);
-                hclose(8w1, hdr.ethernet.isValid() &&  hdr.ipv4.isValid()  && hdr.pos_report.isValid() && PARSER);
-                hopen(8w1, hdr.ethernet.isValid() &&  hdr.ipv4.isValid() && hdr.pos_report.isValid() && PARSER);
+                hclose(8w1, hdr.pos_report.isValid() && INV);
+                hopen(8w1, hdr.pos_report.isValid() && INV);
+                hclose(8w1, hdr.pos_report.isValid() && INV);
+                hopen(8w1, hdr.pos_report.isValid() && INV);
                 check_toll.apply();
-                hclose(8w1, hdr.ethernet.isValid() &&  hdr.ipv4.isValid() && PARSER);
+                hclose(8w1, INV);
             }
             else {
                 if (hdr.accnt_bal_req.isValid()) {
                     load_accnt_bal.apply();
                 }
             }
-            hopen(8w1, hdr.ethernet.isValid() &&  hdr.ipv4.isValid() && PARSER);
+            hopen(8w1, INV);
             ipv4_lpm.apply();
             forward.apply();
-            hclose(8w1, hdr.ethernet.isValid() &&  hdr.ipv4.isValid() && PARSER);
+            hclose(8w1, INV);
         }
     }
 }

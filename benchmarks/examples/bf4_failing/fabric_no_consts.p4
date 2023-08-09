@@ -800,7 +800,7 @@ control IngressSliceTcClassifier(in parsed_headers_t hdr, inout fabric_metadata_
             fabric_md.lkp.l4_dport        : ternary @name("l4_dport") ;
         }
         actions = {
-            // set_slice_id_tc;
+            set_slice_id_tc;
             trust_dscp;
         }
         // const default_action = set_slice_id_tc(DEFAULT_SLICE_ID, DEFAULT_TC);
