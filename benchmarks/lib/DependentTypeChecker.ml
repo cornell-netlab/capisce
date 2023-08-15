@@ -122,53 +122,58 @@ module HoareNet = struct
               cmd = GPL.table name keys actions;
               postcondition = post})
 
-    let of_gpl : GPL.t -> t =
-      GPL.bottom_up
-        ~sequence
-        ~choices
-        ~prim:(fun p ->
-            prim({precondition = None;
-                  cmd = GPL.prim p;
-                  postcondition = None})
-          )
+    let of_gpl cmd =
+      prim( {precondition = None;
+             cmd;
+             postcondition = None})
 
-    let flatten cmd = bottom_up cmd
-        ~sequence:GPL.sequence
-        ~choices:GPL.choices
-        ~prim:(fun p ->
-            match p.precondition, p.postcondition with
-            | None, None ->
-              p.cmd
-            | _, _ ->
-              Log.error "Found hoare annotation in %s" @@ lazy (to_string cmd);
-              failwithf "[HoareNet.flatten] Cannot flatten command wtih Hoare annotations" ())
+    let rec safe_to_gpl_exn (cmd : t) =
+      match cmd with
+      | Prim p ->
+        begin match p.precondition, p.postcondition with
+        | None, None ->
+          p.cmd
+        | _, _ ->
+          Log.error "Found hoare annotation in %s" @@ lazy (to_string cmd);
+          failwithf "[HoareNet.flatten] Cannot flatten command wtih Hoare annotations" ()
+        end
+      | Seq cs ->
+        List.map cs ~f:safe_to_gpl_exn |> GPL.sequence
+      | Choice cxs ->
+        List.map cxs ~f:safe_to_gpl_exn |> GPL.choices
+
+    let rec annotated_to_gpl_exn (cmd : t) =
+      match cmd with
+      | Prim triple ->
+        GPL.sequence [Option.value_map ~f:GPL.assert_ triple.precondition ~default:GPL.skip;
+                      triple.cmd;
+                      Option.value_map ~f:GPL.assert_ triple.postcondition ~default:GPL.skip]
+      | Seq cs ->
+        List.map cs ~f:annotated_to_gpl_exn |> GPL.sequence
+      | Choice cxs ->
+        List.map cxs ~f:annotated_to_gpl_exn |> GPL.choices
 
     let triple (pre : BExpr.t) (cmd : t) (post : BExpr.t) =
-      let gpl = flatten cmd in
       prim ({precondition = Some pre;
-             cmd = gpl;
+             cmd = safe_to_gpl_exn cmd;
              postcondition = Some post;
             })
 
-    let check (cmd : t) =
-      let all = List.for_all ~f:Fn.id in
-      bottom_up cmd ~sequence:all ~choices:all
-        ~prim:(fun (triple : DepPrim.t) ->
-            let phi = DepPrim.vc triple in
-            let vars = BExpr.vars phi |> Tuple2.uncurry (@) in
-            BExpr.not_ phi
-            |> Solver.check_unsat vars ~timeout:(Some 2000))
+    let rec check (cmd : t) =
+      let all = List.for_all ~f:check in
+      match cmd with
+      | Prim triple ->
+        let open BExpr in
+        let phi = DepPrim.vc triple in
+        let vars = vars phi |> Tuple2.uncurry (@) in
+        Solver.check_unsat vars (not_ phi) ~timeout:(Some 2000)
+      | Seq cs | Choice cs ->
+        all cs
 
     let vc cmd =
+      (* Computes the monolithic VC for this program *)
       let open ASTs in
-      bottom_up cmd
-        ~prim:(fun (triple : DepPrim.t) ->
-            GPL.sequence [Option.value_map ~f:GPL.assert_ triple.precondition ~default:GPL.skip;
-                          triple.cmd;
-                          Option.value_map ~f:GPL.assert_ triple.postcondition ~default:GPL.skip]
-          )
-        ~sequence:GPL.sequence
-        ~choices:GPL.choices
+      annotated_to_gpl_exn cmd
       |> GPL.encode_tables
       |> Psv.passify
       |> snd
@@ -190,42 +195,39 @@ module HoareNet = struct
         let vars = BExpr.vars phi |> Tuple2.uncurry (@) in
         Solver.check_unsat_cex vars phi
       in
-      let phi =
-        top_down cmd
-          ~init:BExpr.true_
-          ~prim:(fun postcond prim ->
-              match prim.precondition, prim.postcondition with
-              | None, None ->
-                Log.debug "unmodular program is %s" @@ lazy (GPL.to_string prim.cmd);
-                Log.debug "postcondition is %s" @@ lazy (BExpr.to_smtlib postcond);
-                let postcond = GPL.wp prim.cmd postcond in
-                Log.debug "new postcondition is %s" @@ lazy (BExpr.to_smtlib postcond);
-                postcond
-              | Some p, Some q ->
-                let phi = BExpr.(and_ q @@ not_ postcond) in
-                begin match  validate phi with
-                  | None -> p
-                  | Some cex ->
-                    Log.error "Could not validate postcondition for %s" @@ lazy (GPL.to_string prim.cmd);
-                    Log.error "Counterexample %s" @@ lazy (Model.to_string cex);
-                    Log.error "Annotated Post: %s" @@ lazy (BExpr.to_smtlib q);
-                    Log.error "Computed  Post: %s" @@ lazy (BExpr.to_smtlib postcond);
-                    failwith "Invalid Annotations"
-                end
-              | _, _ ->
-                failwith "P & Q must be both some or both none"
-            )
-          ~sequence:(fun postcond cs check_backwards ->
-              List.fold_right cs
-                ~init:postcond
-                ~f:(Fn.flip check_backwards)
-            )
-          ~choices:(fun postcond cs check_backwards ->
-              BExpr.ands_ @@
-              List.map cs ~f:(check_backwards postcond)
-            )
+      let rec annot_phi postcond cmd =
+        match cmd with
+        | Prim triple ->
+          begin match triple.precondition, triple.postcondition with
+            | None, None ->
+              Log.debug "unmodular program is %s" @@ lazy (GPL.to_string triple.cmd);
+              Log.debug "postcondition is %s" @@ lazy (BExpr.to_smtlib postcond);
+              let postcond = GPL.wp triple.cmd postcond in
+              Log.debug "new postcondition is %s" @@ lazy (BExpr.to_smtlib postcond);
+              postcond
+            | Some p, Some q ->
+              let phi = BExpr.(and_ q @@ not_ postcond) in
+              begin match  validate phi with
+                | None -> p
+                | Some cex ->
+                  Log.error "Could not validate postcondition for %s" @@ lazy (GPL.to_string triple.cmd);
+                  Log.error "Counterexample %s" @@ lazy (Model.to_string cex);
+                  Log.error "Annotated Post: %s" @@ lazy (BExpr.to_smtlib q);
+                  Log.error "Computed  Post: %s" @@ lazy (BExpr.to_smtlib postcond);
+                  failwith "Invalid Annotations"
+              end
+            | _, _ ->
+              failwith "P & Q must be both some or both none"
+          end
+        | Seq cs ->
+          List.fold_right cs
+            ~init:postcond
+            ~f:(Fn.flip annot_phi)
+        | Choice cxs ->
+          List.map cxs ~f:(annot_phi postcond)
+          |> BExpr.ands_
       in
-      match validate @@ BExpr.not_ phi with
+      match validate @@ BExpr.not_ @@ annot_phi BExpr.true_ cmd with
       | None -> true
       | Some cex ->
         Log.error_s "Could not validate precondition";
@@ -239,29 +241,29 @@ module HoareNet = struct
       (* Breakpoint.set (!ninfer > 0); *)
       Int.incr ninfer;
       let seen = ref [] in
-      top_down cmd
-        ~init:BExpr.true_
-        ~sequence:(fun _ cs infer -> BExpr.ands_ @@ List.map ~f:(infer BExpr.true_) cs)
-        ~choices:(fun _ cs infer -> BExpr.ands_ @@ List.map ~f:(infer BExpr.true_) cs)
-        ~prim:(fun _ (triple : DepPrim.t) ->
-            match triple.precondition, triple.postcondition with
-            | Some p, Some q ->
-              let open ASTs in
-              let pre = GCL.assume p in
-              let cmd = GPL.encode_tables triple.cmd in
-              let post = GCL.assert_ q in
-              let prog = GCL.sequence [ pre; cmd; post ] in
-              if List.exists !seen ~f:(GCL.equal prog) then
-                BExpr.true_
-              else begin
-                seen := prog::!seen;
-                match qe with
-                | `Conc -> Qe.concolic prog
-                | `Enum -> Qe.all_paths prog nprocs pid
-              end
-            | _, _ ->
+      let rec loop = function
+        | Seq cs -> List.map ~f:loop cs |> BExpr.ands_
+        | Choice cxs -> List.map ~f:loop cxs |> BExpr.ands_
+        | Prim triple ->
+          match triple.precondition, triple.postcondition with
+          | Some p, Some q ->
+            let open ASTs in
+            let pre = GCL.assume p in
+            let cmd = GPL.encode_tables triple.cmd in
+            let post = GCL.assert_ q in
+            let prog = GCL.sequence [ pre; cmd; post ] in
+            if List.exists !seen ~f:(GCL.equal prog) then
               BExpr.true_
-            )
+            else begin
+              seen := prog::!seen;
+              match qe with
+              | `Conc -> Qe.concolic prog
+              | `Enum -> Qe.all_paths prog nprocs pid
+            end
+          | _, _ ->
+            BExpr.true_
+      in
+      loop cmd
   end
 
   module Normalizer = Transform.Normalize(struct

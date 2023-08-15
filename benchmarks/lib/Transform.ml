@@ -4,7 +4,10 @@ module type Cmd_core = sig
   module P : sig
     type t
   end
-  type t
+  type t =
+    | Prim of P.t
+    | Seq of t list
+    | Choice of t list
   val to_string : t -> string
   val size : t -> int
   val skip : t
@@ -12,24 +15,6 @@ module type Cmd_core = sig
   val prim : P.t -> t
   val choices : t list -> t
   val sequence : t list -> t
-  val top_down :
-    init:'a ->
-    prim:('a -> P.t -> 'a) ->
-    sequence:('a -> t list -> ('a -> t -> 'a) -> 'a) ->
-    choices:('a -> t list -> ('a -> t -> 'a) -> 'a) ->
-    t ->
-    'a
-
-end
-
-module type Cmd_bottom = sig
-  include Cmd_core
-  val bottom_up :
-    prim:(P.t -> 'a) ->
-    sequence:('a list -> 'a) ->
-    choices:('a list -> 'a) ->
-    t ->
-    'a
 end
 
 module Substitutor (Cmd : sig
@@ -39,39 +24,33 @@ module Substitutor (Cmd : sig
     val merge : elt option -> elt option -> elt option
   end ) = struct
 
-  let with_map (subst : Cmd.elt Var.Map.t) c : (Cmd.t * Cmd.elt Var.Map.t) option =
+  let rec with_map (subst : Cmd.elt Var.Map.t) c : (Cmd.t * Cmd.elt Var.Map.t) option =
     let open Option.Let_syntax in
     let open Cmd in
-    top_down c
-      ~init:(Some (skip, subst))
-      ~prim:(fun opt p ->
-          let%map (_, subst) = opt in
-          let  p', subst = psubst subst p in
-          prim p', subst
-        )
-      ~sequence:(fun acc cs recursive_call ->
-          let%bind (_, subst) = acc in
-          List.fold_left ~init:(Some (skip, subst)) cs
-            ~f:(fun acc c ->
-                let%bind (acc_c, subst) = acc in
-                let%map  (c', subst) = recursive_call (Some (skip, subst)) c in
-                (sequence [acc_c; c'], subst)
-              )
-        )
-      ~choices:(fun acc cs recursive_call ->
-          let f = recursive_call acc in
-          Util.fold_right1 cs
-            ~init:f
-            ~f:(fun curr_c acc ->
-                let%bind (curr_c, curr_subst) = f curr_c in
-                let%map  ( acc_c,  acc_subst) = acc in
-                choices [curr_c; acc_c],
-                Var.Map.merge curr_subst acc_subst
-                  ~f:(fun ~key:_ -> function
-                      | `Left a     -> merge (Some a) None
-                      | `Right b    -> merge None (Some b)
-                      | `Both (a,b) -> merge (Some a) (Some b)))
-        )
+    match c with
+    | Prim p ->
+      let  p', subst = psubst subst p in
+      Some (prim p', subst)
+    | Seq cs ->
+      List.fold ~init:(Some (skip, subst)) cs
+        ~f:(fun acc c ->
+            let%bind (acc_c, subst) = acc in
+            let%map  (c', subst) = with_map subst c in
+            (sequence [acc_c; c'], subst)
+          )
+    | Choice cxs ->
+      let f = with_map subst in
+      Util.fold_right1 cxs
+        ~init:f
+        ~f:(fun curr_c acc ->
+            let%bind (curr_c, curr_subst) = f curr_c in
+            let%map  ( acc_c,  acc_subst) = acc in
+            choices [curr_c; acc_c],
+            Var.Map.merge curr_subst acc_subst
+              ~f:(fun ~key:_ -> function
+                  | `Left a     -> merge (Some a) None
+                  | `Right b    -> merge None (Some b)
+                  | `Both (a,b) -> merge (Some a) (Some b)))
 
   let one (x : Var.t) (y : 'a) (c : Cmd.t) : (Cmd.t * Cmd.elt Var.Map.t) option =
     let m = Var.Map.singleton x y in
@@ -80,14 +59,18 @@ module Substitutor (Cmd : sig
 end
 
 module Normalize (Cmd : sig
-    include Cmd_bottom
+    include Cmd_core
     val normalize_prim : P.t -> P.t
   end) = struct
   open Cmd
 
-  let normalize c =
-    let prim p = prim (normalize_prim p) in
-    bottom_up c ~prim ~choices ~sequence
+  let rec normalize c =
+    match c with
+    | Prim p ->  prim (normalize_prim p)
+    | Seq cs ->
+      List.map cs ~f:normalize |> sequence
+    | Choice cxs ->
+      List.map cxs ~f:normalize |> choices
 
 end
 
@@ -129,37 +112,32 @@ module DeadCodeElim (Cmd : sig
 
   open Cmd
 
-  let elim_with_reads reads c =
-    top_down c
-      ~init:(reads, skip)
-      ~prim:(fun (reads, _) p ->
-          match prim_dead_code_elim p reads with
+  let rec elim_with_reads reads c =
+    match c with
+    | Prim p ->
+      begin match prim_dead_code_elim p reads with
           | None -> (reads, skip)
           | Some (reads, p) ->
             (reads, prim p)
-        )
-      ~choices:(fun reads cs recursive_call ->
-          let f = recursive_call reads in
-          List.map cs ~f
-          |> List.fold ~init:(Var.Set.empty, Cmd.dead)
-            ~f:(fun (r_acc, c_acc) (r, c) ->
-                (Var.Set.union r_acc r,
-                 choices [c; c_acc]
-                )
-              )
-        )
-      ~sequence:(fun (reads,_) cs recursive_call ->
-          List.fold_right cs ~init:(reads, skip)
-            ~f:(fun c (reads, cs) ->
-                let reads, c = recursive_call (reads, skip) c in
-                reads, sequence [c;cs]
-              )
+      end
+    | Choice cxs ->
+      let f = elim_with_reads reads in
+      List.map cxs ~f
+      |> List.fold ~init:(Var.Set.empty, Cmd.dead)
+        ~f:(fun (r_acc, c_acc) (r, c) ->
+            (Var.Set.union r_acc r,
+             choices [c; c_acc]
+            )
+          )
+    | Seq cs ->
+      List.fold_right cs ~init:(reads, skip)
+        ~f:(fun c (reads, cs) ->
+            let reads, c = elim_with_reads reads c in
+            reads, sequence [c;cs]
+          )
 
-        )
   let elim c = elim_with_reads Var.Set.empty c |> snd
-
 end
-
 
 module Optimizer ( Cmd : sig
     include Cmd_core

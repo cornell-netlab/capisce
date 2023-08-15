@@ -161,68 +161,13 @@ module Make (P : Primitive) = struct
       | Prim _ -> true
       | _ -> false
 
-    let rec bottom_up ~prim ~sequence ~choices (c : t) =
-      let f = bottom_up ~prim ~sequence ~choices in
-      match c with
-      | Prim p -> prim p
-      | Seq cs -> sequence @@ List.map cs ~f
-      | Choice cs -> choices @@ List.map cs ~f
-
-
-    let rec top_down ~init ~prim ~sequence ~choices (c : t) =
-      let f acc = top_down ~init:acc ~prim ~sequence ~choices in
-      match c with
-      | Prim p -> prim init p
-      | Seq cs ->
-        sequence init cs f
-      | Choice cs ->
-        choices init cs f
-
-    let forward ~(init:'a) ~(prim : 'a -> P.t -> 'a) ~(choices:'a list -> 'a) (c : t) =
-      top_down c
-        ~init
-        ~prim
-        ~choices:(fun acc cs recursive_call ->
-            List.map cs ~f:(recursive_call acc)
-            |> choices
-          )
-        ~sequence:(fun acc cs recursive_call ->
-            List.fold cs ~init:acc ~f:(fun acc c ->
-                recursive_call acc c
-              )
-          )
-      (* let rec loop acc c = *)
-      (* match c with *)
-      (* | Prim p -> prim acc p *)
-      (* | Seq cs -> *)
-      (*   List.fold_left cs ~init:acc ~f:loop *)
-      (* | Choice cs -> *)
-      (*   List.map cs ~f:(loop acc) |> choices *)
-      (* in *)
-      (* loop init c *)
-
-    let backward ~(init:'a) ~(prim : P.t -> 'a -> 'a ) ~(choices: 'a list -> 'a) (c:t) : 'a =
-      let rec loop (c : t) (acc : 'a) : 'a =
-        match c with
-        | Prim p ->
-          Log.debug "[backward] prim %s" @@ lazy (P.to_smtlib p);
-          prim p acc
-        | Seq cs ->
-          Log.debug_s "[sequence]";
-          List.fold_right cs ~init:acc ~f:loop
-        | Choice cs ->
-          Log.debug_s "[choice]";
-          List.map cs ~f:(fun c -> loop c acc) |> choices
-      in
-      loop c init
-
-
     let vars c =
-      bottom_up c
-        ~prim:(Fn.compose Var.Set.of_list P.vars)
-        ~sequence:Var.Set.union_list
-        ~choices:Var.Set.union_list
-      |> Var.Set.to_list
+      let rec vars_set = function
+        | Prim p -> P.vars p |> Var.Set.of_list
+        | Seq cs -> List.map cs ~f:vars_set |> Var.Set.union_list
+        | Choice cs -> List.map cs ~f:vars_set |> Var.Set.union_list
+      in
+      vars_set c |> Var.Set.to_list
 
     (* Monoids *)
     let zero = dead

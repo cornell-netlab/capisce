@@ -9,18 +9,14 @@ module Make (KA : sig
       val assume : BExpr.t -> t
     end
     module S : sig
-      type t
+      type t =
+        | Prim of Prim.t
+        | Seq of t list
+        | Choice of t list
       val skip : t
       val prim : Prim.t -> t
       val sequence : t list -> t
       val choices : t list -> t
-      val top_down :
-        init:'a ->
-        prim:('a -> Prim.t -> 'a) ->
-        sequence:('a -> t list -> ('a -> t -> 'a) -> 'a) ->
-        choices:('a -> t list -> ('a -> t -> 'a) -> 'a)
-        -> t
-        -> 'a
 
     end
   end) = struct
@@ -61,24 +57,26 @@ module Make (KA : sig
         (g, idx + 1, [n'])
       in
       let (g, idx, ns) =
-      KA.S.top_down ka ~init:(g, 1, [src])
-          ~prim:(fun (g, idx, ns) p ->
-              if KA.Prim.is_node p then
-                extend_graph g idx ns p
-              else
-                (g, idx + 1, ns)
-            )
-          ~choices:(fun (g, idx, ns) cs f ->
-              let g, idx, ns = List.fold cs ~init:(g, idx, [])
-                  ~f:(fun (g, idx, ns') t ->
-                      let g, idx, ns'' = f (g, idx, ns) t in
-                      (g, idx, ns' @ ns'')
-                    ) in
-              (* Create a join point *)
-              extend_graph g idx ns (KA.Prim.assume BExpr.true_))
-          ~sequence:(fun (g, idx, ns) cs f ->
+        let rec loop (g, idx, ns) ka =
+          match ka with
+          | KA.S.Prim p ->
+            if KA.Prim.is_node p then
+              extend_graph g idx ns p
+            else
+              (g, idx + 1, ns)
+          | KA.S.Choice cs ->
+            let g, idx, ns = List.fold cs ~init:(g, idx, [])
+                ~f:(fun (g, idx, ns') c ->
+                    let g, idx, ns'' = loop (g, idx, ns) c in
+                    (g, idx, ns' @ ns'')
+                  ) in
+            (* Create a join point *)
+            extend_graph g idx ns (KA.Prim.assume BExpr.true_)
+          | KA.S.Seq cs ->
               List.fold cs ~init:(g, idx, ns)
-                ~f:(fun (g, idx, ns) c -> f (g, idx, ns) c))
+                ~f:(fun (g, idx, ns) c -> loop (g, idx, ns) c)
+        in
+        loop (g, 1, [src]) ka
       in
       let snk = G.V.create (KA.Prim.assume BExpr.true_, idx) in
       let g = List.fold ns ~init:g ~f:(fun g n -> G.add_edge g n snk) in

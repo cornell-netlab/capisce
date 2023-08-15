@@ -5,7 +5,6 @@ let test_suites : unit Alcotest.test list = [
   (* "Monitor", MonitorTest.tests; *)
   (* "Optimizer", Optimizer.tests; *)
   "Survey", SurveyTests.tests;
-  "Iterators", Cmd.tests;
   "Smtlib Parser", Parser.tests;
   "Smarts", SmartConstructors.tests;
   "Logic Algorithms", Algorithms.tests;
@@ -13,6 +12,7 @@ let test_suites : unit Alcotest.test list = [
   "Dependent Type System", Dependent.tests;
   "Util", UtilTest.tests;
   "Programs", Programs.tests;
+  "Concolic Helpers", ConcolicTest.tests;
 ]
 
 let () =

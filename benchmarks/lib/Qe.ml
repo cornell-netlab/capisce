@@ -466,47 +466,6 @@ let concolic (gcl : GCL.t) : BExpr.t =
   in
   loop BExpr.true_
 
-let rec explode_tables ~sufficient ~parserify exploder gpl phi_agg =
-  if sufficient phi_agg
-  then phi_agg
-  else
-    let tables = GPL.tables gpl in
-    match Util.choose tables with
-    | None ->
-      Log.exploder_s "Ran out of things to explode..... trying paths";
-      let gcl = GPL.encode_tables gpl in
-      Log.irs "GCL %s" @@ lazy (GCL.to_string gcl);
-      (* let parsered = parserify gcl in *)
-      (* Log.irs "Parsered GCL %s" @@ lazy (GCL.to_string parsered); *)
-      let phi = all_paths (parserify gcl) None None in
-      Log.irs "Single-path CPI: %s" @@ lazy (BExpr.to_smtlib phi);
-      phi
-    | Some tbl ->
-      Exploder.arm exploder tbl;
-      let rec loop phi_agg =
-        if sufficient phi_agg
-        then phi_agg
-        else match Exploder.pop exploder gpl with
-          | None -> phi_agg
-          | Some piece_gpl ->
-            let gcl = GPL.encode_tables piece_gpl in
-            let phi = parserify gcl |> Psv.passify |> snd |> Psv.vc in
-            Log.exploder_s "solving.....";
-            match solve_one phi ~qe:BottomUpQe.optimistic_qe with
-            (* match None with *)
-            | None ->
-              Log.exploder_s "Insufficiently exploded, trying to explode again";
-              explode_tables ~sufficient ~parserify exploder piece_gpl phi_agg
-              |> BExpr.and_ phi_agg
-              |> loop
-            | Some (cvs, res) ->
-              res
-              |> Solver.of_smtlib ~dvs:[] ~cvs
-              |> BExpr.and_ phi_agg
-              |> loop
-      in
-      loop phi_agg
-
 (** THE MAIN LOOP *)
 let search_generator ~sufficient:_ ~parserify ~statusbar gpl_graph gen phi_agg =
   let rec loop gen gpl_graph (phi_agg : BExpr.t) =

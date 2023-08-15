@@ -2,7 +2,13 @@ open Primitives
 
 module Make : functor (P : Primitive) ->
  sig
-  type t [@@deriving quickcheck, eq, sexp, compare, hash]
+
+  type t =
+    | Prim of P.t
+    | Seq of t list
+    | Choice of t list
+  [@@deriving quickcheck, eq, sexp, compare, hash]
+
   val assume : BExpr.t -> t
   val assert_ : BExpr.t -> t
   val skip : t
@@ -27,33 +33,4 @@ module Make : functor (P : Primitive) ->
   val choice_seqs : t list list -> t
   val is_primitive : t -> bool
   val vars : t -> Var.t list
-
-  val bottom_up :
-    prim:(P.t -> 'a) ->
-    sequence:('a list -> 'a) ->
-    choices:('a list -> 'a)
-    -> t
-    -> 'a
-
-  val top_down :
-    init:'a ->
-    prim:('a -> P.t -> 'a) ->
-    sequence:('a -> t list -> ('a -> t -> 'a) -> 'a) ->
-    choices:('a -> t list -> ('a -> t -> 'a) -> 'a)
-    -> t
-    -> 'a
-
-  val forward :
-    init:'a ->
-    prim:('a -> P.t -> 'a) ->
-    choices:('a list -> 'a)
-    -> t
-    -> 'a
-
-  val backward :
-    init:'a ->
-    prim:(P.t -> 'a -> 'a) ->
-    choices:('a list -> 'a)
-    -> t
-    -> 'a
 end
