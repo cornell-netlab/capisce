@@ -69,67 +69,66 @@ let hh_ingress =
       table ("count_table", [symb_count_match], [count_action; _drop])
     ]
   in
-  (* let set_nhop = *)
-  (*   let nhop_ipv4 = Var.make "set_nhop" 32 in *)
-  (*   let port = Var.make "port" 9 in *)
-  (*   [nhop_ipv4; port], Primitives.Action.[ *)
-  (*       assign meta.custom_metadata.nhop_ipv4 @@ var nhop_ipv4; *)
-  (*       assign standard_metadata.egress_spec @@ var port; *)
-  (*       assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid; *)
-  (*       assign hdr.ipv4.ttl @@ badd (var hdr.ipv4.ttl) (bvi 255 8) *)
-  (*     ] *)
-  (* in *)
-  (* let ipv4_lpm = *)
-  (*   let symb_ipv4_match = Var.make "_symb$ipv4_lpm$match_0" 32 in *)
-  (*   let symb_ipv4_DONTCARE = Var.make "_symb$ipv4_lpm$match_0$DONT_CARE" 1 in *)
-  (*   sequence [ *)
-  (*     ifte_seq (eq_ btrue @@ var symb_ipv4_DONTCARE) [ *)
-  (*     ] [ *)
-  (*       assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid; *)
-  (*       assume @@ eq_ (var symb_ipv4_match) (var hdr.ipv4.srcAddr); *)
-  (*     ]; *)
-  (*     table ("ipv4_lpm", [symb_ipv4_match], [set_nhop; _drop]) *)
-  (*   ] *)
-  (* in *)
-  (* let set_dmac = *)
-  (*   let dmac = Var.make "dmac" 48 in *)
-  (*   [dmac], Primitives.Action.[ *)
-  (*       assert_ @@ eq_ btrue @@ var hdr.ethernet.isValid; *)
-  (*       assign hdr.ethernet.dstAddr @@ var dmac *)
-  (*     ] *)
-  (* in *)
-  (* let forward = *)
-  (*   table ("forward", [meta.custom_metadata.nhop_ipv4], [set_dmac; _drop]) *)
-  (* in *)
+  let set_nhop =
+    let nhop_ipv4 = Var.make "set_nhop" 32 in
+    let port = Var.make "port" 9 in
+    [nhop_ipv4; port], Primitives.Action.[
+        assign meta.custom_metadata.nhop_ipv4 @@ var nhop_ipv4;
+        assign standard_metadata.egress_spec @@ var port;
+        assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid;
+        assign hdr.ipv4.ttl @@ badd (var hdr.ipv4.ttl) (bvi 255 8)
+      ]
+  in
+  let ipv4_lpm =
+    let symb_ipv4_match = Var.make "_symb$ipv4_lpm$match_0" 32 in
+    let symb_ipv4_DONTCARE = Var.make "_symb$ipv4_lpm$match_0$DONT_CARE" 1 in
+    sequence [
+      ifte_seq (eq_ btrue @@ var symb_ipv4_DONTCARE) [
+      ] [
+        assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid;
+        assume @@ eq_ (var symb_ipv4_match) (var hdr.ipv4.srcAddr);
+      ];
+      table ("ipv4_lpm", [symb_ipv4_match], [set_nhop; _drop])
+    ]
+  in
+  let set_dmac =
+    let dmac = Var.make "dmac" 48 in
+    [dmac], Primitives.Action.[
+        assert_ @@ eq_ btrue @@ var hdr.ethernet.isValid;
+        assign hdr.ethernet.dstAddr @@ var dmac
+      ]
+  in
+  let forward =
+    table ("forward", [meta.custom_metadata.nhop_ipv4], [set_dmac; _drop])
+  in
   sequence [
     count_table;
-    (* ipv4_lpm; *)
-    (* forward *)
+    ipv4_lpm;
+    forward
   ]
 
 let hh_egress =
-  HoareNet.skip
-  (* let open HoareNet in *)
-  (* let open BExpr in *)
-  (* let open Expr in *)
-  (* let rewrite_mac = *)
-  (*   let smac = Var.make "smac" 48 in *)
-  (*   [smac], Primitives.Action.[ *)
-  (*       assert_ @@ eq_ btrue @@ var hdr.ethernet.isValid; *)
-  (*       assign hdr.ethernet.srcAddr @@ var smac *)
-  (*     ] *)
-  (* in *)
-  (* let _drop = *)
-  (*   [], Primitives.Action.[ *)
-  (*       assign standard_metadata.egress_spec @@ bvi 511 9 *)
-  (*     ] *)
-  (* in *)
-  (* let send_frame = *)
-  (*   table ("send_frame", [standard_metadata.egress_port], [rewrite_mac; _drop]) *)
-  (* in *)
-  (* sequence [ *)
-  (*   send_frame *)
-  (* ] *)
+  let open HoareNet in
+  let open BExpr in
+  let open Expr in
+  let rewrite_mac =
+    let smac = Var.make "smac" 48 in
+    [smac], Primitives.Action.[
+        assert_ @@ eq_ btrue @@ var hdr.ethernet.isValid;
+        assign hdr.ethernet.srcAddr @@ var smac
+      ]
+  in
+  let _drop =
+    [], Primitives.Action.[
+        assign standard_metadata.egress_spec @@ bvi 511 9
+      ]
+  in
+  let send_frame =
+    table ("send_frame", [standard_metadata.egress_port], [rewrite_mac; _drop])
+  in
+  sequence [
+    send_frame
+  ]
 
 
 let hh = pipeline hh_parser hh_ingress hh_egress

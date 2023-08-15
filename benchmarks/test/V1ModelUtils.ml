@@ -33,6 +33,40 @@ let ipv4 = {
   totalLen = Var.make "hdr.ipv4.totalLen" 16;
 }
 
+type arp_t = {
+  isValid : Var.t;
+  htype : Var.t;
+  ptype : Var.t;
+  hlen : Var.t;
+  plen : Var.t;
+  oper : Var.t
+}
+
+let arp : arp_t = {
+  isValid = Var.make "hdr.arp.isValid" 1;
+  htype = Var.make "hdr.arp.htype" 16;
+  ptype = Var.make "hdr.arp.ptype" 16;
+  hlen = Var.make "hdr.arp.hlen" 8;
+  plen = Var.make "hdr.arp.plen" 8;
+  oper = Var.make "hdr.arp.oper" 16;
+}
+
+type arp_ipv4_t = {
+  isValid : Var.t;
+  sha : Var.t;
+  spa : Var.t;
+  tha : Var.t;
+  tpa : Var.t;
+}
+
+let arp_ipv4 : arp_ipv4_t = {
+  isValid = Var.make "hdr.arp_ipv4.isValid" 1;
+  sha = Var.make "hdr.arp_ipv4.sha" 48;
+  spa = Var.make "hdr.arp_ipv4.spa" 32;
+  tha = Var.make "hdr.arp_ipv4.tha" 48;
+  tpa = Var.make "hdr.arp_ipv4.tpa" 32
+}
+
 type tcp_t = {
   isValid : Var.t;
 }
@@ -51,6 +85,18 @@ let udp : udp_t = {
   isValid = Var.make "hdr.udp.isValid" 1;
   dstPort = Var.make "hdr.udp.dstPort" 16;
   checksum = Var.make "hdr.udp.checksum" 16;
+}
+
+type icmp_t = {
+  isValid : Var.t;
+  type_ : Var.t;
+  checksum : Var.t;
+}
+
+let icmp : icmp_t = {
+  isValid = Var.make "hdr.icmp.isValid" 1;
+  type_ = Var.make "hdr.icmp.type" 8;
+  checksum = Var.make "hdr.icmp.checksum" 16;
 }
 
 (* for netpaxos_acceptor *)
@@ -83,20 +129,26 @@ type hdr_t = {
   ethernet : ethernet_t;
   ipv4 : ipv4_t;
   tcp : tcp_t;
+  icmp : icmp_t;
   udp : udp_t;
   ndp : ndp_t;
   paxos : paxos_t;
+  arp : arp_t;
+  arp_ipv4 : arp_ipv4_t;
 }
 
-let hdr = {ethernet; ipv4; tcp; udp; paxos; ndp}
+let hdr = {ethernet; ipv4; tcp; udp; icmp; paxos; ndp; arp; arp_ipv4}
 
 type zombie_t = {
-  parse_result : Var.t
+  parse_result : Var.t;
+  exited : Var.t;
 }
 
 let zombie : zombie_t = {
   parse_result = Var.make "parse_result" 1;
   (* 1 means successful 0 means failed *)
+  exited = Var.make "exited" 1;
+  (* 1 means `exit` was executed *)
 }
 
 type standard_metadata_t = {

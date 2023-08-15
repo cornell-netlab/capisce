@@ -4,3 +4,4 @@ let tests : unit Alcotest.test_case list =
   @ ResubmitTest.tests
   @ NDPRouterTest.tests
   @ HeavyHitter1Test.tests
+  @ ArpTest.tests
