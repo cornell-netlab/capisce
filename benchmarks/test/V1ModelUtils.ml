@@ -200,12 +200,14 @@ type standard_metadata_t = {
   egress_spec : Var.t;
   egress_port : Var.t;
   ingress_port : Var.t;
+  deq_qdepth : Var.t;
 }
 
 let standard_metadata = {
   egress_spec = Var.make "standard_metadata.egress_spec" 9;
-  egress_port = Var.make "standard_metadata.egress_spec" 9;
+  egress_port = Var.make "standard_metadata.egress_port" 9;
   ingress_port = Var.make "standard_metadata.ingress_port" 9;
+  deq_qdepth = Var.make "standard_metadata.deq_qdepth" 19;
 }
 
 let ifte guard tru fls =

@@ -166,7 +166,7 @@ let multiproto_ingress =
   in
   sequence [
     ethertype_match;
-    select (var @@ Var.make "_symb$ethertype_match$action_run" 3) [
+    select (var @@ Var.make "_symb$ethertype_match$action" 3) [
       bvi 1 3, ipv4_match;
       bvi 3 3, ipv6_match;
       bvi 2 3, ipv6_match;
@@ -212,6 +212,6 @@ let test_concolic () =
 
 let tests : unit Alcotest.test_case list = [
   Alcotest.test_case "07-Multiprotocol annotations" `Quick test_annotations;
-  Alcotest.test_case "07-Multiprotocol infer enum" `Quick test_infer;
+  Alcotest.test_case "07-Multiprotocol infer enum" `Slow test_infer;
   Alcotest.test_case "07-Multiprotocol infer conc" `Quick test_concolic;
 ]
