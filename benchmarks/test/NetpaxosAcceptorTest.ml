@@ -26,11 +26,11 @@ let npa_parser =
     assign hdr.udp.isValid bfalse;
     assign hdr.paxos.isValid bfalse;
     assign hdr.ethernet.isValid btrue;
-    assert_ @@ eq_ (var hdr.ethernet.isValid) btrue;
+    (* assert_ @@ eq_ (var hdr.ethernet.isValid) btrue; *)
     ifte_seq (eq_ (var hdr.ethernet.etherType) (bvi 2048 16))
       [ (* PARSE_IPv4 *)
         assign hdr.ipv4.isValid btrue;
-        assert_ @@ eq_ (var hdr.ipv4.isValid) btrue;
+        (* assert_ @@ eq_ (var hdr.ipv4.isValid) btrue; *)
         ifte_seq (eq_ (var hdr.ipv4.protocol) (bvi 17 8))
           [ (* PARSE UDP *)
             assign hdr.udp.isValid btrue;
@@ -58,17 +58,16 @@ let npa_ingress =
     [], Primitives.Action.[assign standard_metadata.egress_spec (bvi 511 9)]
   in
   let fwd_tbl =
-    table ("fwd_tbl",
-           [standard_metadata.ingress_port],
-           [forward; _drop]
-          )
+    instr_table ("fwd_tbl",
+                 [`Exact standard_metadata.ingress_port],
+                 [forward; _drop])
   in
   let read_round =
     [], Primitives.Action.[assert_ @@ eq_ btrue @@ var hdr.paxos.isValid]
     (*proposal_register.read(meta.local_metadata.proposal, hdr.paxos.inst)*)
   in
   let round_tbl =
-    table ("round_tbl", [], [read_round])
+    instr_table ("round_tbl", [], [read_round])
   in
   let _no_op = [],[] in
   let handle_phase1a =
@@ -81,7 +80,7 @@ let npa_ingress =
         (* val_register.read(hdr.paxos.val, (bit<32>)hdr.paxos.inst); *)
         assign hdr.paxos.msgtype @@ bvi 2 16;
         (* acceptor_id.read(hdr.paxos.acpt, (bit<32>)32w0); *)
-        assert_ @@ eq_ btrue @@ var hdr.udp.isValid;
+        (* assert_ @@ eq_ btrue @@ var hdr.udp.isValid; *)
         assign hdr.udp.checksum @@ bvi 0 16
       ]
   in
@@ -93,24 +92,24 @@ let npa_ingress =
         (* vproposal_register.write((bit<32>)hdr.paxos.inst, (bit<16>)hdr.paxos.proposal); *)
         assert_ @@ eq_ btrue @@ var hdr.paxos.isValid;
         (* val_register.write((bit<32>)hdr.paxos.inst, (bit<32>)hdr.paxos.val); *)
-        assert_ @@ eq_ btrue @@ var hdr.paxos.isValid;
+        (* assert_ @@ eq_ btrue @@ var hdr.paxos.isValid; *)
         assign hdr.paxos.msgtype @@ bvi 4 16;
-        assert_ @@ eq_ btrue @@ var hdr.paxos.isValid;
+        (* assert_ @@ eq_ btrue @@ var hdr.paxos.isValid; *)
         assign hdr.paxos.vproposal @@ var hdr.paxos.proposal;
         (* acceptor_id.read(hdr.paxos.acpt, (bit<32>)32w0); *)
-        assert_ @@ eq_ btrue @@ var hdr.udp.isValid;
+        (* assert_ @@ eq_ btrue @@ var hdr.udp.isValid; *)
         assign hdr.udp.checksum @@ bvi 0 16;
       ]
   in
   let paxos_tbl =
     sequence [
-      assert_ @@ eq_ btrue @@ var hdr.paxos.isValid;
-      table ("paxos_tbl",
-             [ hdr.paxos.msgtype ],
-             [ handle_phase1a;
-               handle_phase2a;
-               _no_op;
-             ])
+      (* assert_ @@ eq_ btrue @@ var hdr.paxos.isValid; *)
+      instr_table ("paxos_tbl",
+                   [ `Exact hdr.paxos.msgtype ],
+                   [ handle_phase1a;
+                     handle_phase2a;
+                     _no_op;
+                   ])
     ]
   in
   let drop_tbl =
@@ -131,8 +130,9 @@ let npa_ingress =
 
 let npa_egress = HoareNet.skip
 
-
-let npa = pipeline npa_parser npa_ingress npa_egress
+let npa =
+  pipeline npa_parser npa_ingress npa_egress
+  |> HoareNet.assert_valids
 
 (*TESTS*)
 

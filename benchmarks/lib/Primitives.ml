@@ -215,7 +215,9 @@ module Action = struct
   [@@deriving quickcheck, hash, eq, sexp, compare]
 
   let assign x e = Assign (Assign.assign x e)
-  let assert_ b = Assert (Assert.assert_ b)
+  let assert_ b =
+    Printf.printf "ASSERTING %s\n%!" (BExpr.to_smtlib b);
+    Assert (Assert.assert_ b)
   let assume b = failwithf "assumes are not allowed in actions, got %s" (BExpr.to_smtlib b) ()
   let contra c1 c2 = match c1,c2 with
     | Assert b1, Assert b2 -> Assert.contra b1 b2
@@ -597,10 +599,6 @@ module Pipeline = struct
         (*     let symb_k = Var.make (cp_key idx) (Var.size k) in *)
         (*     BExpr.eq_ (Expr.var symb_k) (Expr.var k)) in *)
         let act_size = Table.act_size tbl in
-        if String.(tbl.name = "classifier") then begin
-          Log.debug "[explode] there are %d actions in classifier" @@ lazy (List.length tbl.actions);
-          Log.debug "[explode] classifier actsize = %d" @@ lazy act_size
-        end;
         let of_action_list = List.map ~f:(fun a -> (active (Active.of_action a))) in
         let num_actions = List.length tbl.actions in
         let f idx action =

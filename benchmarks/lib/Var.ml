@@ -49,6 +49,20 @@ module V = struct
   let is_sym_of ~sym ~data =
     is_symbRow sym && String.is_suffix (str sym) ~suffix:(str data)
 
+  let header ((s, _) : t) =
+    let open Option.Let_syntax in
+    let%bind (header_struct, reads) = String.lsplit2 s ~on:'.' in
+    if String.(header_struct = "hdr") then
+      let%bind (header, field) = String.rsplit2 reads  ~on:'.' in
+      if String.(field <> "isValid") then
+        Some (Printf.sprintf "%s.%s" header_struct header, field)
+      else
+        None
+    else
+      None
+
+  let isValid s : t =
+    make (Printf.sprintf "%s.isValid" s) 1
 
   let (=) ((s1,n1) : t) ((s2,n2) : t) =
     if String.(s1 = s2) then

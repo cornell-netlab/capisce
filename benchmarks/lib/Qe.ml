@@ -300,7 +300,7 @@ let write_path_results_to_file ~fn pi dur =
     FileIO.append path_json ~to_:file
 
 let implies phi1 phi2 =
-    let cond = BExpr.(and_ phi1 (not_ phi2)) in
+  let cond = BExpr.(and_ phi1 (not_ phi2)) in
   let cvs = BExpr.vars cond |> Tuple2.uncurry (@) in
   Solver.check_unsat cvs cond
     ~timeout:(Some 2000)
@@ -315,7 +315,7 @@ let implies_model consts phi1 phi2 : Model.t option =
 let sufficient ~vc ~prog =
   let program_spec = vc prog in
   fun phi ->
-  Log.path_gen_s "Checking sufficiency";
+  Log.debug_s "Checking sufficiency";
   implies phi program_spec
 
 let nall_paths = ref 0
@@ -344,7 +344,7 @@ let all_paths gcl nprocs pid =
       end
     | _ when sufficient phi_agg ->
 
-      Log.path_gen_s "sufficient!";
+      Log.debug_s "sufficient!";
       phi_agg
     | _ ->
       begin match pid, nprocs with
@@ -461,7 +461,7 @@ let concolic (gcl : GCL.t) : BExpr.t =
             loop (BExpr.and_ cpf phi_agg)
           else begin
             Log.warn "Uncontrollable path:%s" @@ lazy (GCL.to_string pi);
-            BExpr.false_
+            failwith "unsolveable"
           end
   in
   loop BExpr.true_

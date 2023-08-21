@@ -122,6 +122,51 @@ module HoareNet = struct
               cmd = GPL.table name keys actions;
               postcondition = post})
 
+    let instr_table ?(pre = None) ?(post = None) (name, real_keys, actions) =
+      let open BExpr in
+      let open Expr in
+      let new_keys =
+        List.mapi real_keys ~f:(fun i key ->
+            match key with
+            | `MaskableDegen key_var
+            | `Maskable key_var
+            | `Exact key_var ->
+              Var.rename key_var (Printf.sprintf "_symb$%s$match_%d" name i))
+      in
+      let key_assumes  =
+        List.mapi real_keys ~f:(fun i key ->
+            match key with
+            | `MaskableDegen key_var | `Exact key_var  ->
+              let symb_key = Var.rename key_var (Printf.sprintf "_symb$%s$match_%d" name i) in
+              assume @@ eq_ (var symb_key) (var key_var)
+            | `Maskable key_var ->
+              let symb_key = Var.rename key_var (Printf.sprintf "_symb$%s$match_%d" name i) in
+              let symb_key_dc = Var.make (Printf.sprintf "_symb$%s$match_%d$DONT_CARE" name i) 1 in
+              choice_seqs [
+                [assume @@ eq_ (bvi 1 1) (var symb_key_dc)];
+                [assume @@ not_ @@ eq_ (bvi 1 1) (var symb_key_dc);
+                 assume @@ eq_ (var symb_key) (var key_var)]
+                ]
+          )
+        |> sequence
+      in
+      seq
+        key_assumes
+        @@ table ~pre ~post (name, new_keys, actions)
+
+    let rec assert_valids cmd =
+      match cmd with
+      | Prim triple ->
+        let cmd = GPL.assert_valids triple.cmd in
+        Prim {triple with cmd}
+      | Seq cs ->
+        List.map cs ~f:assert_valids
+        |> sequence
+      | Choice cxs ->
+        List.map cxs ~f:assert_valids
+        |> choices
+
+
     let of_gpl cmd =
       prim( {precondition = None;
              cmd;

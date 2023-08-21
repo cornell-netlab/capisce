@@ -1,3 +1,4 @@
+open Core
 open Pbench
 open DependentTypeChecker
 
@@ -21,7 +22,9 @@ type ipv4_t = {
   ttl : Var.t;
   dstAddr : Var.t;
   srcAddr : Var.t;
-  totalLen : Var.t
+  totalLen : Var.t;
+  ihl : Var.t
+
 }
 
 let ipv4 = {
@@ -31,6 +34,28 @@ let ipv4 = {
   dstAddr = Var.make "hdr.ipv4.dstAddr" 32;
   srcAddr = Var.make "hdr.ipv4.srcAddr" 32;
   totalLen = Var.make "hdr.ipv4.totalLen" 16;
+  ihl = Var.make "hdr.ipv4.ihl" 4;
+}
+
+type ipv6_t = {
+  isValid : Var.t;
+  nextHdr : Var.t;
+  dstAddr : Var.t;
+}
+let ipv6 : ipv6_t = {
+  isValid = Var.make "hdr.ipv6.isValid" 1 ;
+  dstAddr = Var.make "hdr.ipv6.dstAddr" 48;
+  nextHdr = Var.make "hdr.ipv6.nextHdr" 8 ;
+}
+
+type vlan_tag_t = {
+  isValid : Var.t;
+  etherType : Var.t;
+}
+
+let vlan_tag : vlan_tag_t = {
+  isValid = Var.make "hdr.vlan_tag.isValid" 1;
+  etherType = Var.make "hdr.vlan_tag.etherType" 16;
 }
 
 type arp_t = {
@@ -69,10 +94,12 @@ let arp_ipv4 : arp_ipv4_t = {
 
 type tcp_t = {
   isValid : Var.t;
+  dstPort : Var.t;
 }
 
 let tcp = {
-  isValid = Var.make "hdr.ipv4.isValid" 1;
+  isValid = Var.make "hdr.tcp.isValid" 1;
+  dstPort = Var.make "hdr.tcp.isValid" 16;
 }
 
 type udp_t = {
@@ -124,10 +151,21 @@ let ndp : ndp_t = {
   isValid = Var.make "hdr.ndp.isValid" 1;
   flags = Var.make "hdr.ndp.flags" 16;
 }
+type rtp_t = {
+  isValid : Var.t;
+  timestamp : Var.t
+}
+let rtp : rtp_t = {
+  isValid = Var.make "hdr.rtp.isValid" 1;
+  timestamp = Var.make "hdr.rtp.timestamp" 32;
+}
+
 
 type hdr_t = {
   ethernet : ethernet_t;
   ipv4 : ipv4_t;
+  ipv6 : ipv6_t;
+  vlan_tag : vlan_tag_t;
   tcp : tcp_t;
   icmp : icmp_t;
   udp : udp_t;
@@ -135,9 +173,16 @@ type hdr_t = {
   paxos : paxos_t;
   arp : arp_t;
   arp_ipv4 : arp_ipv4_t;
+  rtp : rtp_t;
 }
 
-let hdr = {ethernet; ipv4; tcp; udp; icmp; paxos; ndp; arp; arp_ipv4}
+let hdr = {ethernet;
+           ipv4; ipv6; vlan_tag;
+           tcp; udp; icmp;
+           paxos; ndp;
+           arp; arp_ipv4;
+           rtp;
+          }
 
 type zombie_t = {
   parse_result : Var.t;
@@ -163,22 +208,13 @@ let standard_metadata = {
   ingress_port = Var.make "standard_metadata.ingress_port" 9;
 }
 
-let pipeline prsr ingr egr =
+let ifte guard tru fls =
   let open HoareNet in
   let open BExpr in
-  let open Expr in
-  let pipe =
-    sequence [
-      prsr;
-      assume @@ eq_ (var zombie.parse_result) (bvi 1 1);
-      ingr;
-      assume @@ not_ (eq_ (var standard_metadata.egress_spec) (bvi 0 9));
-      assign standard_metadata.egress_port (var standard_metadata.egress_spec);
-      egr
-    ]
-  in
-  triple true_ pipe true_
-
+  choice_seqs [
+    [assume guard; tru];
+    [assume @@ not_ guard; fls]
+  ]
 
 let ifte_seq guard true_seqs false_seqs =
   let open HoareNet in
@@ -194,3 +230,28 @@ let bfalse = Expr.bvi 0 1
 let transition_accept =
   let open HoareNet in
   assign zombie.parse_result btrue
+
+let select discriminee cases default : HoareNet.t =
+  List.fold_right cases ~init:default
+    ~f:(fun (value, state) cont ->
+        ifte (BExpr.eq_ value discriminee) state cont
+      )
+
+let pipeline prsr ingr egr =
+  let open HoareNet in
+  let open BExpr in
+  let open Expr in
+  let pipe =
+    sequence [
+      assign zombie.parse_result bfalse;
+      prsr;
+      ifte_seq (eq_ (var zombie.parse_result) (bvi 1 1)) [
+        ingr;
+        ifte_seq (eq_ (var standard_metadata.egress_spec) (bvi 511 9)) [] [
+          assign standard_metadata.egress_port (var standard_metadata.egress_spec);
+          egr
+        ]
+      ] [skip]
+    ]
+  in
+  triple true_ pipe true_

@@ -26,13 +26,13 @@ let ecmp_parser : HoareNet.t =
   sequence [
     assign zombie.parse_result @@ Expr.bvi 0 1;
     assign hdr.ethernet.isValid @@ Expr.bvi 1 1;
-    assert_ @@ eq_ (var hdr.ethernet.isValid) (bvi 1 1);
+    (* assert_ @@ eq_ (var hdr.ethernet.isValid) (bvi 1 1); *)
     choice_seqs [
       [ assume @@
         eq_ (var hdr.ethernet.etherType) (bvi 2048 16);
         assign hdr.ipv4.isValid @@ bvi 1 1;
         choice_seqs [
-          [ assert_ @@ eq_ (var hdr.ipv4.isValid) (bvi 1 1);
+          [ (* assert_ @@ eq_ (var hdr.ipv4.isValid) (bvi 1 1); *)
             assume @@
             eq_ (var hdr.ipv4.protocol) (bvi 6 8);
             assign hdr.tcp.isValid @@ bvi 1 1;
@@ -59,9 +59,9 @@ let ecmp_ingress =
   let port = Var.make "port" 9 in
   let dmac = Var.make "dmac" 48 in
   let ecmp_group =
-    table
+    instr_table
       ("ecmp_group",
-       [hdr.ipv4.dstAddr],
+       [ `Maskable hdr.ipv4.dstAddr],
        [ (*_drop*)
          [],
          Primitives.Action.[
@@ -74,16 +74,16 @@ let ecmp_ingress =
          Primitives.Action.[
            assign meta.routing_metadata.nhop_ipv4 (var nhop_ipv4);
            assign standard_metadata.egress_spec (var port);
-           assert_ @@ eq_ (var hdr.ipv4.isValid) (bvi 1 1);
+           (* assert_ @@ eq_ (var hdr.ipv4.isValid) (bvi 1 1); *)
            assign hdr.ipv4.ttl @@ badd (var hdr.ipv4.ttl) (bvi 255 8);
          ]
        ]
       )
   in
   let forward =
-    table (
+    instr_table (
       "forward",
-      [meta.routing_metadata.nhop_ipv4],
+      [ `MaskableDegen meta.routing_metadata.nhop_ipv4],
       [ (* set_dmac  *)
         [dmac],
         Primitives.Action.[
@@ -103,7 +103,7 @@ let ecmp_ingress =
   choice_seqs [
     [assume @@ eq_ (var hdr.ipv4.isValid) (bvi 1 1);
      choice_seqs [
-       [ assert_ @@ eq_ (var hdr.ipv4.isValid) (bvi 1 1);
+       [ (* assert_ @@ eq_ (var hdr.ipv4.isValid) (bvi 1 1); *)
          assume @@ ugt_ (var hdr.ipv4.ttl) (bvi 0 8);
          ecmp_group;
          forward;
@@ -118,16 +118,16 @@ let ecmp_ingress =
 
 let ecmp_egress =
   let open HoareNet in
-  let open BExpr in
+  (* let open BExpr in *)
   let open Expr in
   let smac = Var.make "smac" 48 in
   let send_frame =
-    table (
+    instr_table (
       "send_frame",
-      [ standard_metadata.egress_port ],
+      [ `Exact standard_metadata.egress_port ],
       [ [smac],
         Primitives.Action.[
-          assert_ @@ eq_ (var hdr.ethernet.isValid) (bvi 1 1);
+          (* assert_ @@ eq_ (var hdr.ethernet.isValid) (bvi 1 1); *)
           assign hdr.ethernet.srcAddr (var smac);
         ];
         [],
@@ -141,7 +141,9 @@ let ecmp_egress =
     send_frame
   ]
 
-let ecmp = pipeline ecmp_parser ecmp_ingress ecmp_egress
+let ecmp =
+  pipeline ecmp_parser ecmp_ingress ecmp_egress
+  |> HoareNet.assert_valids
 
 let test_annotations () =
   HoareNet.check_annotations ecmp

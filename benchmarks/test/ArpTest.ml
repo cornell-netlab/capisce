@@ -30,13 +30,13 @@ let arp_parser =
     assign hdr.tcp.isValid bfalse;
     (*parse ethenet*)
     assign hdr.ethernet.isValid btrue;
-    assert_ @@ eq_ btrue @@ var hdr.ethernet.isValid;
+    (* assert_ @@ eq_ btrue @@ var hdr.ethernet.isValid; *)
     ifte_seq (eq_ (var hdr.ethernet.etherType) (bvi 2048 16))
       [ (* parse ipv4 *)
         assign hdr.ipv4.isValid btrue;
-        assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid;
+        (* assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid; *)
         assign meta.dst_ipv4 @@ var hdr.ipv4.dstAddr;
-        assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid;
+        (* assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid; *)
         ifte_seq (eq_ (var hdr.ipv4.protocol) (bvi 1 8))
           [ (* parse icmp *)
             assign hdr.icmp.isValid btrue;
@@ -47,7 +47,7 @@ let arp_parser =
         ifte_seq (eq_ (var hdr.ethernet.etherType) (bvi 2054 16))
         [ (*parse_arp*)
           assign hdr.arp.isValid btrue;
-          assert_ @@ eq_ btrue @@ var hdr.arp.isValid;
+          (* assert_ @@ eq_ btrue @@ var hdr.arp.isValid; *)
           ifte_seq (ands_ [
               eq_ (bvi 1    16) (var hdr.arp.htype);
               eq_ (bvi 2048 16) (var hdr.arp.ptype);
@@ -56,7 +56,7 @@ let arp_parser =
             ]) [
             (* parse_arp_ipv4 *)
             assign hdr.arp_ipv4.isValid btrue;
-            assert_ @@ eq_ btrue @@ var hdr.arp_ipv4.isValid;
+            (* assert_ @@ eq_ btrue @@ var hdr.arp_ipv4.isValid; *)
             assign meta.dst_ipv4 @@ var hdr.arp_ipv4.tpa;
           ] [transition_accept]
         ]
@@ -88,14 +88,14 @@ let arp_ingress =
     ]
   in
   let ipv4_lpm =
-    table ("ipv4_lpm", [meta.dst_ipv4], [set_dst_info; drop])
+    instr_table ("ipv4_lpm", [`MaskableDegen meta.dst_ipv4], [set_dst_info; drop])
   in
   let forward_ipv4 = [], Action.[
-      assert_ (eq_ btrue (var hdr.ethernet.isValid));
+      (* assert_ (eq_ btrue (var hdr.ethernet.isValid)); *)
       assign hdr.ethernet.dstAddr @@ var meta.mac_da;
-      assert_ (eq_ btrue (var hdr.ethernet.isValid));
+      (* assert_ (eq_ btrue (var hdr.ethernet.isValid)); *)
       assign hdr.ethernet.srcAddr @@ var meta.mac_sa;
-      assert_ (eq_ btrue (var hdr.ipv4.isValid));
+      (* assert_ (eq_ btrue (var hdr.ipv4.isValid)); *)
       assign hdr.ipv4.ttl @@ bsub (var hdr.ipv4.ttl) (bvi 1 8);
       assign standard_metadata.egress_spec @@ var meta.egress_port;
     ] in
@@ -131,36 +131,14 @@ let arp_ingress =
     ]
   in
   let forward =
-    let match_0 = Var.make "_symb$forward$match_0" 1 in
-    let match_1 = Var.make "_symb$forward$match_1" 16 (*ternary*) in
-    let match_1_DC = Var.make "_symb$forward$match_1$DONT_CARE" 1 in
-    let match_2 = Var.make "_symb$forward$match_2" 1 in
-    let match_3 = Var.make "_symb$forward$match_3" 1 in
-    let match_4 = Var.make "_symb$forward$match_4" 1 in
-    let match_5 = Var.make "_symb$forward$match_5" 8 in
-    let match_5_DC = Var.make "_symb$forward$match_5$DONT_CARE" 1 in
-    let assumes =
-      sequence [
-        assume (eq_ (var match_0) (var hdr.arp.isValid));
-        ifte_seq (eq_ btrue (var match_1_DC)) [
-          assert_ (eq_ btrue (var hdr.arp.isValid));
-          assume (eq_ (var match_1) (var hdr.arp.oper));
-        ] [];
-        assume (eq_ (var match_2) (var hdr.arp_ipv4.isValid));
-        assume (eq_ (var match_3) (var hdr.ipv4.isValid));
-        assume (eq_ (var match_4) (var hdr.icmp.isValid));
-        ifte_seq (eq_ btrue (var match_5_DC)) [
-          assert_ (eq_ btrue (var hdr.icmp.isValid));
-          assume (eq_ (var match_5) (var hdr.icmp.type_))
-        ] []
-      ]
-    in
-    sequence [
-      assumes;
-      table ("forward",
-             [match_0; match_1; match_2; match_3; match_4; match_5],
-             [forward_ipv4; send_arp_reply; send_icmp_reply; drop])
-    ]
+    instr_table ("forward",
+                 [`Exact hdr.arp.isValid;
+                  `MaskableDegen hdr.arp.oper;
+                  `Exact hdr.arp_ipv4.isValid;
+                  `Exact hdr.ipv4.isValid;
+                  `Exact hdr.icmp.isValid;
+                  `Maskable hdr.icmp.type_],
+                 [forward_ipv4; send_arp_reply; send_icmp_reply; drop])
   in
   sequence [
     assign meta.my_mac @@ bvi 000102030405 48;
@@ -177,7 +155,9 @@ let arp_egress =
   skip
 
 
-let arp = pipeline arp_parser arp_ingress arp_egress
+let arp =
+  pipeline arp_parser arp_ingress arp_egress
+  |> HoareNet.assert_valids
 
 let test_annotations () =
   HoareNet.check_annotations arp
@@ -196,7 +176,7 @@ let test_concolic () =
     BExpr.false_
 
 let tests : unit Alcotest.test_case list = [
-  Alcotest.test_case "heavy_hitter_1 annotations" `Quick test_annotations;
-  Alcotest.test_case "heavy_hitter_1 infer enum" `Quick test_infer;
-  Alcotest.test_case "heavy_hitter_1 infer conc" `Quick test_concolic;
+  Alcotest.test_case "arp annotations" `Quick test_annotations;
+  Alcotest.test_case "arp infer enum" `Quick test_infer;
+  Alcotest.test_case "arp infer conc" `Quick test_concolic;
 ]

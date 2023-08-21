@@ -27,6 +27,9 @@ val make_symbRow_str : string -> t -> t
 val is_sym_of : sym:t -> data:t -> bool
 (** [is_sym_of ~sym ~data] checks whether [sym] is the symbolic row variable for data plane variable ~data. In otherwords, ~sym represents the key that the controller matches on for ~data. *)  
 
+val header : t -> (string * string) option
+val isValid : string -> t
+
 val list_to_smtlib_quant : t list -> string
 val list_to_smtlib_decls : t list -> string
 

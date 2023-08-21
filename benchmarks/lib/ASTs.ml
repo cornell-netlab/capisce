@@ -94,7 +94,7 @@ module Psv = struct
       |> BExpr.ands_
     | Choice cs ->
       List.map cs ~f:normal
-      |> BExpr.ands_
+      |> BExpr.ors_
 
 
   let rec wrong (c : t) : BExpr.t =
@@ -105,11 +105,9 @@ module Psv = struct
     | Prim (Assume _) -> false_
     | Seq cs ->
       List.fold_right cs ~init:false_
-        ~f:(fun c acc ->
-            let w1 = wrong c in
-            let w2 = and_ (normal c) acc in
-            or_ w1 w2
-        )
+        ~f:(fun a wrong_b ->
+            let wrong_a = wrong a in
+            ors_ [wrong_a; and_ (normal a) wrong_b])
     | Choice cs ->
       List.map cs ~f:(wrong) |> ors_
 
@@ -196,6 +194,53 @@ end
       | Prim (Active a) -> GCL.prim a
       | Seq cs -> List.map cs ~f:encode_tables |> GCL.sequence
       | Choice cs -> List.map cs ~f:encode_tables |> GCL.choices
+
+    module type CanAssert = sig
+      type t
+      val assert_ : BExpr.t -> t
+    end
+
+    module Asserter(Prim : CanAssert) = struct
+      open BExpr
+      open Expr
+      let from_vars (xs : Var.t list) : Prim.t list =
+        List.bind xs ~f:(fun x ->
+            match Var.header x with
+            | Some (hdr, _) ->
+              [Prim.assert_ @@ eq_ (bvi 1 1) @@ var @@ Var.isValid hdr ]
+            | None -> []
+          )
+    end
+
+    let rec assert_valids (cmd:t) : t =
+      let assert_valids_action (data, act_cmds) : (Var.t list * Action.t list) =
+        let module AAsserter = Asserter(Action) in
+        let asserts a = Action.vars a
+                      |> List.filter ~f:(fun x -> List.exists data ~f:(Var.equal x) )
+                      |> AAsserter.from_vars in
+        (data, List.bind act_cmds ~f:(fun a -> asserts a @ [a]))
+      in
+      let module PAsserter = Asserter(Pipeline) in
+      match cmd with
+      | Prim (Table table) ->
+        let key_asserts =
+          PAsserter.from_vars table.keys
+          |> List.map ~f:prim
+          |> sequence
+        in
+        let actions = List.map ~f:assert_valids_action table.actions in
+        seq key_asserts (Prim (Table {table with actions}))
+      | Prim (Active a) ->
+        let asserts =
+          PAsserter.from_vars @@ Active.vars a
+          |> List.map ~f:prim
+          |> sequence
+        in
+        seq asserts cmd
+      | Seq cs ->
+        List.map cs ~f:assert_valids |> sequence
+      | Choice cxs ->
+        List.map cxs ~f:assert_valids |> choices
 
     let wp cmd phi =
       let cmd = encode_tables cmd in
@@ -325,7 +370,6 @@ module Concrete = struct
 end
 
 let passive_vc (c : GCL.t) : BExpr.t =
-  Psv.passify c
-  |> snd
-  |> Psv.wrong
-  |> BExpr.not_
+  let _, passive_form = Psv.passify c in
+  Log.debug "Passive form -----\n%s\n----------" @@ lazy (Psv.to_string passive_form);
+  Psv.vc passive_form
