@@ -9,3 +9,4 @@ let tests : unit Alcotest.test_case list =
   @ MCNatTest.tests
   @ TSSwitchingTest.tests
   @ HeavyHitter2Test.tests
+  @ FlowletTest.tests
