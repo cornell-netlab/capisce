@@ -105,13 +105,16 @@ let tcp = {
 type udp_t = {
   isValid : Var.t;
   dstPort : Var.t;
-  checksum : Var.t
+  checksum : Var.t;
+  length : Var.t
+
 }
 
 let udp : udp_t = {
   isValid = Var.make "hdr.udp.isValid" 1;
   dstPort = Var.make "hdr.udp.dstPort" 16;
   checksum = Var.make "hdr.udp.checksum" 16;
+  length = Var.make "hdr.udp.length" 16;
 }
 
 type icmp_t = {
