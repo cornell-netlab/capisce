@@ -3,38 +3,12 @@ open Pbench
 open DependentTypeChecker
 open V1ModelUtils
 
-type ingress_metadata_t = {
-  flow_ipg : Var.t;
-  flowlet_lasttime : Var.t;
-  flowlet_id : Var.t;
-  ecmp_offset : Var.t;
-  nhop_ipv4 : Var.t;
-}
-
-let ingress_metadata : ingress_metadata_t = {
-  flow_ipg = Var.make "meta.ingress_metadata.flow_ipg" 32;
-  flowlet_lasttime = Var.make "meta.ingress_metadata.flowlet_lasttime" 32;
-  flowlet_id = Var.make "meta.ingress_metadata.flowlet_id" 16;
-  ecmp_offset = Var.make "meta.ingress_metadata.ecmp_offset" 14;
-  nhop_ipv4 = Var.make "meta.ingress_metadata.nhop_ipv4" 32;
-}
-
-type intrinsic_metadata_t = {
-  ingress_global_timestamp : Var.t
-}
-
-let intrinsic_metadata : intrinsic_metadata_t = {
-  ingress_global_timestamp = Var.make "meta.intrinsic_metadata.ingress_global_timestamp" 48;
-}
-
-type meta_t =  {
-  ingress_metadata : ingress_metadata_t;
-  intrinsic_metadata : intrinsic_metadata_t;
+type meta_t = {
   index : Var.t
 }
-
-let meta : meta_t = {ingress_metadata; intrinsic_metadata;
-                     index = Var.make "meta.index" 32}
+let meta : meta_t = {
+  index = Var.make "meta.index" 32;
+}
 
 type hula_t = {
   isValid : Var.t;
@@ -76,7 +50,7 @@ let pop_front_1 f n =
   |> List.concat
   |> Fun.flip List.append [assign (f (n - 1)).isValid @@ bfalse]
 
-let flowlet_parser =
+let hula_parser =
   let open HoareNet in
   let open BExpr in
   let open Expr in
@@ -148,7 +122,7 @@ let flowlet_parser =
   in
   start
 
-let flowlet_ingress fixed =
+let hula_ingress fixed =
   let open HoareNet in
   let open BExpr in
   let open Expr in
@@ -285,7 +259,7 @@ let flowlet_ingress fixed =
   ]
 
 
-let flowlet_egress =
+let hula_egress =
   let open HoareNet in
   let open BExpr in
   let open Expr in
@@ -299,23 +273,23 @@ let flowlet_egress =
     ) skip
   ]
 
-let flowlet fixed =
-  pipeline flowlet_parser (flowlet_ingress fixed) flowlet_egress
+let hula fixed =
+  pipeline hula_parser (hula_ingress fixed) hula_egress
   |> HoareNet.assert_valids
 
 let test_annotations () =
-  HoareNet.check_annotations (flowlet true)
+  HoareNet.check_annotations (hula true)
    |> Alcotest.(check bool) "check_annotations should pass" true
 
 let test_infer_buggy () =
-  Printf.printf "GPL Program: %s ------\n" @@ HoareNet.to_string (flowlet false);
+  Printf.printf "GPL Program: %s ------\n" @@ HoareNet.to_string (hula false);
   Alcotest.check_raises
     "Enum CPI is unsolveable"
     (Failure "unsolveable")
-    (fun () -> ignore (HoareNet.infer ~qe:`Enum (flowlet false) None None))
+    (fun () -> ignore (HoareNet.infer ~qe:`Enum (hula false) None None))
 
 let test_infer_fixed () =
-  HoareNet.infer ~qe:`Enum (flowlet true) None None
+  HoareNet.infer ~qe:`Enum (hula true) None None
   |> Alcotest.(check Equivalences.smt_equiv)
     "Enum CPI is trivial"
     BExpr.true_
@@ -324,10 +298,10 @@ let test_concolic_buggy () =
   Alcotest.check_raises
     "Conc CPI is unsolveable"
     (Failure "unsolveable")
-    (fun () -> ignore (HoareNet.infer ~qe:`Conc (flowlet false) None None))
+    (fun () -> ignore (HoareNet.infer ~qe:`Conc (hula false) None None))
 
 let test_concolic_fixed () =
-  HoareNet.infer ~qe:`Conc (flowlet true) None None
+  HoareNet.infer ~qe:`Conc (hula true) None None
   |> Alcotest.(check Equivalences.smt_equiv)
     "Conc CPI is trivial"
     BExpr.true_
