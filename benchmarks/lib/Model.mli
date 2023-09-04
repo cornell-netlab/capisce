@@ -6,3 +6,4 @@ val lookup : t -> Var.t -> (Bigint.t * int) option
 val disjoint_union : t -> t -> t
 val project_inputs : t -> t
 val of_alist_exn : (Var.t * (Bigint.t * int)) list -> t
+val of_map : (Bigint.t * int) Var.Map.t -> t

@@ -136,7 +136,7 @@ let hula_ingress fixed =
   let srcRoute_nhop =
     [],
     Action.[
-      assign standard_metadata.egress_spec @@ bslice 0 8 @@ var (srcRoute 0).port;
+      assign standard_metadata.egress_spec @@ bcast 9 @@ var (srcRoute 0).port;
     ] @ pop_front_1 srcRoute 8
   in
   let hula_fwd =
@@ -188,7 +188,7 @@ let hula_ingress fixed =
     let tmp = Var.make "tmp" 16 in
     [], Action.[
        (* dstindex_nhop_reg.read(tmp, index); *)
-       assign standard_metadata.egress_spec @@ bslice 0 8 @@ var tmp;
+       assign standard_metadata.egress_spec @@ bcast 9 @@ var tmp;
     ]
   in
   let hula_nhop =
@@ -246,7 +246,7 @@ let hula_ingress fixed =
         hula_nhop;
         (* flow_port_reg.write((bit<32>)flow_hash, (bit<16>)standard_metadata.egress_spec); *)
       ] [
-        assign standard_metadata.egress_spec @@ bslice 0 8 @@ var port;
+        assign standard_metadata.egress_spec @@ bcast 9 @@ var port;
       ];
       dmac
     ] [
@@ -266,8 +266,8 @@ let hula_egress =
   sequence [
     ifte (eq_ btrue @@ var hula.isValid) (
       ifte (eq_ bfalse @@ var hula.dir) (
-        ifte (ult_ (var hula.qdepth) @@ bslice 0 14 @@ var standard_metadata.deq_qdepth) (
-          assign hula.qdepth @@ bslice 0 14 @@ var standard_metadata.deq_qdepth
+        ifte (ult_ (var hula.qdepth) @@ bcast 15 @@ var standard_metadata.deq_qdepth) (
+          assign hula.qdepth @@ bcast 15 @@ var standard_metadata.deq_qdepth
         ) skip
       ) skip
     ) skip

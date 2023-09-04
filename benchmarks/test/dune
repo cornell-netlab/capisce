@@ -1,4 +1,4 @@
 (test
   (name tests)
-  (libraries pbench alcotest)
+  (libraries pbench alcotest async)
   (preprocess (pps ppx_jane ppx_assert ppx_expect ppx_inline_test ppx_deriving.std)))

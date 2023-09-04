@@ -177,6 +177,6 @@ let test_concolic () =
 
 let tests : unit Alcotest.test_case list = [
   Alcotest.test_case "arp annotations" `Quick test_annotations;
-  Alcotest.test_case "arp infer enum" `Quick test_infer;
+  Alcotest.test_case "arp infer enum" `Slow test_infer;
   Alcotest.test_case "arp infer conc" `Quick test_concolic;
 ]

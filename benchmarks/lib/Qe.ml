@@ -443,11 +443,12 @@ let concolic (gcl : GCL.t) : BExpr.t =
         Log.error "Failed to slice(GCL):\n%s\n----------" @@ lazy (GCL.to_string gcl);
         failwith "Could not slice the counterexample"
       | Some pi ->
+        Log.debug "Slice:\n%s------/" @@ lazy (GCL.to_string pi);
         let pi = GCL.optimize pi in
         let pi_vc = Psv.(vc @@ snd @@ passify pi) in
         match
           orelse ~input:pi_vc
-            [solve_one ~qe:BottomUpQe.optimistic_qe;
+            [solve_one ~qe:nikolaj_please;
              solve_one ~qe:BottomUpQe.cnf_qe]
         with
         | None ->

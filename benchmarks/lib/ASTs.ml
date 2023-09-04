@@ -36,6 +36,82 @@ module GCL = struct
       | Choice cs ->
         List.map cs ~f:(fun cmd -> wp cmd phi)
         |> BExpr.ands_
+
+  let simplify_path (gcl : t) : t =
+    let of_map ctx x =
+      match Var.Map.find ctx x with
+      | Some (v, sz) ->
+        Expr.bv v sz
+      | None ->
+        Expr.var x
+    in
+    let rec dead_code_elim_inner (reads : Var.Set.t) gcl =
+      match gcl with
+      | Prim (Assign (x,e)) ->
+        let vars = Expr.vars e |> Util.uncurry (@) in
+        if Var.Set.mem reads x then
+          let reads = Var.Set.remove reads x in
+          let reads = Var.Set.(union reads (of_list vars)) in
+          reads, gcl
+        else
+          reads, skip
+      | Prim (Passive (Assert phi))
+      | Prim (Passive (Assume phi)) ->
+        let vars = BExpr.vars phi |> Util.uncurry (@) in
+        Var.Set.(union reads @@ of_list vars),
+        gcl
+      | Seq cs ->
+        List.fold_right cs ~init:(reads, [])
+          ~f:(fun c (reads, cs) ->
+              let reads, c = dead_code_elim_inner reads c in
+              reads, c::cs
+            )
+        |> Tuple2.map_snd ~f:sequence
+      | Choice _ ->
+        failwith "choices cannot occur in paths"
+    in
+    let const_prop_form ctor ctx phi =
+      let phi' = BExpr.fun_subst (of_map ctx) phi in
+      match BExpr.get_equality phi' with
+        | Some (x, e) ->
+          begin match Expr.get_const e with
+            | Some v->
+              let sz = Expr.size e in
+              let ctx = Var.Map.set ctx ~key:x ~data:(v,sz) in
+              (ctx, ctor phi')
+            | None ->
+              (ctx, ctor phi')
+          end
+        | None ->
+          (ctx, ctor phi')
+    in
+    let rec const_prop_inner (ctx : (Bigint.t * int) Var.Map.t) gcl : (Bigint.t * int) Var.Map.t * t =
+      match gcl with
+      | Prim (Assign (x,e)) ->
+        begin match Expr.eval (Model.of_map ctx) e with
+          | Result.Error _ ->
+            (ctx, assign x e)
+          | Result.Ok (v,sz) ->
+            let ctx = Var.Map.set ctx ~key:x ~data:(v,sz) in
+            (ctx, assign x @@ Expr.bv v sz)
+        end
+      | Prim (Passive (Assert phi)) ->
+        const_prop_form assert_ ctx phi
+      | Prim (Passive (Assume phi)) ->
+        const_prop_form assume ctx phi
+      | Seq cs ->
+        List.fold cs ~init:(ctx, [])
+          ~f:(fun (ctx, prec) curr ->
+              let ctx, new_curr = const_prop_inner ctx curr in
+              (ctx, prec@[new_curr])
+          )
+        |> Tuple2.map_snd ~f:sequence
+      | Choice _ ->
+        failwith "choices disallowed in const prop"
+    in
+    let _, gcl' = const_prop_inner Var.Map.empty gcl in
+    let _ , gcl'' = dead_code_elim_inner Var.Set.empty gcl' in
+    gcl''
   end
 
   module CP = Transform.ConstProp (struct
@@ -151,6 +227,7 @@ module Psv = struct
             (ctx, choice rc_acc rc))
     in
     passify_rec Context.empty c
+    
 
   let vc (c : t) : BExpr.t =
     let phi = wrong c in
@@ -212,14 +289,14 @@ end
           )
     end
 
-    let rec assert_valids (cmd:t) : t =
-      let assert_valids_action (data, act_cmds) : (Var.t list * Action.t list) =
-        let module AAsserter = Asserter(Action) in
-        let asserts a = Action.vars a
-                      |> List.filter ~f:(fun x -> List.exists data ~f:(Var.equal x) )
+    let assert_valids_action (data, act_cmds) : (Var.t list * Action.t list) =
+      let module AAsserter = Asserter(Action) in
+      let asserts a = Action.vars a
+                      |> List.filter ~f:(fun x -> not (List.exists data ~f:(Var.equal x)))
                       |> AAsserter.from_vars in
-        (data, List.bind act_cmds ~f:(fun a -> asserts a @ [a]))
-      in
+      (data, List.bind act_cmds ~f:(fun a -> asserts a @ [a]))
+
+    let rec assert_valids (cmd:t) : t =
       let module PAsserter = Asserter(Pipeline) in
       match cmd with
       | Prim (Table table) ->
@@ -340,7 +417,7 @@ module Concrete = struct
       Log.debug "%s" @@ lazy (Active.to_smtlib p);
       begin match p with
       | Assign (x,e) ->
-        let value = Expr.eval model e in
+        let value = Expr.eval model e |> Result.ok_or_failwith in
         let model = Model.update model x value in
         Some (model, Prim p)
       | (Passive (Assume phi)) when BExpr.eval model phi->

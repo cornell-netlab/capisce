@@ -106,34 +106,36 @@ let eval1 op e1 =
      end
   | _ -> UnOp(op, e1)
 
-let get_value_exn = function
-  | BV (v, w) -> (v,w)
-  | e -> failwithf "Couldnt get value from non-BV expression: %s" (to_smtlib e) ()
+let get_value = function
+  | BV (v, w) -> Result.return (v,w)
+  | e ->
+    Printf.sprintf "Couldnt get value from non-BV expression: %s" (to_smtlib e)
+    |> Result.fail
 
-
-let eval (model : Model.t) expr : (Bigint.t * int) =
+let eval (model : Model.t) expr : ((Bigint.t * int), string) Result.t =
+  let open Result.Let_syntax in
   let rec loop e =
     match e with
-    | BV (v,w) -> (v,w)
+    | BV (v,w) -> return (v,w)
     | Var x ->
       begin match Model.lookup model x with
         | None ->
-          Log.error "Model:\n%s" @@ lazy (Model.to_string model);
-          Log.error "is missing: %s" @@ lazy (Var.str x);
-          failwithf "Failed to evaluate expression:%s" (to_smtlib expr) ()
+          Printf.sprintf "Model is missing %s:\n%s"
+            (Var.str x) (Model.to_string model)
+          |> Result.fail
         | Some v ->
           Log.debug_s @@ Printf.sprintf "\t{ %s |--> %s }" (Var.str x) (Bigint.to_string (fst v));
-          v
+          return v
       end
     | UnOp (op, e) ->
-      let v,w = loop e in
+      let%bind v,w = loop e in
       eval1 op (bv v w)
-      |> get_value_exn
+      |> get_value
     | BinOp (op, e1, e2) ->
-      let v1,w1 = loop e1 in
-      let  v2,w2 = loop e2 in
+      let%bind v1,w1 = loop e1 in
+      let%bind v2,w2 = loop e2 in
       eval2 op (bv v1 w1) (bv v2 w2)
-      |> get_value_exn
+      |> get_value
   in
   loop expr
 
@@ -234,7 +236,6 @@ let bcast width e =
     bslice 0 (width - 1) e
   else
     bconcat (bvi 0 (width - ew)) e
-
 
 let get_smart1 op =
   match op with

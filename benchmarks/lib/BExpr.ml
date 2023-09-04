@@ -138,9 +138,9 @@ let rec compute_vars (t : t) =
   | Forall (x, b) | Exists (x, b) ->
      let dvs, cvs = compute_vars b in
      Var.(Util.ldiff ~equal dvs [x], Util.ldiff ~equal cvs [x])                    
-    
+
 let get_labelled_vars b =
-  compute_vars b |> Util.uncurry (@)
+      compute_vars b |> Util.uncurry (@)
   
 let vars t : Var.t list * Var.t list =
   let c = Clock.start () in
@@ -1067,8 +1067,8 @@ let rec eval (model : Model.t) (phi : t) : bool =
   | TFalse -> false
   | TTrue -> true
   | TComp (c, e1, e2) ->
-    let v1 = Expr.eval model e1 in
-    let v2 = Expr.eval model e2 in
+    let v1 = Expr.eval model e1 |> Result.ok_or_failwith in
+    let v2 = Expr.eval model e2 |> Result.ok_or_failwith in
     begin match c with
       | Eq ->
         Log.debug_s "evaluating (=)";
