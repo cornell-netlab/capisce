@@ -189,10 +189,63 @@ let multiproto_egress =
   let open HoareNet in
   skip
 
-
 let multiproto =
   pipeline multiproto_parser multiproto_ingress multiproto_egress
   |> HoareNet.assert_valids
+
+let funky_path () =
+  let open ASTs.GCL in
+  let open BExpr in
+  let open Expr in
+  sequence [
+    (* parse_result:=(_ bv0 1); *)
+    (* hdr.ethernet.isValid:=(_ bv0 1); *)
+    (* hdr.ipv4.isValid:=(_ bv0 1); *)
+    (* hdr.tcp.isValid:=(_ bv0 1); *)
+    (* hdr.ethernet.isValid:=(_ bv1 1); *)
+    (* assert_ (= (_ bv1 1) hdr.ethernet.isValid); *)
+    assume (eq_ (bvi 33024 16) (var hdr.ethernet.etherType));
+    (* hdr.vlan_tag.isValid:=(_ bv1 1); *)
+    (* assert_ (= (_ bv1 1) hdr.vlan_tag.isValid); *)
+    (* assume (not  (= (_ bv2048 16) hdr.vlan_tag.etherType)); *)
+    (* assert_ (= (_ bv1 1) hdr.vlan_tag.isValid); *)
+    (* assume (= (_ bv34525 16) hdr.vlan_tag.etherType); *)
+    (* hdr.ipv6.isValid:=(_ bv1 1); *)
+    (* assert_ (= (_ bv1 1) hdr.ipv6.isValid); *)
+    (* assume (not  (= (_ bv1 8) hdr.ipv6.nextHdr)); *)
+    (* assert_ (= (_ bv1 1) hdr.ipv6.isValid); *)
+    (* assume (not  (= (_ bv6 8) hdr.ipv6.nextHdr)); *)
+    (* assert_ (= (_ bv1 1) hdr.ipv6.isValid); *)
+    (* assume (= (_ bv17 8) hdr.ipv6.nextHdr); *)
+    (* hdr.udp.isValid:=(_ bv1 1); *)
+    (* parse_result:=(_ bv1 1); *)
+    (* assume (= parse_result (_ bv1 1)); *)
+    (* assert_ (= (_ bv1 1) hdr.ethernet.isValid); *)
+    assume (eq_ (var @@ Var.make "_symb$ethertype_match$match_0" 16) (var hdr.ethernet.etherType));
+    (* assume (= _symb$ethertype_match$action (_ bv1 3)); *)
+    (* meta.ing_metadata.packet_type:=(_ bv3 4); *)
+    (* assume (= (_ bv1 3) _symb$ethertype_match$action); *)
+    (* assert_ (= (_ bv1 1) hdr.ipv4.isValid); *)
+    (* assume (= _symb$ipv4_match$match_0 hdr.ipv4.dstAddr); *)
+    (* assume (= _symb$ipv4_match$action (_ bv0 1)); *)
+    (* meta.ing_metadata.egress_port:=_symb$ipv4_match$0$egress_port; *)
+    (* assume (not  (= (_ bv1 1) hdr.tcp.isValid)); *)
+    (* assume (= (_ bv1 1) hdr.udp.isValid); *)
+    (* assert_ (= (_ bv1 1) hdr.udp.isValid); *)
+    (* assume (= _symb$udp_check$match_0 hdr.udp.dstPort); *)
+    (* assume (bvuge _symb$udp_check$action (_ bv1 1)); *)
+    (* assume (= _symb$set_egress$match_0 meta.ing_metadata.drop); *)
+    (* assume (= _symb$set_egress$action (_ bv0 1)); *)
+    (* standard_metadata.egress_spec:=meta.ing_metadata.egress_port; *)
+    (* assume (= standard_metadata.egress_spec (_ bv511 9)) *)
+  ]
+  |> simplify_path
+  |> Alcotest.(check Equivalences.gcl)
+    "programs are equivalent"
+    @@ sequence [
+      assume (eq_ (bvi 33024 16) (var hdr.ethernet.etherType));
+      assume (eq_ (var @@ Var.make "_symb$ethertype_match$match_0" 16) (bvi 33024 16));
+    ]
 
 let test_annotations () =
   HoareNet.check_annotations multiproto
@@ -211,6 +264,7 @@ let test_concolic () =
     BExpr.true_
 
 let tests : unit Alcotest.test_case list = [
+  Alcotest.test_case "07-Multiprotocol path simplification" `Quick funky_path;
   Alcotest.test_case "07-Multiprotocol annotations" `Quick test_annotations;
   Alcotest.test_case "07-Multiprotocol infer enum" `Slow test_infer;
   Alcotest.test_case "07-Multiprotocol infer conc" `Quick test_concolic;

@@ -775,7 +775,52 @@ let rec get_conjuncts b =
      List.bind bs ~f:get_conjuncts
   | _ ->
      [b]
-    
+
+let abstract_expressionism ~threshold b =
+  let abstractable expr =
+    (* expr is sufficiently big *)
+    Expr.size expr > threshold
+    && (* there are no symbolic variables *)
+    (Expr.vars expr |> snd |> List.is_empty)
+  in
+  let abstract name_gen expr =
+    if abstractable expr then
+      let name, name_gen = NameGen.get name_gen in
+      let width = Expr.width expr in
+      let abstract_name = Var.make name width in
+      (name_gen, Expr.var abstract_name, [abstract_name])
+    else
+      (name_gen, expr, [])
+  in
+  let rec abstract_inner threshold name_gen b =
+    match b with
+    | TFalse | TTrue | LVar _  ->
+      name_gen, b, []
+    | TNary (op, bs) ->
+      let name_gen, bs, new_vars = List.fold bs ~init:(name_gen, [], [])
+          ~f:(fun (name_gen, bs, new_vars) b ->
+              let name_gen, b, b_vars = abstract_inner threshold name_gen b in
+              name_gen, bs@[b], new_vars @ b_vars)
+      in
+      (name_gen, get_smarts op bs, new_vars)
+    | TNot b ->
+      let name_gen, b, new_vars = abstract_inner threshold name_gen b in
+      (name_gen, not_ b, new_vars)
+    | Forall (x, b) ->
+      let name_gen, b, new_vars = abstract_inner threshold name_gen b in
+      name_gen, forall_one x b, new_vars
+    | Exists (x,b) ->
+      let name_gen, b, new_vars = abstract_inner threshold name_gen b in
+      name_gen, forall_one x b, new_vars
+    | TComp (comp, e1, e2) ->
+      let name_gen, e1, new_vars1 = abstract name_gen e1 in
+      let name_gen, e2, new_vars2 = abstract name_gen e2 in
+      (name_gen, (get_smart_comp comp) e1 e2, new_vars1 @ new_vars2)
+  in
+  let _, phi, xs = abstract_inner threshold (NameGen.create ()) b in
+  forall xs phi
+
+
 let quickcheck_generator : t Generator.t =
   let open Quickcheck.Generator in
   let open Let_syntax in

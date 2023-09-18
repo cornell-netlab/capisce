@@ -16,17 +16,16 @@ module Make (P : Primitive) = struct
     module PHash_set = Hash_set.Make (P)
     module PHashtbl = Hashtbl.Make (P)
 
-    let assume phi = Prim (P.assume phi)
-    let assert_ phi = Prim (P.assert_ phi)
-    let skip = Prim (P.assume BExpr.true_)
-    let pass = Prim (P.assert_ BExpr.true_)
-    let dead = Prim (P.assume BExpr.false_)
-    let abort = Prim (P.assert_ BExpr.false_)
-
     let prim p = Prim p
+    let assume phi = prim @@ P.assume @@ BExpr.simplify phi
+    let assert_ phi = prim @@ P.assert_ @@ BExpr.simplify phi
+    let skip = prim @@ P.assume BExpr.true_
+    let pass = prim @@ P.assert_ BExpr.true_
+    let dead = prim @@ P.assume BExpr.false_
+    let abort = prim @@ P.assert_ BExpr.false_
 
     let is_mult_unit p = equal skip p || equal pass p
-    let is_mult_annihil p = equal dead p || equal abort p
+    (* let is_mult_annihil p = equal dead p || equal abort p *)
 
     let is_add_unit p = equal dead p
     let is_add_annihil p = equal abort p
@@ -75,22 +74,21 @@ module Make (P : Primitive) = struct
 
     let flatten_seqs cs : t list =
       let open List.Let_syntax in
-      let%bind c = cs in
-      match c with
-      | Choice _  | Prim _ ->
-        return c
+      match%bind cs with
+      | Prim _ as c -> return c
+      | Choice _ as c -> return c
       | Seq cs -> cs
 
     let sequence cs =
       let cs = flatten_seqs cs in
       let cs = List.filter cs ~f:(Fn.non is_mult_unit) in
       let cs = List.remove_consecutive_duplicates cs ~which_to_keep:`First ~equal in
-      match List.find cs ~f:is_mult_annihil with
-      | Some p -> p
-      | None ->
-        if List.exists2_exn cs cs ~f:(contra) then
-          abort
-        else
+      (* match List.find cs ~f:is_mult_annihil with *)
+      (* | Some p -> p *)
+      (* | None -> *)
+        (* if List.exists2_exn cs cs ~f:(contra) then *)
+        (*   abort *)
+        (* else *)
           match cs with
           | [] -> skip
           | [c] -> c

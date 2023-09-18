@@ -7,6 +7,7 @@ let test_suites : unit Alcotest.test list = [
   "Survey", SurveyTests.tests;
   "Smtlib Parser", Parser.tests;
   "Smarts", SmartConstructors.tests;
+  "ProgramSmarts", ProgramSmarts.tests;
   "Logic Algorithms", Algorithms.tests;
   "Traversals", Traversals.tests;
   "Dependent Type System", Dependent.tests;

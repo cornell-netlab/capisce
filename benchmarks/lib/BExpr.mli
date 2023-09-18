@@ -104,6 +104,7 @@ val coerce_types : TypeContext.t -> t -> t
 val complete_predicate_abstraction : Var.t -> t -> t option
 val get_atoms : t -> t list  
 val get_equality :  t -> (Var.t * Expr.t) option
+val abstract_expressionism : threshold:int -> t -> t
   
 val label : Context.t -> t -> t
 val erase_max_label : Context.t -> t -> t

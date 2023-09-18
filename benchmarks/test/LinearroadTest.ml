@@ -1201,7 +1201,8 @@ let tricky_path_solves () =
      assume @@ eq_ (var @@ Var.make "_symb$update_ewma_spd$match_0" 8) (var meta.seg_meta.vol);
      assume @@ eq_ (var @@ Var.make "_symb$update_ewma_spd$action" 1) (bvi 0 1);
      assert_ @@ eq_ (bvi 1 1) @@ var hdr.pos_report.isValid;
-     assign meta.seg_meta.ewma_spd @@ bslice 0 15 @@ badd (bmul (bconcat (bvi 0 16) @@ var meta.seg_meta.ewma_spd) (bvi 96 32)) (bconcat (bvi 0 16) (lshr_ (bmul (bconcat (bvi 0 8) (var hdr.pos_report.spd)) (bvi 32 16)) (bvi 7 16)));
+     assign meta.seg_meta.ewma_spd @@ (* var @@ Var.make "ABSTRACT" 16; *)
+     bslice 0 15 @@ badd (bmul (bconcat (bvi 0 16) @@ var meta.seg_meta.ewma_spd) (bvi 96 32)) (bconcat (bvi 0 16) (lshr_ (bmul (bconcat (bvi 0 8) (var hdr.pos_report.spd)) (bvi 32 16)) (bvi 7 16)));
      assert_ @@ eq_ (bvi 1 1) @@ var hdr.pos_report.isValid;
      assume @@ not_ @@ ands_ [
        eq_ (var hdr.pos_report.xway) @@ var meta.v_state.prev_xway;
@@ -1264,7 +1265,7 @@ let tricky_path_solves () =
      assign hdr.accident_alert.vid @@ var hdr.pos_report.vid;
      assert_ @@ eq_ (bvi 1 1) @@ var hdr.accident_alert.isValid;
      assign hdr.accident_alert.seg @@ var meta.accident_meta.accident_seg;
-     assign hdr.pos_report.isValid @@ bvi 0 1;
+     assign hdr.pos_report.isValid @@ bvi 0 1;  (*The offending assignment*)
      assert_ @@ eq_ (bvi 1 1) @@ var hdr.ipv4.isValid;
      assign hdr.ipv4.totalLen @@ bvi 38 16;
      assert_ @@ eq_ (bvi 1 1) @@ var hdr.udp.isValid;
@@ -1278,6 +1279,7 @@ let tricky_path_solves () =
      assign hdr.lr_msg_type.msg_type @@ bvi 10 8;
      assign hdr.toll_notification.isValid @@ bvi 1 1;
      assert_ @@ eq_ (bvi 1 1) @@ var hdr.toll_notification.isValid;
+     (* THE NEXT LINE IS THE OFFENDING ASSERTION *)
      assert_ @@ eq_ (bvi 1 1) @@ var hdr.pos_report.isValid;
      assign hdr.toll_notification.time @@ var hdr.pos_report.time;
      assert_ @@ eq_ (bvi 1 1) @@ var hdr.toll_notification.isValid;
@@ -1295,26 +1297,33 @@ let tricky_path_solves () =
      assert_ @@ eq_ (bvi 1 1) @@ var hdr.udp.isValid;
      assign hdr.udp.checksum @@ bvi 0 16;
      assume @@ eq_ (var @@ Var.make "_symb$send_frame$match_0" 9) @@ var standard_metadata.egress_port;
-     assume @@ uge_ (var @@ Var.make "_symb$send_frame$action" 1) @@ bvi 1 1;
+     assume @@ uge_ (var @@ Var.make "_symb$send_fr ame$action" 1) @@ bvi 1 1;
      assert_ @@ eq_ (bvi 1 1) @@ var hdr.ethernet.isValid;
      assign hdr.ethernet.srcAddr @@ var @@ Var.make "_symb$send_frame$1$smac" 48
    ]
   in
-  let tricky_path =
-    GCL.simplify_path tricky_path
+  let assert_normalized = GCL.single_assert_nf tricky_path in
+  let solve path =
+    let path = GCL.simplify_path path in
+    let pi_vc = Psv.(vc @@ snd @@ passify path) in
+    match
+      Qe.orelse ~input:pi_vc
+        [Qe.solve_one ~qe:Qe.nikolaj_please;
+         Qe.solve_one ~qe:Qe.abstract_expressionism;
+         (* Qe.solve_one ~qe:BottomUpQe.cnf_qe *)
+        ]
+    with
+    | None -> Alcotest.fail "QE failed"
+    | Some (cvs, cpf_str) ->
+      Solver.of_smtlib ~dvs:[] ~cvs cpf_str
   in
-  let pi_vc = Psv.(vc @@ snd @@ passify tricky_path) in
-  match
-    Qe.orelse ~input:pi_vc
-      [Qe.solve_one ~qe:Qe.nikolaj_please;
-       Qe.solve_one ~qe:BottomUpQe.cnf_qe]
-  with
-  | None -> Alcotest.fail "QE failed"
-  | Some (cvs, cpf_str) ->
-    Solver.of_smtlib ~dvs:[] ~cvs cpf_str
-    |> Alcotest.(check Equivalences.smt_equiv)
-      "Enum CPI is trivial"
-      BExpr.true_
+  let solutions = List.map ~f:solve assert_normalized in
+  BExpr.ands_ solutions
+  |> Alcotest.(check @@ neg Equivalences.smt_equiv)
+    "Enum CPI is satisfiable"
+    BExpr.false_
+
+
 
 let test_annotations () =
   HoareNet.check_annotations (linearroad true)

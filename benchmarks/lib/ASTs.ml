@@ -37,6 +37,74 @@ module GCL = struct
         List.map cs ~f:(fun cmd -> wp cmd phi)
         |> BExpr.ands_
 
+
+  (* let path_simplify_assumes (gcl : t) : t = *)
+  (*   let rec listify = function *)
+  (*     | Prim p -> [p] *)
+  (*     | Seq cs -> List.bind cs ~f:listify *)
+  (*     | Choice _ -> failwith "[listify failed] got a choice => not a path" *)
+  (*   in *)
+    (* let rec heuristic_elim info_flow_state (prims : Active.t list) = *)
+    (*   (\* info_flow_state maintains all variables that flow to the key *\) *)
+    (*   match prims with *)
+    (*   | (Assign(x,e))::prims -> *)
+    (*     let evars = Expr.vars e |> Util.uncurry (@) in *)
+    (*     let flow_to_x = *)
+    (*       List.bind evars ~f:(fun y -> *)
+    (*           Var.Map.find info_flow_state y *)
+    (*           |> Option.value ~default:[]) *)
+    (*     in *)
+    (*     let info_flow_state = Var.Map.set info_flow_state ~key:x ~data:flow_to_x in *)
+    (*     assign x e :: heuristic_elim info_flow_state prims *)
+    (*   | (Passive (Assume phi)) :: prims -> *)
+    (*     begin match BExpr.get_equality phi with *)
+    (*     | Some (x, e) -> *)
+    (*       let phi_vars = BExpr.vars phi in *)
+    (*       (\* if everything that contributes to the value of e is a constant or a control var, keep it. *\) *)
+    (*       (\* that doesnt quite work the way that I would like either *\) *)
+
+    (*     end *)
+    (*     | (Passive (Assert phi)) :: prims -> *)
+    (*       assert_ phi :: heuristic_elim info_flow_state prims *)
+    (* in *)
+    (* listify gcl *)
+    (* |> heuristic_elim Var.Map.empty *)
+
+  let single_assert_nf c : t list =
+    (* convert the program into single-assert normal form, that is, *)
+    (* a list of programs where each program has exactly one assert, the last one *)
+    let rec assumeize c =
+      match c with
+      | Prim (Passive (Assert phi)) ->
+        assume phi
+      | Prim _ -> c
+      | Seq [] -> c
+      | Seq (c::cs) ->
+        seq (assumeize c) (assumeize (Seq cs))
+      | Choice _ ->
+        failwith "assumize requires paths only"
+    in
+    let conjoin = seq in
+    let disjoin = (@) in
+    let rec assertize c =
+      match c with
+      | Prim (Passive (Assert phi)) ->
+        [assert_ phi]
+      | Prim _ -> []
+      | Seq [] -> [Seq []]
+      | Seq (c::cs) ->
+        let cs' =
+          let open List.Let_syntax in
+          let%map c' = assertize (Seq cs) in
+          conjoin (assumeize c) c'
+        in
+        disjoin (assertize c) cs'
+      | Choice _ ->
+        failwith "assertize requires paths only"
+    in
+    assertize c
+
+
   let simplify_path (gcl : t) : t =
     let of_map ctx x =
       match Var.Map.find ctx x with
@@ -55,20 +123,24 @@ module GCL = struct
           reads, gcl
         else
           reads, skip
-      | Prim (Passive (Assert phi))
+      | Prim (Passive (Assert phi)) ->
+        let vars = BExpr.vars phi |> Util.uncurry (@) in
+        Var.Set.(union reads @@ of_list vars),
+        assert_ phi
       | Prim (Passive (Assume phi)) ->
         let vars = BExpr.vars phi |> Util.uncurry (@) in
         Var.Set.(union reads @@ of_list vars),
-        gcl
-      | Seq cs ->
-        List.fold_right cs ~init:(reads, [])
-          ~f:(fun c (reads, cs) ->
-              let reads, c = dead_code_elim_inner reads c in
-              reads, c::cs
-            )
-        |> Tuple2.map_snd ~f:sequence
+        assume phi
       | Choice _ ->
         failwith "choices cannot occur in paths"
+      | Seq cs ->
+        match List.rev cs with
+        | [] -> (reads, skip)
+        | (last :: rest) ->
+          let reads, last = dead_code_elim_inner reads last in
+          let rest = List.rev rest in
+          let reads, rest = dead_code_elim_inner reads @@ sequence rest in
+          (reads, seq rest last)
     in
     let const_prop_form ctor ctx phi =
       let phi' = BExpr.fun_subst (of_map ctx) phi in
@@ -76,7 +148,7 @@ module GCL = struct
         | Some (x, e) ->
           begin match Expr.get_const e with
             | Some v->
-              let sz = Expr.size e in
+              let sz = Var.size x in
               let ctx = Var.Map.set ctx ~key:x ~data:(v,sz) in
               (ctx, ctor phi')
             | None ->
@@ -99,13 +171,12 @@ module GCL = struct
         const_prop_form assert_ ctx phi
       | Prim (Passive (Assume phi)) ->
         const_prop_form assume ctx phi
-      | Seq cs ->
-        List.fold cs ~init:(ctx, [])
-          ~f:(fun (ctx, prec) curr ->
-              let ctx, new_curr = const_prop_inner ctx curr in
-              (ctx, prec@[new_curr])
-          )
-        |> Tuple2.map_snd ~f:sequence
+      | Seq [] ->
+        (ctx, skip)
+      | Seq (c::cs) ->
+        let ctx, c = const_prop_inner ctx c in
+        let ctx, cs = const_prop_inner ctx @@ sequence cs in
+        (ctx, seq c cs)
       | Choice _ ->
         failwith "choices disallowed in const prop"
     in

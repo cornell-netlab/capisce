@@ -174,8 +174,29 @@ let solve_one ~qe phi : (Var.t list * string) option =
   Log.qe "%s" @@ lazy "[solve_one} done";
   (cvs, qf_phi_str)
 
+let abstract_expressionism (solver : ?with_timeout:int -> Var.t list -> string -> string) phi : BExpr.t option =
+  Log.debug_s "ABSTRACT EXPRESSIONISM";
+  let rec solve_loop threshold =
+    let phi = BExpr.abstract_expressionism ~threshold phi in
+    let _, cvs = BExpr.vars phi in
+    let res = solver ~with_timeout:2000 cvs (BExpr.to_smtlib phi) in
+    if BottomUpQe.check_success res then
+      Some (Solver.of_smtlib ~dvs:[] ~cvs res)
+    else begin
+      Log.smt "Solver failed with message:\n%s" @@ lazy res;
+      if threshold <= 1 then
+        None
+      else begin
+        Log.debug "DECREMENTING THRESHOLD: %d" @@ lazy threshold;
+        solve_loop (threshold - 1)
+      end
+    end
+  in
+  solve_loop 10
+
 
 let nikolaj_please (solver : ?with_timeout:int -> Var.t list -> string -> string) phi : BExpr.t option =
+  Log.debug_s "Nikolaj pleaseeeeeee";
   let _, cvs = BExpr.vars phi in
   let res = solver ~with_timeout:2000 cvs (BExpr.to_smtlib phi) in
   if BottomUpQe.check_success res then
@@ -416,11 +437,6 @@ let concolic (gcl : GCL.t) : BExpr.t =
   let num_cexs = ref Bigint.zero in
   let rec loop phi_agg =
     Log.debug_s "checking implication...";
-    (* Log.debug "current cpf is %s" @@ lazy (BExpr.to_smtlib phi_agg); *)
-    (* Log.debug "normal_execs : %s" @@ lazy (BExpr.to_smtlib normal_executions); *)
-    (* Log.debug_s "=>"; *)
-    (* Log.debug "safety_condition: %s" @@ lazy (BExpr.to_smtlib safety_condition); *)
-    (* match implies_model all_passive_consts phi_agg symbolic_semantics with *)
     match
       Solver.check_sat_model
         all_passive_consts
@@ -444,7 +460,7 @@ let concolic (gcl : GCL.t) : BExpr.t =
         failwith "Could not slice the counterexample"
       | Some pi ->
         Log.debug "Slice:\n%s------/" @@ lazy (GCL.to_string pi);
-        let pi = GCL.optimize pi in
+        let pi = GCL.simplify_path pi in
         let pi_vc = Psv.(vc @@ snd @@ passify pi) in
         match
           orelse ~input:pi_vc
@@ -458,7 +474,10 @@ let concolic (gcl : GCL.t) : BExpr.t =
         | Some (cvs, cpf_str) ->
           let cpf = Solver.of_smtlib ~dvs:[] ~cvs cpf_str in
           let sat = Solver.check_sat cvs cpf in
-          if sat then
+          if BExpr.(cpf = true_) then begin
+            Printf.printf "the following path gave true when cpfed:%s" (GCL.to_string pi);
+            failwith "found false"
+          end else if sat then
             loop (BExpr.and_ cpf phi_agg)
           else begin
             Log.warn "Uncontrollable path:%s" @@ lazy (GCL.to_string pi);

@@ -380,7 +380,7 @@ let rec size = function
 let rec width = function
   | BV(_, w) -> w
   | Var x -> Var.size x
-  | UnOp(USlice (lo, hi), _) -> hi - lo 
+  | UnOp(USlice (lo, hi), _) -> hi - lo + 1
   | UnOp(UNot, e) -> width e
   | BinOp(BConcat, e1, e2) -> width e1 + width e2
   | BinOp(_ , e1, e2) ->

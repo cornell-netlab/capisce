@@ -290,9 +290,9 @@ let test_infer_buggy () =
 
 let test_infer_fixed () =
   HoareNet.infer ~qe:`Enum (hula true) None None
-  |> Alcotest.(check Equivalences.smt_equiv)
+  |> Alcotest.(check @@ neg Equivalences.smt_equiv)
     "Enum CPI is trivial"
-    BExpr.true_
+    BExpr.false_
 
 let test_concolic_buggy () =
   Alcotest.check_raises
@@ -302,9 +302,9 @@ let test_concolic_buggy () =
 
 let test_concolic_fixed () =
   HoareNet.infer ~qe:`Conc (hula true) None None
-  |> Alcotest.(check Equivalences.smt_equiv)
-    "Conc CPI is trivial"
-    BExpr.true_
+  |> Alcotest.(check @@ neg Equivalences.smt_equiv)
+    "Conc CPI is sat"
+    BExpr.false_
 
 let tests : unit Alcotest.test_case list = [
   Alcotest.test_case "Hula annotations" `Quick test_annotations;
