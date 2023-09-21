@@ -818,7 +818,7 @@ let abstract_expressionism ~threshold b =
       (name_gen, (get_smart_comp comp) e1 e2, new_vars1 @ new_vars2)
   in
   let _, phi, xs = abstract_inner threshold (NameGen.create ()) b in
-  forall xs phi
+  List.fold xs ~init:phi ~f:(fun phi x -> Forall (x, phi))
 
 
 let quickcheck_generator : t Generator.t =

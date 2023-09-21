@@ -17,7 +17,11 @@ let assert_apply ?timeout consts phi_str =
   let open Printf in
   let cmd = match timeout with
     | None -> "(apply qe)"
-    | Some ms -> sprintf "(apply (then simplify (try-for qe %i)))" ms in
+    | Some _ -> sprintf {|(apply (then simplify
+             (try-for (! qe :eliminate_variables_as_block false) 10000)
+             simplify
+             (try-for (! qe :eliminate_variables_as_block true) 2000)
+             ))|} in
   sprintf "%s\n\n(assert %s)\n\n%s%!"
     (Var.list_to_smtlib_decls consts)
     phi_str
