@@ -570,7 +570,7 @@ let linearroad_parser =
   in
   start
 
-let linearroad_ingress _ (*annotated*) =
+let linearroad_ingress annot =
   let open HoareNet in
   let open BExpr in
   let open Expr in
@@ -657,12 +657,15 @@ let linearroad_ingress _ (*annotated*) =
     [], Action.[
         assert_ @@ eq_ btrue @@ var hdr.pos_report.isValid;
         (* seg_ewma_spd_reg.read(meta.seg_meta.ewma_spd, (bit<32>)((bit<16>)hdr.pos_report.xway * 16w200 + (bit<16>)(hdr.pos_report.seg * 8w2) + (bit<16>)hdr.pos_report.dir)); *)
+        if annot then
+          assume @@ eq_ (var meta.seg_meta.ewma_spd) @@ band (bvi 65504 16) @@ var meta.seg_meta.ewma_spd
+        else
         (* meta.seg_meta.ewma_spd = (bit<16>)( (bit<32>)meta.seg_meta.ewma_spd * 32w96 + (bit<32>) (((bit<16>)hdr.pos_report.spd * 16w32) >> 16w7)); *)
-        lshr_ (bmul (bcast 16 @@ var hdr.pos_report.spd) (bvi 32 16)) (bvi 7 16)
-        |> bcast 32
-        |> badd (bmul (bcast 32 @@ var meta.seg_meta.ewma_spd) (bvi 96 32))
-        |> bcast 16
-        |> assign meta.seg_meta.ewma_spd;
+          lshr_ (bmul (bcast 16 @@ var hdr.pos_report.spd) (bvi 32 16)) (bvi 7 16)
+          |> bcast 32
+          |> badd (bmul (bcast 32 @@ var meta.seg_meta.ewma_spd) (bvi 96 32))
+          |> bcast 16
+          |> assign meta.seg_meta.ewma_spd;
         assert_ @@ eq_ btrue @@ var hdr.pos_report.isValid
         (* seg_ewma_spd_reg.write((bit<32>)((bit<16>)hdr.pos_report.xway * 16w200 + (bit<16>)(hdr.pos_report.seg * 8w2) + (bit<16>)hdr.pos_report.dir), (bit<16>)meta.seg_meta.ewma_spd); *)
       ]
@@ -1201,8 +1204,10 @@ let tricky_path_solves () =
      assume @@ eq_ (var @@ Var.make "_symb$update_ewma_spd$match_0" 8) (var meta.seg_meta.vol);
      assume @@ eq_ (var @@ Var.make "_symb$update_ewma_spd$action" 1) (bvi 0 1);
      assert_ @@ eq_ (bvi 1 1) @@ var hdr.pos_report.isValid;
-     assign meta.seg_meta.ewma_spd @@ (* var @@ Var.make "ABSTRACT" 16; *)
-     bslice 0 15 @@ badd (bmul (bconcat (bvi 0 16) @@ var meta.seg_meta.ewma_spd) (bvi 96 32)) (bconcat (bvi 0 16) (lshr_ (bmul (bconcat (bvi 0 8) (var hdr.pos_report.spd)) (bvi 32 16)) (bvi 7 16)));
+     (* assign meta.seg_meta.ewma_spd @@ (\* var @@ Var.make "ABSTRACT" 16; *\) *)
+     (* bslice 0 15 @@ badd (bmul (bconcat (bvi 0 16) @@ var meta.seg_meta.ewma_spd) (bvi 96 32)) (bconcat (bvi 0 16) (lshr_ (bmul (bconcat (bvi 0 8) (var hdr.pos_report.spd)) (bvi 32 16)) (bvi 7 16))); *)
+     (* the eliminated form using ICs *)
+     assume @@ eq_ (var meta.seg_meta.ewma_spd) @@ band (bvi 65504 16) @@ var meta.seg_meta.ewma_spd;
      assert_ @@ eq_ (bvi 1 1) @@ var hdr.pos_report.isValid;
      assume @@ not_ @@ ands_ [
        eq_ (var hdr.pos_report.xway) @@ var meta.v_state.prev_xway;
@@ -1309,7 +1314,7 @@ let tricky_path_solves () =
     match
       Qe.orelse ~input:pi_vc
         [Qe.solve_one ~qe:Qe.nikolaj_please;
-         Qe.solve_one ~qe:Qe.abstract_expressionism;
+         (* Qe.solve_one ~qe:Qe.abstract_expressionism; *)
          (* Qe.solve_one ~qe:BottomUpQe.cnf_qe *)
         ]
     with
@@ -1426,7 +1431,6 @@ let tests : unit Alcotest.test_case list = [
   Alcotest.test_case "tricky path is eliminated" `Quick tricky_path_solves;
   Alcotest.test_case "true path is not true" `Quick true_path_resolves;
   Alcotest.test_case "Validity Assert_s are Correct" `Quick test_assert_valids_travel_estimate_send;
-  Alcotest.test_case "Linearroad annotations" `Quick test_annotations;
   Alcotest.test_case "Linearroad infer enum unannotated" `Slow test_infer_timeout;
-  Alcotest.test_case "Linearroad infer concolic" `Quick test_concolic;
+  Alcotest.test_case "Linearroad infer concolic with annotation" `Quick test_concolic;
 ]

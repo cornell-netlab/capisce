@@ -402,7 +402,7 @@ let all_paths gcl nprocs pid =
           (* match Some ([], BExpr.true_) with *)
           match orelse ~input:phi [
               solve_one ~qe:nikolaj_please;
-              solve_one ~qe:abstract_expressionism;
+              (* solve_one ~qe:abstract_expressionism; *)
               solve_one ~qe:BottomUpQe.cnf_qe;
             ] with
           | None ->
@@ -467,7 +467,7 @@ let concolic (gcl : GCL.t) : BExpr.t =
         match
           orelse ~input:pi_vc
             [solve_one ~qe:nikolaj_please;
-             solve_one ~qe:abstract_expressionism;
+             (* solve_one ~qe:abstract_expressionism; *)
              solve_one ~qe:BottomUpQe.cnf_qe]
         with
         | None ->

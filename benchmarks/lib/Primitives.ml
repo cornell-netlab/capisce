@@ -208,97 +208,6 @@ module Assign = struct
 
 end
 
-module Action = struct
-  type t =
-    | Assign of Assign.t
-    | Assert of Assert.t
-  [@@deriving quickcheck, hash, eq, sexp, compare]
-
-  let assign x e = Assign (Assign.assign x e)
-  let assert_ b =
-    Printf.printf "ASSERTING %s\n%!" (BExpr.to_smtlib b);
-    Assert (Assert.assert_ b)
-  let assume b = failwithf "assumes are not allowed in actions, got %s" (BExpr.to_smtlib b) ()
-  let contra c1 c2 = match c1,c2 with
-    | Assert b1, Assert b2 -> Assert.contra b1 b2
-    | _ -> false
-
-  let to_smtlib = function
-    | Assign a -> Assign.to_smtlib a
-    | Assert b -> Assert.to_smtlib b
-
-  let name = function
-    | Assign a -> Assign.name a
-    | Assert b -> Assert.name b
-
-  let size = function
-    | Assign a -> Assign.size a
-    | Assert b -> Assert.size b
-
-  let subst x e = function
-    | Assign a -> Assign (Assign.subst x e a)
-    | Assert b -> Assert (Assert.subst x e b)
-
-  let normalize_names = function
-    | Assign a -> Assign (Assign.normalize_names a)
-    | Assert b -> Assert (Assert.normalize_names b)
-
-  let count_asserts = function
-    | Assign a -> Assign.count_asserts a
-    | Assert b -> Assert.count_asserts b
-
-  let comparisons = function
-    | Assign _ -> None
-    | Assert b -> Assert.comparisons b
-
-  let is_node (_ : t) = true
-  let is_table (_:t) = false
-
-  let const_prop f : t -> (t * Expr.t Var.Map.t) = function
-    | Assign a ->
-      let (a, f) = Assign.const_prop f a in
-      (Assign a, f)
-    | Assert a ->
-      let (a, f) = Assert.const_prop f a in
-      (Assert a, f)
-
-  let dead_code_elim c reads : (Var.Set.t * t) option =
-    match c with
-    | Assign a ->
-      let%map (reads, (x,e)) = Assign.dead_code_elim a reads in
-      (reads, assign x e)
-    | Assert a ->
-      let%map (reads, a) = Assert.dead_code_elim reads a in
-      (reads, assert_ a)
-
-  let explode action = [[action]]
-
-  let cp_action name act_size = Var.make (Printf.sprintf "_symb$%s$action" name) act_size
-  let cp_data name act_idx param =
-     Var.make (Printf.sprintf  "_symb$%s$%d$%s" name act_idx (Var.str param)) (Var.size param)
-
-  let symbolize (name : string)
-      ~num_actions
-      ~act_size
-      ~idx
-      ((params : Var.t list), (body : t list)) : (BExpr.t * t list) =
-    let act_choice =
-      let c = if idx >= num_actions - 1 then BExpr.uge_ else BExpr.eq_ in
-      if String.(name = "classifier") then
-        Log.debug "[symbolize] classifier action_size = %d" @@ lazy act_size;
-      c (cp_action name act_size |> Expr.var ) (Expr.bvi idx act_size)
-    in
-    let symb param = Expr.var (cp_data name idx param) in
-    let symbolize body param = subst param (symb param) body in
-    let f body = List.fold params ~init:body ~f:symbolize in
-    (act_choice, List.map body ~f)
-
-  let vars = function
-    | Assign a -> Assign.vars a
-    | Assert a -> Assert.vars a
-
-end
-
 module Active = struct
   type t =
     | Passive of Passive.t
@@ -382,13 +291,37 @@ module Active = struct
     | Passive p ->  Passive.explode p |> Util.mapmap ~f:passive
     | Assign a -> List.map ~f:(List.map ~f:assign_) (Assign.explode a)
 
-  let of_action : Action.t -> t = function
-    | Action.Assign a -> Assign a
-    | Action.Assert a -> Passive (Assert a)
-
   let vars = function
     | Passive p -> Passive.vars p
     | Assign a -> Assign.vars a
+end
+
+
+module Action = struct
+  include Active
+
+  let explode action = [[action]]
+
+  let cp_action name act_size = Var.make (Printf.sprintf "_symb$%s$action" name) act_size
+  let cp_data name act_idx param =
+     Var.make (Printf.sprintf  "_symb$%s$%d$%s" name act_idx (Var.str param)) (Var.size param)
+
+  let symbolize (name : string)
+      ~num_actions
+      ~act_size
+      ~idx
+      ((params : Var.t list), (body : t list)) : (BExpr.t * t list) =
+    let act_choice =
+      let c = if idx >= num_actions - 1 then BExpr.uge_ else BExpr.eq_ in
+      if String.(name = "classifier") then
+        Log.debug "[symbolize] classifier action_size = %d" @@ lazy act_size;
+      c (cp_action name act_size |> Expr.var ) (Expr.bvi idx act_size)
+    in
+    let symb param = Expr.var (cp_data name idx param) in
+    let symbolize body param = subst param (symb param) body in
+    let f body = List.fold params ~init:body ~f:symbolize in
+    (act_choice, List.map body ~f)
+
 end
 
 module Table = struct
@@ -527,7 +460,7 @@ module Pipeline = struct
     let active a = Active a
     let assign x e = active @@ Active.assign x e
 
-    let action (a : Action.t) = Active (Active.of_action a)
+    let action (a : Action.t) = Active a
 
     let table name keys actions =
       Table (Table.make name keys actions)
@@ -599,7 +532,7 @@ module Pipeline = struct
         (*     let symb_k = Var.make (cp_key idx) (Var.size k) in *)
         (*     BExpr.eq_ (Expr.var symb_k) (Expr.var k)) in *)
         let act_size = Table.act_size tbl in
-        let of_action_list = List.map ~f:(fun a -> (active (Active.of_action a))) in
+        let of_action_list = List.map ~f:active in
         let num_actions = List.length tbl.actions in
         let f idx action =
           let (phi, acts) = Action.symbolize tbl.name ~num_actions ~act_size ~idx action in
