@@ -66,7 +66,7 @@ module Normalize (Cmd : sig
 
   let rec normalize c =
     match c with
-    | Prim p ->  prim (normalize_prim p)
+    | Prim p -> prim (normalize_prim p)
     | Seq cs ->
       List.map cs ~f:normalize |> sequence
     | Choice cxs ->

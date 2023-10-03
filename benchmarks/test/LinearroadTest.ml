@@ -657,15 +657,15 @@ let linearroad_ingress annot =
     [], Action.[
         assert_ @@ eq_ btrue @@ var hdr.pos_report.isValid;
         (* seg_ewma_spd_reg.read(meta.seg_meta.ewma_spd, (bit<32>)((bit<16>)hdr.pos_report.xway * 16w200 + (bit<16>)(hdr.pos_report.seg * 8w2) + (bit<16>)hdr.pos_report.dir)); *)
-        if annot then
-          assume @@ eq_ (var meta.seg_meta.ewma_spd) @@ band (bvi 65504 16) @@ var meta.seg_meta.ewma_spd
-        else
+        assume @@ eq_ (var meta.seg_meta.ewma_spd) @@ band (bvi 65504 16) @@ var meta.seg_meta.ewma_spd
+        |> annotate (
         (* meta.seg_meta.ewma_spd = (bit<16>)( (bit<32>)meta.seg_meta.ewma_spd * 32w96 + (bit<32>) (((bit<16>)hdr.pos_report.spd * 16w32) >> 16w7)); *)
           lshr_ (bmul (bcast 16 @@ var hdr.pos_report.spd) (bvi 32 16)) (bvi 7 16)
           |> bcast 32
           |> badd (bmul (bcast 32 @@ var meta.seg_meta.ewma_spd) (bvi 96 32))
           |> bcast 16
           |> assign meta.seg_meta.ewma_spd;
+        );
         assert_ @@ eq_ btrue @@ var hdr.pos_report.isValid
         (* seg_ewma_spd_reg.write((bit<32>)((bit<16>)hdr.pos_report.xway * 16w200 + (bit<16>)(hdr.pos_report.seg * 8w2) + (bit<16>)hdr.pos_report.dir), (bit<16>)meta.seg_meta.ewma_spd); *)
       ]

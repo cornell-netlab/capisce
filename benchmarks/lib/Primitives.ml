@@ -11,6 +11,8 @@ module type Primitive = sig
   val vars : t -> Var.t list
 end
 
+type 'a alt = {data : 'a; alt : 'a option} [@@deriving quickcheck, eq, hash, sexp, compare]
+
 let substitution_of facts x =
   match Var.Map.find facts x with
   | None -> Expr.var x
@@ -20,31 +22,31 @@ module Assert = struct
   type t = BExpr.t
   [@@deriving quickcheck, eq, hash, sexp, compare]
 
-  let assert_ b = b
-  let contra b1 b2 =
-    BExpr.equal b1 (BExpr.not_ b2) || BExpr.equal b2 (BExpr.not_ b2)
-  let to_smtlib b =
-    Printf.sprintf "assert %s" (BExpr.to_smtlib b)
+  let assert_ (phi : BExpr.t) : t = phi
+  let contra (asst1 : t) (asst2 : t) =
+    BExpr.equal asst1 (BExpr.not_ asst2) || BExpr.equal asst2 (BExpr.not_ asst1)
+  let to_smtlib (asst : t) =
+    Printf.sprintf "assert %s" (BExpr.to_smtlib asst)
   let name _ = Printf.sprintf "assert"
-  let count_asserts (_:t) = 1
-  let size (b : t) = BExpr.size b
-  let subst x e (b:t) : t = BExpr.subst x e b
-  let wp (b:t) (phi : BExpr.t) : BExpr.t = BExpr.and_ b phi
-  let normalize_names : t -> t = BExpr.normalize_names
+  let count_asserts (_ : t) = 1
+  let size (asst : t) : int = BExpr.size asst
+  let subst x e (asst:t) : t = BExpr.subst x e asst
+  let wp (asst : t) (post : BExpr.t) : BExpr.t = BExpr.and_ asst post
+  let normalize_names assm = BExpr.normalize_names assm
   let comparisons = BExpr.comparisons
-  let is_table (_:t) = false
-  let vars b = BExpr.vars b |> Tuple2.uncurry (@)
+  let is_table (_ : t) = false
+  let vars (asst : t) = BExpr.vars asst |> Tuple2.uncurry (@)
 
-  let const_prop facts b : t * Expr.t Var.Map.t =
-    let b = BExpr.fun_subst (substitution_of facts) b |> BExpr.simplify in
+  let const_prop facts (asst : t) : t * Expr.t Var.Map.t =
+    let b = BExpr.fun_subst (substitution_of facts)  asst |> BExpr.simplify in
     (assert_ b, facts)
 
-  let dead_code_elim reads b =
-    let read_by_b = Var.Set.of_list (Util.concat (BExpr.vars b)) in
-    let b = BExpr.simplify b in
-    Some (Var.Set.union reads read_by_b, assert_ b)
+  let dead_code_elim reads (asst : t) =
+    let reads' = Var.Set.of_list (Util.concat (BExpr.vars asst)) in
+    let asst = BExpr.simplify asst in
+    Some (Var.Set.union reads reads', asst)
 
-  let explode b = [[b]]
+  let explode (asst : t) = [[asst]]
 
 end
 
@@ -52,35 +54,41 @@ module Assume = struct
   type t = BExpr.t
   [@@deriving quickcheck, eq, hash, sexp, compare]
 
-  let assume b = b
+  let assume (phi: BExpr.t) = phi
   let contra _ _ = false
-  let to_smtlib b =
-    Printf.sprintf "assume %s" (BExpr.to_smtlib b)
+  let to_smtlib (assm : t) =
+    Printf.sprintf "assume %s" (BExpr.to_smtlib assm)
   let name _ = Printf.sprintf "assume"
   let count_asserts (_:t) = 0
-  let size (b : t) = BExpr.size b
-  let subst x e (b:t) : t = BExpr.subst x e b
-  let wp (b:t) (phi : BExpr.t) : BExpr.t = BExpr.imp_ b phi
-  let normalize_names : t -> t = BExpr.normalize_names
-  let comparisons = BExpr.comparisons
+  let size (assm : t) = BExpr.size assm
+  let subst x e (assm:t) : t = BExpr.subst x e assm
+  let wp (assm:t) (post : BExpr.t) : BExpr.t = BExpr.imp_ assm post
+  let normalize_names assm = BExpr.normalize_names assm
+  let comparisons assm = BExpr.comparisons assm
   let is_table (_:t) = false
 
-  let const_prop f b = Assert.const_prop f b
-  let dead_code_elim reads b = Assert.dead_code_elim reads b
+  let const_prop facts (assm : t) =
+    let b = BExpr.fun_subst (substitution_of facts) assm |> BExpr.simplify in
+    (assume b, facts)
 
-  let explode b = [[b]]
-  let vars b = BExpr.vars b |> Tuple2.uncurry (@)
+  let dead_code_elim reads (assm : t) =
+    let reads' = Var.Set.of_list (Util.concat (BExpr.vars assm)) in
+    let assm = BExpr.simplify assm in
+    Some (Var.Set.union reads reads', assm)
+
+  let explode (assm : t) = [[assm]]
+  let vars (assm : t) = BExpr.vars assm |> Tuple2.uncurry (@)
 
 end
 
 module Passive = struct
   type t =
-    | Assume of BExpr.t
+    | Assume of Assume.t
     | Assert of Assert.t
   [@@deriving quickcheck, eq, hash, sexp, compare]
 
-  let assume b = Assume b
-  let assert_ a = Assert a
+  let assume b = Assume (Assume.assume b)
+  let assert_ a = Assert (Assert.assert_ a)
 
   let contra c1 c2 =
     match c1, c2 with
@@ -88,8 +96,7 @@ module Passive = struct
     | _, _ -> false
 
   let to_smtlib = function
-    | Assume b ->
-      Printf.sprintf "assume %s%!" (BExpr.to_smtlib b)
+    | Assume b -> Assume.to_smtlib b
     | Assert b -> Assert.to_smtlib b
 
   let name = function
@@ -102,23 +109,23 @@ module Passive = struct
     | Assert _ -> 1
 
   let size = function
-    | Assume b -> 1 + BExpr.size b
+    | Assume b -> 1 + Assume.size b
     | Assert b -> 1 + Assert.size b
 
   let subst x e = function
-    | Assume b -> assume (BExpr.subst x e b)
-    | Assert b -> assert_ (Assert.subst x e b)
+    | Assume b -> Assume (Assume.subst x e b)
+    | Assert b -> Assert (Assert.subst x e b)
 
   let wp t phi = match t with
-    | Assume b -> BExpr.imp_ b phi
+    | Assume b -> Assume.wp b phi
     | Assert b -> Assert.wp b phi
 
   let normalize_names = function
-    | Assume b -> assume (BExpr.normalize_names b)
-    | Assert b -> assert_ (Assert.normalize_names b)
+    | Assume b -> Assume (Assume.normalize_names b)
+    | Assert b -> Assert (Assert.normalize_names b)
 
   let comparisons = function
-    | Assume b -> BExpr.comparisons b
+    | Assume b -> Assume.comparisons b
     | Assert _ -> None
 
   let is_node (_:t) = true
@@ -130,19 +137,19 @@ module Passive = struct
   let const_prop f : t -> (t * Expr.t Var.Map.t) = function
     | Assert a ->
       let a, f = Assert.const_prop f a in
-      (assert_ a, f)
+      (Assert a, f)
     | Assume b ->
       let b, f = Assume.const_prop f b in
-      (assume b, f)
+      (Assume b, f)
 
   let dead_code_elim c reads =
     match c with
     | Assert b ->
       let%map reads, b = Assert.dead_code_elim reads b in
-      (reads, assert_ b)
+      (reads, Assert b)
     | Assume b ->
       let%map reads, b = Assume.dead_code_elim reads b in
-      (reads, assume b)
+      (reads, Assume b)
 
   let explode = function
     | Assert b -> Assert.explode b |> Util.mapmap ~f:assert_
@@ -209,30 +216,44 @@ module Assign = struct
 end
 
 module Active = struct
-  type t =
+  type pre_t =
     | Passive of Passive.t
     | Assign of Assign.t
   [@@deriving quickcheck, eq, hash, sexp, compare]
 
-  let passive p = Passive p
-  let assume b = Passive (Passive.assume b)
-  let assert_ b = Passive (Passive.assert_ b)
-  let assign_ a = Assign a
+  type t = pre_t alt
+  [@@deriving quickcheck, eq, hash, sexp, compare]
+
+
+  let passive (p : Passive.t) : t = {data = Passive p; alt = None}
+  let assume b = passive (Passive.assume b)
+  let annotate (active : t) (alt : t option) =
+    match alt with
+    | None ->
+      {active with alt = None}
+    | Some alt ->
+      {active with alt = Some alt.data}
+
+  let assert_ b = passive (Passive.assert_ b)
+  let assign_ a = {data = Assign a; alt = None}
   let assign x e = assign_ (Assign.assign x e)
   let contra a1 a2 =
-    match a1, a2 with
+    match a1.data, a2.data with
     | Passive p1, Passive p2 -> Passive.contra p1 p2
     | _, _ -> false
 
-  let to_smtlib = function
+  let to_smtlib active =
+    match active.data with
     | Passive p -> Passive.to_smtlib p
     | Assign a -> Assign.to_smtlib a
 
-  let count_asserts = function
+  let count_asserts active =
+    match active.data with
     | Passive p -> Passive.count_asserts p
     | Assign a -> Assign.count_asserts a
 
-  let size = function
+  let size active =
+    match active.data with
     | Passive p -> Passive.size p
     | Assign a -> Assign.size a
 
@@ -240,23 +261,28 @@ module Active = struct
   (*   | Passive p -> Passive.vars p *)
   (*   | Active a -> Assign.vars a *)
 
-  let subst x e = function
-    | Passive p -> Passive (Passive.subst x e p)
-    | Assign a -> Assign (Assign.subst x e a)
+  let subst x e active =
+    match active.data with
+    | Passive p -> passive (Passive.subst x e p)
+    | Assign a -> assign_ (Assign.subst x e a)
 
-  let wp active phi = match active with
+  let wp active phi =
+    match active.data with
     | Passive p -> Passive.wp p phi
     | Assign p -> Assign.wp p phi
 
-  let normalize_names = function
-    | Passive p -> Passive (Passive.normalize_names p)
-    | Assign a -> Assign (Assign.normalize_names a)
+  let normalize_names active =
+    match active.data with
+    | Passive p -> passive (Passive.normalize_names p)
+    | Assign a -> assign_ (Assign.normalize_names a)
 
-  let comparisons = function
+  let comparisons active =
+    match active.data with
     | Passive p -> Passive.comparisons p
     | Assign _ -> None
 
-  let name = function
+  let name active =
+    match active.data with
     | Passive p -> Passive.name p
     | Assign a -> Assign.name a
 
@@ -266,20 +292,22 @@ module Active = struct
   (*   | Action.Assign (x,e) -> assign x e *)
   (*   | Action.Assert b -> assert_ b *)
 
-  let is_table = function
+  let is_table active =
+    match active.data with
     | Passive p -> Passive.is_table p
     | Assign a -> Assign.is_table a
 
-  let const_prop f = function
+  let const_prop f active =
+    match active.data with
     | Passive p ->
       let p, f = Passive.const_prop f p in
-      (Passive p, f)
+      (passive p, f)
     | Assign a ->
       let a, f = Assign.const_prop f a in
-      (Assign a, f)
+      (assign_ a, f)
 
-  let dead_code_elim c reads =
-    match c with
+  let dead_code_elim active reads =
+    match active.data with
     | Passive p ->
       let%map reads, p = Passive.dead_code_elim p reads in
       (reads, passive p)
@@ -287,11 +315,13 @@ module Active = struct
       let%map reads, a = Assign.dead_code_elim a reads in
       (reads, assign_ a)
 
-  let explode = function
+  let explode active =
+    match active.data with
     | Passive p ->  Passive.explode p |> Util.mapmap ~f:passive
     | Assign a -> List.map ~f:(List.map ~f:assign_) (Assign.explode a)
 
-  let vars = function
+  let vars active =
+    match active.data with
     | Passive p -> Passive.vars p
     | Assign a -> Assign.vars a
 end
@@ -318,8 +348,8 @@ module Action = struct
       c (cp_action name act_size |> Expr.var ) (Expr.bvi idx act_size)
     in
     let symb param = Expr.var (cp_data name idx param) in
-    let symbolize body param = subst param (symb param) body in
-    let f body = List.fold params ~init:body ~f:symbolize in
+    let symbolize (body : t) param : t = subst param (symb param) body in
+    let f (body : t) : t = List.fold params ~init:body ~f:symbolize in
     (act_choice, List.map body ~f)
 
 end

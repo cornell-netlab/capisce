@@ -1,53 +1,6 @@
 open Core
 open ASTs
 
-
-(* let vc prog asst = *)
-(*   vc (GCL.(seq prog (assert_ asst))) *)
-
-(* let qe solver simpl body c = *)
-(*   let (dvs,cvs) = BExpr.vars body in *)
-(*   let phi =  BExpr.forall dvs body in *)
-(*   let phi = if simpl then BExpr.simplify phi else phi in *)
-(*   let size = -1 in *)
-(*   if BExpr.qf phi then *)
-(*     let res = BExpr.to_smtlib phi in *)
-(*     let dur = Clock.stop c in *)
-(*     (dur, res, size, false) *)
-(*   else     *)
-(*     (\* let phi_str = BExpr.to_smtlib phi in *\) *)
-(*     let res = solver dvs cvs phi in *)
-(*     let dur = Clock.stop c in *)
-(*     (dur, res, size, true) *)
-
-(* let exp_inner stringifier runner simpl (prog, asst) = *)
-(*   let c = Clock.start () in *)
-(*   let body = vc prog asst in *)
-(*   let solver _ cvs phi = runner (stringifier cvs (BExpr.to_smtlib phi)) in *)
-(*   qe solver simpl body c *)
-
-(* let cvc4_infer = exp_inner Smt.simplify Solver.run_cvc4 *)
-(* let cvc4_check = exp_inner Smt.check_sat Solver.run_cvc4  *)
-(* let z3_check = exp_inner Smt.check_sat Solver.run_z3               *)
-(* let z3_infer = exp_inner Smt.assert_apply Solver.run_z3 *)
-(* let princess_infer = exp_inner Smt.simplify Solver.run_princess *)
-
-(* let cvc4_z3_infer simpl (prog, asst) = *)
-(*   let (dur, res, size, use_solver) = cvc4_infer simpl (prog, asst) in *)
-(*   let (dvs,cvs) = BExpr.vars (vc prog asst) in   *)
-(*   if Smt.qf res then *)
-(*     (dur,res,size,use_solver) *)
-(*   else *)
-(*     let c = Clock.start () in *)
-(*     let uneliminated_dvs = List.filter dvs ~f:(fun v -> String.is_substring res ~substring:(Var.str v)) in *)
-(*     let quantified_res = Printf.sprintf "(forall (%s) %s)" (Var.list_to_smtlib_quant uneliminated_dvs) res in  *)
-(*     let res = Solver.run_z3 (Smt.assert_apply cvs quantified_res) in *)
-(*     let z3_dur = Clock.stop c in  *)
-(*     (Float.(dur + z3_dur), res, size, true) *)
-
-(* let var_still_used smtstring var = *)
-(*   String.is_substring smtstring ~substring:(Var.str var) *)
-
 let solve_wto solver ?(with_timeout:int option) cvs smt =
   match solver, with_timeout with
   | `Z3, Some timeout ->
@@ -58,52 +11,6 @@ let solve_wto solver ?(with_timeout:int option) cvs smt =
     Solver.run_z3 (Smt.assert_apply_light cvs smt)
   | `CVC4,_ ->
     Solver.run_cvc4 (Smt.simplify cvs smt)
-
-(* let solve solver cvs smt = solve_wto solver cvs smt      *)
-
-(* let normalize solver dvs cvs res = *)
-(*   if Smt.success res then *)
-(*       match solver with *)
-(*       | `Z3 | `Z3Light -> *)
-(*          let goals = BExpr.to_smtlib (Solver.of_smtlib ~dvs ~cvs res) in *)
-(*          if String.is_substring goals ~substring:":precision" then *)
-(*            "true" *)
-(*          else *)
-(*            goals *)
-(*       | `CVC4 -> *)
-(*          let dvs' = List.filter dvs ~f:(var_still_used res) in *)
-(*          if List.is_empty dvs' then *)
-(*            res *)
-(*          else *)
-(*            Printf.sprintf "(forall (%s) %s)" (Var.list_to_smtlib_quant dvs') res *)
-(*   else *)
-(*     begin *)
-(*       Printf.eprintf "Solver failed:\n %s" res; *)
-(*       exit (-1) *)
-(*     end *)
-
-(* let rec solver_fixpoint_str gas solvers dvs cvs (smt : string) : string = *)
-(*   if gas <= 0 then smt else *)
-(*     let dvs' = List.filter dvs ~f:(var_still_used smt) in *)
-(*     let cvs' = List.filter cvs ~f:(var_still_used smt) in *)
-(*     match solvers with *)
-(*     | [] -> *)
-(*        failwith "Ran out of solvers to try" *)
-(*     | solver :: solvers' -> *)
-(*        let res = normalize solver dvs cvs' (solve solver cvs' smt) in *)
-(*        if Smt.qf res then *)
-(*          res *)
-(*        else *)
-(*          solver_fixpoint_str (gas-1) (solvers'@[solver]) dvs' cvs' res *)
-
-(* let solver_fixpoint gas solvers dvs cvs phi = *)
-(*   BExpr.to_smtlib phi *)
-(*   |> solver_fixpoint_str gas solvers dvs cvs *)
-
-(* let cvc4_z3_fix gas solvers simpl (prog, asst) = *)
-(*   let c = Clock.start () in *)
-(*   let body = vc prog asst in *)
-(*   qe (solver_fixpoint gas solvers) simpl body c *)
 
 let subsolving (prog, asst) =
   let c = Clock.start () in
