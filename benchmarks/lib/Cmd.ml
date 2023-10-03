@@ -16,7 +16,7 @@ module Make (P : Primitive) = struct
     module PHash_set = Hash_set.Make (P)
     module PHashtbl = Hashtbl.Make (P)
 
-    let prim p = Prim p
+    let prim prim = Prim prim
     let assume phi = prim @@ P.assume @@ BExpr.simplify phi
     let assert_ phi = prim @@ P.assert_ @@ BExpr.simplify phi
     let skip = prim @@ P.assume BExpr.true_
@@ -29,18 +29,6 @@ module Make (P : Primitive) = struct
 
     let is_add_unit p = equal dead p
     let is_add_annihil p = equal abort p
-
-    (* let get_prim = function *)
-    (*   | Prim p -> Some p *)
-    (*   | _ -> None *)
-
-    (* let get_seq = function *)
-    (*   | Seq cs -> Some cs *)
-    (*   | _ -> None *)
-
-    (* let get_choice = function *)
-    (*   | Choice cs -> Some cs *)
-    (*   | _ -> None *)
 
     let contra c1 c2 = match c1, c2 with
       | Prim p1, Prim p2 -> P.contra p1 p2
@@ -55,8 +43,8 @@ module Make (P : Primitive) = struct
       | Seq cs ->
         List.map cs ~f:(to_string_aux indent)
         |> String.concat ~sep:(sprintf ";\n")
-      | Choice cs ->
-        List.map cs
+      | Choice chxs ->
+        List.map chxs
           ~f:(fun c ->
               sprintf "{\n%s\n%s}" (to_string_aux (indent+2) c) space)
         |> String.concat ~sep:(sprintf " [] ")
@@ -97,6 +85,11 @@ module Make (P : Primitive) = struct
     let sequence_opt cs =
       Util.commute cs
       |> Option.map ~f:sequence
+
+
+    let sequence_map cs ~f =
+      List.map ~f cs
+      |> sequence
 
     let seq c1 c2 =
       match c1, c2 with
@@ -151,6 +144,10 @@ module Make (P : Primitive) = struct
     let choice_seq cs1 cs2 = choice (sequence cs1) (sequence cs2)
 
     let choice_seqs cs = List.map cs ~f:sequence |> choices
+
+    let choices_map cs ~f =
+      List.map ~f cs
+      |> choices
 
     (**/ END Smart Constructors*)
 

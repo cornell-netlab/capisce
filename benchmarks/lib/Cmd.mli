@@ -26,8 +26,10 @@ module Make : functor (P : Primitive) ->
   val seq : t -> t -> t
   val sequence : t list -> t
   val sequence_opt : t option list -> t option
+  val sequence_map : 'a list -> f:('a -> t) -> t
   val choice : t -> t -> t
   val choices : t list -> t
+  val choices_map : 'a list -> f:('a -> t) -> t
   val choices_opt : t option list -> t option
   val choice_seq : t list -> t list -> t
   val choice_seqs : t list list -> t

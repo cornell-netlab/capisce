@@ -174,10 +174,10 @@ module HoareNet = struct
 
     let rec safe_to_gpl_exn (cmd : t) =
       match cmd with
-      | Prim p ->
-        begin match p.precondition, p.postcondition with
+      | Prim triple ->
+        begin match triple.precondition, triple.postcondition with
         | None, None ->
-          p.cmd
+          triple.cmd
         | _, _ ->
           Log.error "Found hoare annotation in %s" @@ lazy (to_string cmd);
           failwithf "[HoareNet.flatten] Cannot flatten command wtih Hoare annotations" ()

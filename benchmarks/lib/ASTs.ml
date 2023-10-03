@@ -23,12 +23,6 @@ module GCL = struct
 
     let rec wp cmd phi =
       match cmd with
-      | Prim (Passive (Assume psi)) ->
-        BExpr.imp_ psi phi
-      | Prim (Passive (Assert psi)) ->
-        BExpr.and_ psi phi
-      | Prim (Assign (x,e)) ->
-        BExpr.subst x e phi
       | Seq cs ->
         List.fold_right cs
           ~init:phi
@@ -36,7 +30,14 @@ module GCL = struct
       | Choice cs ->
         List.map cs ~f:(fun cmd -> wp cmd phi)
         |> BExpr.ands_
-
+      | Prim p ->
+        match p.data with
+        | Passive (Assume psi) ->
+          BExpr.imp_ psi phi
+        | Passive (Assert psi) ->
+          BExpr.and_ psi phi
+        | Assign (x,e) ->
+          BExpr.subst x e phi
 
   (* let path_simplify_assumes (gcl : t) : t = *)
   (*   let rec listify = function *)
@@ -75,7 +76,7 @@ module GCL = struct
     (* a list of programs where each program has exactly one assert, the last one *)
     let rec assumeize c =
       match c with
-      | Prim (Passive (Assert phi)) ->
+      | Prim {data = Passive (Assert phi); alt = _} ->
         assume phi
       | Prim _ -> c
       | Seq [] -> c
@@ -88,7 +89,7 @@ module GCL = struct
     let disjoin = (@) in
     let rec assertize c =
       match c with
-      | Prim (Passive (Assert phi)) ->
+      | Prim {data = (Passive (Assert phi));_} ->
         [assert_ phi]
       | Prim _ -> []
       | Seq [] -> [Seq []]
@@ -115,7 +116,7 @@ module GCL = struct
     in
     let rec dead_code_elim_inner (reads : Var.Set.t) gcl =
       match gcl with
-      | Prim (Assign (x,e)) ->
+      | Prim {data = Assign (x,e); _} ->
         let vars = Expr.vars e |> Util.uncurry (@) in
         if Var.Set.mem reads x then
           let reads = Var.Set.remove reads x in
@@ -123,11 +124,11 @@ module GCL = struct
           reads, gcl
         else
           reads, skip
-      | Prim (Passive (Assert phi)) ->
+      | Prim {data = Passive (Assert phi); _} ->
         let vars = BExpr.vars phi |> Util.uncurry (@) in
         Var.Set.(union reads @@ of_list vars),
         assert_ phi
-      | Prim (Passive (Assume phi)) ->
+      | Prim {data = Passive (Assume phi); _ } ->
         let vars = BExpr.vars phi |> Util.uncurry (@) in
         Var.Set.(union reads @@ of_list vars),
         assume phi
@@ -159,7 +160,7 @@ module GCL = struct
     in
     let rec const_prop_inner (ctx : (Bigint.t * int) Var.Map.t) gcl : (Bigint.t * int) Var.Map.t * t =
       match gcl with
-      | Prim (Assign (x,e)) ->
+      | Prim {data = Assign (x,e); _} ->
         begin match Expr.eval (Model.of_map ctx) e with
           | Result.Error _ ->
             (ctx, assign x e)
@@ -167,9 +168,9 @@ module GCL = struct
             let ctx = Var.Map.set ctx ~key:x ~data:(v,sz) in
             (ctx, assign x @@ Expr.bv v sz)
         end
-      | Prim (Passive (Assert phi)) ->
+      | Prim {data = Passive (Assert phi);_} ->
         const_prop_form assert_ ctx phi
-      | Prim (Passive (Assume phi)) ->
+      | Prim {data = Passive (Assume phi);_} ->
         const_prop_form assume ctx phi
       | Seq [] ->
         (ctx, skip)
@@ -269,15 +270,15 @@ module Psv = struct
   let passify (c : GCL.t) : Context.t * t =
     let rec passify_rec ctx c =
     match c with
-    | GCL.Prim (Assign (x,e)) ->
+    | GCL.Prim {data = Assign (x,e);_} ->
       let e' = Expr.label ctx e in
       let ctx = Context.increment ctx x in
       let x' = Context.label ctx x in
       (ctx, assume (BExpr.eq_ (Expr.var x') e'))
 
-    | GCL.Prim (Passive (Assert b)) ->
+    | GCL.Prim {data = Passive (Assert b);_} ->
       (ctx, assert_ (BExpr.label ctx b))
-    | GCL.Prim (Passive (Assume b)) ->
+    | GCL.Prim {data = Passive (Assume b);_} ->
       (ctx, assume (BExpr.label ctx b))
     | Seq cs ->
       List.fold cs ~init:(ctx, skip)
@@ -337,11 +338,13 @@ end
 
     let rec encode_tables (cmd : t) : GCL.t =
       match cmd with
-      | Prim (Table {name;keys;actions}) ->
-        GCL.table (name, keys, actions)
-      | Prim (Active a) -> GCL.prim a
-      | Seq cs -> List.map cs ~f:encode_tables |> GCL.sequence
       | Choice cs -> List.map cs ~f:encode_tables |> GCL.choices
+      | Seq cs -> List.map cs ~f:encode_tables |> GCL.sequence
+      | Prim p ->
+        match p with
+        | Table {name;keys;actions} ->
+          GCL.table (name, keys, actions)
+        | Active a -> GCL.prim a
 
     module type CanAssert = sig
       type t
@@ -370,25 +373,27 @@ end
     let rec assert_valids (cmd:t) : t =
       let module PAsserter = Asserter(Pipeline) in
       match cmd with
-      | Prim (Table table) ->
-        let key_asserts =
-          PAsserter.from_vars table.keys
-          |> List.map ~f:prim
-          |> sequence
-        in
-        let actions = List.map ~f:assert_valids_action table.actions in
-        seq key_asserts (Prim (Table {table with actions}))
-      | Prim (Active a) ->
-        let asserts =
-          PAsserter.from_vars @@ Active.vars a
-          |> List.map ~f:prim
-          |> sequence
-        in
-        seq asserts cmd
       | Seq cs ->
         List.map cs ~f:assert_valids |> sequence
       | Choice cxs ->
         List.map cxs ~f:assert_valids |> choices
+      | Prim p ->
+        match p with
+        | Table table ->
+          let key_asserts =
+            PAsserter.from_vars table.keys
+            |> List.map ~f:prim
+            |> sequence
+          in
+          let actions = List.map ~f:assert_valids_action table.actions in
+          seq key_asserts (prim (Table {table with actions}))
+        | Active a ->
+          let asserts =
+            PAsserter.from_vars @@ Active.vars a
+            |> List.map ~f:prim
+            |> sequence
+          in
+          seq asserts cmd
 
     let wp cmd phi =
       let cmd = encode_tables cmd in
@@ -460,8 +465,10 @@ module TFG = struct
 
   let rec project (gpl : GPL.t) : t =
     match gpl with
-    | Prim (Pipeline.Active a) -> prim (T.Active a)
-    | Prim (Pipeline.Table t) -> prim (T.Table t)
+    | Prim (Pipeline.Active a) ->
+      prim (T.Active a)
+    | Prim (Pipeline.Table t) ->
+      prim (T.Table t)
     | Seq cs ->
       List.map cs ~f:project |> sequence
     | Choice cs ->
@@ -471,11 +478,10 @@ module TFG = struct
     match tfg with
     | Prim p -> GPL.prim p
     | Seq cs ->
-      List.map cs ~f:inject |>  GPL.sequence
+      GPL.sequence_map cs ~f:inject
     | Choice cs ->
-      List.map cs ~f:inject |> GPL.choices
+      GPL.choices_map cs ~f:inject
 end
-
 
 module Concrete = struct
   open GCL
@@ -486,7 +492,7 @@ module Concrete = struct
     match cmd with
     | Prim p ->
       Log.debug "%s" @@ lazy (Active.to_smtlib p);
-      begin match p with
+      begin match p.data with
       | Assign (x,e) ->
         let value = Expr.eval model e |> Result.ok_or_failwith in
         let model = Model.update model x value in
