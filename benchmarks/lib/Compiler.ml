@@ -12,7 +12,7 @@ open Core
 module Poulet4EGCL = struct
   (* Compiler(s) from Poulet4's E.t, E.t, E.t GCL.t to HoareNet *)
 
-  let rec exp_to_string : Exp.t -> string =
+  let exp_to_string : Exp.t -> string =
     Fn.compose Sexp.to_string Petr4.P4cubSexp.sexp_of_exp
 
   let rec get_var_name : Exp.t -> string option =
@@ -30,7 +30,7 @@ module Poulet4EGCL = struct
     | _ ->
        None
 
-  let rec get_var_name_exn p4exp =
+  let get_var_name_exn p4exp =
     get_var_name p4exp
     |> Option.value_exn
       ~message:(sprintf "[varify] Could not convert %s to variable" (exp_to_string p4exp))
@@ -347,7 +347,7 @@ module Poulet4EGCL = struct
     | Index (_, array, _) -> always_valid array
     | Member (_, _, arg) -> always_valid arg
 
-let rec to_gpl (coq_gpl : (E.t, E.t, E.t) t) : HoareNet.t =
+let rec to_hoarenet (coq_gpl : (E.t, E.t, E.t) t) : HoareNet.t =
     let open HoareNet in
     match simplify_expressions coq_gpl with
     | GSkip -> skip
@@ -356,9 +356,9 @@ let rec to_gpl (coq_gpl : (E.t, E.t, E.t) t) : HoareNet.t =
       let e = to_expr_exn rhs in
       assign x e
     | GSeq (g1, g2) ->
-      sequence [to_gpl g1; to_gpl g2]
+      sequence [to_hoarenet g1; to_hoarenet g2]
     | GChoice (g1, g2) ->
-      choices [to_gpl g1; to_gpl g2]
+      choices [to_hoarenet g1; to_hoarenet g2]
     | GAssume expr ->
       let phi = to_bexpr_exn expr in
       assume phi
@@ -384,3 +384,4 @@ let rec to_gpl (coq_gpl : (E.t, E.t, E.t) t) : HoareNet.t =
     | GExternAssn _ -> failwith ""
 
 end
+
