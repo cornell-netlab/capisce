@@ -99,9 +99,10 @@ let log flag fmt colors a : unit =
   end
 
 
-let error fmt   = log FLAGS.error     fmt [red]
-let error_s s = error "%s" (lazy s)
-let warn fmt    = log FLAGS.warn      fmt [yellow; Bold]
+let error fmt    = log FLAGS.error     fmt [red]
+let error_s s    = error "%s" (lazy s)
+let warn fmt     = log FLAGS.warn      fmt [yellow; Bold]
+let warn_s s     = warn "%s" (lazy s)
 let smt fmt      = log FLAGS.smt      fmt [green]
 let irs fmt      = log FLAGS.irs      fmt []
 let path_gen fmt = log FLAGS.path_gen fmt [cyan; Bold]

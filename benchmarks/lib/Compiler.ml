@@ -290,6 +290,30 @@ module Poulet4EGCL = struct
     | "extract", [Coq_inl phi] ->
       Log.warn "Got an Coq_inl as an argument to extract, Optimistically forcing it into an Inr: %s" @@ lazy (exp_to_string phi);
       extract phi
+    | "mark_to_drop", [Coq_inr stdmeta] ->
+      let t = Typ.Bit (Bigint.of_int 9) in
+      let drop_ = Expr.bvi 511 9 in
+      [assign (extract_var_exn (t, Exp.Member (t, 1, stdmeta))) drop_]
+    | "read", _ ->
+      Log.warn_s "ignoring a register read";
+      []
+    | "write", _ ->
+      Log.warn_s "ignoring a register write";
+      []
+    | "count", _ ->
+      Log.warn_s "ignoring count";
+      []
+    | "hash", _ ->
+      Log.warn_s "hash unsupported";
+      []
+    | "clone3", _ ->
+      Log.warn_s "cloning unsupported";
+      []
+    | "truncate", _ ->
+      []
+    | "hclose", _ | "hopen", _ ->
+      Log.warn_s "TODO implement scope";
+      []
     | _-> failwithf "TODO implement action %s wih %d arguments" e (List.length args) ()
 
   

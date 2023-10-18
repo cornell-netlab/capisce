@@ -21,7 +21,9 @@ val override : unit -> unit
 
 val error :  ('a -> unit, unit, string, string, string, unit) format6  -> 'a lazy_t -> unit
 val error_s : string -> unit
+
 val warn : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
+val warn_s : string -> unit
 
 val smt      : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
 val irs      : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
