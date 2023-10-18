@@ -284,8 +284,24 @@ module HoareNet = struct
         Log.error "counterexample:\n%s" @@ lazy (Model.to_string cex);
         failwith "Invalid Annotations"
 
-    let ninfer = ref 0
 
+    let rec has_triple = function
+      | Prim triple ->
+        Option.is_some triple.precondition || Option.is_some triple.postcondition
+      | Seq cs ->
+        List.exists cs ~f:has_triple
+      | Choice cxs ->
+        List.exists cxs ~f:has_triple
+
+    let ensure_triple c =
+      if has_triple c then
+        c
+      else
+        prim ({precondition = Some BExpr.true_;
+               cmd = safe_to_gpl_exn c;
+               postcondition = Some BExpr.true_})
+
+    let ninfer = ref 0
     let infer ?(qe = `Enum) (cmd:t) nprocs pid =
       Log.path_gen "INFER CALL #%d" @@ lazy (!ninfer);
       (* Breakpoint.set (!ninfer > 0); *)
