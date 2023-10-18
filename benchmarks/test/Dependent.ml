@@ -15,8 +15,8 @@ let passing_table_example () =
       ~pre:(Some BExpr.(eq_ (Expr.var vlan) (Expr.var ghost_vlan)))
       ~post:(Some BExpr.(eq_ (Expr.var vlan) (Expr.var ghost_vlan)))
       ("vlan", [key], [
-          ([], [Action.Assign (egress, Expr.bvi 511 9)]);
-          ([], [Action.Assign (egress, Expr.bvi 11  9)])
+          ([], [Action.assign_ (egress, Expr.bvi 511 9)]);
+          ([], [Action.assign_ (egress, Expr.bvi 11  9)])
         ])
   ]
   |> check
@@ -34,8 +34,8 @@ let failing_table_example () =
       ~pre:(Some BExpr.(eq_ (Expr.var vlan) (Expr.var ghost_vlan)))
       ~post:(Some BExpr.(eq_ (Expr.var vlan) (Expr.var ghost_vlan)))
       ("vlan", [key], [
-          ([], [Action.Assign (egress, Expr.bvi 511 9)]);
-          ([], [Action.Assign (vlan, Expr.bvi 11 9)])
+          ([], [Action.assign_ (egress, Expr.bvi 511 9)]);
+          ([], [Action.assign_ (vlan, Expr.bvi 11 9)])
         ])
   ]
   |> check
@@ -64,8 +64,8 @@ let safe_p4_validity_inference () =
       table "t"
         [symbolic_validity; symbolic_read]
         [
-          ([], [Action.Assign (egress, Expr.bvi 511 9)]);
-          ([], [Action.Assign (vlan, Expr.bvi 11 9)])
+          ([], [Action.assign_ (egress, Expr.bvi 511 9)]);
+          ([], [Action.assign_ (vlan, Expr.bvi 11 9)])
         ]
     ]
   in
@@ -108,8 +108,8 @@ let bf4_heuristic_inference () =
       ];
       table "t2"
         [symbolic_read]
-        [ ([], [Action.Assign (egress, Expr.bvi 511 9)]);
-          ([], [Action.Assign (vlan, Expr.bvi 11 9)])
+        [ ([], [Action.assign_ (egress, Expr.bvi 511 9)]);
+          ([], [Action.assign_ (vlan, Expr.bvi 11 9)])
         ]
     ]
   in
@@ -156,8 +156,8 @@ let modular_heuristic_inference () =
       ];
       table "t2"
         [symbolic_read]
-        [ ([], [Action.Assign (egress, Expr.bvi 511 9)]);
-          ([], [Action.Assign (vlan, Expr.bvi 11 9)])
+        [ ([], [Action.assign_ (egress, Expr.bvi 511 9)]);
+          ([], [Action.assign_ (vlan, Expr.bvi 11 9)])
         ]
     ]
   in
@@ -208,8 +208,8 @@ let annotated_inference () =
       ];
       table "t2"
         [symbolic_read]
-        [ ([], [Action.Assign (egress, Expr.bvi 511 9)]);
-          ([], [Action.Assign (vlan, Expr.bvi 11 9)])
+        [ ([], [Action.assign_ (egress, Expr.bvi 511 9)]);
+          ([], [Action.assign_ (vlan, Expr.bvi 11 9)])
         ]
     ]
   in
@@ -261,8 +261,8 @@ let infer_annotations () =
       ];
       table "t2"
         [symbolic_read]
-        [ ([], [Action.Assign (egress, Expr.bvi 511 9)]);
-          ([], [Action.Assign (vlan, Expr.bvi 11 8)])
+        [ ([], [Action.assign_ (egress, Expr.bvi 511 9)]);
+          ([], [Action.assign_ (vlan, Expr.bvi 11 8)])
         ]
     ]
   in

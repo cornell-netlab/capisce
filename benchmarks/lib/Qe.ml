@@ -81,28 +81,6 @@ let solve_one ~qe phi : (Var.t list * string) option =
   Log.qe "%s" @@ lazy "[solve_one} done";
   (cvs, qf_phi_str)
 
-let abstract_expressionism (solver : ?with_timeout:int -> Var.t list -> string -> string) phi : BExpr.t option =
-  let rec solve_loop threshold =
-    Log.debug "ABSTRACT EXPRESSIONISM %d" @@ lazy threshold;
-    let phi = BExpr.abstract_expressionism ~threshold phi in
-    Log.debug "%s\n" @@ lazy (BExpr.to_smtlib phi);
-    let _, cvs = BExpr.vars phi in
-    let res = solver ~with_timeout:2000 cvs (BExpr.to_smtlib phi) in
-    if BottomUpQe.check_success res then
-      Some (Solver.of_smtlib ~dvs:[] ~cvs res)
-    else begin
-      Log.smt "Solver failed with message:\n%s" @@ lazy res;
-      if threshold <= 5 then
-        None
-      else begin
-        Log.debug "DECREMENTING THRESHOLD: %d" @@ lazy threshold;
-        solve_loop (threshold - 1)
-      end
-    end
-  in
-  solve_loop 10
-
-
 let nikolaj_please (solver : ?with_timeout:int -> Var.t list -> string -> string) phi : BExpr.t option =
   Log.debug_s "Nikolaj pleaseeeeeee";
   let _, cvs = BExpr.vars phi in
@@ -309,7 +287,6 @@ let all_paths gcl nprocs pid =
           (* match Some ([], BExpr.true_) with *)
           match orelse ~input:phi [
               solve_one ~qe:nikolaj_please;
-              (* solve_one ~qe:abstract_expressionism; *)
               solve_one ~qe:BottomUpQe.cnf_qe;
             ] with
           | None ->
@@ -374,7 +351,6 @@ let concolic (gcl : GCL.t) : BExpr.t =
         match
           orelse ~input:pi_vc
             [solve_one ~qe:nikolaj_please;
-             (* solve_one ~qe:abstract_expressionism; *)
              solve_one ~qe:BottomUpQe.cnf_qe]
         with
         | None ->
