@@ -111,8 +111,8 @@ module Poulet4EGCL = struct
       end
 
   let map_coq_sum ~inr ~inl = function
-    | Datatypes.Coq_inl x -> Datatypes.Coq_inl (inl x)
-    | Datatypes.Coq_inr x -> Datatypes.Coq_inr (inr x)
+    | Datatypes.Coq_inl phi -> Datatypes.Coq_inl (inl phi)
+    | Datatypes.Coq_inr exp -> Datatypes.Coq_inr (inr exp)
 
   let rec exp_map_gcl ~exp : (E.t, E.t, E.t) t -> (E.t, E.t, E.t) t =
     function
@@ -280,15 +280,15 @@ module Poulet4EGCL = struct
     | "mark_to_drop",[] ->
       let egress_spec = Var.make "standard_metdata.1" 9 in
       [assign egress_spec (Expr.bvi 511 9)]
-    | "assume", [Coq_inr phi] ->
+    | "assume", [Coq_inl phi] ->
       let phi = to_bexpr_exn phi in
       [assume phi]
     | "assume", _ ->
       failwithf "unrecognized arguments to assume: expected 1, got %d" (List.length args) ()
-    | "extract", [Coq_inl hdr] ->
+    | "extract", [Coq_inr hdr] ->
       extract hdr
-    | "extract", [Coq_inr phi] ->
-      Log.warn "Got an Coq_inr as an argument to extract, Optimistically forcing it into an Inl: %s" @@ lazy (exp_to_string phi);
+    | "extract", [Coq_inl phi] ->
+      Log.warn "Got an Coq_inl as an argument to extract, Optimistically forcing it into an Inr: %s" @@ lazy (exp_to_string phi);
       extract phi
     | _-> failwithf "TODO implement action %s wih %d arguments" e (List.length args) ()
 
