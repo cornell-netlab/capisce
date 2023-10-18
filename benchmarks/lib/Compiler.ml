@@ -15,6 +15,37 @@ module Poulet4EGCL = struct
   let exp_to_string : Exp.t -> string =
     Fn.compose Sexp.to_string Petr4.P4cubSexp.sexp_of_exp
 
+  let eithermap ~f = function
+    | Datatypes.Coq_inl x -> f x
+    | Datatypes.Coq_inr x -> f x
+
+  let rec coq_gcl_to_string : (E.t, E.t, E.t) t -> string =
+    let open Printf in
+    function
+    | GSkip ->
+      sprintf "skip"
+    | GAssign (_, lhs, rhs) ->
+      sprintf "%s := %s" (exp_to_string lhs) (exp_to_string rhs)
+    | GSeq (g1, g2) ->
+      sprintf "%s;\n %s" (coq_gcl_to_string g1) (coq_gcl_to_string g2)
+    | GChoice (g1, g2) ->
+      sprintf "{\n%s\n}\n [] \n{\n%s\n}\n" (coq_gcl_to_string g1) (coq_gcl_to_string g2)
+    | GAssume phi ->
+      sprintf "assume %s" (exp_to_string phi)
+    | GAssert phi ->
+      sprintf "assert %s" (exp_to_string phi)
+    | GExternVoid (extern, args) ->
+      List.to_string ~f:(eithermap ~f:exp_to_string) args
+      |> sprintf "%s(%s)" extern
+    | GExternAssn (lhs, extern, args) ->
+      List.to_string ~f:(eithermap ~f:exp_to_string) args
+      |> sprintf "%s := %s(%s)" (exp_to_string lhs) extern
+    | GTable (tbl, keys, actions) ->
+      List.to_string ~f:fst actions
+      |> sprintf "%s.apply(%s, %s)" tbl @@ List.to_string ~f:(fun (k,_) -> exp_to_string k) keys
+
+
+
   let rec get_var_name : Exp.t -> string option =
     let open Option.Let_syntax in
     function
@@ -41,15 +72,15 @@ module Poulet4EGCL = struct
     | Member (typ, _, _) -> typ
     | p4exp -> failwithf "TODO Get type of %s" (exp_to_string p4exp) ()
 
-  let typ_width_exn : Typ.t -> int = function
-    | Bool -> failwith "booleans don't have a width"
-    | VarBit n | Bit n | Int n -> Bigint.to_int_exn n
+  let typ_width : Typ.t -> int option = function
+    | Bool -> Some 1
+    | VarBit n | Bit n | Int n -> Some (Bigint.to_int_exn n)
     | Error | Array _ | Struct _ | Var _ ->
-      failwith "Could not get type of non-bitwidth type"
+      None
 
   let extract_var_exn (typ, p4exp) : Var.t =
-    typ_width_exn typ
-    |> Var.make @@ get_var_name_exn p4exp
+    let w = typ_width typ |> Option.value_exn ~message:(Printf.sprintf "Couldnt get width of %s" (exp_to_string p4exp)) in
+    Var.make (get_var_name_exn p4exp) w
 
   let extract_var (typ, p4exp) : Var.t option =
     try
@@ -63,6 +94,8 @@ module Poulet4EGCL = struct
       Slice (hi, lo, varify arg)
     | Cast (typ, arg) ->
       Cast(typ, varify arg)
+    | Uop (_, Una.IsValid, _) ->
+      Var (Typ.Bit Bigint.one, (get_var_name_exn p4exp), -1)
     | Uop (typ, op, arg) ->
       Uop (typ, op, varify arg)
     | Bop (typ, op, lhs, rhs) ->
@@ -81,16 +114,19 @@ module Poulet4EGCL = struct
     | Datatypes.Coq_inl x -> Datatypes.Coq_inl (inl x)
     | Datatypes.Coq_inr x -> Datatypes.Coq_inr (inr x)
 
-  let rec exp_map_gcl ~exp =
-    let y = exp_map_gcl ~exp in
+  let rec exp_map_gcl ~exp : (E.t, E.t, E.t) t -> (E.t, E.t, E.t) t =
     function
     | GSkip -> GSkip
     | GAssign (typ, lhs, rhs) ->
       GAssign (typ, exp lhs, exp rhs)
     | GSeq (g1, g2) ->
-      GSeq (y g1, y g2)
+      let g1 = exp_map_gcl ~exp g1 in
+      let g2 = exp_map_gcl ~exp g2 in
+      GSeq (g1, g2)
     | GChoice (g1, g2) ->
-      GChoice (y g1, y g2)
+      let g1 = exp_map_gcl ~exp g1 in
+      let g2 = exp_map_gcl ~exp g2 in
+      GChoice (g1, g2)
     | GAssume phi ->
       GAssume (exp phi)
     | GAssert phi ->
@@ -104,16 +140,17 @@ module Poulet4EGCL = struct
     | GTable (tbl, keys, actions) ->
       let keys = List.map keys ~f:(Tuple2.map_fst ~f:exp) in
       let map_action (name, (data, act)) =
-        (name, (List.map ~f:exp data, y act))
+        (name, (List.map ~f:exp data, exp_map_gcl ~exp act))
       in
       let actions = List.map actions ~f:map_action in
       GTable(tbl, keys, actions)
 
-  let to_unary_op_expr = function
-    | Una.BitNot -> Expr.bnot
+  let to_unary_op_expr op arg =
+    match op with
+    | Una.BitNot -> Expr.bnot arg
     | Una.Not -> failwith "cannot translate boolean not to bitvectors, though i'd like to"
     | Una.Minus -> failwith "negative numbers unsupported"
-    | Una.IsValid -> failwith "isValid should be factored out by translation time"
+    | Una.IsValid -> failwithf "isValid (%s) should already be a string, but its a Unary Op" (Expr.to_smtlib arg) ()
 
   let to_binary_op_expr =
     let open Bin in
@@ -147,12 +184,13 @@ module Poulet4EGCL = struct
       Bigint.to_int_exn width
       |> bv value
     | Var (typ, original_name, _) ->
-      var (Var.make original_name (typ_width_exn typ))
+      let w = typ_width typ |> Option.value_exn ~message:(Printf.sprintf "Couldn't get width of variable %s" original_name) in
+      var @@ Var.make original_name w
     | Slice (hi, lo, arg) ->
       to_expr_exn arg
       |> bslice (Bigint.to_int_exn lo) (Bigint.to_int_exn hi)
     | Cast (typ, arg) ->
-      let width = typ_width_exn typ in
+      let width = typ_width typ |> Option.value_exn ~message:(Printf.sprintf "Couldn't get width for cast %s" (exp_to_string p4exp)) in
       let arg = to_expr_exn arg in
       bcast width arg
     | Uop (_, op, arg) ->
@@ -166,8 +204,10 @@ module Poulet4EGCL = struct
     | Una.Not -> BExpr.not_
     | _ -> failwith "boolean conversion error: tried to translate a non-boolean unary operator to bexpr"
 
-  let is_comparison = function
-    | Bin.Le | Bin.Ge | Bin.Lt | Bin.Gt -> true
+  let is_comparison =
+    let open Bin in
+    function
+    | Le | Ge | Lt | Gt | Eq | NotEq -> true
     | _ -> false
 
   let is_logical = function
@@ -224,12 +264,61 @@ module Poulet4EGCL = struct
       else if is_comparison op then
         (to_binary_op_comp op) (to_expr_exn lhs) (to_expr_exn rhs)
       else
-        failwithf "boolean conversion error: tried to use bitvector expression in a boolean context: %s" (exp_to_string p4exp) ()
+        failwithf "boolean conversion error: tried to use bitvector operator in a boolean context: %s" (exp_to_string p4exp) ()
     | Lists _ | Index _ | Member _ | Error _ ->
       failwithf "[to_bexpr] Cannot translate %s to hoarenet, must be factored out" (exp_to_string p4exp) ()
 
-  let to_action : (string * (E.t list * (E.t, E.t, E.t) t)) -> Var.t list * Action.t list =
-    failwith ""
+  let extern e args : Action.t list =
+    let open Action in
+    let open Datatypes in
+    let extract hdr =
+      let bit = Typ.Bit Bigint.one in
+      let hdr_isValid = extract_var_exn (bit, Uop (bit, Una.IsValid, hdr)) in
+      [assign hdr_isValid Expr.(bvi 1 1)]
+    in
+    match e, args with
+    | "mark_to_drop",[] ->
+      let egress_spec = Var.make "standard_metdata.1" 9 in
+      [assign egress_spec (Expr.bvi 511 9)]
+    | "assume", [Coq_inr phi] ->
+      let phi = to_bexpr_exn phi in
+      [assume phi]
+    | "assume", _ ->
+      failwithf "unrecognized arguments to assume: expected 1, got %d" (List.length args) ()
+    | "extract", [Coq_inl hdr] ->
+      extract hdr
+    | "extract", [Coq_inr phi] ->
+      Log.warn "Got an Coq_inr as an argument to extract, Optimistically forcing it into an Inl: %s" @@ lazy (exp_to_string phi);
+      extract phi
+    | _-> failwithf "TODO implement action %s wih %d arguments" e (List.length args) ()
+
+  
+  let to_action (action, (params, act)) : Var.t list * Action.t list =
+    let var_params = List.map params ~f:(fun p -> extract_var (type_of_exp p, p) |> Option.value_exn ~message:(Printf.sprintf "failed to get parameter var of %s" (exp_to_string p))) in
+    let rec to_action act =
+      let open Action in
+      match act with
+      | GSkip -> []
+      | GAssign (typ, lhs, rhs) ->
+        let x = extract_var_exn (typ, lhs) in
+        let e = to_expr_exn rhs in
+        [assign x e]
+      | GSeq (g1, g2) ->
+        to_action g1 @ to_action g2
+    | GChoice (_, _) ->
+      failwith "to_action error unexpected CHOICE in actions"
+    | GAssume expr ->
+      let phi = to_bexpr_exn expr in
+      [assume phi]
+    | GAssert expr ->
+      let phi = to_bexpr_exn expr in
+      [assert_ phi]
+    | GTable (name, _, _) ->
+      failwithf "tables cannot be in actions, but got table %s in action %s" name action ()
+    | GExternVoid (name, args) -> extern name args
+    | GExternAssn _ -> failwith "TODO to_actions unimplemented externs"
+    in
+    (var_params, to_action act)
 
   let explode_and_fold_lists (p4exp : E.t) : E.t list =
     let access name i : string =
@@ -321,14 +410,12 @@ module Poulet4EGCL = struct
       else
         failwith "elaborate: whole lists are not supported as keys"
 
-
   let eliminate_slices x = x
 
   let simplify_expressions coq_gpl =
     coq_gpl
     |> exp_map_gcl ~exp:varify
     |> elaborate_listlikes
-    |> exp_map_gcl ~exp:varify
     |> eliminate_slices
 
   let rec always_valid (expr : E.t) : bool =
@@ -347,18 +434,19 @@ module Poulet4EGCL = struct
     | Index (_, array, _) -> always_valid array
     | Member (_, _, arg) -> always_valid arg
 
-let rec to_hoarenet (coq_gpl : (E.t, E.t, E.t) t) : HoareNet.t =
+
+let to_hoarenet (coq_gpl : (E.t, E.t, E.t) t) : HoareNet.t =
     let open HoareNet in
-    match simplify_expressions coq_gpl with
+    let rec loop = function
     | GSkip -> skip
     | GAssign (typ, lhs, rhs) ->
       let x = extract_var_exn (typ, lhs) in
       let e = to_expr_exn rhs in
       assign x e
     | GSeq (g1, g2) ->
-      sequence [to_hoarenet g1; to_hoarenet g2]
+      sequence [loop g1; loop g2]
     | GChoice (g1, g2) ->
-      choices [to_hoarenet g1; to_hoarenet g2]
+      choices [loop g1; loop g2]
     | GAssume expr ->
       let phi = to_bexpr_exn expr in
       assume phi
@@ -380,8 +468,12 @@ let rec to_hoarenet (coq_gpl : (E.t, E.t, E.t) t) : HoareNet.t =
       in
       let gpl_actions = List.map actions ~f:to_action in
       instr_table (name, gpl_keys, gpl_actions)
-    | GExternVoid _-> failwith ""
+    | GExternVoid (name, args) -> HoareNet.sequence_map ~f:HoareNet.of_action @@ extern name args
     | GExternAssn _ -> failwith ""
+  in
+  simplify_expressions coq_gpl
+  |> loop
+
 
 end
 

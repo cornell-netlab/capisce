@@ -18,7 +18,6 @@ let infer : Command.t =
      (* and solvers = flag "-s" (listed string) ~doc:"solving order" *)
      (* and disable_header_validity = flag "--no-hv" (no_arg) ~doc:"disable header validity checks" *)
      in fun () ->
-       let open ASTs in
        let open DependentTypeChecker in
        Printexc.record_backtrace true;
        Log.parse_flags (String.concat verbosity);
@@ -47,7 +46,6 @@ let verify : Command.t =
          unroll_opt = flag "-u" (optional int) ~doc:"how much to unroll the parser"
      in
          fun () ->
-         let open ASTs in
          let open DependentTypeChecker in
          let gas = Option.value gas_opt ~default:1000 in
          let unroll = Option.value unroll_opt ~default:10 in

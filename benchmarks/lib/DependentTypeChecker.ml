@@ -172,6 +172,11 @@ module HoareNet = struct
              cmd;
              postcondition = None})
 
+    let of_action (a : Primitives.Action.t) : t =
+      Prim ({precondition = None;
+            cmd = GPL.prim (Primitives.Pipeline.action a);
+            postcondition = None})
+
     let rec safe_to_gpl_exn (cmd : t) =
       match cmd with
       | Prim triple ->
