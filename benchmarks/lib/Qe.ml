@@ -344,9 +344,8 @@ let concolic (gcl : GCL.t) : BExpr.t =
       | None ->
         Log.error "Failed to slice(GCL):\n%s\n----------" @@ lazy (GCL.to_string gcl);
         failwith "Could not slice the counterexample"
-      | Some pi ->
-        Log.debug "Slice:\n%s------/" @@ lazy (GCL.to_string pi);
-        let pi = GCL.simplify_path pi in
+      | Some pi' ->
+        let pi = GCL.simplify_path pi' in
         let pi_vc = Psv.(vc @@ snd @@ passify pi) in
         match
           orelse ~input:pi_vc
@@ -361,7 +360,8 @@ let concolic (gcl : GCL.t) : BExpr.t =
           let cpf = Solver.of_smtlib ~dvs:[] ~cvs cpf_str in
           let sat = Solver.check_sat cvs cpf in
           if BExpr.(cpf = true_) then begin
-            Printf.printf "the following path gave true when cpfed:%s" (GCL.to_string pi);
+            Printf.printf "the following path gave true when cpfed:\n%s\n%!" (GCL.to_string pi);
+            Printf.printf "But it started out as:\n%s\n%!" (GCL.to_string pi');
             failwith "found false"
           end else if sat then
             loop (BExpr.and_ cpf phi_agg)

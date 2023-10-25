@@ -151,6 +151,8 @@ module GCL = struct
             | Some v->
               let sz = Var.size x in
               let ctx = Var.Map.set ctx ~key:x ~data:(v,sz) in
+              if BExpr.(phi = false_) then
+                Log.debug "got a false assumption %s" @@ lazy BExpr.(to_smtlib phi);
               (ctx, ctor phi')
             | None ->
               (ctx, ctor phi')
@@ -163,7 +165,7 @@ module GCL = struct
       | Prim {data = Assign (x,e); _} ->
         begin match Expr.eval (Model.of_map ctx) e with
           | Result.Error _ ->
-            (ctx, assign x e)
+            (Var.Map.remove ctx x, assign x e)
           | Result.Ok (v,sz) ->
             let ctx = Var.Map.set ctx ~key:x ~data:(v,sz) in
             (ctx, assign x @@ Expr.bv v sz)
@@ -181,7 +183,9 @@ module GCL = struct
       | Choice _ ->
         failwith "choices disallowed in const prop"
     in
+    Printf.printf "Before optimization: %s\n%!" (to_string gcl);
     let _, gcl' = const_prop_inner Var.Map.empty gcl in
+    Printf.printf "After constant propagation: %s\n%!" (to_string gcl');
     let _ , gcl'' = dead_code_elim_inner Var.Set.empty gcl' in
     gcl''
   end

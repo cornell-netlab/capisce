@@ -1116,13 +1116,7 @@ let rec eval (model : Model.t) (phi : t) : bool =
     let v2 = Expr.eval model e2 |> Result.ok_or_failwith in
     begin match c with
       | Eq ->
-        Log.debug_s "evaluating (=)";
-        Log.debug "\te1 was %s" @@ lazy (Expr.to_smtlib e1);
-        Log.debug "\te1  is %s" @@ lazy (Bigint.to_string (fst v1));
-        Log.debug "\te2 was %s" @@ lazy (Expr.to_smtlib e2);
-        Log.debug "\te2  is %s" @@ lazy (Bigint.to_string (fst v2));
         let b = eval_comp c v1 v2 in
-        Log.debug "\t==== %b"   @@ lazy b;
         b
       | _ -> eval_comp c v1 v2
     end

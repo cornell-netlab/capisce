@@ -451,6 +451,15 @@ let hdr : header_t = {
     udp;
 }
 
+let firsts = List.filter_map ~f:(function
+    | Either.First x -> Some x
+    | Either.Second _ -> None
+  )
+
+let seconds = List.filter_map ~f:(function
+    | Either.First _ -> None
+    | Either.Second x -> Some x
+  )
 
 let linearroad_parser =
   let open HoareNet in
@@ -776,11 +785,11 @@ let linearroad_ingress annot =
   in
   let check_toll =
     instr_table ("check_toll",
-                [`Exact meta.v_state.new_seg ] @
-                (if annot then [] else [`MaskableDegen meta.seg_meta.ewma_spd]) @
-                [
-                 `MaskableDegen meta.seg_meta.vol;
-                 `MaskableDegen meta.accident_meta.has_accident_ahead
+                 firsts
+                 [`Exact meta.v_state.new_seg |> Either.first;
+                  `MaskableDegen meta.seg_meta.ewma_spd |> if annot then Either.second else Either.first;
+                  `MaskableDegen meta.seg_meta.vol |> Either.first;
+                  `MaskableDegen meta.accident_meta.has_accident_ahead |> Either.first
                 ],
                 [issue_toll])
   in

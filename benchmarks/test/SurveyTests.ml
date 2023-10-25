@@ -12,3 +12,4 @@ let tests : unit Alcotest.test_case list =
   @ FlowletTest.tests
   @ HulaTest.tests
   @ LinearroadTest.tests
+  @ SimpleNatTest.tests

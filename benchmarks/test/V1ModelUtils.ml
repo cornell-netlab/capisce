@@ -95,11 +95,13 @@ let arp_ipv4 : arp_ipv4_t = {
 type tcp_t = {
   isValid : Var.t;
   dstPort : Var.t;
+  srcPort : Var.t;
 }
 
 let tcp = {
   isValid = Var.make "hdr.tcp.isValid" 1;
-  dstPort = Var.make "hdr.tcp.isValid" 16;
+  dstPort = Var.make "hdr.tcp.dstPort" 16;
+  srcPort = Var.make "hdr.tcp.srcPort" 16
 }
 
 type udp_t = {
@@ -163,6 +165,21 @@ let rtp : rtp_t = {
   timestamp = Var.make "hdr.rtp.timestamp" 32;
 }
 
+type cpu_header_t = {
+  isValid : Var.t;
+  preamble : Var.t;
+  device : Var.t;
+  reason : Var.t;
+  if_index : Var.t
+}
+
+let cpu_header : cpu_header_t = {
+  isValid = Var.make "hdr.cpu_header.isValid" 1;
+  preamble = Var.make "hdr.cpu_header.preamble" 64;
+  device = Var.make "hdr.cpu_header.device" 8;
+  reason = Var.make "hdr.cpu_header.reason" 8;
+  if_index = Var.make "hdr.cpu_header.if_index" 8;
+}
 
 type hdr_t = {
   ethernet : ethernet_t;
@@ -177,6 +194,7 @@ type hdr_t = {
   arp : arp_t;
   arp_ipv4 : arp_ipv4_t;
   rtp : rtp_t;
+  cpu_header : cpu_header_t
 }
 
 let hdr = {ethernet;
@@ -184,7 +202,7 @@ let hdr = {ethernet;
            tcp; udp; icmp;
            paxos; ndp;
            arp; arp_ipv4;
-           rtp;
+           rtp; cpu_header;
           }
 
 type zombie_t = {
@@ -204,6 +222,7 @@ type standard_metadata_t = {
   egress_port : Var.t;
   ingress_port : Var.t;
   deq_qdepth : Var.t;
+  instance_type : Var.t;
 }
 
 let standard_metadata = {
@@ -211,6 +230,7 @@ let standard_metadata = {
   egress_port = Var.make "standard_metadata.egress_port" 9;
   ingress_port = Var.make "standard_metadata.ingress_port" 9;
   deq_qdepth = Var.make "standard_metadata.deq_qdepth" 19;
+  instance_type = Var.make "standard_metadata.instance_type" 32;
 }
 
 let ifte guard tru fls =
@@ -241,6 +261,12 @@ let select discriminee cases default : HoareNet.t =
     ~f:(fun (value, state) cont ->
         ifte (BExpr.eq_ value discriminee) state cont
       )
+
+let mark_to_drop =
+  let open Primitives in
+  Action.assign_ @@
+  Assign.assign standard_metadata.egress_spec @@
+  Expr.bvi 511 9
 
 let pipeline prsr ingr egr =
   let open HoareNet in
