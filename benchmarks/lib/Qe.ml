@@ -11,10 +11,13 @@ let solve_wto solver ?(with_timeout:int option) cvs smt =
     Solver.run_z3 (Smt.assert_apply_light cvs smt)
   | `CVC4,_ ->
     Solver.run_cvc4 (Smt.simplify cvs smt)
+  | `Princess, _ ->
+    Log.debug_s "princess";
+    Solver.run_z3 (Smt.simplify cvs smt)
 
 let subsolving (prog, asst) =
   let c = Clock.start () in
-  Log.qe "%s" @@ lazy "computing vc";
+  (* Log.qe "%s" @@ lazy "computing vc"; *)
   let phi = passive_vc (GCL.(seq prog (assert_ asst))) in
   Log.qe "%s" @@ lazy "getting vars";
   let (dvs, _) = BExpr.vars phi in
@@ -64,7 +67,7 @@ let check_no_quantified_vars dvs phi dvs' qf_phi =
       ()
 
 
-let solve_one ~qe phi : (Var.t list * string) option =
+let solve_one ?(solver=`Z3) ~qe phi : (Var.t list * string) option =
   let open Option.Let_syntax in
   Log.qe "%s" @@ lazy ("Solve_one");
   let (dvs, _) = BExpr.vars phi in
@@ -72,7 +75,7 @@ let solve_one ~qe phi : (Var.t list * string) option =
   Log.qe "%s" @@ lazy "smart constructors";
   let qphi = BExpr.(forall dvs phi |> order_all_quantifiers) in
   Log.qe "%s" @@ lazy "solver";
-  let%map qf_phi = qe (solve_wto `Z3) qphi in
+  let%map qf_phi = qe (solve_wto solver) qphi in
   Log.qe "%s" @@ lazy "getting the vars of the result";
   let dvs', cvs = BExpr.vars qf_phi in
   check_no_quantified_vars dvs phi dvs' qf_phi;
@@ -349,8 +352,10 @@ let concolic (gcl : GCL.t) : BExpr.t =
         let pi_vc = Psv.(vc @@ snd @@ passify pi) in
         match
           orelse ~input:pi_vc
-            [solve_one ~qe:nikolaj_please;
-             solve_one ~qe:BottomUpQe.cnf_qe]
+            [solve_one ~solver:`Z3       ~qe:nikolaj_please;
+             solve_one ~solver:`Princess ~qe:nikolaj_please;
+             solve_one ~solver:`Princess ~qe:BottomUpQe.cnf_qe;
+             ]
         with
         | None ->
           Log.error "GCL:\n%s-------\n" @@ lazy (GCL.to_string pi);

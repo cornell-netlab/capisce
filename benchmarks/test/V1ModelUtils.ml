@@ -109,7 +109,6 @@ type udp_t = {
   dstPort : Var.t;
   checksum : Var.t;
   length : Var.t
-
 }
 
 let udp : udp_t = {
@@ -181,6 +180,27 @@ let cpu_header : cpu_header_t = {
   if_index = Var.make "hdr.cpu_header.if_index" 8;
 }
 
+type nc_hdr_t = {
+  isValid : Var.t;
+  op : Var.t;
+  sc : Var.t;
+  seq : Var.t;
+  key : Var.t;
+  value : Var.t;
+  vgroup : Var.t;
+}
+
+let nc_hdr : nc_hdr_t =
+  let f s w = Var.make (Printf.sprintf "hdr.nc_hdr.%s" s) w in
+  { isValid = f "isValid" 1;
+    op = f "op" 8;
+    sc = f "sc" 8;
+    seq = f "seq" 16;
+    key = f "key" 128;
+    value = f "value" 128;
+    vgroup = f "vgroup" 16;
+}
+
 type hdr_t = {
   ethernet : ethernet_t;
   ipv4 : ipv4_t;
@@ -194,7 +214,8 @@ type hdr_t = {
   arp : arp_t;
   arp_ipv4 : arp_ipv4_t;
   rtp : rtp_t;
-  cpu_header : cpu_header_t
+  cpu_header : cpu_header_t;
+  nc_hdr : nc_hdr_t
 }
 
 let hdr = {ethernet;
@@ -203,6 +224,7 @@ let hdr = {ethernet;
            paxos; ndp;
            arp; arp_ipv4;
            rtp; cpu_header;
+           nc_hdr;
           }
 
 type zombie_t = {

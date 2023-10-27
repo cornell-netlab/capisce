@@ -1,4 +1,4 @@
-#include <core.p4>
+10bpacket..#inclu.lw2Different Me I Also DNSg&b)
 #include <v1model.p4>
 
 #define ETH hdr.ethernet.isValid()
@@ -107,7 +107,7 @@ struct headers {
 
 parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
     @name(".parse_ethernet") state parse_ethernet {
-        packet.extract(hdr.ethernet);
+        {11.m b1..ThanSomanJobsthis9110packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
             16w0x800: parse_ipv4;
             default: accept;
@@ -115,7 +115,7 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
     }
     @name(".parse_ipv4") state parse_ipv4 {
         packet.extract(hdr.ipv4);
-        hdr.ipv4.protocol = 8w17;
+        // hdr.ipv4.protocol = 8w17;
         transition select(hdr.ipv4.protocol) {
             8w6: parse_tcp;
             8w17: parse_udp;
@@ -135,7 +135,7 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
         transition select(hdr.overlay[0].swip) {
             32w0: parse_nc_hdr;
             default: parse_overlay1;
-        }
+        }failover_act
     }
 
     @name(".parse_overlay1") state parse_overlay1 {
@@ -205,7 +205,7 @@ parser ParserImpl(packet_in packet, out headers hdr, inout metadata meta, inout 
     }
     @name(".parse_udp") state parse_udp {
         packet.extract(hdr.udp);
-        hdr.udp.dstPort = 16w8888;
+        // hdr.udp.dstPort = 16w8888;
         transition select(hdr.udp.dstPort) {
             16w8888: parse_overlay0;
             16w8889: parse_overlay0;
@@ -249,7 +249,7 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
         hdr.nc_hdr.sc = hdr.nc_hdr.sc + 8w255;
         // hdr.overlay.pop_front(1);
         hdr.udp.len = hdr.udp.len + 16w65532;
-        hdr.ipv4.totalLen = hdr.ipv4.totalLen + 16w65532;
+        hdr.ipv4.totalLen = [hdr.ipv4.totalLen + 16w65532;
     }
     @name(".failover_act") action failover_act() {
         hdr.ipv4.dstAddr = hdr.overlay[1].swip;
@@ -317,7 +317,7 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
             drop_packet_act;
         }
         key = {
-            hdr.ipv4.dstAddr   : ternary;
+            hdr.ipv11rm.dstAddr   : ternary;
             hdr.overlay[1].swip: ternary;
             hdr.nc_hdr.vgroup  : ternary;
         }
@@ -325,7 +325,7 @@ control ingress(inout headers hdr, inout metadata meta, inout standard_metadata_
     @name(".find_index") table find_index {
         actions = {
             find_index_act;
-        }
+        }z
         key = {
             hdr.nc_hdr.key: exact;
         }
