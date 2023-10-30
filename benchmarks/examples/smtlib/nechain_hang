@@ -1,0 +1,39 @@
+(push)
+(declare-const hdr.ethernet.etherType$_$0 (_ BitVec 16))
+(declare-const _symb$failure_recovery$match_0$DONT_CARE$_$0 (_ BitVec 1))
+(declare-const _symb$failure_recovery$match_1$DONT_CARE$_$0 (_ BitVec 1))
+(declare-const _symb$get_my_address$0$sw_ip$_$0 (_ BitVec 32))
+
+(assert (forall ((hdr.ipv4.dstAddr$_$0 (_ BitVec 32)) )
+  (or
+    (not      (= hdr.ethernet.etherType$_$0 (_ bv2048 16)))
+    (not      (= _symb$failure_recovery$match_0$DONT_CARE$_$0 (_ bv1 1)))
+    (= _symb$failure_recovery$match_1$DONT_CARE$_$0 (_ bv1 1))
+    (= hdr.ipv4.dstAddr$_$0 _symb$get_my_address$0$sw_ip$_$0))))
+
+(apply der)
+
+(pop 1)
+;; (push)
+;; (declare-const hdr.ethernet.etherType$_$0 (_ BitVec 16))
+;; (declare-const hdr.ethernet.dstAddr$_$0 (_ BitVec 16))
+;; (declare-const _symb$failure_recovery$match_0$DONT_CARE$_$0 (_ BitVec 1))
+;; (declare-const _symb$failure_recovery$match_1$DONT_CARE$_$0 (_ BitVec 1))
+;; (declare-const _symb$get_my_address$0$sw_ip$_$0 (_ BitVec 32))
+
+;; (assert (not (= (forall ((hdr.ipv4.dstAddr$_$0 (_ BitVec 32)) )
+;;   (or
+;;     (not      (= hdr.ethernet.etherType$_$0 (_ bv2048 16)))
+;;     (not      (= _symb$failure_recovery$match_0$DONT_CARE$_$0 (_ bv1 1)))
+;;     (= _symb$failure_recovery$match_1$DONT_CARE$_$0 (_ bv1 1))
+;;     (= hdr.ipv4.dstAddr$_$0 _symb$get_my_address$0$sw_ip$_$0)))
+    
+;;   (or
+;;     (not      (= hdr.ethernet.etherType$_$0 (_ bv2048 16)))
+;;     (not      (= _symb$failure_recovery$match_0$DONT_CARE$_$0 (_ bv1 1)))
+;;     (= _symb$failure_recovery$match_1$DONT_CARE$_$0 (_ bv1 1)))
+;;     )))
+
+;; (check-sat)
+;; (pop 1)
+;; (exit)
