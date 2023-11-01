@@ -14,3 +14,4 @@ let tests : unit Alcotest.test_case list =
   @ LinearroadTest.tests
   @ SimpleNatTest.tests
   @ NetChainTest.tests
+  @ FabricTest.tests

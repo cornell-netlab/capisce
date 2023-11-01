@@ -2,6 +2,10 @@ open Core
 open Pbench
 open DependentTypeChecker
 
+
+let access obj field width =
+  Var.make (Printf.sprintf "%s.%s" obj field) width
+
 type ethernet_t = {
   isValid : Var.t;
   etherType : Var.t;
@@ -16,25 +20,46 @@ let ethernet = {
   srcAddr = Var.make "hdr.ethernet.srcAddr" 48;
 }
 
+type mpls_t = {
+  isValid  : Var.t;
+  label : Var.t;
+  tc : Var.t;
+  bos : Var.t;
+  ttl : Var.t;
+}
+
+let mpls : mpls_t =
+  let f = access "hdr.mpls"  in
+  {
+    isValid = f "isValid" 1;
+    label = f "label" 20;
+    tc =  f "tc" 3;
+    bos = f "bos" 1;
+    ttl = f "ttl" 8;
+  }
+
 type ipv4_t = {
   isValid : Var.t;
+  version : Var.t;
   protocol : Var.t;
   ttl : Var.t;
   dstAddr : Var.t;
   srcAddr : Var.t;
   totalLen : Var.t;
-  ihl : Var.t
-
+  ihl : Var.t;
+  dscp : Var.t;
 }
 
 let ipv4 = {
   isValid = Var.make "hdr.ipv4.isValid" 1;
+  version = Var.make "hdr.ipv4.version" 4;
   protocol = Var.make "hdr.ipv4.protocol" 8;
   ttl = Var.make "hdr.ipv4.ttl" 8;
   dstAddr = Var.make "hdr.ipv4.dstAddr" 32;
   srcAddr = Var.make "hdr.ipv4.srcAddr" 32;
   totalLen = Var.make "hdr.ipv4.totalLen" 16;
   ihl = Var.make "hdr.ipv4.ihl" 4;
+  dscp = Var.make "hdr.ipv4.dscp" 6;
 }
 
 type ipv6_t = {
@@ -106,6 +131,7 @@ let tcp = {
 
 type udp_t = {
   isValid : Var.t;
+  srcPort : Var.t;
   dstPort : Var.t;
   checksum : Var.t;
   length : Var.t
@@ -113,6 +139,7 @@ type udp_t = {
 
 let udp : udp_t = {
   isValid = Var.make "hdr.udp.isValid" 1;
+  srcPort = Var.make "hdr.udp.srcPort" 16;
   dstPort = Var.make "hdr.udp.dstPort" 16;
   checksum = Var.make "hdr.udp.checksum" 16;
   length = Var.make "hdr.udp.length" 16;
@@ -122,12 +149,14 @@ type icmp_t = {
   isValid : Var.t;
   type_ : Var.t;
   checksum : Var.t;
+  code : Var.t;
 }
 
 let icmp : icmp_t = {
   isValid = Var.make "hdr.icmp.isValid" 1;
   type_ = Var.make "hdr.icmp.type" 8;
   checksum = Var.make "hdr.icmp.checksum" 16;
+  code = Var.make "hdr.icmp.code" 8;
 }
 
 (* for netpaxos_acceptor *)
@@ -245,6 +274,7 @@ type standard_metadata_t = {
   ingress_port : Var.t;
   deq_qdepth : Var.t;
   instance_type : Var.t;
+  mcast_grp : Var.t;
 }
 
 let standard_metadata = {
@@ -253,6 +283,7 @@ let standard_metadata = {
   ingress_port = Var.make "standard_metadata.ingress_port" 9;
   deq_qdepth = Var.make "standard_metadata.deq_qdepth" 19;
   instance_type = Var.make "standard_metadata.instance_type" 32;
+  mcast_grp = Var.make "standard_metadata.mcast_grp" 32;
 }
 
 let ifte guard tru fls =
@@ -270,9 +301,13 @@ let ifte_seq guard true_seqs false_seqs =
     assume guard::true_seqs;
     assume (not_ guard) :: false_seqs
   ]
+  
+  let btrue = Expr.bvi 1 1
+  let bfalse = Expr.bvi 0 1
 
-let btrue = Expr.bvi 1 1
-let bfalse = Expr.bvi 0 1
+let exited = Var.make "exit" 1
+let exit_ = HoareNet.assign exited btrue
+let check_exit = ifte (BExpr.eq_ btrue @@ Expr.var exited) HoareNet.skip
 
 let transition_accept =
   let open HoareNet in
