@@ -60,14 +60,16 @@ let npa_ingress =
   let fwd_tbl =
     instr_table ("fwd_tbl",
                  [`Exact standard_metadata.ingress_port],
-                 [forward; _drop])
+                 [forward; _drop;
+                  nop (*No default action assuming noop*)
+                 ])
   in
   let read_round =
     [], Primitives.Action.[assert_ @@ eq_ btrue @@ var hdr.paxos.isValid]
     (*proposal_register.read(meta.local_metadata.proposal, hdr.paxos.inst)*)
   in
   let round_tbl =
-    instr_table ("round_tbl", [], [read_round])
+    instr_table ("round_tbl", [], [read_round; nop]) (* no default action assuming noop*)
   in
   let _no_op = [],[] in
   let handle_phase1a =
@@ -109,11 +111,14 @@ let npa_ingress =
                    [ handle_phase1a;
                      handle_phase2a;
                      _no_op;
+                     (* no default action specified assuming noop, 
+                        but making no changes,
+                        because we already have an action _no_op*)
                    ])
     ]
   in
   let drop_tbl =
-    table ("drop_tbl", [], [_drop])
+    table ("drop_tbl", [], [_drop; nop]) (* adding dummy default action noop *)
   in
   sequence [
     ifte_seq (eq_ (var hdr.ipv4.isValid) btrue)
