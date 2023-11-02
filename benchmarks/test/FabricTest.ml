@@ -525,7 +525,7 @@ let slice_tc_classifier =
 
     [], Action.[
       assign fabric_metadata.slice_id @@ bvi 0 4;
-      assign fabric_metadata.tc @@ bvi 0 4;
+      assign fabric_metadata.tc @@ bvi 0 2;
       (* classifier_stats.count() *)
     ] 
   in
@@ -1070,7 +1070,7 @@ let fabric_egress =
     pkt_io_egress; 
     check_exit @@
     ifte_seq (eq_ bfalse @@ var fabric_metadata.is_controller_packet_out) [
-      (* egress_next; *)
+      egress_next;
       dscp_rewriter;
     ] []
   ]
@@ -1250,7 +1250,7 @@ let test_infer_timeout () =
     BExpr.true_
 
 let test_concolic () =
-  Pbench.Log.parse_flags "p";
+  Pbench.Log.parse_flags "pzd";
   HoareNet.infer ~qe:`Conc (fabric true) None None
   |> Alcotest.(check @@ neg Equivalences.smt_equiv)
     "Conc CPI is not trivial"
