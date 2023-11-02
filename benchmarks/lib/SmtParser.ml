@@ -10,10 +10,10 @@ let parse_with_error lexbuf =
   try Parser.program Lexer.read lexbuf with
   | Lexer.SyntaxError msg ->
      fprintf stderr "%a: %s\n" print_position lexbuf msg;
-     exit (-1)
+     failwith "Lexer Error"
   | Parser.Error ->
      fprintf stderr "%a: syntax error\n" print_position lexbuf;
-     exit (-1)
+     failwith "parser Error"
 
 let parse filename () =
   let inx = In_channel.create filename in

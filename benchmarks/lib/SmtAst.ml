@@ -140,7 +140,7 @@ let rec subst (sigma : t String.Map.t) term : t =
      let sigma' =
        String.Map.filter_keys sigma ~f:(fun x -> List.for_all xs ~f:(fun y -> String.(x <> (Var.str y))))
      in
-     Forall (xs, subst sigma' b)     
+     Exists (xs, subst sigma' b)     
   | Not b ->
      Not (f b)
   | Imp bs ->

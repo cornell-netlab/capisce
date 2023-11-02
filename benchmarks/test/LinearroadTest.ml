@@ -1319,13 +1319,12 @@ let tricky_path_solves () =
     let pi_vc = Psv.(vc @@ snd @@ passify path) in
     match
       Qe.orelse ~input:pi_vc
-        [Qe.solve_one ~qe:Qe.nikolaj_please;
+        [Qe.solve_one_option ~qe:(Qe.nikolaj_please);
          (* Qe.solve_one ~qe:BottomUpQe.cnf_qe *)
         ]
     with
     | None -> Alcotest.fail "QE failed"
-    | Some (cvs, cpf_str) ->
-      Solver.of_smtlib ~dvs:[] ~cvs cpf_str
+    | Some cpf -> cpf
   in
   let solutions = List.map ~f:solve assert_normalized in
   BExpr.ands_ solutions
@@ -1399,14 +1398,13 @@ let true_path_resolves () =
     let pi_vc = Psv.(vc @@ snd @@ passify path) in
     match
       Qe.orelse ~input:pi_vc
-        [Qe.solve_one ~qe:Qe.nikolaj_please;
+        [Qe.solve_one_option ~qe:(Qe.nikolaj_please);
          (* Qe.solve_one ~qe:Qe.abstract_expressionism; *)
-         Qe.solve_one ~qe:BottomUpQe.cnf_qe
+         Qe.solve_one_option ~qe:BottomUpQe.cnf_qe_result
         ]
     with
     | None -> Alcotest.fail "QE failed"
-    | Some (cvs, cpf_str) ->
-      Solver.of_smtlib ~dvs:[] ~cvs cpf_str
+    | Some cpf -> cpf     
   in
   let solutions = List.map ~f:solve assert_normalized in
   BExpr.ands_ solutions

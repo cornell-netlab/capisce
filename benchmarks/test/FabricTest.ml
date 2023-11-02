@@ -429,7 +429,7 @@ let fabric_parser =
   ] in
   let look_packet_out = Var.make "look_packet_out" 1 in
   let parse_packet_out_and_accept = sequence [
-    assign hdr.packet_out.isValid bfalse;
+    assign hdr.packet_out.isValid btrue;
     assign hdr.packet_out.do_forwarding @@ var look_packet_out; 
     transition_accept
   ] in
@@ -509,7 +509,7 @@ let slice_tc_classifier =
   let open Primitives in  
   let set_slice_id_tc =
     let slice_id = Var.make "slice_id" 4 in
-    let tc = Var.make "tc" 6 in
+    let tc = Var.make "tc" 2 in
     [slice_id; tc], Action.[
       assign fabric_metadata.slice_id @@ var slice_id;
       assign fabric_metadata.tc @@ var tc;
@@ -547,14 +547,14 @@ let filtering =
     (* ingress_port_vlan_counter.count *)
   ] in
   let permit =
-    let port_type = Var.make "port_type" 9 in
+    let port_type = Var.make "port_type" 2 in
     [port_type], Action.[
       assign fabric_metadata.port_type @@ var port_type;
       (* ingress_port_vlan_counter.count *)
     ] in
   let permit_with_internal_vlan = 
     let vlan_id = Var.make "vlan_id" 12 in
-    let port_type = Var.make "port_type" 9 in
+    let port_type = Var.make "port_type" 2 in
     [vlan_id; port_type], Action.[
       assign fabric_metadata.vlan_id @@ var vlan_id;
       (* permit(port_type) *)
@@ -572,7 +572,7 @@ let filtering =
     )
   in
   let set_forwarding_type = 
-    let fwd_type = Var.make "fwd_type" 2 in
+    let fwd_type = Var.make "fwd_type" 3 in
     [fwd_type], Action.[
       assign fabric_metadata.fwd_type @@ var fwd_type;
       (* fwd_classifier_counter.count() *)
@@ -656,9 +656,9 @@ let forwarding =
         ]
       )
   in
-  ifte (eq_ (bvi 0 2) @@ var fabric_metadata.fwd_type) bridging @@
-  ifte (eq_ (bvi 1 2) @@ var fabric_metadata.fwd_type) mpls @@
-  ifte (eq_ (bvi 2 2) @@ var fabric_metadata.fwd_type) routing_v4 @@
+  ifte (eq_ (bvi 0 3) @@ var fabric_metadata.fwd_type) bridging @@
+  ifte (eq_ (bvi 1 3) @@ var fabric_metadata.fwd_type) mpls @@
+  ifte (eq_ (bvi 2 3) @@ var fabric_metadata.fwd_type) routing_v4 @@
   skip
 
 let pre_next =
@@ -740,8 +740,10 @@ let acl =
         `MaskableDegen fabric_metadata.lkp.ipv4_src;        
         `MaskableDegen fabric_metadata.lkp.ipv4_dst;
         `MaskableDegen fabric_metadata.lkp.ip_proto;
-        `Maskable      hdr.icmp.type_;
-        `Maskable      hdr.icmp.code;
+        (* `Maskable      hdr.icmp.type_;
+        `Maskable      hdr.icmp.code; *)
+        `MaskableDegen fabric_metadata.lkp.icmp_code;
+        `MaskableDegen fabric_metadata.lkp.icmp_type;
         `MaskableDegen fabric_metadata.lkp.l4_sport;
         `MaskableDegen fabric_metadata.lkp.l4_dport;
         `MaskableDegen fabric_metadata.port_type;
@@ -769,7 +771,7 @@ let next =
     ]
   in
   let set_next_id_xconnect =
-    let next_id = Var.make "next_id" 9 in
+    let next_id = Var.make "next_id" 32 in
     [next_id], Action.[
       assign fabric_metadata.next_id @@ var next_id;
       (* xconnect_counter.count() *)
@@ -819,7 +821,7 @@ let next =
     )
   in
   let set_mcast_group_id =
-    let group_id = Var.make "group_id" 16 in
+    let group_id = Var.make "group_id" 32 in
     [group_id], Action.[
       assign standard_metadata.mcast_grp @@ var group_id;
       assign fabric_metadata.is_multicast @@ btrue;
@@ -1013,7 +1015,7 @@ let dscp_rewriter =
     ])
   in
   let rewrite_or_clear =
-    ifte (eq_ btrue @@ var hdr.ipv4.isValid ) 
+    ifte (eq_ btrue @@ var hdr.ipv4.isValid) 
       (assign hdr.inner_ipv4.dscp @@ var tmp_dscp)
       skip
   in
@@ -1032,12 +1034,177 @@ let fabric_egress =
   let open Expr in
   let open BExpr in
   sequence [
-    pkt_io_egress; check_exit @@
+    pkt_io_egress; 
+    check_exit @@
     ifte_seq (eq_ bfalse @@ var fabric_metadata.is_controller_packet_out) [
-      egress_next;
+      (* egress_next; *)
       dscp_rewriter;
     ] []
   ]
+
+let unsolved_path () = 
+  let open ASTs in
+  let open GCL in
+  let open Expr in
+  let open BExpr in
+  let path =
+    let parse_result = Var.make "parse_result" 1 in
+    let last_ipv4_dscp = Var.make "last_ipv4_dscp" 6 in
+    let look_packet_out = Var.make "look_packet_out" 1 in
+    let look_eth = Var.make "look_eth" 16 in
+    let exit = Var.make "exit" 1 in
+    let slice_tc = Var.make "slice_tc" 6 in
+    sequence [
+      assign parse_result (bvi 0 1);
+      assign last_ipv4_dscp (bvi 0 6);
+      assume (eq_ (bvi 510 9) @@ var standard_metadata.ingress_port);
+      assume (not_ (eq_ (bvi 0 1) @@ var look_packet_out));
+      assign hdr.ethernet.isValid (bvi 1 1);
+      assign fabric_metadata.vlan_id (bvi 4094 12);
+      assume (not_ (eq_ (bvi 34984 16) @@ var look_eth));
+      assume (not_ (eq_ (bvi 37120 16) @@ var look_eth));
+      assume (not_ (eq_ (bvi 33024 16) @@ var look_eth));
+      assign hdr.eth_type.isValid (bvi 1 1);
+      assert_ (eq_ (bvi 1 1) @@ var hdr.eth_type.isValid);
+      assign hdr.eth_type.value @@ var look_eth;
+      assert_ (eq_ (bvi 1 1) @@ var hdr.eth_type.isValid);
+      assume (not_ (eq_ (bvi 34887 16) @@ var hdr.eth_type.value));
+      assert_ (eq_ (bvi 1 1) @@ var hdr.eth_type.isValid);
+      assume (not_ (eq_ (bvi 2048 16) @@ var hdr.eth_type.value));
+      assign parse_result (bvi 1 1);
+      assume (eq_ (var parse_result) (bvi 1 1));
+      assign fabric_metadata.lkp.is_ipv4 (bvi 0 1);
+      assign fabric_metadata.lkp.ipv4_src (bvi 0 32);
+      assign fabric_metadata.lkp.ipv4_dst (bvi 0 32);
+      assign fabric_metadata.lkp.ip_proto (bvi 0 8);
+      assign fabric_metadata.lkp.l4_sport (bvi 0 16);
+      assign fabric_metadata.lkp.l4_dport (bvi 0 16);
+      assign fabric_metadata.lkp.icmp_type (bvi 0 8);
+      assign fabric_metadata.lkp.icmp_code (bvi 0 8);
+      assume (not_ (eq_ (bvi 1 1) @@ var hdr.inner_ipv4.isValid));
+      assume (eq_ (bvi 1 1) @@ var hdr.ipv4.isValid);
+      assign fabric_metadata.lkp.is_ipv4 (bvi 1 1);
+      assert_ (eq_ (bvi 1 1) @@ var hdr.ipv4.isValid);
+      assign fabric_metadata.lkp.ipv4_src @@ var hdr.ipv4.srcAddr;
+      assert_ (eq_ (bvi 1 1) @@ var hdr.ipv4.isValid);
+      assign fabric_metadata.lkp.ipv4_dst @@ var hdr.ipv4.dstAddr;
+      assert_ (eq_ (bvi 1 1)  @@ var hdr.ipv4.isValid);
+      assign fabric_metadata.lkp.ip_proto @@ var hdr.ipv4.protocol;
+      assume (not_ (eq_ (bvi 1 1) @@ var hdr.tcp.isValid));
+      assume (not_ (eq_ (bvi 1 1) @@ var hdr.udp.isValid));
+      assume (not_ (eq_ (bvi 1 1) @@ var hdr.icmp.isValid));
+      assume (not_ (eq_ (bvi 1 1) @@ var hdr.packet_out.isValid));
+      assume (not_ (eq_ (bvi 1 1) @@ var exit));
+      assume (eq_ (var @@ Var.make "_symb$classifier$match_0" 9)  @@ var standard_metadata.ingress_port);
+      assume (eq_ (var @@ Var.make "_symb$classifier$match_1" 32)  @@ var fabric_metadata.lkp.ipv4_src);
+      assume (eq_ (var @@ Var.make "_symb$classifier$match_2" 32)  @@ var fabric_metadata.lkp.ipv4_dst);
+      assume (eq_ (var @@ Var.make "_symb$classifier$match_3" 8)  @@ var fabric_metadata.lkp.ip_proto);
+      assume (eq_ (var @@ Var.make "_symb$classifier$match_4" 16)  @@ var fabric_metadata.lkp.l4_sport);
+      assume (eq_ (var @@ Var.make "_symb$classifier$match_5" 16)  @@ var fabric_metadata.lkp.l4_dport);
+      assume (uge_ (var @@ Var.make "_symb$classifier$action" 1) (bvi 1 1));
+      assign fabric_metadata.slice_id @@ var @@ Var.make "_symb$classifier$1$slice_id" 4;
+      assign fabric_metadata.tc @@ var @@ Var.make "_symb$classifier$1$tc" 2;
+      assume (eq_ (bvi 0 1) @@ var fabric_metadata.is_controller_packet_out);
+      assume (not_ (eq_ (bvi 1 1) @@ var hdr.vlan_tag.isValid));
+      assume (not_ (eq_ (bvi 1 1) @@ var hdr.mpls.isValid));
+      assume (eq_ (var @@ Var.make "_symb$ingress_port_vlan$match_0" 9) @@ var standard_metadata.ingress_port);
+      assume (eq_ (var @@ Var.make "_symb$ingress_port_vlan$match_1" 1) @@ var hdr.vlan_tag.isValid);
+      assume (not_ (eq_ (bvi 1 1) (var @@ Var.make "_symb$ingress_port_vlan$match_2$DONT_CARE" 1)));
+      assert_ (eq_ (bvi 1 1) @@ var hdr.vlan_tag.isValid);
+      assume (eq_ (var @@ Var.make "_symb$ingress_port_vlan$match_2" 12) @@ var hdr.vlan_tag.vlan_id);
+      assume (eq_ (var @@ Var.make "_symb$ingress_port_vlan$action" 2) (bvi 1 2));
+      assign fabric_metadata.port_type @@ var @@ Var.make "_symb$ingress_port_vlan$1$port_type" 2;
+      assume (eq_ (var @@ Var.make "_symb$fwd_classifier$match_0" 9) @@ var standard_metadata.ingress_port);
+      assert_ (eq_ (bvi 1 1) @@ var hdr.ethernet.isValid);
+      assume (eq_ (var @@ Var.make "_symb$fwd_classifier$match_1" 48) @@ var hdr.ethernet.dstAddr);
+      assert_ (eq_ (bvi 1 1) @@ var hdr.eth_type.isValid);
+      assume (eq_ (var @@ Var.make "_symb$fwd_classifier$match_2" 16) @@ var hdr.eth_type.value);
+      assume (eq_ (var @@ Var.make "_symb$fwd_classifier$match_3" 16) @@ var fabric_metadata.ip_eth_type);
+      assume (uge_ (var @@ Var.make "_symb$fwd_classifier$action" 1) (bvi 0 1));
+      assign fabric_metadata.fwd_type @@ var @@ Var.make "_symb$fwd_classifier$0$fwd_type" 3;
+      assume (not_ (eq_ (bvi 0 1) @@ var fabric_metadata.skip_forwarding));
+      assume (eq_ (bvi 0 1) @@ var fabric_metadata.skip_next);
+      assume (eq_ (var @@ Var.make "_symb$next_mpls$match_0" 32) @@ var fabric_metadata.next_id);
+      assume (eq_ (var @@ Var.make "_symb$next_mpls$action" 1) (bvi 0 1));
+      assume (eq_ (var @@ Var.make "_symb$next_vlan$match_0" 32) @@ var fabric_metadata.next_id);
+      assume (eq_ (var @@ Var.make "_symb$next_vlan$action" 1) (bvi 0 1));
+      assume (eq_ (var @@ Var.make "_symb$acl$match_0" 9) @@ var standard_metadata.ingress_port);
+      assert_ (eq_ (bvi 1 1) @@ var hdr.ethernet.isValid);
+      assume (eq_ (var @@ Var.make "_symb$acl$match_1" 48) @@ var hdr.ethernet.dstAddr);
+      assert_ (eq_ (bvi 1 1) @@ var hdr.ethernet.isValid);
+      assume (eq_ (var @@ Var.make "_symb$acl$match_2" 48) @@ var hdr.ethernet.srcAddr);
+      assume (not_ (eq_ (bvi 1 1) @@ var @@ Var.make "_symb$acl$match_3$DONT_CARE" 1));
+      assert_ (eq_ (bvi 1 1) @@ var hdr.vlan_tag.isValid);
+      assume (eq_ (var @@ Var.make "_symb$acl$match_3" 12) @@ var hdr.vlan_tag.vlan_id);
+      assert_ (eq_ (bvi 1 1) @@ var hdr.eth_type.isValid);
+      assume (eq_ (var @@ Var.make "_symb$acl$match_4" 16) @@ var hdr.eth_type.value);
+      assume (eq_ (var @@ Var.make "_symb$acl$match_5" 32) @@ var fabric_metadata.lkp.ipv4_src);
+      assume (eq_ (var @@ Var.make "_symb$acl$match_6" 32) @@ var fabric_metadata.lkp.ipv4_dst);
+      assume (eq_ (var @@ Var.make "_symb$acl$match_7" 8) @@ var fabric_metadata.lkp.ip_proto);
+      assume (not_ (eq_ (bvi 1 1) @@ var @@ Var.make "_symb$acl$match_8$DONT_CARE" 1));
+      assert_ (eq_ (bvi 1 1) @@ var hdr.icmp.isValid);
+      assume (eq_ (var @@ Var.make "_symb$acl$match_8" 8) @@ var hdr.icmp.type_);
+      assume (not_ (eq_ (bvi 1 1) @@ var @@ Var.make "_symb$acl$match_9$DONT_CARE" 1));
+      assert_ (eq_ (bvi 1 1) @@ var hdr.icmp.isValid);
+      assume (eq_ (var @@ Var.make "_symb$acl$match_9" 8) @@ var hdr.icmp.code);
+      assume (eq_ (var @@ Var.make "_symb$acl$match_10" 16) @@ var fabric_metadata.lkp.l4_sport);
+      assume (eq_ (var @@ Var.make "symb$acl$match_11" 16) @@ var fabric_metadata.lkp.l4_dport);
+      assume (eq_ (var @@ Var.make "_symb$acl$match_12" 16) @@ var fabric_metadata.port_type);
+      assume (eq_ (var @@ Var.make "_symb$acl$action" 3) (bvi 0 3));
+      assume (eq_ (bvi 0 1) @@ var fabric_metadata.skip_next);
+      assume (eq_ (var @@ Var.make "_symb$xconnect$match_0" 9) @@ var standard_metadata.ingress_port);
+      assume (eq_ (var @@ Var.make "_symb$xconnect$match_1" 32) @@ var fabric_metadata.next_id);
+      assume (eq_ (var @@ Var.make "_symb$xconnect$action" 2) (bvi 1 2));
+      assign fabric_metadata.next_id @@ var @@ Var.make "_symb$xconnect$1$next_id" 32;
+      assume (eq_ (var @@ Var.make "_symb$hashed$match_0" 32) @@ var fabric_metadata.next_id);
+      assume (eq_ (var @@ Var.make "_symb$hashed$match_1" 32) @@ var fabric_metadata.ipv4_src_addr);
+      assume (eq_ (var @@ Var.make "_symb$hashed$match_2" 32) @@ var fabric_metadata.ipv4_dst_addr);
+      assume (eq_ (var @@ Var.make "_symb$hashed$match_3" 8) @@ var fabric_metadata.ip_proto);
+      assume (eq_ (var @@ Var.make "_symb$hashed$match_4" 16) @@ var fabric_metadata.l4_sport);
+      assume (eq_ (var @@ Var.make "_symb$hashed$match_5" 16) @@ var fabric_metadata.l4_dport);
+      assume (uge_ (var @@ Var.make "_symb$hashed$action" 2) (bvi 2 2));
+      assign standard_metadata.egress_spec @@ var @@ Var.make "_symb$hashed$2$port_num" 9;
+      assume (eq_ (var @@ Var.make "_symb$multicast$match_0" 32) @@ var fabric_metadata.next_id);
+      assume (uge_ (var @@ Var.make "_symb$multicast$action" 1) (bvi 1 1));
+      assign standard_metadata.mcast_grp @@ var @@ Var.make "_symb$multicast$1$group_id" 32;
+      assign fabric_metadata.is_multicast (bvi 1 1);
+      assign slice_tc (bconcat (var fabric_metadata.slice_id) @@ var fabric_metadata.tc);
+      assign fabric_metadata.packet_color @@ var @@ Var.make "meter_havoc" 2;
+      assign fabric_metadata.dscp @@ var slice_tc;
+      assume (eq_ (var @@ Var.make "_symb$queues$match_0" 4) @@ var fabric_metadata.slice_id);
+      assume (eq_ (var @@ Var.make "_symb$queues$match_1" 2) @@ var fabric_metadata.tc);
+      assume (eq_ (var @@ Var.make "_symb$queues$match_2" 2) @@ var fabric_metadata.packet_color);
+      assume (uge_ (var @@ Var.make "_symb$queues$action" 1) (bvi 1 1));
+      assume (not_ (eq_ (var standard_metadata.egress_spec) (bvi 511 9)));
+      assign standard_metadata.egress_port @@ var standard_metadata.egress_spec;
+      assume (not_ (eq_ (bvi 1 1) @@ var fabric_metadata.is_controller_packet_out));
+      assume (not_ (eq_ (bvi 1 1) @@ var exit));
+      assume (eq_ (bvi 510 9) @@ var standard_metadata.egress_port);
+      assign hdr.packet_in.isValid (bvi 1 1);
+      assert_ (eq_ (bvi 1 1) @@ var hdr.packet_in.isValid);
+      assign hdr.packet_in.ingress_port @@ var standard_metadata.ingress_port;
+      assign exit (bvi 1 1);
+      assume (eq_ (bvi 1 1) @@ var exit)
+    ]
+  in
+  let assert_normalized = GCL.single_assert_nf path in
+  let solve path =
+    let path = GCL.simplify_path path in
+    let pi_vc = Psv.(vc @@ snd @@ passify path) in
+    match
+        Qe.hybrid_strategy pi_vc
+    with
+    | None -> Alcotest.fail "QE failed"
+    | Some cpf -> 
+      Printf.printf "computed formula:\n%s" (BExpr.to_smtlib cpf);
+      cpf     
+  in
+  let solutions = List.map ~f:solve assert_normalized in
+  BExpr.ands_ solutions
+  |> Alcotest.(check @@ neg Equivalences.smt_equiv)
+    "Enum CPI is not trivial"
+    BExpr.true_
+
 
 let fabric fixed =
   pipeline fabric_parser (fabric_ingress fixed) fabric_egress
@@ -1050,12 +1217,14 @@ let test_infer_timeout () =
     BExpr.true_
 
 let test_concolic () =
+  Pbench.Log.parse_flags "p";
   HoareNet.infer ~qe:`Conc (fabric true) None None
   |> Alcotest.(check @@ neg Equivalences.smt_equiv)
     "Conc CPI is not trivial"
     BExpr.true_
 
 let tests : unit Alcotest.test_case list = [
+  Alcotest.test_case "solve unsolved path" `Quick unsolved_path;
   Alcotest.test_case "Fabric infer enum unannotated" `Slow test_infer_timeout;
   Alcotest.test_case "Fabric infer concolic with annotation" `Quick test_concolic;
 ]

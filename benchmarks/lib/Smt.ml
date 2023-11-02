@@ -67,7 +67,7 @@ let doesnt_contain_any s subs =
   List.for_all subs ~f:(fun substring -> not (String.is_substring s ~substring))
 
 let success s =
-  doesnt_contain_any s ["error"; "unknown"; "UNKNOWN"; "timeout"; "Killed"]
+  doesnt_contain_any s ["error"; "unknown"; "UNKNOWN"; "timeout"; "Killed"; "failed"; "canceled"]
 
 
 

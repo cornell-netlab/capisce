@@ -50,6 +50,7 @@ val tree_s : string -> unit
 val smart    : ('a -> unit, unit, string, string, string, unit) format6  -> 'a lazy_t -> unit
 val rewrites : ('a -> unit, unit, string, string, string, unit) format6 -> 'a lazy_t -> unit
 val qe       : ('a -> unit, unit, string, string, string, unit) format6  -> 'a lazy_t -> unit
+val qe_s     : string -> unit
 
 val graph_dot    : (string option -> unit) -> string -> unit
 val path_gen_dot : (string option -> unit) -> string -> unit

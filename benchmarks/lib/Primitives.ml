@@ -208,9 +208,12 @@ module Assign = struct
 
   let explode assign = [[assign]]
 
-  let vars (x,e) =
+  let reads (_,e) =
     Expr.vars e
     |> Tuple2.uncurry (@)
+
+  let vars (x,e) =
+    reads (x,e)
     |> List.cons x
 
 end
@@ -324,6 +327,11 @@ module Active = struct
     match active.data with
     | Passive p -> Passive.vars p
     | Assign a -> Assign.vars a
+
+  let reads active =
+    match active.data with
+    | Passive p -> Passive.vars p
+    | Assign a -> Assign.reads a
 end
 
 

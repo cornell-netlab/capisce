@@ -2,9 +2,9 @@ module P4Info = Info
 open Core
 module Info = P4Info
 
-let princess_exe = "/home/ericthewry/Downloads/princess-bin-2021-05-10/princess -inputFormat=smtlib +mostGeneralConstraint +incremental "
+let princess_exe = "/home/ericthewry/Downloads/princess-bin-2021-05-10/princess -inputFormat=smtlib +mostGeneralConstraint +incremental +stdin "
 (* let z3_exe = "/usr/bin/z3 -smt2 -t:30000" *)
-let z3_exe = "/usr/bin/z3 -smt2"
+let z3_exe = "/usr/bin/z3 -smt2 -in"
 (* let z3_daemon = z3_exe ^ " -in" *)
 
 (* let z3_chan_in, z3_chan_out = Core_unix.open_process z3_daemon *)
@@ -20,9 +20,10 @@ let close_process_in in_chan =
 
 let run_proc_file p str =
   let str = Printf.sprintf "%s\n(exit)\n%!" str in
-  Log.smt "SENDING SMT QUERY:\n%s\n%!" (lazy str);
+  Log.smt "starting process:%s" (lazy p);
+  Log.smt "SENDING SMT QUERY:\n\"%s\"\n%!" (lazy str);
   (* let file = FileIO.tmp_write str in *)
-  let in_chan, out_chan = Core_unix.open_process (Printf.sprintf "%s -in" p) in
+  let in_chan, out_chan = Core_unix.open_process (Printf.sprintf "%s" p) in
   Out_channel.fprintf out_chan "%s\n%!" str; Out_channel.flush out_chan;
   let strs = In_channel.input_lines in_chan in
   Log.smt "Got a result:\n%s" @@ lazy (String.concat strs ~sep:"\n");

@@ -1,7 +1,7 @@
 open Base_quickcheck
 open Core
 
-let enable_smart_constructors = ref `On
+let enable_smart_constructors = ref `Off
 
 let q_count = ref (Bigint.zero)
 let measure s : unit =
@@ -92,7 +92,7 @@ let rec to_smtlib_buffer indent buff b : unit =
      Buffer.add_string buff a
   | TNot (t) ->
      Buffer.add_string buff "(not";
-     to_smtlib_buffer (indent + 1) buff t;
+     to_smtlib_buffer 0 buff t;
      Buffer.add_string buff ")";
   | TNary (b,ts) ->
      Buffer.add_string buff "(";
@@ -642,7 +642,7 @@ let rec forall_one (x : Var.t) b =
           Forall(x, b)
 
 let forall xs b = if List.is_empty xs then
-                    true_
+                    b
                   else
                     List.fold_right xs ~init:b ~f:forall_one 
 

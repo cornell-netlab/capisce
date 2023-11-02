@@ -112,6 +112,7 @@ let compiler_s s = compiler "%s" (lazy s)
 let smart fmt    = log FLAGS.smart    fmt []
 let rewrites fmt = log FLAGS.rewrites fmt []
 let qe fmt       = log FLAGS.qe       fmt []
+let qe_s s       = qe "%s" (lazy s)
 
 let measure fmt = log FLAGS.measure   fmt []
 let measure_s s = measure "%s" (lazy s)

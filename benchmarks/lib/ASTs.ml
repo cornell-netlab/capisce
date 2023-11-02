@@ -183,9 +183,9 @@ module GCL = struct
       | Choice _ ->
         failwith "choices disallowed in const prop"
     in
-    Printf.printf "Before optimization: %s\n%!" (to_string gcl);
+    Log.debug "Before optimization: %s\n%!" @@ lazy (to_string gcl);
     let _, gcl' = const_prop_inner Var.Map.empty gcl in
-    Printf.printf "After constant propagation: %s\n%!" (to_string gcl');
+    Log.debug "After constant propagation: %s\n%!" @@ lazy (to_string gcl');
     let _ , gcl'' = dead_code_elim_inner Var.Set.empty gcl' in
     gcl''
   end
@@ -369,7 +369,7 @@ end
 
     let assert_valids_action (data, act_cmds) : (Var.t list * Action.t list) =
       let module AAsserter = Asserter(Action) in
-      let asserts a = Action.vars a
+      let asserts a = Action.reads a
                       |> List.filter ~f:(fun x -> not (List.exists data ~f:(Var.equal x)))
                       |> AAsserter.from_vars in
       (data, List.bind act_cmds ~f:(fun a -> asserts a @ [a]))
@@ -393,7 +393,7 @@ end
           seq key_asserts (prim (Table {table with actions}))
         | Active a ->
           let asserts =
-            PAsserter.from_vars @@ Active.vars a
+            PAsserter.from_vars @@ Active.reads a
             |> List.map ~f:prim
             |> sequence
           in

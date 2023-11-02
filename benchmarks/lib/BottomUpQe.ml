@@ -116,6 +116,11 @@ let rec cnf_qe (solver : ?with_timeout:int -> Var.t list -> string -> string)  b
   | Exists _ ->
      failwith "not sure how to handle exists"
 
+let cnf_qe_result solver b =
+  match cnf_qe solver b with
+  | None -> Result.Error b 
+  | Some b -> Result.Ok b
+
 let rec optimistic_qe (solver : ?with_timeout:int -> Var.t list -> string -> string) b : BExpr.t option =
   let open Option.Let_syntax in
   let open BExpr in
