@@ -77,6 +77,8 @@ let ecmp_ingress =
            (* assert_ @@ eq_ (var hdr.ipv4.isValid) (bvi 1 1); *)
            assign hdr.ipv4.ttl @@ badd (var hdr.ipv4.ttl) (bvi 255 8);
          ]
+         ;
+         nop (* No default action specified, assuming noop *)
        ]
       )
   in
@@ -95,7 +97,8 @@ let ecmp_ingress =
           assign
             standard_metadata.egress_spec
             (Expr.bvi 511 9)
-        ]
+        ];
+        nop (*  no default action specified assuming noop *)
       ]
     )
 
