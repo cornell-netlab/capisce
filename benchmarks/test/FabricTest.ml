@@ -960,6 +960,10 @@ let egress_next =
   let open BExpr in
   let push_vlan = [], Action.[
     assign hdr.vlan_tag.isValid btrue;
+    havoc hdr.vlan_tag.cfi "push_vlan_havoc_cfi";
+    havoc hdr.vlan_tag.pri "push_vlan_havoc_pri";
+    havoc hdr.vlan_tag.eth_type "push_vlan_havoc_eth_type";
+    havoc hdr.vlan_tag.vlan_id "push_vlan_havoc_vlan_id";
     assign hdr.vlan_tag.cfi @@ var fabric_metadata.vlan_cfi;
     assign hdr.vlan_tag.pri @@ var fabric_metadata.vlan_pri;
     assign hdr.vlan_tag.eth_type @@ bvi 33024 16;
@@ -1001,6 +1005,10 @@ let egress_next =
         [];
     ] [
       assign hdr.mpls.isValid btrue;
+      havoc hdr.mpls.label "egress_havoc_label" |> of_action;
+      havoc hdr.mpls.tc "egress_havoc_tc" |> of_action;
+      havoc hdr.mpls.bos "egress_havoc_bos" |> of_action;
+      havoc hdr.mpls.ttl "egress_havoc_ttl" |> of_action;
       assign hdr.mpls.label @@ var fabric_metadata.mpls_label;
       assign hdr.mpls.tc @@ bvi 0 3;
       assign hdr.mpls.bos @@ bvi  1 1;

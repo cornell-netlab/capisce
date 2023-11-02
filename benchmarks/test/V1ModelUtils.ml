@@ -327,6 +327,11 @@ let mark_to_drop =
 
 let nop : Var.t list * Primitives.Action.t list = [],[]
 
+let havoc variable name =
+  Var.make name @@ Var.size variable
+  |> Expr.var
+  |> Primitives.Action.assign variable
+
 let pipeline prsr ingr egr =
   let open HoareNet in
   let open BExpr in
