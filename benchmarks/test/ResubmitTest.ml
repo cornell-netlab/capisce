@@ -43,9 +43,11 @@ let resubmit_ingress =
       ]
   in
   let t_ingress_1 =
+    (* No default action specified, but we already have a _nop action *)
     instr_table ("t_ingress_1", [`Exact meta.mymeta.f1], [_nop; set_port])
   in
   let t_ingress_2 =
+    (* No default action specified, but we already have a _nop action *)
     instr_table ("t_ingress_2", [`Exact meta.mymeta.f2], [_nop; _resubmit])
   in
   sequence [
