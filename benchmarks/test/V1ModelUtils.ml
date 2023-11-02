@@ -325,6 +325,8 @@ let mark_to_drop =
   Assign.assign standard_metadata.egress_spec @@
   Expr.bvi 511 9
 
+let nop : Var.t list * Primitives.Action.t list = [],[]
+
 let pipeline prsr ingr egr =
   let open HoareNet in
   let open BExpr in
