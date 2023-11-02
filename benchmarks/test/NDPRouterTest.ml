@@ -73,8 +73,12 @@ let ndp_ingress =
   in
   let ipv4_lpm =
     sequence [
-      (* assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid; *)
-      instr_table ("ipv4_lpm", [`Maskable hdr.ipv4.dstAddr], [set_nhop; _drop])
+      instr_table ("ipv4_lpm", [
+        `Maskable hdr.ipv4.dstAddr
+        ], [
+          set_nhop; _drop; 
+          nop (*Unspecified default action, assuming noop*)
+          ])
     ]
   in
   let directpriohigh =
@@ -85,7 +89,13 @@ let ndp_ingress =
       ]
   in
   let directtoprio =
-    instr_table ("directtoprio", [`MaskableDegen meta.meta.register_tmp], [directpriohigh])
+    instr_table ("directtoprio", 
+    [
+      `MaskableDegen meta.meta.register_tmp
+    ], [
+      directpriohigh;
+      nop (*Unspecified default action, assuming noop*)
+    ])
   in
   let readbuffer =
     [], [
@@ -93,7 +103,12 @@ let ndp_ingress =
     ]
   in
   let readbuffersense =
-    instr_table ("readbuffersense", [`MaskableDegen meta.meta.register_tmp], [readbuffer])
+    instr_table ("readbuffersense", [
+      `MaskableDegen meta.meta.register_tmp
+      ], [
+        readbuffer;
+        nop (*Unspecified default action, assuming noop*)
+      ])
   in
   let setpriolow =
     [], Primitives.Action.[
@@ -112,7 +127,12 @@ let ndp_ingress =
       ]
   in
   let setprio =
-    instr_table ("setprio", [`MaskableDegen meta.meta.register_tmp], [setpriolow; setpriohigh])
+    instr_table ("setprio", [
+      `MaskableDegen meta.meta.register_tmp
+      ], [
+        setpriolow; setpriohigh;
+        nop (* unspecified default action, adding noop  *)
+        ])
   in
   let set_dmac =
     let dmac = Var.make "dmac" 48 in
@@ -123,7 +143,12 @@ let ndp_ingress =
       ]
   in
   let forward =
-    instr_table ("forward", [`Exact meta.routing_metadata.nhop_ipv4], [set_dmac; _drop])
+    instr_table ("forward", [
+      `Exact meta.routing_metadata.nhop_ipv4
+      ], [
+        set_dmac; _drop;
+        nop (* unspecified default action, adding noop  *)
+        ])
   in
   ifte_seq (eq_ btrue @@ var hdr.ipv4.isValid) [
     (* assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid; *)
@@ -160,7 +185,9 @@ let ndp_egress =
   let dec_counter =
     instr_table ("dec_counter",
                  [`MaskableDegen meta.meta.ndpflags],
-                 [decreasereg; cont])
+                 [decreasereg; cont;
+                  nop (* unspecified default action assuming noop *) 
+                 ])
   in
   let rewrite_mac =
     let smac = Var.make "smac" 48 in
@@ -177,7 +204,9 @@ let ndp_egress =
   let send_frame =
     instr_table ("send_frame",
                  [`Exact standard_metadata.egress_port],
-                 [rewrite_mac; _drop])
+                 [rewrite_mac; _drop;
+                 nop (* unspecified default action assuming noop *)
+                 ])
   in
   sequence [
     dec_counter;
