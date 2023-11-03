@@ -76,7 +76,9 @@ let mc_nat_ingress fixed =
   let set_mcg =
     instr_table("set_mcg",
          [`Exact hdr.ipv4.dstAddr ],
-         [set_output_mcg; _drop])
+         [set_output_mcg; _drop;
+          nop (*Unspecified default action, assuming nop*)
+         ])
   in
   sequence [
     if fixed then assume @@ eq_ btrue @@ var hdr.ipv4.isValid else skip;
@@ -104,7 +106,10 @@ let mc_nat_egress =
     instr_table ( "nat_table",
                   [`Exact meta.intrinsic_metadata.egress_rid;
                    `Exact hdr.ipv4.dstAddr],
-                  [do_nat; _drop]
+                  [
+                    do_nat; _drop;
+                    nop (*Unspecified default action, assuming nop*)
+                  ]
     )
   in
   sequence [
