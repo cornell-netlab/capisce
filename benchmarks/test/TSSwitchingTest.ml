@@ -22,7 +22,6 @@ let ts_switching_parser =
   let parse_ipv4 =
     sequence [
         assign hdr.ipv4.isValid btrue;
-        (* assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid; *)
         ifte_seq (eq_ (var hdr.ipv4.protocol) (bvi 17 8))
           [ parse_udp ]
           [ transition_accept ];
@@ -32,7 +31,6 @@ let ts_switching_parser =
   let parse_ethernet =
     sequence [
       assign hdr.ethernet.isValid btrue;
-      (* assert_ @@ eq_ btrue @@ var hdr.ethernet.isValid; *)
       ifte_seq (eq_ (var hdr.ethernet.etherType) (bvi 2048 16))
         [parse_ipv4]
         [transition_accept]
@@ -69,9 +67,13 @@ let ts_switching_ingress fixed =
   in
   let schedule_table =
     instr_table ("schedule_table",
-         [`Exact hdr.ipv4.dstAddr;
-          `Maskable hdr.rtp.timestamp],
-         [take_video_0; _drop_0])
+          [ 
+            `Exact hdr.ipv4.dstAddr;
+            `Maskable hdr.rtp.timestamp
+          ], [
+            take_video_0; _drop_0;
+            nop (*Unspecified default action, assuming nop*)
+          ])
   in
   sequence [
     if fixed then assume @@ ands_ [
