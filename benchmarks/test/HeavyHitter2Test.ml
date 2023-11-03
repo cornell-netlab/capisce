@@ -34,7 +34,6 @@ let hh2_parser =
   let parse_ipv4 =
     sequence [
         assign hdr.ipv4.isValid btrue;
-        (* assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid; *)
         ifte_seq (eq_ (var hdr.ipv4.protocol) (bvi 6 8))
           [ parse_tcp ]
           [ transition_accept ];
@@ -44,7 +43,6 @@ let hh2_parser =
   let parse_ethernet =
     sequence [
       assign hdr.ethernet.isValid btrue;
-      (* assert_ @@ eq_ btrue @@ var hdr.ethernet.isValid; *)
       ifte_seq (eq_ (var hdr.ethernet.etherType) (bvi 2048 16))
         [parse_ipv4]
         [transition_accept]
@@ -89,7 +87,10 @@ let hh2_ingress fixed =
   let set_heavy_hitter_count_table =
     instr_table (
       "set_heavy_hitter_count_table",
-      [`Exact (Var.make "dummy" 1)], [set_heavy_hitter_count]
+      [], [
+        set_heavy_hitter_count;
+        nop (*Unspecified default action, assuming nop*);
+      ]
     )
   in
   let _drop =
@@ -100,7 +101,10 @@ let hh2_ingress fixed =
   let drop_heavy_hitter_table =
     instr_table (
       "drop_heavy_hitter_table",
-      [],[_drop]
+      [],[
+        _drop;
+        nop (*Unspecified default action, assuming nop*)
+      ]
     )
   in
   let set_nhop  =
@@ -115,7 +119,10 @@ let hh2_ingress fixed =
   let ipv4_lpm =
     instr_table (
       "ipv4_lpm",
-      [`Maskable hdr.ipv4.dstAddr], [set_nhop; _drop]
+      [`Maskable hdr.ipv4.dstAddr], [
+        set_nhop; _drop;
+        nop (*Unspecified default action, assuming nop*)
+      ]
     )
   in
   let set_dmac =
@@ -127,7 +134,10 @@ let hh2_ingress fixed =
   let forward =
     instr_table (
       "forward",
-      [`Exact meta.custom_metadata.nhop_ipv4],[set_dmac; _drop]
+      [`Exact meta.custom_metadata.nhop_ipv4],[
+        set_dmac; _drop;
+        nop (*Unspecified default action, assuming nop*)  
+      ]
     )
   in
   sequence [
@@ -149,7 +159,6 @@ let hh2_ingress fixed =
   ]
 
 let hh2_egress =
-  (* HoareNet.skip *)
   let open HoareNet in
   let open Expr in
   let rewrite_mac =
@@ -164,8 +173,11 @@ let hh2_egress =
   in
   let send_frame =
     instr_table ("send_frame",
-                 [`Exact standard_metadata.egress_port],
-                 [rewrite_mac; _drop]
+                  [`Exact standard_metadata.egress_port],
+                  [
+                    rewrite_mac; _drop;
+                    nop (*Unspecified default action, assuming nop*)
+                  ]
                 )
   in
   send_frame
