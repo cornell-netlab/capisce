@@ -144,7 +144,7 @@ let hula_ingress fixed =
       "hula_fwd",
       [`Exact hdr.ipv4.dstAddr;
        `Exact hdr.ipv4.srcAddr],
-      [hula_dst; srcRoute_nhop]
+      [hula_dst; srcRoute_nhop (* default *) ]
     )
   in
   let change_best_path_at_dst = sequence [
@@ -172,7 +172,10 @@ let hula_ingress fixed =
   let hula_bwd =
     instr_table ("hula_bwd",
                 [`Maskable hdr.ipv4.dstAddr],
-                [hula_set_nhop])
+                [
+                  hula_set_nhop;
+                  nop; (* Unspecified default action, assuming nop *)
+                ])
   in
   let _drop = [], Action.[
       assign standard_metadata.egress_spec @@ bvi 511 9
@@ -181,7 +184,7 @@ let hula_ingress fixed =
   let hula_src =
     instr_table ("hula_src",
                  [`Exact hdr.ipv4.srcAddr],
-                 [_drop; srcRoute_nhop]
+                 [_drop; srcRoute_nhop; (*default*)]
                 )
   in
   let hula_get_nhop =
@@ -194,7 +197,7 @@ let hula_ingress fixed =
   let hula_nhop =
     instr_table ("hula_nhop",
                 [`Maskable hdr.ipv4.dstAddr],
-                [hula_get_nhop; _drop])
+                [hula_get_nhop; _drop (* default *)])
   in
   let set_dmac =
     let dstAddr = Var.make "dstAddr" 48 in
@@ -207,7 +210,7 @@ let hula_ingress fixed =
   let dmac =
     instr_table ("dmac",
                  [`Exact standard_metadata.egress_spec],
-                 [set_dmac; nop]
+                 [set_dmac; nop (* default *)]
                 )
   in
   let old_qdepth = Var.make "old_qdepth" 15 in
