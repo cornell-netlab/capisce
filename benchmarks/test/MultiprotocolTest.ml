@@ -123,11 +123,11 @@ let multiproto_ingress =
                  [`Exact hdr.ethernet.etherType],
                  [l2_packet;
                   ipv4_packet; ipv6_packet;
-                  mpls_packet; mim_packet
+                  mpls_packet; mim_packet; 
+                  nop (* Unspecified default action, assuming  noop *)
                  ]
                 )
   in
-  let nop = [], [] in
   let _drop = [], Action.[
       assign meta.ing_metadata.drop btrue
     ]
@@ -146,6 +146,8 @@ let multiproto_ingress =
   let l2_match   = _match "l2_match"   hdr.ethernet.dstAddr in
   let _check name key =
     instr_table (name, [`Exact key], [nop; _drop])
+    (*  none of the check tables have specified default actions, assuming noop *)
+    (*  no change made since they already have   noop *)
   in
   let  tcp_check = _check "tcp_check"  hdr.tcp.dstPort in
   let  udp_check = _check "udp_check"  hdr.udp.dstPort in
@@ -160,8 +162,11 @@ let multiproto_ingress =
   in
   let set_egress =
     instr_table ("set_egress",
-                 [`Exact meta.ing_metadata.drop],
-                 [discard; send_packet]
+                  [`Exact meta.ing_metadata.drop],
+                  [
+                    discard; send_packet;
+                    nop; (*  unspecified default action, assuming noop *)
+                  ]
                 )
   in
   sequence [

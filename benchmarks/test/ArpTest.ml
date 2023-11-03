@@ -88,7 +88,11 @@ let arp_ingress =
     ]
   in
   let ipv4_lpm =
-    instr_table ("ipv4_lpm", [`MaskableDegen meta.dst_ipv4], [set_dst_info; drop])
+    instr_table ("ipv4_lpm", [
+      `MaskableDegen meta.dst_ipv4
+      ], [
+        set_dst_info; drop (*default*)
+        ])
   in
   let forward_ipv4 = [], Action.[
       (* assert_ (eq_ btrue (var hdr.ethernet.isValid)); *)
@@ -137,8 +141,11 @@ let arp_ingress =
                   `Exact hdr.arp_ipv4.isValid;
                   `Exact hdr.ipv4.isValid;
                   `Exact hdr.icmp.isValid;
-                  `Maskable hdr.icmp.type_],
-                 [forward_ipv4; send_arp_reply; send_icmp_reply; drop])
+                  `Maskable hdr.icmp.type_
+                  ],[
+                  forward_ipv4; send_arp_reply; send_icmp_reply;
+                  drop (* default *)
+                ])
   in
   sequence [
     assign meta.my_mac @@ bvi 000102030405 48;
