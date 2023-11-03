@@ -90,14 +90,20 @@ let flowlet_ingress fixed =
       (* flowlet_lasttime.write((bit<32>)meta.ingress_metadata.flowlet_map_index, (bit<32>)meta.intrinsic_metadata.ingress_global_timestamp); *)
     ]
   in
-  let flowlet = instr_table ("flowlet", [], [lookup_flowlet_map]) in
+  let flowlet = instr_table ("flowlet", [], [
+    lookup_flowlet_map;
+    nop (* Undefined default action, assuming nop *)
+    ]) in
   let update_flowlet_id =
     [], Primitives.Action.[
         assign meta.ingress_metadata.flowlet_id @@ badd (var meta.ingress_metadata.flowlet_id) (bvi 1 16);
         (* flowlet_id.write((bit<32>)meta.ingress_metadata.flowlet_map_index, (bit<16>)meta.ingress_metadata.flowlet_id) *)
       ]
   in
-  let new_flowlet = instr_table ("new_flowlet", [], [update_flowlet_id]) in
+  let new_flowlet = instr_table ("new_flowlet", [], [
+    update_flowlet_id;
+    nop (* Undefined default action, assuming nop *)
+    ]) in
   let _drop = [], Primitives.Action.[
       assign standard_metadata.egress_spec @@ bvi 511 9;
     ]
@@ -114,7 +120,10 @@ let flowlet_ingress fixed =
   let ecmp_group = instr_table (
       "ecmp_group",
       [`Maskable hdr.ipv4.dstAddr],
-      [_drop; set_ecmp_select])
+      [
+        _drop; set_ecmp_select;
+        nop (* Undefined default action, assuming nop *)
+      ])
   in
   let set_nhop =
     let nhop_ipv4 = Var.make "nhop_ipv4" 32 in
@@ -129,7 +138,10 @@ let flowlet_ingress fixed =
   let ecmp_nhop = instr_table (
       "ecmp_nhop",
       [`Exact meta.ingress_metadata.ecmp_offset],
-      [_drop; set_nhop])
+      [
+        _drop; set_nhop;
+        nop (* Undefined default action, assuming nop *)
+      ])
   in
   let set_dmac =
     let dmac = Var.make "dmac" 48 in
@@ -140,7 +152,10 @@ let flowlet_ingress fixed =
   let forward = instr_table (
       "forward",
       [`Exact meta.ingress_metadata.nhop_ipv4],
-      [set_dmac; _drop]) in
+      [
+        set_dmac; _drop;
+        nop (* Undefined default action, assuming nop *)
+      ]) in
   sequence [
     begin if fixed then assume @@ ands_ [
         eq_ btrue @@ var hdr.ipv4.isValid;
@@ -172,7 +187,10 @@ let flowlet_egress =
   let send_frame =
     instr_table ("send_frame",
                  [`Exact standard_metadata.egress_port],
-                 [rewrite_mac; _drop])
+                 [
+                  rewrite_mac; _drop;
+                  nop (* Undefined default action, assuming nop *)
+                  ])
   in
   send_frame
 

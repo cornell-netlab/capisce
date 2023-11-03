@@ -26,5 +26,5 @@ check: all
 	dune build ./test/tests.exe && ./_build/default/test/tests.exe test -- ${TEST}
 
 check-q: all
-	dune build ./test/tests.exe && ./_build/default/test/tests.exe test -q -- ${TEST}
+	dune build ./test/tests.exe && ./_build/default/test/tests.exe test -q --tail-errors=500 -- ${TEST}
 # end
