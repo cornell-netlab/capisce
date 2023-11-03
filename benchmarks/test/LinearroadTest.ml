@@ -613,14 +613,21 @@ let linearroad_ingress annot =
         (* v_dir_reg.write((bit<32>)hdr.pos_report.vid, (bit<1>)hdr.pos_report.dir); *)
       ]
   in
-  let update_pos_state = instr_table ("update_pos_state", [], [do_update_pos_state]) in
+  let update_pos_state = 
+    instr_table ("update_pos_state", [], [
+    do_update_pos_state;
+    nop (* Unspecified default action, assuming nop *)
+    ]) in
   let set_new_seg =
     [], Action.[
         assign meta.v_state.new_seg @@ bvi 1 1
       ]
   in
   let update_new_seg =
-    instr_table ("update_new_seg", [], [set_new_seg])
+    instr_table ("update_new_seg", [], [
+      set_new_seg;
+      nop (* Unspecified default action, assuming nop *)
+    ])
   in
   let load_vol =
     [], Action.[
@@ -652,6 +659,7 @@ let linearroad_ingress annot =
                    load_vol;
                    load_and_inc_vol;
                    load_and_inc_and_dec_vol;
+                   nop (* Unspecified default action, assuming nop *)
                  ])
   in
   let set_spd =
@@ -688,7 +696,10 @@ let linearroad_ingress annot =
       ]
   in
   let loc_not_changed =
-    instr_table ("loc_not_changed", [], [do_loc_not_changed])
+    instr_table ("loc_not_changed", [], [
+      do_loc_not_changed;
+      nop (* Unspecified default action, assuming nop *)
+    ])
   in
   let do_loc_changed =
     [], Action.[
@@ -699,12 +710,17 @@ let linearroad_ingress annot =
       ]
   in
   let loc_changed =
-    instr_table ("loc_changed", [], [do_loc_changed])
+    instr_table ("loc_changed", [], [
+      do_loc_changed;
+      nop (* Unspecified default action, assuming nop *)
+    ])
   in
   let update_ewma_spd =
     instr_table ("update_ewma_spd",
-                [`Exact meta.seg_meta.vol],
-                [set_spd; calc_ewma_spd])
+                firsts [
+                  `Exact meta.seg_meta.vol |> if annot then Either.second else Either.first
+                ],
+                [set_spd; calc_ewma_spd (* default *)])
   in
   let do_dec_prev_stopped =
     [], [
@@ -713,7 +729,10 @@ let linearroad_ingress annot =
       ]
   in
   let dec_prev_stopped =
-    instr_table ("dec_prev_stopped", [], [do_dec_prev_stopped])
+    instr_table ("dec_prev_stopped", [], [
+      do_dec_prev_stopped;
+      nop (* Unspecified default action, assuming nop *)
+    ])
   in
   let do_inc_stopped =
     [], Action.[
@@ -766,7 +785,10 @@ let linearroad_ingress annot =
     ]
   in
   let load_stopped_ahead =
-    instr_table ("load_stopped_ahead", [], [do_load_stopped_ahead])
+    instr_table ("load_stopped_ahead", [], [
+      do_load_stopped_ahead; 
+      nop (* Unspecified default action, assuming nop *)
+      ])
   in
   let issue_toll =
     let base_toll = Var.make "base_toll" 16 in
@@ -788,10 +810,13 @@ let linearroad_ingress annot =
                  firsts
                  [`Exact meta.v_state.new_seg |> Either.first;
                   `MaskableDegen meta.seg_meta.ewma_spd |> if annot then Either.second else Either.first;
-                  `MaskableDegen meta.seg_meta.vol |> Either.first;
+                  `MaskableDegen meta.seg_meta.vol |> if annot then Either.second else Either.first;
                   `MaskableDegen meta.accident_meta.has_accident_ahead |> Either.first
                 ],
-                [issue_toll])
+                [
+                  issue_toll;
+                  nop (* Unspecified default action, assuming nop *)
+                ])
   in
   let do_load_accnt_bal = [], Action.[
       assert_ @@ eq_ btrue @@ var hdr.accnt_bal_req.isValid;
@@ -820,7 +845,10 @@ let linearroad_ingress annot =
   let ipv4_lpm =
     instr_table ("ipv4_lpm",
                 [`Maskable hdr.ipv4.dstAddr],
-                [set_nhop; _drop])
+                [
+                  set_nhop; _drop;
+                  nop (* Unspecified default action, assuming nop *)
+                ])
   in
   let set_dmac =
     let dmac = Var.make "dmac" 48 in
@@ -831,7 +859,10 @@ let linearroad_ingress annot =
   let forward =
     instr_table ("forward",
                  [`Exact hdr.ipv4.dstAddr],
-                 [set_dmac; _drop]
+                 [
+                  set_dmac; _drop;
+                  nop (* Unspecified default action, assuming nop *)
+                 ]
                 )
   in
   ifte_seq (eq_ btrue @@ var hdr.ipv4.isValid) [
@@ -902,7 +933,11 @@ let linearroad_egress =
     instr_table ("send_accident_alert",
                 [`Exact meta.accident_meta.has_accident_ahead;
                  `Exact meta.accident_egress_meta.recirculate ],
-                [ accident_alert_e2e; make_accident_alert ])
+                [ 
+                  accident_alert_e2e; 
+                  make_accident_alert;
+                  nop (* Unspecified default action, assuming nop *)
+                ])
   in
   let toll_notification_e2e =
     [], Action.[
@@ -928,7 +963,10 @@ let linearroad_egress =
     instr_table ("send_toll_notification",
                 [`Exact meta.toll_meta.has_toll;
                  `Exact meta.toll_egress_meta.recirculate],
-                [toll_notification_e2e; make_toll_notification])
+                [
+                  toll_notification_e2e; make_toll_notification;
+                  nop (* Unspecified default action, assuming nop *)
+                ])
   in
   let accnt_bal_e2e =
     [], Action.[
@@ -953,7 +991,10 @@ let linearroad_egress =
   let send_accnt_bal =
     instr_table ("send_accnt_bal",
                 [`Exact meta.accnt_bal_egress_meta.recirculate],
-                [accnt_bal_e2e; make_accnt_bal])
+                [
+                  accnt_bal_e2e; make_accnt_bal;
+                  nop (* Unspecified default action, assuming nop *)
+                ])
   in
   let make_expenditure_report =
     let bal = Var.make "bal" 16 in
@@ -976,7 +1017,10 @@ let linearroad_egress =
                  `Exact hdr.expenditure_req.day;
                  `Exact hdr.expenditure_req.xway
                 ],
-                [make_expenditure_report])
+                [
+                  make_expenditure_report;
+                  nop (* Unspecified default action, assuming nop *)
+                ])
   in
   let do_travel_estimate_init =
     [],
@@ -989,7 +1033,7 @@ let linearroad_egress =
   let travel_estimate_init =
     instr_table ("travel_estimate_init",
                 [],
-                [do_travel_estimate_init])
+                [do_travel_estimate_init (*default*)])
   in
   let do_travel_estimate_init_rev =
     [], Action.[
@@ -1001,7 +1045,7 @@ let linearroad_egress =
   let travel_estimate_init_rev =
     instr_table ("travel_estimate_init_rev",
                  [],
-                 [do_travel_estimate_init_rev]
+                 [do_travel_estimate_init_rev (* default *)]
                 )
   in
   let update_travel_estimate =
@@ -1019,8 +1063,10 @@ let linearroad_egress =
                  `Exact hdr.travel_estimate_req.xway;
                  `Exact meta.te_md.dir;
                  `Exact meta.te_md.seg_cur
-                ],
-                [update_travel_estimate])
+                ], [
+                  update_travel_estimate;
+                  nop (* Unspecified default action, assuming nop *)
+                ])
   in
   let do_travel_estimate_send = [], Action.[
       assign hdr.lr_msg_type.msg_type @@ bvi 14 8;
@@ -1051,7 +1097,10 @@ let linearroad_egress =
   let travel_estimate_recirc =
     instr_table("travel_estimate_recirc",
                 [],
-                [travel_estimate_e2e])
+                [
+                  travel_estimate_e2e;
+                  nop (*  unspecified default action, assuming nop *)
+                ])
   in
   let rewrite_mac =
     let smac = Var.make "smac" 48 in
@@ -1067,7 +1116,10 @@ let linearroad_egress =
   let send_frame =
     instr_table("send_frame",
                 [`Exact standard_metadata.egress_port],
-                [rewrite_mac; _drop]
+                [
+                  rewrite_mac; _drop;
+                  nop (*  unspecified default action, assuming nop *)
+                ]
                )
   in
   ifte_seq (eq_ btrue @@ var hdr.ipv4.isValid) [
@@ -1120,32 +1172,32 @@ let test_assert_valids_travel_estimate_send () =
   let travel_estimate_send =
     HoareNet.instr_table("travel_estimate_send",
                [],
-               [do_travel_estimate_send])
+               [do_travel_estimate_send (* default *)])
   in
   let travel_estimate_send_annotated =
-  let do_travel_estimate_send = [], Primitives.Action.[
-      assert_ @@ eq_ btrue @@ var hdr.lr_msg_type.isValid;
-      assign hdr.lr_msg_type.msg_type @@ bvi 14 8;
-      assign hdr.travel_estimate.isValid btrue;
-      assert_ @@ eq_ btrue @@ var hdr.travel_estimate.isValid;
-      assert_ @@ eq_ btrue @@ var hdr.travel_estimate_req.isValid;
-      assign hdr.travel_estimate.qid @@ var hdr.travel_estimate_req.qid;
-      assert_ @@ eq_ btrue @@ var hdr.travel_estimate.isValid;
-      assign hdr.travel_estimate.travel_time @@ var meta.te_md.time_sum;
-      assert_ @@ eq_ btrue @@ var hdr.travel_estimate.isValid;
-      assign hdr.travel_estimate.toll @@ var meta.te_md.toll_sum;
-      assign hdr.travel_estimate_req.isValid bfalse;
-      assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid;
-      assign hdr.ipv4.totalLen @@ bvi 37 16;
-      assert_ @@ eq_ btrue @@ var hdr.udp.isValid;
-      assign hdr.udp.length @@ bvi 16 16;
-      assert_ @@ eq_ btrue @@ var hdr.udp.isValid;
-      assign hdr.udp.checksum @@ bvi 0 16
-    ]
-  in
-  HoareNet.instr_table
-      ("travel_estimate_send",
-       [], [do_travel_estimate_send])
+    let do_travel_estimate_send = [], Primitives.Action.[
+        assert_ @@ eq_ btrue @@ var hdr.lr_msg_type.isValid;
+        assign hdr.lr_msg_type.msg_type @@ bvi 14 8;
+        assign hdr.travel_estimate.isValid btrue;
+        assert_ @@ eq_ btrue @@ var hdr.travel_estimate.isValid;
+        assert_ @@ eq_ btrue @@ var hdr.travel_estimate_req.isValid;
+        assign hdr.travel_estimate.qid @@ var hdr.travel_estimate_req.qid;
+        assert_ @@ eq_ btrue @@ var hdr.travel_estimate.isValid;
+        assign hdr.travel_estimate.travel_time @@ var meta.te_md.time_sum;
+        assert_ @@ eq_ btrue @@ var hdr.travel_estimate.isValid;
+        assign hdr.travel_estimate.toll @@ var meta.te_md.toll_sum;
+        assign hdr.travel_estimate_req.isValid bfalse;
+        assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid;
+        assign hdr.ipv4.totalLen @@ bvi 37 16;
+        assert_ @@ eq_ btrue @@ var hdr.udp.isValid;
+        assign hdr.udp.length @@ bvi 16 16;
+        assert_ @@ eq_ btrue @@ var hdr.udp.isValid;
+        assign hdr.udp.checksum @@ bvi 0 16
+      ]
+    in
+    HoareNet.instr_table
+        ("travel_estimate_send",
+        [], [do_travel_estimate_send (* default *)])
   in
   travel_estimate_send
   |> HoareNet.assert_valids

@@ -103,7 +103,12 @@ let simple_nat_ingress _ =
       assign meta.meta.is_ext_if @@ var is_ext
     ]
   in
-  let if_info = instr_table ("if_info", [`Exact meta.meta.if_index], [set_if_info; _drop]) in
+  let if_info = instr_table ("if_info", [
+      `Exact meta.meta.if_index
+    ], [
+      set_if_info; _drop;
+      nop (* Unspecified default action, assuming nop *)
+    ]) in
   let nat_miss_int_to_ext = [], [
         (* clone3(CloneType.I2E, (bit<32>)32w250, { standard_metadata }); *)
     ]
@@ -147,6 +152,7 @@ let simple_nat_ingress _ =
                   nat_hit_int_to_ext;
                   nat_hit_ext_to_int;
                   nat_no_nat;
+                  nop; (*Unspeecified default action assuming nop*)
                  ])
   in
   let set_nhop =
@@ -159,14 +165,24 @@ let simple_nat_ingress _ =
       assign hdr.ipv4.ttl @@ bsub (var hdr.ipv4.ttl) (bvi 1 8);
     ]
   in
-  let ipv4_lpm = instr_table ("ipv4_lpm", [`MaskableDegen meta.meta.ipv4_da], [set_nhop; _drop]) in
+  let ipv4_lpm = instr_table ("ipv4_lpm", [
+    `MaskableDegen meta.meta.ipv4_da
+    ], [
+      set_nhop; _drop;
+      nop (*Unspecified default action, assuming nop*)
+    ]) in
   let set_dmac =
     let dmac = Var.make "dmac" 48 in
     [dmac], Action.[
         assign hdr.ethernet.dstAddr @@ var dmac
     ]
   in
-  let forward = instr_table ("forward", [`Exact meta.meta.nhop_ipv4], [set_dmac; _drop]) in
+  let forward = instr_table ("forward", [
+    `Exact meta.meta.nhop_ipv4
+    ], [
+      set_dmac; _drop;
+      nop (*Unspecified default action, assuming nop*)
+    ]) in
   sequence [
     if_info;
     nat;
@@ -203,7 +219,10 @@ let simple_nat_egress =
   let send_frame =
     instr_table("send_frame",
                 [`Exact standard_metadata.egress_port],
-                [do_rewrites; _drop]
+                [
+                  do_rewrites; _drop;
+                  nop (*Unspecified default action, assuming nop*)
+                ]
                )
   in
   let do_cpu_encap = [], Action.[
@@ -215,7 +234,10 @@ let simple_nat_egress =
     ]
   in
   let send_to_cpu =
-    instr_table("send_to_cpu", [], [do_cpu_encap])
+    instr_table("send_to_cpu", [], [
+      do_cpu_encap;
+      nop (*Unspecified default action, assuming nop*)
+    ])
   in
   ifte_seq (eq_ (var standard_metadata.instance_type) (bvi 0 32)) [
     send_frame
