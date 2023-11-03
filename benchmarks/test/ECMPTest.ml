@@ -26,13 +26,12 @@ let ecmp_parser : HoareNet.t =
   sequence [
     assign zombie.parse_result @@ Expr.bvi 0 1;
     assign hdr.ethernet.isValid @@ Expr.bvi 1 1;
-    (* assert_ @@ eq_ (var hdr.ethernet.isValid) (bvi 1 1); *)
     choice_seqs [
       [ assume @@
         eq_ (var hdr.ethernet.etherType) (bvi 2048 16);
         assign hdr.ipv4.isValid @@ bvi 1 1;
         choice_seqs [
-          [ (* assert_ @@ eq_ (var hdr.ipv4.isValid) (bvi 1 1); *)
+          [ 
             assume @@
             eq_ (var hdr.ipv4.protocol) (bvi 6 8);
             assign hdr.tcp.isValid @@ bvi 1 1;
@@ -74,7 +73,6 @@ let ecmp_ingress =
          Primitives.Action.[
            assign meta.routing_metadata.nhop_ipv4 (var nhop_ipv4);
            assign standard_metadata.egress_spec (var port);
-           (* assert_ @@ eq_ (var hdr.ipv4.isValid) (bvi 1 1); *)
            assign hdr.ipv4.ttl @@ badd (var hdr.ipv4.ttl) (bvi 255 8);
          ]
          ;

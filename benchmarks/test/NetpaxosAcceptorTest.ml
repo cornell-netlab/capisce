@@ -65,41 +65,44 @@ let npa_ingress =
                  ])
   in
   let read_round =
-    [], Primitives.Action.[assert_ @@ eq_ btrue @@ var hdr.paxos.isValid]
-    (*proposal_register.read(meta.local_metadata.proposal, hdr.paxos.inst)*)
+    [],   
+      (*proposal_register.read(meta.local_metadata.proposal, hdr.paxos.inst)*)
+      register_read "proposal_register_read_round" meta.local_metadata.proposal (var hdr.paxos.inst)
   in
   let round_tbl =
     instr_table ("round_tbl", [], [read_round; nop]) (* no default action assuming noop*)
   in
   let _no_op = [],[] in
   let handle_phase1a =
-    [], Primitives.Action.[
-        assert_ @@ eq_ btrue @@ var hdr.paxos.isValid;
-        (* proposal_register.write((bit<32>)hdr.paxos.inst, (bit<16>)hdr.paxos.proposal); *)
-        assert_ @@ eq_ btrue @@ var hdr.paxos.isValid;
-        (* vproposal_register.read(hdr.paxos.vproposal, (bit<32>)hdr.paxos.inst); *)
-        assert_ @@ eq_ btrue @@ var hdr.paxos.isValid;
-        (* val_register.read(hdr.paxos.val, (bit<32>)hdr.paxos.inst); *)
-        assign hdr.paxos.msgtype @@ bvi 2 16;
-        (* acceptor_id.read(hdr.paxos.acpt, (bit<32>)32w0); *)
-        (* assert_ @@ eq_ btrue @@ var hdr.udp.isValid; *)
+    [], 
+    (* proposal_register.write((bit<32>)hdr.paxos.inst, (bit<16>)hdr.paxos.proposal); *)
+    register_write "proposal_register_1a" (var hdr.paxos.inst) (var hdr.paxos.proposal) @
+    (* vproposal_register.read(hdr.paxos.vproposal, (bit<32>)hdr.paxos.inst); *)
+    register_read "vproposal_register_1a" hdr.paxos.vproposal (var hdr.paxos.inst) @
+    (* val_register.read(hdr.paxos.val, (bit<32>)hdr.paxos.inst); *)
+    register_read "val_register_1a" hdr.paxos.value (var hdr.paxos.inst) @
+    (* acceptor_id.read(hdr.paxos.acpt, (bit<32>)32w0); *)
+    register_read "acceptor_id_1a" hdr.paxos.acpt (bvi 0 32) @
+    Primitives.Action.[
         assign hdr.udp.checksum @@ bvi 0 16
       ]
   in
   let handle_phase2a =
-    [], Primitives.Action.[
-        assert_ @@ eq_ btrue @@ var hdr.paxos.isValid;
+    let open Primitives.Action in
+    [], 
         (* proposal_register.write((bit<32>)hdr.paxos.inst, (bit<16>)hdr.paxos.proposal); *)
-        assert_ @@ eq_ btrue @@ var hdr.paxos.isValid;
+        register_write "proposal_register_2a" (var hdr.paxos.inst) (var hdr.paxos.proposal) @
         (* vproposal_register.write((bit<32>)hdr.paxos.inst, (bit<16>)hdr.paxos.proposal); *)
-        assert_ @@ eq_ btrue @@ var hdr.paxos.isValid;
+        register_write "vproposal_register_2a" (var hdr.paxos.inst) (var hdr.paxos.proposal) @
         (* val_register.write((bit<32>)hdr.paxos.inst, (bit<32>)hdr.paxos.val); *)
-        (* assert_ @@ eq_ btrue @@ var hdr.paxos.isValid; *)
+        register_write "val_register" (var hdr.paxos.inst) (var hdr.paxos.value) @
+      [ 
         assign hdr.paxos.msgtype @@ bvi 4 16;
-        (* assert_ @@ eq_ btrue @@ var hdr.paxos.isValid; *)
-        assign hdr.paxos.vproposal @@ var hdr.paxos.proposal;
+        assign hdr.paxos.vproposal @@ var hdr.paxos.proposal
+      ] @
         (* acceptor_id.read(hdr.paxos.acpt, (bit<32>)32w0); *)
-        (* assert_ @@ eq_ btrue @@ var hdr.udp.isValid; *)
+        register_read "acceptor_id" hdr.paxos.acpt (bvi 0 32) @
+      [
         assign hdr.udp.checksum @@ bvi 0 16;
       ]
   in

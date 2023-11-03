@@ -77,7 +77,6 @@ let overlay_pop_front ident max i =
   let open BExpr in
   let open Expr in
   let rec pop_front_aux cur =
-    let open Primitives in
     let cur_header = overlay cur in 
     let next_header_index = Int.(cur + i) in
     let havoc_var = Printf.sprintf "havoc_%s_%i" ident next_header_index in

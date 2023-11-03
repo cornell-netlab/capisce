@@ -164,7 +164,10 @@ type paxos_t = {
   isValid : Var.t;
   msgtype : Var.t;
   proposal : Var.t;
-  vproposal : Var.t
+  vproposal : Var.t;
+  inst : Var.t;
+  value : Var.t;
+  acpt : Var.t;
 }
 
 let paxos : paxos_t = {
@@ -172,6 +175,9 @@ let paxos : paxos_t = {
   msgtype = Var.make "hdr.paxos.msgtype" 16;
   proposal = Var.make "hdr.paxos.proposal" 16;
   vproposal = Var.make "hdr.paxos.vproposal" 16;
+  inst = Var.make "hdr.paxos.inst" 32;
+  value = Var.make "hdr.paxos.val" 32;
+  acpt = Var.make "hdr.paxos.acpt" 16;
 }
 
 (* used in ndp_router *)
@@ -331,6 +337,25 @@ let havoc variable name =
   Var.make name @@ Var.size variable
   |> Expr.var
   |> Primitives.Action.assign variable
+
+let havoc_read name expr =
+  let havoc_var = Var.make name @@ Expr.width expr in
+  Primitives.Action.assign havoc_var expr
+
+let devnull = Printf.sprintf "DEVNULL_%s"
+
+let register_read name result index = [
+  havoc_read (devnull name) index;
+  havoc result name
+]
+
+let register_write name index value = 
+  let name_index = Printf.sprintf "%s_index" name in
+  let name_value = Printf.sprintf "%s_value" name in
+[
+  havoc_read (devnull name_index) index;
+  havoc_read (devnull name_value) value;
+]
 
 let pipeline prsr ingr egr =
   let open HoareNet in

@@ -98,9 +98,9 @@ let ndp_ingress =
     ])
   in
   let readbuffer =
-    [], [
-      (* buffersense.read(meta.meta.register_tmp, (bit<32>)standard_metadata.egress_port); *)
-    ]
+    [],
+    (* buffersense.read(meta.meta.register_tmp, (bit<32>)standard_metadata.egress_port); *)
+    register_read "buffersense_readbuffer" meta.meta.register_tmp (var standard_metadata.egress_port)
   in
   let readbuffersense =
     instr_table ("readbuffersense", [
@@ -114,14 +114,16 @@ let ndp_ingress =
     [], Primitives.Action.[
         (* standard_metadata.egress_spec = 9w0; *)
         assign standard_metadata.egress_spec @@ bvi 0 9;
-        (* buffersense.read(meta.meta.register_tmp, (bit<32>)standard_metadata.egress_port); *)
-        (* buffersense.write((bit<32>)standard_metadata.egress_port, (bit<16>)(meta.meta.register_tmp + 16w1)); *)
       ]
+        (* buffersense.read(meta.meta.register_tmp, (bit<32>)standard_metadata.egress_port); *)
+      @ register_read "buffersense_setpriolow" meta.meta.register_tmp (var standard_metadata.egress_port  )
+        (* buffersense.write((bit<32>)standard_metadata.egress_port, (bit<16>)(meta.meta.register_tmp + 16w1)); *)
+      @ register_write "buffersense_setpriolow" (var standard_metadata.egress_port) @@
+        badd (var meta.meta.register_tmp) (bvi 1 16)
   in
   let setpriohigh =
     [], Primitives.Action.[
         (* truncate((bit<32>)32w54); *)
-        (* assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid; *)
         assign hdr.ipv4.totalLen @@ bvi 20 16;
         assign standard_metadata.egress_spec @@ bvi 1 9;
       ]
@@ -137,10 +139,10 @@ let ndp_ingress =
   let set_dmac =
     let dmac = Var.make "dmac" 48 in
     [dmac], Primitives.Action.[
-        (* assert_ @@ eq_ btrue @@ var hdr.ethernet.isValid; *)
-        assign hdr.ethernet.dstAddr @@ var dmac;
-        (* buffersense.read(meta.meta.register_tmp, (bit<32>)standard_metadata.egress_port); *)
-      ]
+      assign hdr.ethernet.dstAddr @@ var dmac;
+    ] @
+      (* buffersense.read(meta.meta.register_tmp, (bit<32>)standard_metadata.egress_port); *)
+      register_read "buffersense_set_dmac" meta.meta.register_tmp (var standard_metadata.egress_port)
   in
   let forward =
     instr_table ("forward", [
@@ -151,11 +153,9 @@ let ndp_ingress =
         ])
   in
   ifte_seq (eq_ btrue @@ var hdr.ipv4.isValid) [
-    (* assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid; *)
     ifte_seq (ugt_ (var hdr.ipv4.ttl) (bvi 0 8)) [
       ipv4_lpm;
       ifte_seq (eq_ btrue @@ var hdr.ndp.isValid) [
-        (* assert_ @@ eq_ btrue @@ var hdr.ndp.isValid; *)
         ifte_seq (ugt_ (var hdr.ndp.flags) (bvi 1 16)) [
           directtoprio
         ] [
@@ -176,10 +176,13 @@ let ndp_egress =
   (* let open BExpr in *)
   let open Expr in
   let decreasereg =
-    [], [
-        (* buffersense.read(meta.meta.register_tmp, (bit<32>)standard_metadata.egress_port); *)
-        (* buffersense.write((bit<32>)standard_metadata.egress_port, (bit<16>)(meta.meta.register_tmp - 16w1 + (bit<16>)standard_metadata.egress_spec)); *)
-      ]
+    [],
+    (* buffersense.read(meta.meta.register_tmp, (bit<32>)standard_metadata.egress_port); *)
+    register_read "buffersense_decreasereg" meta.meta.register_tmp (var standard_metadata.egress_port) @
+    (* buffersense.write((bit<32>)standard_metadata.egress_port, (bit<16>)(meta.meta.register_tmp - 16w1 + (bit<16>)standard_metadata.egress_spec)); *)
+    register_write "buffersense_decreasereg" (var standard_metadata.egress_port) @@
+    badd (bsub (var meta.meta.register_tmp) (bvi 1 16)) @@
+    bcast 16 (var standard_metadata.egress_spec)
   in
   let cont = [], [] in
   let dec_counter =
@@ -192,7 +195,6 @@ let ndp_egress =
   let rewrite_mac =
     let smac = Var.make "smac" 48 in
     [smac], Primitives.Action.[
-        (* assert_ @@ eq_ btrue @@ var hdr.ethernet.isValid; *)
         assign hdr.ethernet.srcAddr @@ var smac
     ]
   in
