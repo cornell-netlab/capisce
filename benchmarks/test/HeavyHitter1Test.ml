@@ -74,7 +74,12 @@ let hh_ingress =
       ]
   in
   let count_table =
-    instr_table ("count_table", [`Maskable hdr.ipv4.srcAddr], [count_action; _drop])
+    instr_table ("count_table", [
+      `Maskable hdr.ipv4.srcAddr
+      ], [
+      count_action; _drop;
+      nop (* Unspecified default action, assuming noop *)
+      ])
   in
   let set_nhop =
     let nhop_ipv4 = Var.make "set_nhop" 32 in
@@ -88,7 +93,12 @@ let hh_ingress =
       ]
   in
   let ipv4_lpm =
-    instr_table ("ipv4_lpm", [`Maskable hdr.ipv4.dstAddr], [set_nhop; _drop])
+    instr_table ("ipv4_lpm", [
+      `Maskable hdr.ipv4.dstAddr
+      ], [
+        set_nhop; _drop;
+        nop (* Unspecified default action, assuming noop *)
+        ])
   in
   let set_dmac =
     let dmac = Var.make "dmac" 48 in
@@ -98,7 +108,12 @@ let hh_ingress =
       ]
   in
   let forward =
-    instr_table ("forward", [`Exact meta.custom_metadata.nhop_ipv4], [set_dmac; _drop])
+    instr_table ("forward", [
+      `Exact meta.custom_metadata.nhop_ipv4
+      ], [
+        set_dmac; _drop;
+        nop (* Unspecified default action, assuming noop *)
+        ])
   in
   sequence [
     count_table;
@@ -124,7 +139,14 @@ let hh_egress =
       ]
   in
   let send_frame =
-    instr_table ("send_frame", [`Exact standard_metadata.egress_port], [rewrite_mac; _drop])
+    instr_table (
+      "send_frame", [
+        `Exact standard_metadata.egress_port
+        ], [
+          rewrite_mac; _drop;
+          nop (* Unspecified default action, assuming noop *)
+          ]
+          )
   in
   sequence [
     send_frame
