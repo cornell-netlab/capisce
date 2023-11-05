@@ -367,8 +367,8 @@ let hash_ result algo base inputs max havoc_name =
     input |> havoc_read @@ Printf.sprintf "%s_%i" hash_name idx
   ) @
   [
-    assume (uge_ (var hash_var) base);
-    assume (ult_ (var hash_var) (badd base max));
+    assume (uge_ (var hash_var) (bcast (Var.size hash_var) base));
+    assume (ult_ (var hash_var) (bcast (Var.size hash_var) @@ badd base max));
     havoc result hash_name
   ]
 

@@ -388,6 +388,36 @@ let fabric_parser =
       bvi 17 8, parse_udp;
       bvi 1 8, parse_icmp;
     ] transition_accept
+  ] in  
+  let parse_eth_type_1 = sequence [
+    assign hdr.eth_type.isValid btrue;
+    assign hdr.eth_type.value @@ var look_eth;
+    select (var hdr.eth_type.value) [
+      bvi 34887 16, assume BExpr.false_;
+      bvi 2048 16, parse_ipv4;
+    ] transition_accept
+  ] 
+  in
+  let look_vlan = Var.make "look_vlan" 16 in
+  let parse_inner_vlan_tag_1 = sequence [
+    assign hdr.inner_vlan_tag.isValid btrue;
+    assign hdr.inner_vlan_tag.eth_type @@ var look_vlan;
+    parse_eth_type_1
+  ] in
+  let parse_vlan_tag_1 = sequence [
+    assign hdr.vlan_tag.isValid btrue;
+    select (var look_vlan)  [
+      bvi 33024 16, parse_inner_vlan_tag_1;
+    ] parse_eth_type_1 
+  ] in
+  let parse_ethernet_1 = sequence [
+    assign hdr.ethernet.isValid btrue;
+    assign fabric_metadata.vlan_id @@ bvi 4094 12;
+    select (var look_eth) [
+      bvi 34984 16, parse_vlan_tag_1;
+      bvi 37120 16, parse_vlan_tag_1;
+      bvi 33024 16, parse_vlan_tag_1;
+    ] parse_eth_type_1
   ] in
   let parse_mpls = sequence [
     assign hdr.mpls.isValid btrue;
@@ -395,7 +425,7 @@ let fabric_parser =
     assign fabric_metadata.mpls_ttl @@ var hdr.mpls.ttl;
     select (var look_mpls) [
       bvi 4 4, parse_ipv4;
-    ] transition_accept (*parse_ethernet*)
+    ] parse_ethernet_1
   ] in
   let parse_eth_type = sequence [
     assign hdr.eth_type.isValid btrue;

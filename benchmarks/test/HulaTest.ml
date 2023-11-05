@@ -147,11 +147,12 @@ let hula_ingress fixed =
       [hula_dst; srcRoute_nhop (* default *) ]
     )
   in
-  let change_best_path_at_dst = sequence [
-      assert_ @@ eq_ btrue @@ var hula.isValid;
+  let change_best_path_at_dst =
       (* srcindex_qdepth_reg.write(meta.index, hdr.hula.qdepth); *)
+      register_read "srcindex_qdepth_reg_change_best_path_at_dst" meta.index (var hula.qdepth) @
       (* srcindex_digest_reg.write(meta.index, hdr.hula.digest); *)
-    ]
+      register_read "srcindex_digest_reg_change_best_path_at_dst" meta.index (var hula.digest)
+      |> sequence_map ~f:of_action
   in
   let return_hula_to_src = sequence [
       assign hula.dir btrue;
@@ -166,8 +167,9 @@ let hula_ingress fixed =
   in
   let hula_set_nhop =
     let index = Var.make "index" 32 in
-    [index], []
+    [index],
     (* dstindex_nhop_reg.write(index, (bit<16>)standard_metadata.ingress_port);  *)
+    register_write "dstindec_nhop_reg_hula_set_nhop" (var index) (var standard_metadata.ingress_port);
   in
   let hula_bwd =
     instr_table ("hula_bwd",
@@ -189,10 +191,12 @@ let hula_ingress fixed =
   in
   let hula_get_nhop =
     let tmp = Var.make "tmp" 16 in
-    [], Action.[
+    let index = Var.make "index" 32 in
+    [index], Action.[
        (* dstindex_nhop_reg.read(tmp, index); *)
-       assign standard_metadata.egress_spec @@ bcast 9 @@ var tmp;
-    ]
+       register_read "dstindex_nhop_reg_hula_get_nhop" tmp (var index);
+       [assign standard_metadata.egress_spec @@ bcast 9 @@ var tmp];
+    ] |> List.concat
   in
   let hula_nhop =
     instr_table ("hula_nhop",
@@ -215,23 +219,31 @@ let hula_ingress fixed =
   in
   let old_qdepth = Var.make "old_qdepth" 15 in
   let old_digest = Var.make "old_digest" 32 in
+  let flow_hash = Var.make "flow_hash" 16 in
   let port = Var.make "port" 16 in
   sequence [
     ifte_seq (eq_ btrue @@ var hula.isValid) [
       ifte_seq (eq_ bfalse @@ var hula.dir) [
         hula_fwd;
         select (var @@ Var.make "_symb$hula_fwd$action" 1) [
-          bfalse,
-          (* qdepth_t old_qdepth; *)
-          (* srcindex_qdepth_reg.read(old_qdepth, meta.index); *)
-          ifte_seq (ugt_ (var old_qdepth) (var hula.qdepth)) [
-              change_best_path_at_dst;
-              return_hula_to_src;
-          ] [ (* srcindex_digest_reg.read(old_digest, meta.index); *)
-          ifte (eq_ (var old_digest) (var hula.digest))
-            (assert_ @@ eq_ btrue @@ var hula.isValid (* srcindex_qdepth_reg.write(meta.index, hdr.hula.qdepth); *))
-            (skip);
-          drop;
+          bvi 0 1, sequence [
+            (* qdepth_t old_qdepth; *)
+            (* srcindex_qdepth_reg.read(old_qdepth, meta.index); *)
+            register_read "srcindex_qdepth_reg_ingress" old_qdepth (var meta.index) |> sequence_map ~f:of_action;
+            ifte_seq (ugt_ (var old_qdepth) (var hula.qdepth)) [
+                change_best_path_at_dst;
+                return_hula_to_src;
+            ] [ 
+            (* srcindex_digest_reg.read(old_digest, meta.index); *)
+            register_read "srcindex_qdepth_reg_ingress1" old_digest (var meta.index) |> sequence_map ~f:of_action;
+            ifte (eq_ (var old_digest) (var hula.digest))
+              ((* srcindex_qdepth_reg.write(meta.index, hdr.hula.qdepth); *)
+                register_write "srcindex_qdepth_reg_ingress" (var meta.index) (var hula.qdepth)
+                |> sequence_map ~f:of_action
+              )
+              skip;
+            drop;
+        ]
         ]
       ] skip
     ] [
@@ -241,13 +253,15 @@ let hula_ingress fixed =
   ] [
     ifte_seq (eq_ btrue @@ var hdr.ipv4.isValid) [
       if fixed then assume @@ eq_ btrue @@ var hdr.udp.isValid else skip;
-      assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid;
-      assert_ @@ eq_ btrue @@ var hdr.udp.isValid;
-         (* bit<16> flow_hash; *)
-         (* hash(flow_hash, hashAlgorithm.crc16, 16w0, { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.udp.srcPort}, 32w65536);       *)
+      (* bit<16> flow_hash; *)
+      (* hash(flow_hash, hashAlgorithm.crc16, 16w0, { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.udp.srcPort}, 32w65536);       *)
+      hash_ flow_hash "crc16" (bvi 0 16) [ var hdr.ipv4.srcAddr; var hdr.ipv4.dstAddr; var hdr.udp.srcPort ] (bvi 65536 32) "flow_hash_ingress"
+      |> sequence_map ~f:of_action;
       ifte_seq (eq_ (var port) (bvi 0 16)) [
         hula_nhop;
         (* flow_port_reg.write((bit<32>)flow_hash, (bit<16>)standard_metadata.egress_spec); *)
+        register_write "flow_port_reg_ingress" (var flow_hash) (var standard_metadata.egress_spec)
+        |> sequence_map ~f:of_action
       ] [
         assign standard_metadata.egress_spec @@ bcast 9 @@ var port;
       ];

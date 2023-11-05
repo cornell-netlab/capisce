@@ -9,6 +9,7 @@ type ingress_metadata_t = {
   flowlet_id : Var.t;
   ecmp_offset : Var.t;
   nhop_ipv4 : Var.t;
+  flowlet_map_index : Var.t;
 }
 
 let ingress_metadata : ingress_metadata_t = {
@@ -17,6 +18,7 @@ let ingress_metadata : ingress_metadata_t = {
   flowlet_id = Var.make "meta.ingress_metadata.flowlet_id" 16;
   ecmp_offset = Var.make "meta.ingress_metadata.ecmp_offset" 14;
   nhop_ipv4 = Var.make "meta.ingress_metadata.nhop_ipv4" 32;
+  flowlet_map_index = Var.make "meta.ingress_metadata.flowlet_map_index" 13;
 }
 
 type intrinsic_metadata_t = {
@@ -78,17 +80,19 @@ let flowlet_ingress fixed =
   let open HoareNet in
   let open BExpr in
   let open Expr in
-  let lookup_flowlet_map = [], Primitives.Action.[
-      assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid;
-      assert_ @@ eq_ btrue @@ var hdr.tcp.isValid;
-      (* hash(meta.ingress_metadata.flowlet_map_index, HashAlgorithm.crc16, (bit<13>)13w0, { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.tcp.srcPort, hdr.tcp.dstPort }, (bit<26>)26w13); *)
+  let lookup_flowlet_map = [], 
+  Primitives.Action.[
+      (* hash(meta.ingress_metadata.flowlet_map_index, HashAlgorithm.crc16, (bit<13>)13w0, { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.tcp.srcPort, hdr.tcp.dstPort }, (bit<13>)13w26); *)
+      hash_  meta.ingress_metadata.flowlet_map_index "crc16" (bvi 0 13) [ var hdr.ipv4.srcAddr; var hdr.ipv4.dstAddr; var hdr.ipv4.protocol; var hdr.tcp.srcPort; var hdr.tcp.dstPort] (bvi 13 26) "lookup_flowlet_map";
       (* flowlet_id.read(meta.ingress_metadata.flowlet_id, (bit<32>)meta.ingress_metadata.flowlet_map_index); *)
-      (* meta.ingress_metadata.flow_ipg = (bit<32>)meta.intrinsic_metadata.ingress_global_timestamp; *)
-      assign meta.ingress_metadata.flow_ipg @@ bslice 0 31 @@ var meta.intrinsic_metadata.ingress_global_timestamp;
+      register_read "flowlet_id_lookup_flowlet_map" meta.ingress_metadata.flowlet_id (var meta.ingress_metadata.flowlet_map_index);
+      [assign meta.ingress_metadata.flow_ipg @@ bslice 0 31 @@ var meta.intrinsic_metadata.ingress_global_timestamp];
       (* flowlet_lasttime.read(meta.ingress_metadata.flowlet_lasttime, (bit<32>)meta.ingress_metadata.flowlet_map_index); *)
-      assign meta.ingress_metadata.flow_ipg @@ bsub (var meta.ingress_metadata.flow_ipg) (var meta.ingress_metadata.flowlet_lasttime);
+      register_read "flowlet_lasttime_lookup_flowlet_map" meta.ingress_metadata.flowlet_lasttime (var meta.ingress_metadata.flowlet_map_index);
+      [assign meta.ingress_metadata.flow_ipg @@ bsub (var meta.ingress_metadata.flow_ipg) (var meta.ingress_metadata.flowlet_lasttime)];
       (* flowlet_lasttime.write((bit<32>)meta.ingress_metadata.flowlet_map_index, (bit<32>)meta.intrinsic_metadata.ingress_global_timestamp); *)
-    ]
+      register_write "flowlet_lasttime_lookup_flowlet_map" (var meta.ingress_metadata.flowlet_map_index) (var meta.intrinsic_metadata.ingress_global_timestamp);
+    ] |> List.concat
   in
   let flowlet = instr_table ("flowlet", [], [
     lookup_flowlet_map;
@@ -96,9 +100,10 @@ let flowlet_ingress fixed =
     ]) in
   let update_flowlet_id =
     [], Primitives.Action.[
-        assign meta.ingress_metadata.flowlet_id @@ badd (var meta.ingress_metadata.flowlet_id) (bvi 1 16);
+        [assign meta.ingress_metadata.flowlet_id @@ badd (var meta.ingress_metadata.flowlet_id) (bvi 1 16)];
         (* flowlet_id.write((bit<32>)meta.ingress_metadata.flowlet_map_index, (bit<16>)meta.ingress_metadata.flowlet_id) *)
-      ]
+        register_write "flowlet_id_update_flowlet_id" (var meta.ingress_metadata.flowlet_map_index) (var meta.ingress_metadata.flowlet_id);
+      ] |> List.concat
   in
   let new_flowlet = instr_table ("new_flowlet", [], [
     update_flowlet_id;
@@ -111,11 +116,9 @@ let flowlet_ingress fixed =
   let set_ecmp_select =
     let ecmp_base = Var.make "ecmp_base" 8 in
     let ecmp_count = Var.make "ecmp_count" 8 in
-    [ecmp_base; ecmp_count], Primitives.Action.[
-      assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid;
-      assert_ @@ eq_ btrue @@ var hdr.tcp.isValid;
+    [ecmp_base; ecmp_count],
       (* hash(meta.ingress_metadata.ecmp_offset, HashAlgorithm.crc16, (bit<10>)ecmp_base, { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.tcp.srcPort, hdr.tcp.dstPort, meta.ingress_metadata.flowlet_id }, (bit<20>)ecmp_count); *)
-    ]
+      hash_ meta.ingress_metadata.ecmp_offset "crc16" (var ecmp_base) [var hdr.ipv4.srcAddr; var hdr.ipv4.dstAddr; var hdr.ipv4.protocol; var hdr.tcp.srcPort; var hdr.tcp.dstPort; var meta.ingress_metadata.flowlet_id] (var ecmp_count) "set_ecmp_select";
   in
   let ecmp_group = instr_table (
       "ecmp_group",

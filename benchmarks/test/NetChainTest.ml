@@ -219,9 +219,10 @@ let netchain_ingress _ =
       ])
   in
   let get_sequence_act =
-    [], [
+    [], 
       (* sequence_reg.read(meta.sequence_md.seq, (bit<32>)meta.location.index); *)
-    ]
+      register_read "sequence_reg_get_sequence_act" meta.sequence_md.seq (var meta.location.index);
+    
   in
   let get_sequence =
     instr_table ("get_sequence", [], [
@@ -230,9 +231,9 @@ let netchain_ingress _ =
     ])
   in
   let read_value_act =
-    [], [
+    [], 
       (* value_reg.read(hdr.nc_hdr.value, (bit<32>)meta.location.index); *)
-    ]
+      register_read "value_reg_read_value_act" hdr.nc_hdr.value (var meta.location.index)
   in
   let read_value =
     instr_table ("read_value", [], [
@@ -242,10 +243,12 @@ let netchain_ingress _ =
   in
   let maintain_sequence_act =
     [], Action.[
-      assign meta.sequence_md.seq @@ badd (var meta.sequence_md.seq) (bvi 1 16);
+      [assign meta.sequence_md.seq @@ badd (var meta.sequence_md.seq) (bvi 1 16)];
       (* sequence_reg.write((bit<32>)meta.location.index, (bit<16>)meta.sequence_md.seq); *)
+      register_write "sequence_reg_maintain_sequence_act" (var meta.location.index) (var meta.sequence_md.seq);
       (* sequence_reg.read(hdr.nc_hdr.seq, (bit<32>)meta.location.index); *)
-    ]
+      register_read "sequence_reg_maintain_sequence_act" hdr.nc_hdr.seq (var meta.location.index)
+    ] |> List.concat
   in
   let maintain_sequence =
     instr_table ("maintain_sequence", [], [
@@ -254,10 +257,11 @@ let netchain_ingress _ =
     ])
   in
   let assign_value_act = 
-    [], [
+    [], 
       (* sequence_reg.write((bit<32>)meta.location.index, (bit<16>)hdr.nc_hdr.seq); *)
+      register_write "sequence_reg_assign_value_act" (var meta.location.index) (var hdr.nc_hdr.seq) @
       (* value_reg.write((bit<32>)meta.location.index, (bit<128>)hdr.nc_hdr.value);  *)
-    ]
+      register_write "value_reg_assign_value_act" (var meta.location.index) (var hdr.nc_hdr.value)
   in
   let assign_value =
     instr_table ("assign_value", [], [
