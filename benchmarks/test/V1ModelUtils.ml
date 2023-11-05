@@ -357,6 +357,21 @@ let register_write name index value =
   havoc_read (devnull name_value) value;
 ]
 
+let hash_ result algo base inputs max havoc_name =
+  let open Primitives.Action in
+  let open Expr in
+  let open BExpr in
+  let hash_name = Printf.sprintf "%s_hash_%s_%s" havoc_name algo (Var.str result) in
+  let hash_var = Var.make hash_name (Var.size result) in
+  List.mapi inputs ~f:(fun idx input -> 
+    input |> havoc_read @@ Printf.sprintf "%s_%i" hash_name idx
+  ) @
+  [
+    assume (uge_ (var hash_var) base);
+    assume (ult_ (var hash_var) (badd base max));
+    havoc result hash_name
+  ]
+
 let pipeline prsr ingr egr =
   let open HoareNet in
   let open BExpr in

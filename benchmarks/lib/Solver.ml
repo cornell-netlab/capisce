@@ -43,15 +43,15 @@ let run_proc_file p str =
 
   
 let run_princess = run_proc_file princess_exe
-let run_z3 =
-  let table = String.Table.create () in
-  fun str ->
+let run_z3 str =
+  (* let table = String.Table.create () in *)
+  (* fun str ->
   match String.Table.find table str with
   | Some res ->
      res
-  | None ->
+  | None -> *)
      let res = run_proc_file z3_exe str in
-     String.Table.set table ~key:str ~data:res;
+     (* String.Table.set table ~key:str ~data:res; *)
      res
      
 let run_cvc4 = run_proc_file cvc4_exe

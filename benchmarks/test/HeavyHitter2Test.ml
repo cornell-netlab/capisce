@@ -6,13 +6,17 @@ open V1ModelUtils
 type custom_metadata_t = {
   count_val1 : Var.t;
   count_val2 : Var.t;
-  nhop_ipv4 : Var.t
+  nhop_ipv4 : Var.t;
+  hash_val1 : Var.t;
+  hash_val2 : Var.t;
 }
 
 let custom_metadata : custom_metadata_t = {
   count_val1 = Var.make "meta.custom_metadata.count_val2" 16;
   count_val2 = Var.make "meta.custom_metadata.count_val1" 16;
   nhop_ipv4 = Var.make "meta.custom_metadata.nhop_ipv4" 32;
+  hash_val1 = Var.make "meta.custom_metadata.hash_val1" 16;
+  hash_val2 = Var.make "meta.custom_metadata.hash_val2" 16;
 }
 
 type meta_t =  {
@@ -66,23 +70,27 @@ let hh2_ingress fixed =
   let set_heavy_hitter_count =
     [], Primitives.Action.[
         (* // Count the hash 1 for indexing *)
-        assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid;
-        assert_ @@ eq_ btrue @@ var hdr.tcp.isValid;
         (* hash(meta.custom_metadata.hash_val1, HashAlgorithm.csum16, (bit<16>)16w0, { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.tcp.srcPort, hdr.tcp.dstPort }, (bit<32>)32w16); *)
+        hash_ meta.custom_metadata.hash_val1 "csum16" (bvi 0 16) [var hdr.ipv4.srcAddr;var hdr.ipv4.dstAddr;var hdr.ipv4.protocol;var hdr.tcp.srcPort;var hdr.tcp.dstPort] (bvi 16 32) "set_heavy_hitter_count";
         (* // Read the value in the register with that index *)
         (* heavy_hitter_counter1.read(meta.custom_metadata.count_val1, (bit<32>)meta.custom_metadata.hash_val1); *)
+        register_read "heavy_hitter_counter1_set_heavy_hitter_count" meta.custom_metadata.count_val1 (var meta.custom_metadata.hash_val1);
         (* // Incremet the value with 1 *)
-        assign meta.custom_metadata.count_val1 @@ badd (var meta.custom_metadata.count_val1) (bvi 1 16);
+        [assign meta.custom_metadata.count_val1 @@ badd (var meta.custom_metadata.count_val1) (bvi 1 16)];
         (* // Write the value back to the register with that index *)
         (* heavy_hitter_counter1.write((bit<32>)meta.custom_metadata.hash_val1, (bit<16>)meta.custom_metadata.count_val1); *)
+        register_write "heavy_hitter_counter1_set_heavy_hitter_count" (var meta.custom_metadata.hash_val1) (var meta.custom_metadata.count_val1);
         (* // Count the hash 2 for another indexing, similar to the first hash *)
-        assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid;
-        assert_ @@ eq_ btrue @@ var hdr.tcp.isValid;
         (* hash(meta.custom_metadata.hash_val2, HashAlgorithm.crc16, (bit<16>)16w0, { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.tcp.srcPort, hdr.tcp.dstPort }, (bit<32>)32w16); *)
+        hash_ meta.custom_metadata.hash_val2 "crc16" (bvi 0 16) [var hdr.ipv4.srcAddr; var hdr.ipv4.dstAddr; var hdr.ipv4.protocol; var hdr.tcp.srcPort; var hdr.tcp.dstPort] (bvi 16 32) "set_heavy_hitter_count";
         (* heavy_hitter_counter2.read(meta.custom_metadata.count_val2, (bit<32>)meta.custom_metadata.hash_val2); *)
-        assign meta.custom_metadata.count_val2 @@ badd (var meta.custom_metadata.count_val2) (bvi 1 16);
+        register_read "heavy_hitter_counter2_set_heavy_hitter_count" meta.custom_metadata.count_val2 (var meta.custom_metadata.hash_val2);
+        [assign meta.custom_metadata.count_val2 @@ badd (var meta.custom_metadata.count_val2) (bvi 1 16)];
         (* heavy_hitter_counter2.write((bit<32>)meta.custom_metadata.hash_val2, (bit<16>)meta.custom_metadata.count_val2); *)
-      ]
+        register_write "heavy_hitter_counter2_set_heavy_hitter_count" 
+          (var meta.custom_metadata.hash_val2)
+          (var meta.custom_metadata.count_val2)
+      ] |> List.concat
   in
   let set_heavy_hitter_count_table =
     instr_table (
