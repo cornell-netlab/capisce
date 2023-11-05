@@ -12,7 +12,7 @@ let test_suites : unit Alcotest.test list = [
   "Traversals", Traversals.tests;
   "Dependent Type System", Dependent.tests;
   "Util", UtilTest.tests;
-  "Programs", Programs.tests;
+  "Raw Programs", RawPrograms.tests;
   "Concolic Helpers", ConcolicTest.tests;
 ]
 

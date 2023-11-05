@@ -1,0 +1,54 @@
+(declare-const _symb$acl$action$_$0 (_ BitVec 3))
+(declare-const _symb$classifier$action$_$0 (_ BitVec 1))
+(declare-const _symb$egress_vlan$action$_$0 (_ BitVec 2))
+(declare-const _symb$fwd_classifier$0$fwd_type$_$0 (_ BitVec 3))
+(declare-const _symb$hashed$action$_$0 (_ BitVec 2))
+(declare-const _symb$ingress_port_vlan$action$_$0 (_ BitVec 2))
+(declare-const _symb$multicast$action$_$0 (_ BitVec 1))
+(declare-const _symb$next_mpls$action$_$0 (_ BitVec 1))
+(declare-const _symb$next_vlan$action$_$0 (_ BitVec 1))
+(declare-const _symb$queues$action$_$0 (_ BitVec 1))
+(declare-const _symb$rewriter$action$_$0 (_ BitVec 2))
+(declare-const _symb$xconnect$2$port_num$_$0 (_ BitVec 9))
+(declare-const _symb$xconnect$action$_$0 (_ BitVec 2))
+
+(assert 
+   ;; (forall ((_symb$acl$action$_$0 (_ BitVec 3)))
+(not 
+(and
+  (and
+    (and
+      (and
+        (= _symb$classifier$action$_$0 (_ bv1 1))
+        (= _symb$ingress_port_vlan$action$_$0 (_ bv1 2))
+        (= _symb$next_mpls$action$_$0 (_ bv0 1))
+        (= _symb$next_vlan$action$_$0 (_ bv0 1))
+        (= _symb$acl$action$_$0 (_ bv2 3))
+        (bvule (_ bv2 2) _symb$xconnect$action$_$0)
+        (= _symb$hashed$action$_$0 (_ bv0 2))
+        (= _symb$multicast$action$_$0 (_ bv1 1))
+        (= _symb$queues$action$_$0 (_ bv1 1))
+        (= _symb$egress_vlan$action$_$0 (_ bv1 2))
+        (= _symb$rewriter$action$_$0 (_ bv1 2)))
+      (not(= _symb$fwd_classifier$0$fwd_type$_$0 (_ bv0 3))))
+    (not(= _symb$xconnect$2$port_num$_$0 (_ bv511 9)))))))
+
+(assert (not (and
+  (not (= _symb$fwd_classifier$0$fwd_type$_$0 #b000))
+  (not (= _symb$xconnect$2$port_num$_$0 #b111111111))
+  (= _symb$rewriter$action$_$0 #b01)
+  (= _symb$egress_vlan$action$_$0 #b01)
+  (= _symb$queues$action$_$0 #b1)
+  (= _symb$multicast$action$_$0 #b1)
+  (= _symb$hashed$action$_$0 #b00)
+  (bvule #b10 _symb$xconnect$action$_$0)
+  (= _symb$next_vlan$action$_$0 #b0)
+  (= _symb$next_mpls$action$_$0 #b0)
+  (= _symb$ingress_port_vlan$action$_$0 #b01)
+  (= _symb$classifier$action$_$0 #b1)
+  (not true)))
+
+
+;; (check-sat)
+(apply qe)
+
