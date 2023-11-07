@@ -27,11 +27,11 @@ conc mc_nat_fixed &\
 conc ts_switching &\
 conc ts_switching_fixed &\
 conc heavy_hitter_2 &\
-conc heavy_hitter_2_fixed &\
+# conc heavy_hitter_2_fixed &\
 conc flowlet &\
-conc flowlet_fixed &\
+# conc flowlet_fixed &\
 conc hula &\
-conc hula_fixed &\
+# conc hula_fixed &\
 conc netchain &\
 conc simple_nat &\
 conc fabric &\

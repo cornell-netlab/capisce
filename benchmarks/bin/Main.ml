@@ -30,11 +30,11 @@ let experiment : Command.t =
       | "heavy_hitter_2" | "hh2" -> HeavyHitter2.heavy_hitter_2 false
       (* | "heavy_hitter_2_fixed" | "hh2_fixed" -> HeavyHitter2.heavy_hitter_2 true *)
       | "flowlet" -> Flowlet.flowlet false
-      | "flowlet_fixed" -> Flowlet.flowlet true
+      (* | "flowlet_fixed" -> Flowlet.flowlet true *)
       | "hula" -> Hula.hula false
       (* | "hula_fixed" -> Hula.hula true *)
       | "linearroad" -> Linearroad.linearroad false
-      | "linearroad_annotated" -> Linearroad.linearroad true
+      | "linearroad_fixed" -> Linearroad.linearroad true
       | "netchain" -> NetChain.netchain
       | "simple_nat" | "simplenat" -> SimpleNat.simple_nat
       | "fabric" -> Fabric.fabric false

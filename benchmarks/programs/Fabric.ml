@@ -753,7 +753,7 @@ let pre_next =
     next_vlan
   ]
 
-let acl = 
+let acl fixed = 
   let open HoareNet in
   let open Expr in
   let set_next_id_acl =
@@ -793,9 +793,12 @@ let acl =
         `MaskableDegen fabric_metadata.lkp.ipv4_src;        
         `MaskableDegen fabric_metadata.lkp.ipv4_dst;
         `MaskableDegen fabric_metadata.lkp.ip_proto;
-        (* `Maskable      hdr.icmp.type_;
-        `Maskable      hdr.icmp.code; *)
-        `MaskableDegen fabric_metadata.lkp.icmp_code;
+        if fixed 
+        then `MaskableDegen fabric_metadata.lkp.icmp_type
+        else `Maskable      hdr.icmp.type_;
+        if fixed
+        then `MaskableDegen fabric_metadata.lkp.icmp_code
+        else `Maskable      hdr.icmp.code;
         `MaskableDegen fabric_metadata.lkp.icmp_type;
         `MaskableDegen fabric_metadata.lkp.l4_sport;
         `MaskableDegen fabric_metadata.lkp.l4_dport;
@@ -947,7 +950,7 @@ let pkt_io_ingress =
     exit_; 
   ] []
 
-let fabric_ingress _ =
+let fabric_ingress fixed =
   let open HoareNet in
   let open Expr in
   let open BExpr in
@@ -961,7 +964,7 @@ let fabric_ingress _ =
         forwarding skip;
       ifte (eq_ bfalse (var fabric_metadata.skip_next))
         pre_next skip;
-      acl;
+      acl fixed;
       ifte (eq_ bfalse (var fabric_metadata.skip_next))
         next skip;
       qos;
