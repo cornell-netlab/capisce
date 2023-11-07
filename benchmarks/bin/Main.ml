@@ -28,11 +28,11 @@ let experiment : Command.t =
       | "ts_switching" -> TSSwitching.ts_switching false
       | "ts_switching_fixed" -> TSSwitching.ts_switching true
       | "heavy_hitter_2" | "hh2" -> HeavyHitter2.heavy_hitter_2 false
-      | "heavy_hitter_2_fixed" | "hh2_fixed" -> HeavyHitter2.heavy_hitter_2 true
+      (* | "heavy_hitter_2_fixed" | "hh2_fixed" -> HeavyHitter2.heavy_hitter_2 true *)
       | "flowlet" -> Flowlet.flowlet false
       | "flowlet_fixed" -> Flowlet.flowlet true
       | "hula" -> Hula.hula false
-      | "hula_fixed" -> Hula.hula true
+      (* | "hula_fixed" -> Hula.hula true *)
       | "linearroad" -> Linearroad.linearroad false
       | "linearroad_annotated" -> Linearroad.linearroad true
       | "netchain" -> NetChain.netchain

@@ -1,7 +1,7 @@
 #! /usr/bin/bash
 
-data_dir="${HOME}/p4-inference/benchmarks/survey_data"
-log_dir="${HOME}/p4-inference/benchmarks/log"
+data_dir="./survey_data"
+log_dir="./log"
 
 # rm -r $data_dir
 mkdir $data_dir
