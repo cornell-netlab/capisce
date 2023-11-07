@@ -2,7 +2,7 @@ module P4Info = Info
 open Core
 module Info = P4Info
 
-let princess_exe = "/home/ericthewry/Downloads/princess-bin-2021-05-10/princess -inputFormat=smtlib +mostGeneralConstraint +incremental +stdin "
+let princess_exe = "~/princess/princess -inputFormat=smtlib +mostGeneralConstraint +incremental +stdin "
 (* let z3_exe = "/usr/bin/z3 -smt2 -t:30000" *)
 let z3_exe = "/usr/bin/z3 -smt2 -in"
 (* let z3_daemon = z3_exe ^ " -in" *)
