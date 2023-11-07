@@ -23,6 +23,20 @@ def unsolveable(formula_string):
 def trivial(formula_string):
     return "true" == formula_string
 
+def underscores(n):
+    return n.replace("_","\\_")
+
+def sci(time_str):
+    py_sci_not = "{:e}".format(float(time_str))
+    if py_sci_not == "inf":
+        return "\\infty"
+    else:
+        base, exp = py_sci_not.split('e')
+        return "{0} \\times 10^{{{1}}}".format(base, str(int(exp)))
+
+def timeout(time_str):
+    return time_str == "inf" or time_str == "\\infty"
+
 data = {}
 names = [
     "ecmp",
@@ -41,7 +55,7 @@ names = [
     "flowlet",
     # "flowlet_fixed",
     "hula",
-    "hula_fixed",
+    # "hula_fixed",
     "linearroad",
     "linearroad_fixed",
     "netchain",
@@ -63,13 +77,14 @@ for n in names:
     else:
         data[n]["result"] = ""
 
-print("\\begin{array}{l l l}")
-print("\\toprule")
-print("Program & Time (s) & Unsolveable?\\ \midrule")
+print("\\footnotesize")
+print("\\[\\begin{array}{l l l}")
+print("    \\text{Program} & \\text{Time (s)} & \\text{Result}\\\\ \midrule")
 names.sort(key=lambda t: float(data[t]["time"]))
 for n in names:
     did_fail = "\\bot"     if unsolveable(data[n]["result"]) else \
                "\\top"     if trivial(data[n]["result"]) else \
+               ""          if timeout(data[n]["time"]) else \
                "\\formula"
-    print("    {0} & {1:e} & {2} \\\\".format(n, float(data[n]["time"]), did_fail))
-print("\\end{array}")
+    print("    \\texttt{{{0}}} & {1} & {2} \\\\".format(underscores(n), sci(data[n]["time"]), did_fail))
+print("\\end{array}\\]")
