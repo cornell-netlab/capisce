@@ -15,27 +15,26 @@ function conc {
 
 }
 
-# conc ecmp &\
-# conc netpaxos_acceptor &\
-# conc resubmit &\
-# conc ndp_router &\
-# conc heavy_hitter_1 &\
-# conc arp &\
-# conc "07-multiprotocol"&\
+conc ecmp &\
+conc netpaxos_acceptor &\
+conc resubmit &\
+conc ndp_router &\
+conc heavy_hitter_1 &\
+conc arp &\
+conc "07-multiprotocol"&\
 conc mc_nat &\
 conc mc_nat_fixed &\
 conc ts_switching &\
 conc ts_switching_fixed &\
-conc heavy_hitter_2 
-# &\
-# conc heavy_hitter_2_fixed &\
-# conc flowlet &\
-# conc flowlet_fixed &\
-# conc hula &\
-# conc hula_fixed &\
-# conc netchain &\
-# conc simple_nat &\
-# conc fabric &\
-# conc fabric_fixed &\
-# conc linearroad &\
-# conc linearroad_fixed
+conc heavy_hitter_2 &\
+conc heavy_hitter_2_fixed &\
+conc flowlet &\
+conc flowlet_fixed &\
+conc hula &\
+conc hula_fixed &\
+conc netchain &\
+conc simple_nat &\
+conc fabric &\
+conc fabric_fixed &\
+conc linearroad &\
+conc linearroad_fixed
