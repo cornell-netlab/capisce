@@ -586,32 +586,32 @@ let linearroad_ingress annot =
   let open Primitives in
   let do_update_pos_state =
     [], Action.[
-        assert_ @@ eq_ btrue @@ var hdr.pos_report.isValid;
         (* v_valid_reg.read(meta.v_state.new, (bit<32>)hdr.pos_report.vid); *)
-        assign meta.v_state.new_ @@ bnot @@ var meta.v_state.new_;
-        assert_ @@ eq_ btrue @@ var hdr.pos_report.isValid;
+        register_read "v_valid_reg_do_update_pos_state" meta.v_state.new_ (var hdr.pos_report.vid);
+        [assign meta.v_state.new_ @@ bnot @@ var meta.v_state.new_];
         (* v_spd_reg.read(meta.v_state.prev_spd, (bit<32>)hdr.pos_report.vid); *)
-        assert_ @@ eq_ btrue @@ var hdr.pos_report.isValid;
+        register_read "v_spd_reg_do_update_pos_state" meta.v_state.prev_spd (var hdr.pos_report.vid);
         (* v_xway_reg.read(meta.v_state.prev_xway, (bit<32>)hdr.pos_report.vid); *)
-        assert_ @@ eq_ btrue @@ var hdr.pos_report.isValid;
+        register_read "v_xway_reg_do_update_pos_state" meta.v_state.prev_xway (var hdr.pos_report.vid);
         (* v_lane_reg.read(meta.v_state.prev_lane, (bit<32>)hdr.pos_report.vid); *)
-        assert_ @@ eq_ btrue @@ var hdr.pos_report.isValid;
+        register_read "v_lane_reg_do_update_pos_state" meta.v_state.prev_lane (var hdr.pos_report.vid);
         (* v_seg_reg.read(meta.v_state.prev_seg, (bit<32>)hdr.pos_report.vid); *)
-        assert_ @@ eq_ btrue @@ var hdr.pos_report.isValid;
+        register_read "v_seg_reg_do_update_pos_state" meta.v_state.prev_seg (var hdr.pos_report.vid);
         (* v_dir_reg.read(meta.v_state.prev_dir, (bit<32>)hdr.pos_report.vid); *)
-        assert_ @@ eq_ btrue @@ var hdr.pos_report.isValid;
+        register_read "v_dir_reg_do_update_pos_state" meta.v_state.prev_dir (var meta.v_state.prev_dir);
         (* v_valid_reg.write((bit<32>)hdr.pos_report.vid, (bit<1>)1w1); *)
-        assert_ @@ eq_ btrue @@ var hdr.pos_report.isValid;
+        register_write "v_valid_reg_do_update_pos_state" (var hdr.pos_report.vid) (bvi 1 1);
         (* v_spd_reg.write((bit<32>)hdr.pos_report.vid, (bit<8>)hdr.pos_report.spd); *)
-        assert_ @@ eq_ btrue @@ var hdr.pos_report.isValid;
+        register_write "v_spd_reg_do_update_pos_state" (var hdr.pos_report.vid) (var hdr.pos_report.spd);
         (* v_xway_reg.write((bit<32>)hdr.pos_report.vid, (bit<8>)hdr.pos_report.xway); *)
-        assert_ @@ eq_ btrue @@ var hdr.pos_report.isValid;
+        register_write "v_xway_reg_do_update_pos_state" (var hdr.pos_report.vid) (var hdr.pos_report.xway);
         (* v_lane_reg.write((bit<32>)hdr.pos_report.vid, (bit<3>)hdr.pos_report.lane); *)
-        assert_ @@ eq_ btrue @@ var hdr.pos_report.isValid;
+        register_write "v_lane_reg_do_update_pos_state" (var hdr.pos_report.vid) (var hdr.pos_report.lane);
         (* v_seg_reg.write((bit<32>)hdr.pos_report.vid, (bit<8>)hdr.pos_report.seg); *)
-        assert_ @@ eq_ btrue @@ var hdr.pos_report.isValid;
+        register_write "v_seg_reg_do_update_pos_state" (var hdr.pos_report.vid) (var hdr.pos_report.seg);
         (* v_dir_reg.write((bit<32>)hdr.pos_report.vid, (bit<1>)hdr.pos_report.dir); *)
-      ]
+        register_write "v_dir_reg_do_update_pos_state" (var hdr.pos_report.vid) (var hdr.pos_report.dir);
+      ] |> List.concat
   in
   let update_pos_state = 
     instr_table ("update_pos_state", [], [
