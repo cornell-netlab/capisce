@@ -8,3 +8,5 @@ cpi
 **/ccompiled.c
 **/*.png
 fabric_1k_paths.data
+survey_data
+log

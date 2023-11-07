@@ -45,7 +45,13 @@ let experiment : Command.t =
         DependentTypeChecker.HoareNet.infer p None None ~qe:(if enum then `Enum else `Conc)
       in
       let st = Clock.start () in
-      let phi = algorithm program in
+      let phi = 
+        try algorithm program with
+        | Failure msg -> 
+          if String.(msg = "unsolveable") then
+            BExpr.false_ 
+          else failwith msg
+      in
       let time = Clock.stop st  |> Float.to_string in
       let filename f = Printf.sprintf "%s/%s_%s_%s" out name (if enum then "enum" else "cegps") f in
       Out_channel.write_all (filename "formula") ~data:(BExpr.to_smtlib phi);

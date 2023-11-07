@@ -1,7 +1,7 @@
 open Base_quickcheck
 open Core
 
-let enable_smart_constructors = ref `Off
+let enable_smart_constructors = ref `On
 
 let q_count = ref (Bigint.zero)
 let measure s : unit =
