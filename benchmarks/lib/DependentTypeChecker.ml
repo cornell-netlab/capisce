@@ -192,16 +192,16 @@ module HoareNet = struct
       | Choice cxs ->
         List.map cxs ~f:safe_to_gpl_exn |> GPL.choices
 
-    let rec annotated_to_gpl_exn (cmd : t) =
+    let rec annotated_to_gpl (cmd : t) =
       match cmd with
       | Prim triple ->
         GPL.sequence [Option.value_map ~f:GPL.assert_ triple.precondition ~default:GPL.skip;
                       triple.cmd;
                       Option.value_map ~f:GPL.assert_ triple.postcondition ~default:GPL.skip]
       | Seq cs ->
-        List.map cs ~f:annotated_to_gpl_exn |> GPL.sequence
+        List.map cs ~f:annotated_to_gpl |> GPL.sequence
       | Choice cxs ->
-        List.map cxs ~f:annotated_to_gpl_exn |> GPL.choices
+        List.map cxs ~f:annotated_to_gpl |> GPL.choices
 
     let triple (pre : BExpr.t) (cmd : t) (post : BExpr.t) =
       prim ({precondition = Some pre;
@@ -223,7 +223,7 @@ module HoareNet = struct
     let vc cmd =
       (* Computes the monolithic VC for this program *)
       let open ASTs in
-      annotated_to_gpl_exn cmd
+      annotated_to_gpl cmd
       |> GPL.encode_tables
       |> Psv.passify
       |> snd

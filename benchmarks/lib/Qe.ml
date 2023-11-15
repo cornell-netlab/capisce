@@ -248,13 +248,17 @@ let path_generator gcl =
       | Some pi -> Some pi
       
 
+let num_cexs = ref Bigint.zero
+
 let concolic (gcl : GCL.t) : BExpr.t =
   let get_new_path = path_generator gcl in
-  let num_cexs = ref Bigint.zero in
+  num_cexs := Bigint.zero;
   let rec loop phi_agg =
     Log.debug_s "checking implication...";
     match get_new_path phi_agg with
-    | None -> phi_agg
+    | None -> 
+      (* TERMINATION *)
+      phi_agg
     | Some unsolved_path ->
       Bigint.incr num_cexs;
       Log.qe "found counterexample number %s" @@ lazy (Bigint.to_string !num_cexs);

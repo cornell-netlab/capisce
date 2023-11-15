@@ -339,6 +339,25 @@ end
       | GCL.Choice cs ->
         List.map cs ~f:of_gcl
         |> choices
+        
+    let rec count_paths c =
+      match c with 
+      | Seq cs ->
+        List.fold cs ~init:Bigint.one
+        ~f:(fun running_product command ->
+          count_paths command
+          |> Bigint.( * ) running_product
+          )
+      | Choice cs ->
+        List.fold cs ~init:Bigint.zero 
+        ~f:(fun running_sum command ->
+            count_paths command
+            |> Bigint.(+) running_sum
+          )
+      | Prim (Active _) ->
+        Bigint.one
+      | Prim (Table {actions;_}) ->
+        List.length actions |> Bigint.of_int
 
     let rec encode_tables (cmd : t) : GCL.t =
       match cmd with

@@ -28,11 +28,11 @@ let experiment : Command.t =
       | "ts_switching" -> TSSwitching.ts_switching false
       | "ts_switching_fixed" -> TSSwitching.ts_switching true
       | "heavy_hitter_2" | "hh2" -> HeavyHitter2.heavy_hitter_2 false
-      (* | "heavy_hitter_2_fixed" | "hh2_fixed" -> HeavyHitter2.heavy_hitter_2 true *)
+      | "heavy_hitter_2_fixed" | "hh2_fixed" -> HeavyHitter2.heavy_hitter_2 true
       | "flowlet" -> Flowlet.flowlet false
-      (* | "flowlet_fixed" -> Flowlet.flowlet true *)
+      | "flowlet_fixed" -> Flowlet.flowlet true
       | "hula" -> Hula.hula false
-      (* | "hula_fixed" -> Hula.hula true *)
+      | "hula_fixed" -> Hula.hula true
       | "linearroad" -> Linearroad.linearroad false
       | "linearroad_fixed" -> Linearroad.linearroad true
       | "netchain" -> NetChain.netchain
@@ -41,20 +41,30 @@ let experiment : Command.t =
       | "fabric_fixed" -> Fabric.fabric true
       | _ -> failwithf "unrecognized program:%s" name ()
       in
+      let open DependentTypeChecker in
       let algorithm p = 
-        DependentTypeChecker.HoareNet.infer p None None ~qe:(if enum then `Enum else `Conc)
+        HoareNet.infer p None None ~qe:(if enum then `Enum else `Conc)
+      in
+      let paths p =
+        HoareNet.annotated_to_gpl p
+        |> ASTs.GPL.count_paths
+        |> Bigint.to_string
       in
       let st = Clock.start () in
       let phi = 
         try algorithm program with
         | Failure msg -> 
           if String.(msg = "unsolveable") then
-            BExpr.false_ 
+            BExpr.false_
           else failwith msg
       in
+      let num_cexs = !Qe.num_cexs |> Bigint.to_string in
       let time = Clock.stop st  |> Float.to_string in
       let filename f = Printf.sprintf "%s/%s_%s_%s" out name (if enum then "enum" else "cegps") f in
       Out_channel.write_all (filename "formula") ~data:(BExpr.to_smtlib phi);
+      Out_channel.write_all (filename "size") ~data:(Int.to_string @@ BExpr.size phi);
+      Out_channel.write_all (filename "tot_paths") ~data:(paths program);
+      Out_channel.write_all (filename "count_paths") ~data:(num_cexs);
       Out_channel.write_all (filename "time") ~data:time
   ]
 
