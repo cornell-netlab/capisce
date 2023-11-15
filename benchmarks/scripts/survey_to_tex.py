@@ -29,7 +29,7 @@ def sci(time_str):
         return "\\infty"
     else:
         base, exp = py_sci_not.split('e')
-        return "{0} \\times 10^{{{1}}}".format(base, str(int(exp)))
+        return "{0:.2g} \\times 10^{{{1}}}".format(float(base), int(exp))
 
 def timeout(time_str):
     return time_str == "inf" or time_str == "\\infty"
@@ -82,21 +82,21 @@ for n in names:
 
 
 print("\\footnotesize")
-print("\\[\\begin{array}{l l l l}")
-print("    \\text{Program} & \\text{Program Paths} &  \\text{Result} & \\text{Time (ms)} & \\text{Explored Paths} & \\text{Spec AST Size} & \\text{Explored}\\\\ \midrule")
+print("\\[\\begin{array}{l l l l l l l l}")
+print("    \\text{Program} & \\text{Program Paths} &  \\text{Result} & \\text{Time (ms)} & \\text{Explored Paths} & \\text{Spec AST Size} & \\text{\\\% Explored}\\\\ \midrule")
 names.sort(key=lambda t: float(data[t]["tot_paths"]))
 for n in names:
     did_fail = "\\bot"     if unsolveable(data[n]["formula"]) else \
                "\\top"     if trivial(data[n]["formula"]) else \
                ""          if timeout(data[n]["time"]) else \
                "\\formula"
-    print("    \\texttt{{{name}}} & {prog_paths} & {result} & {time} & {exp_paths}  & {size} & {percent:.2g}\\\% \\\\".format(
+    print("    \\texttt{{{name}}} & {prog_paths} & {result} & {time} & {exp_paths}  & {size} & {percent}\\\% \\\\".format(
         name = underscores(n),
         prog_paths = data[n]["tot_paths"],
         result = did_fail,
         time = sci(data[n]["time"]),
         exp_paths = data[n]["count_paths"],
         size = data[n]["size"],
-        percent = 100 * float(data[n]["count_paths"]) / float(data[n]["tot_paths"])
+        percent = sci(100 * float(data[n]["count_paths"]) / float(data[n]["tot_paths"]))
         ))
 print("\\end{array}\\]")
