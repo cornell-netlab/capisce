@@ -93,11 +93,11 @@ for n in names:
                "\\top"     if trivial(data[n]["formula"]) else \
                ""          if timeout(data[n]["time"]) else \
                "\\formula"
-    print("    \\texttt{{{name}}} & {prog_paths} & {result} & {time} & {exp_paths}  & {size} & {percent} \\\\".format(
+    print("    \\texttt{{{name}}} & {prog_paths} & {result} & {time:.26} & {exp_paths}  & {size} & {percent:.2g} \\\\".format(
         name = underscores(n),
         prog_paths = data[n]["tot_paths"],
         result = did_fail,
-        time = data[n]["time"],
+        time = float(data[n]["time"]),
         exp_paths = data[n]["count_paths"],
         size = data[n]["size"],
         percent = float(data[n]["count_paths"]) / float(data[n]["tot_paths"])
