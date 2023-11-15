@@ -437,18 +437,19 @@ let size_ = ref 0
          
 let rec size_aux = function
   | TFalse | TTrue | LVar _ ->
-     size_ := !size_ + 1  
+    Int.incr size_  
   | TComp (_,e1,e2) ->
-     size_ := !size_ + 1 + Expr.size e1 + Expr.size e2;
+    Int.incr size_;
+    size_ := !size_ + Expr.size e1 + Expr.size e2
   | TNot (b) ->
-     size_ := !size_ + 1;
-     size_aux b
+    Int.incr size;
+    size_aux b
   | TNary (_, bs) ->
-     size_ := !size_ + 1;
-     List.iter bs ~f:size_aux
+    Int.incr size_;
+    List.iter bs ~f:size_aux
   | Forall (_, b) | Exists (_, b) ->
-     size_ := !size_ + 1;
-     size_aux b
+    Int.incr size_;
+    size_aux b
 
 let size b =
   size_ := 0;
