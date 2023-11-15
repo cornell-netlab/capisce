@@ -72,7 +72,7 @@ for n in names:
     data[n] = {}
     attributes = [
         ("time", "inf"),
-        ("result", ""),
+        ("formula", ""),
         ("size", ""),
         ("tot_paths", "inf"),
         ("count_paths", "0")
@@ -83,19 +83,20 @@ for n in names:
 
 print("\\footnotesize")
 print("\\[\\begin{array}{l l l l}")
-print("    \\text{Program} & \\text{Program Paths} &  \\text{Result} & \\text{Time (ms)} & \\text{Explored Paths} & \\text{Spec AST Size} \\\\ \midrule")
+print("    \\text{Program} & \\text{Program Paths} &  \\text{Result} & \\text{Time (ms)} & \\text{Explored Paths} & \\text{Spec AST Size} & \\text{Explored}\\\\ \midrule")
 names.sort(key=lambda t: float(data[t]["tot_paths"]))
 for n in names:
-    did_fail = "\\bot"     if unsolveable(data[n]["result"]) else \
-               "\\top"     if trivial(data[n]["result"]) else \
+    did_fail = "\\bot"     if unsolveable(data[n]["formula"]) else \
+               "\\top"     if trivial(data[n]["formula"]) else \
                ""          if timeout(data[n]["time"]) else \
                "\\formula"
-    print("    \\texttt{{{name}}} & {prog_paths} & {result} & {time} & {exp_paths}  & {size} \\\\".format(
+    print("    \\texttt{{{name}}} & {prog_paths} & {result} & {time} & {exp_paths}  & {size} & {percent:.2g}\\\% \\\\".format(
         name = underscores(n),
         prog_paths = data[n]["tot_paths"],
         result = did_fail,
         time = sci(data[n]["time"]),
         exp_paths = data[n]["count_paths"],
-        size = data[n]["size"]
+        size = data[n]["size"],
+        percent = 100 * float(data[n]["count_paths"]) / float(data[n]["tot_paths"])
         ))
 print("\\end{array}\\]")
