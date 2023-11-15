@@ -2,7 +2,7 @@
 let () = Pbench.Log.override ()
 
 let test_suites : unit Alcotest.test list = [
-  (* "Monitor", MonitorTest.tests; *)
+  "Monitor", MonitorTest.tests;
   (* "Optimizer", Optimizer.tests; *)
   "Survey", SurveyTests.tests;
   "Smtlib Parser", Parser.tests;

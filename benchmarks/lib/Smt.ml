@@ -49,13 +49,9 @@ let check_sat_funs ?(timeout=None) consts funs phi_str =
   (* Printf.sprintf "%s%s\n%s\n(assert %s)\n\n(check-sat)%!" *)
   Printf.sprintf "%s%s\n%s\n(assert %s)\n\n(check-sat)%!"
     (string_of_timeout timeout)
-    (Var.list_to_smtlib_decls consts)
+    (Var.dedup consts |> Var.list_to_smtlib_decls)
     funs
-    (
-      Fn.id
-      (* (fun _ -> "true") *)
-      phi_str
-    )
+    phi_str
 
 
 let check_sat_model ?(timeout=None) consts phi_str =

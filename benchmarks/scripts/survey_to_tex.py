@@ -97,9 +97,9 @@ for n in names:
         name = underscores(n),
         prog_paths = data[n]["tot_paths"],
         result = did_fail,
-        time = sci(data[n]["time"]),
+        time = data[n]["time"],
         exp_paths = data[n]["count_paths"],
         size = data[n]["size"],
-        percent = sci(float(data[n]["count_paths"]) / float(data[n]["tot_paths"]))
+        percent = float(data[n]["count_paths"]) / float(data[n]["tot_paths"])
         ))
 print("\\end{array}\\]")

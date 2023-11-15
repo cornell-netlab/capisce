@@ -799,7 +799,6 @@ let acl fixed =
         if fixed
         then `MaskableDegen fabric_metadata.lkp.icmp_code
         else `Maskable      hdr.icmp.code;
-        `MaskableDegen fabric_metadata.lkp.icmp_type;
         `MaskableDegen fabric_metadata.lkp.l4_sport;
         `MaskableDegen fabric_metadata.lkp.l4_dport;
         `MaskableDegen fabric_metadata.port_type;
@@ -866,11 +865,11 @@ let next =
     instr_table ("hashed",
       [
         `Exact fabric_metadata.next_id;
-        `Exact fabric_metadata.ipv4_src_addr; (* selector *)
+        (* `Exact fabric_metadata.ipv4_src_addr; (* selector *)
         `Exact fabric_metadata.ipv4_dst_addr; (* selector *)
         `Exact fabric_metadata.ip_proto; (* selector *)
         `Exact fabric_metadata.l4_sport; (* selector *)
-        `Exact fabric_metadata.l4_dport; (* selector *)
+        `Exact fabric_metadata.l4_dport; selector *)
       ], [
         output_hashed; routing_hashed; 
         nop (*defaultonly*)
