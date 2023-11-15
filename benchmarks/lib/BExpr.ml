@@ -442,7 +442,7 @@ let rec size_aux = function
     Int.incr size_;
     size_ := !size_ + Expr.size e1 + Expr.size e2
   | TNot (b) ->
-    Int.incr size;
+    Int.incr size_;
     size_aux b
   | TNary (_, bs) ->
     Int.incr size_;
