@@ -25,7 +25,9 @@ def underscores(n):
     return n.replace("_","\\_")
 
 def sci(time_str):
-    py_sci_not = "{:e}".format(float(time_str))
+    py_sci_not = "{}".format(float(time_str))
+    if "e" not in py_sci_not:
+        return py_sci_not
     if py_sci_not == "inf":
         return "\\infty"
     else:
@@ -102,6 +104,6 @@ for n in names:
         time = "\\infty" if data[n]["time"] == "inf" else round(float(data[n]["time"]), sigfigs=2),
         exp_paths = data[n]["count_paths"],
         size = data[n]["size"],
-        percent = round(float(data[n]["count_paths"]) / float(data[n]["tot_paths"]), sigfigs=2)
+        percent = sci(round(float(data[n]["count_paths"]) / float(data[n]["tot_paths"]), sigfigs=2))
         ))
 print("\\end{array}\\]")
