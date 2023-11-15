@@ -86,7 +86,7 @@ for n in names:
 
 print("\\footnotesize")
 print("\\[\\begin{array}{l l l l l l l l}")
-print("    \\text{Program} & \\text{Program Paths} &  \\text{Result} & \\text{Time (ms)} & \\text{Explored Paths} & \\text{Spec AST Size} & \\text{\% Explored}<{\%}\\\\ \midrule")
+print("    \\text{Program} & \\text{Program Paths} &  \\text{Result} & \\text{Time (ms)} & \\text{Explored Paths} & \\text{Spec AST Size} & \\text{Explored Ratio}\\\\ \midrule")
 names.sort(key=lambda t: float(data[t]["tot_paths"]))
 for n in names:
     did_fail = "\\bot"     if unsolveable(data[n]["formula"]) else \
@@ -100,6 +100,6 @@ for n in names:
         time = sci(data[n]["time"]),
         exp_paths = data[n]["count_paths"],
         size = data[n]["size"],
-        percent = sci(100 * float(data[n]["count_paths"]) / float(data[n]["tot_paths"]))
+        percent = sci(float(data[n]["count_paths"]) / float(data[n]["tot_paths"]))
         ))
 print("\\end{array}\\]")
