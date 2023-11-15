@@ -1,6 +1,7 @@
 #! /usr/bin/python3
 
 import os
+from sigfig import round
 
 def file(name, attribute):
     return "./survey_data/{0}_cegps_{1}".format(name, attribute)
@@ -93,13 +94,14 @@ for n in names:
                "\\top"     if trivial(data[n]["formula"]) else \
                ""          if timeout(data[n]["time"]) else \
                "\\formula"
-    print("    \\texttt{{{name}}} & {prog_paths} & {result} & {time:.26} & {exp_paths}  & {size} & {percent:.2g} \\\\".format(
+    print()
+    print("    \\texttt{{{name}}} & {prog_paths} & {result} & {time} & {exp_paths}  & {size} & {percent} \\\\".format(
         name = underscores(n),
         prog_paths = data[n]["tot_paths"],
         result = did_fail,
-        time = float(data[n]["time"]),
+        time = "\\infty" if data[n]["time"] == "inf" else round(float(data[n]["time"]), sigfigs=2),
         exp_paths = data[n]["count_paths"],
         size = data[n]["size"],
-        percent = float(data[n]["count_paths"]) / float(data[n]["tot_paths"])
+        percent = round(float(data[n]["count_paths"]) / float(data[n]["tot_paths"]), sigfigs=2)
         ))
 print("\\end{array}\\]")
