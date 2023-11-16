@@ -77,7 +77,6 @@ let ts_switching_ingress fixed =
   in
   sequence [
     if fixed then assume @@ ands_ [
-        eq_ btrue @@ var hdr.ipv4.isValid;
         eq_ btrue @@ var hdr.rtp.isValid;
       ]
     else skip;
