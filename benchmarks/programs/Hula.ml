@@ -43,8 +43,8 @@ let pop_front_1 f n =
   let open Expr in
   List.init (n-1) ~f:(fun i ->
     [assign (f i).isValid @@ var (f Int.(i + 1)).isValid;
-     assign (f i).bos @@ var (f Int.(i + 1)).bos;
-     assign (f i).port @@ var (f Int.(i + 1)).port
+     (* assign (f i).bos @@ var (f Int.(i + 1)).bos;
+     assign (f i).port @@ var (f Int.(i + 1)).port *)
     ]
   )
   |> List.concat
@@ -122,7 +122,7 @@ let hula_parser =
   in
   start
 
-let hula_ingress fixed =
+let hula_ingress _ =
   let open HoareNet in
   let open BExpr in
   let open Expr in
@@ -250,25 +250,25 @@ let hula_ingress fixed =
       hula_bwd;
       hula_src
     ]
-  ] [
-    ifte_seq (eq_ btrue @@ var hdr.ipv4.isValid) [
-      if fixed then assume @@ eq_ btrue @@ var hdr.udp.isValid else skip;
-      (* bit<16> flow_hash; *)
-      (* hash(flow_hash, hashAlgorithm.crc16, 16w0, { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.udp.srcPort}, 32w65536);       *)
-      hash_ flow_hash "crc16" (bvi 0 16) [ var hdr.ipv4.srcAddr; var hdr.ipv4.dstAddr; var hdr.udp.srcPort ] (bvi 65536 32) "flow_hash_ingress"
-      |> sequence_map ~f:of_action;
-      ifte_seq (eq_ (var port) (bvi 0 16)) [
-        hula_nhop;
-        (* flow_port_reg.write((bit<32>)flow_hash, (bit<16>)standard_metadata.egress_spec); *)
-        register_write "flow_port_reg_ingress" (var flow_hash) (var standard_metadata.egress_spec)
-        |> sequence_map ~f:of_action
-      ] [
-        assign standard_metadata.egress_spec @@ bcast 9 @@ var port;
-      ];
-      dmac
     ] [
-      drop
-    ]
+      ifte_seq (eq_ btrue @@ var hdr.ipv4.isValid) [
+        (* assert_ (eq_ btrue @@ var hdr.udp.isValid); *)
+        (* bit<16> flow_hash; *)
+        (* hash(flow_hash, hashAlgorithm.crc16, 16w0, { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.udp.srcPort}, 32w65536);       *)
+        hash_ flow_hash "crc16" (bvi 0 16) [ var hdr.ipv4.srcAddr; var hdr.ipv4.dstAddr; var hdr.udp.srcPort ] (bvi 65536 32) "flow_hash_ingress"
+        |> sequence_map ~f:of_action;
+        ifte_seq (eq_ (var port) (bvi 0 16)) [
+          hula_nhop;
+          (* flow_port_reg.write((bit<32>)flow_hash, (bit<16>)standard_metadata.egress_spec); *)
+          register_write "flow_port_reg_ingress" (var flow_hash) (var standard_metadata.egress_spec)
+          |> sequence_map ~f:of_action
+        ] [
+          assign standard_metadata.egress_spec @@ bcast 9 @@ var port;
+        ];
+        dmac
+      ] [
+        drop
+      ]
   ];
     ifte (eq_ btrue @@ var hdr.ipv4.isValid)
       update_ttl

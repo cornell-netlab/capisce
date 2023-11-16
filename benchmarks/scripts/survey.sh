@@ -12,7 +12,7 @@ function conc {
     start=$(date +%s%N | cut -b1-13)
     icecap exp -name $1 -out $data_dir 2>&1 > "${log_dir}/${1}"
     finish=$(date +%s%N | cut -b1-13)
-
+    echo $1
 }
 
 conc ecmp &\
