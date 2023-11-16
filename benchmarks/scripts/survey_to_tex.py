@@ -65,7 +65,7 @@ names = [
     "flowlet",
     "flowlet_fixed",
     "hula",
-    "hula_fixed",
+    # "hula_fixed",
     "linearroad",
     "linearroad_fixed",
     "netchain",
