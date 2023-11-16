@@ -32,7 +32,6 @@ let mc_nat_parser =
   let parse_ipv4 =
     sequence [
         assign hdr.ipv4.isValid btrue;
-        (* assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid; *)
         ifte_seq (eq_ (var hdr.ipv4.protocol) (bvi 17 8))
           [ parse_udp ]
           [ transition_accept ];
@@ -42,7 +41,6 @@ let mc_nat_parser =
   let parse_ethernet =
     sequence [
       assign hdr.ethernet.isValid btrue;
-      (* assert_ @@ eq_ btrue @@ var hdr.ethernet.isValid; *)
       ifte_seq (eq_ (var hdr.ethernet.etherType) (bvi 2048 16))
         [parse_ipv4]
         [transition_accept]
