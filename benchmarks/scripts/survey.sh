@@ -1,7 +1,7 @@
 #! /usr/bin/bash
 
-data_dir="./survey_data_new"
-log_dir="./log_new"
+data_dir="./survey_data_oopsla"
+log_dir="./log_oopsla"
 
 # rm -r $data_dir
 mkdir $data_dir
@@ -10,7 +10,7 @@ mkdir $log_dir
 
 function conc {
     start=$(date +%s%N | cut -b1-13)
-    icecap exp -name $1 -out $data_dir 2>&1 > "${log_dir}/${1}"
+    capisce exp -name $1 -out $data_dir 2>&1 > "${log_dir}/${1}"
     finish=$(date +%s%N | cut -b1-13)
     echo $1
 }
@@ -38,4 +38,3 @@ conc fabric &\
 conc fabric_fixed &\
 conc linearroad &\
 conc linearroad_fixed
-
