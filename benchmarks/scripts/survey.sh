@@ -1,7 +1,7 @@
 #! /usr/bin/bash
 
-data_dir="./survey_data"
-log_dir="./log"
+data_dir="./survey_data_new"
+log_dir="./log_new"
 
 # rm -r $data_dir
 mkdir $data_dir
@@ -38,3 +38,4 @@ conc fabric &\
 conc fabric_fixed &\
 conc linearroad &\
 conc linearroad_fixed
+

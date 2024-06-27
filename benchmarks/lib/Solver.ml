@@ -4,7 +4,7 @@ module Info = P4Info
 
 let princess_exe = "~/princess/princess -inputFormat=smtlib +mostGeneralConstraint +incremental +stdin "
 (* let z3_exe = "/usr/bin/z3 -smt2 -t:30000" *)
-let z3_exe = "/usr/bin/z3 -smt2 -in"
+let z3_exe = "/usr/bin/z3.4.8.13 -smt2 -in"
 (* let z3_daemon = z3_exe ^ " -in" *)
 
 (* let z3_chan_in, z3_chan_out = Core_unix.open_process z3_daemon *)
