@@ -165,7 +165,7 @@ let determined_forwarding ~bitwidth ~max_tables ~max_acts ~max_assigns =
   let gcl = gen_assignable_pipeline bitwidth ntables nacts nassigns in
   let gcl = seq gcl @@ assert_ @@ not_ @@ eq_ (var outvar) (bvi 509 9) in
   let c = Clock.start () in
-  let psi = Qe.all_paths gcl None None in
+  let psi = Qe.concolic gcl in
   Log.debug "got %s" @@ lazy (BExpr.to_smtlib psi);
   let time = Clock.stop c in
   Printf.printf "%d,%d,%d,%f,%d,%d\n%!" ntables nacts nassigns time (BExpr.size psi) Int.(nacts ** ntables)

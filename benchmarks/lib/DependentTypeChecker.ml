@@ -324,7 +324,9 @@ module HoareNet = struct
               seen := prog::!seen;
               match qe with
               | `Conc -> Qe.concolic prog
-              | `Enum -> Qe.all_paths prog nprocs pid
+              | `Enum ->
+                let s = function None -> "NONE" | Some i -> Printf.sprintf "%d" i in 
+                failwithf "path enumeration (%s, %s) is no longer supported" (s nprocs) (s pid) ()
             end
           | _, _ ->
             BExpr.true_
