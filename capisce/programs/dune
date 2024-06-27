@@ -1,4 +1,4 @@
 (library
   (name programs)
   (libraries capiscelib)
-  (preprocess (pps ppx_jane ppx_assert ppx_expect ppx_inline_test ppx_deriving.std)))
+  (preprocess (pps ppx_jane ppx_deriving.std)))

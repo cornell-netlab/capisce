@@ -1,2 +1,13 @@
 (lang dune 2.9)
 (using menhir 2.0)
+(generate_opam_files)
+(package
+ (name capisce)
+ (synopsis "library to write pipeline programs and infer their control interface specifications")
+ (depends
+   (core (= v0.15.1))
+   (core_unix (= v0.15.2))
+   (bignum (= v0.15.0))
+   ANSITerminal
+   (ppx_jane (= v0.15.0))
+   (ppx_deriving (= 5.2.1))))

@@ -1,5 +1,5 @@
 open Core
-open Pbench
+open Capiscelib
 open Base_quickcheck
 open Equivalences
 

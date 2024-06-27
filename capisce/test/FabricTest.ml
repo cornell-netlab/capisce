@@ -1,5 +1,5 @@
 open Core
-open Pbench
+open Capiscelib
 open DependentTypeChecker
 open Programs.Fabric
 
@@ -10,7 +10,7 @@ let test_infer_timeout () =
     BExpr.true_
 
 let test_concolic () =
-  Pbench.Log.parse_flags "pzd";
+  Log.parse_flags "pzd";
   HoareNet.infer ~qe:`Conc (fabric true) None None
   |> Alcotest.(check @@ neg Equivalences.smt_equiv)
     "Conc CPI is not trivial"

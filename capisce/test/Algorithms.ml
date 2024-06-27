@@ -1,5 +1,5 @@
 open Core
-open Pbench
+open Capiscelib
 open Base_quickcheck   
 open Equivalences   
 
@@ -13,11 +13,11 @@ let cnf_foils () =
   let b = prop "b" in
   let c = prop "c" in
   let d = prop "d" in
-  Pbench.BExpr.enable_smart_constructors := `Off;
+  BExpr.enable_smart_constructors := `Off;
   let phi = BExpr.(or_ (and_ a b) (and_ c d)) in
   let exp = BExpr.(and_ (and_ (and_ (or_ c a) (or_ c b)) (or_ a d)) (or_ b d)) in
   let cphi = cnf phi in 
-  Pbench.BExpr.enable_smart_constructors := `On;
+  BExpr.enable_smart_constructors := `On;
   Alcotest.(check smt_equiv) "logically equivalent" exp cphi
 
 let cnf_equiv () =

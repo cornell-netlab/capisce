@@ -1,6 +1,6 @@
 open Core
 open Base_quickcheck
-open Pbench
+open Capiscelib
 open ASTs
 
 let log_eq b1 b2 =

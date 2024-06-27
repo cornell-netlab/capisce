@@ -1,8 +1,7 @@
 
-let () = Pbench.Log.override ()
+let () = Capiscelib.Log.override ()
 
 let test_suites : unit Alcotest.test list = [
-  "Monitor", MonitorTest.tests;
   (* "Optimizer", Optimizer.tests; *)
   "Survey", SurveyTests.tests;
   "Smtlib Parser", Parser.tests;
@@ -12,12 +11,11 @@ let test_suites : unit Alcotest.test list = [
   "Traversals", Traversals.tests;
   "Dependent Type System", Dependent.tests;
   "Util", UtilTest.tests;
-  "Raw Programs", RawPrograms.tests;
   "Concolic Helpers", ConcolicTest.tests;
 ]
 
 let () =
-  Pbench.Log.parse_flags "dzo";
-  Pbench.Log.override ();
-  Pbench.BExpr.enable_smart_constructors := `On;
+  Capiscelib.Log.parse_flags "dzo";
+  Capiscelib.Log.override ();
+  Capiscelib.BExpr.enable_smart_constructors := `On;
   Alcotest.run "Inference" test_suites

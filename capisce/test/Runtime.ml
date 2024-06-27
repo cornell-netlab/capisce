@@ -1,7 +1,7 @@
 module P4Info = Info
 open Core
 module Info = P4Info
-open Pbench
+open Capiscelib
 
 type match_key =
   | Exact of { value : Bigint.t }

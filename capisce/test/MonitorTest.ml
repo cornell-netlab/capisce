@@ -1,7 +1,7 @@
  open Core 
- open Pbench 
+ open Capiscelib 
 
- let () = Pbench.Log.override () 
+ let () = Log.override () 
 
 
  let vlan_100 = (Bigint.of_int 100, 12) 
@@ -32,7 +32,7 @@
    let tables, cvs = get_info_from_program gpl in 
    let%map filepath = filepaths in 
    let cpf_string = In_channel.read_all filepath in 
-   let cpf = Pbench.Solver.of_smtlib ~dvs:[] ~cvs cpf_string in 
+   let cpf = Solver.of_smtlib ~dvs:[] ~cvs cpf_string in 
    (cvs, tables, cpf, filepath) 
 
  let fabric () = 
