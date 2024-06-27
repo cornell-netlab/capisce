@@ -261,7 +261,11 @@ let true_path_resolves () =
     "Enum CPI is not trivial"
     BExpr.true_
 
-
+let paths () = 
+  HoareNet.annotated_to_gpl (linearroad true)
+  |> ASTs.GPL.count_paths
+  |> Bigint.to_string
+  |> Alcotest.(check string) "equal" ""
 
 let test_annotations () =
   HoareNet.check_annotations (linearroad true)
@@ -280,6 +284,7 @@ let test_concolic () =
     BExpr.true_
 
 let tests : unit Alcotest.test_case list = [
+  Alcotest.test_case "has some paths" `Quick paths;
   Alcotest.test_case "tricky path is eliminated" `Quick tricky_path_solves;
   Alcotest.test_case "true path is not true" `Quick true_path_resolves;
   Alcotest.test_case "Linearroad infer enum unannotated" `Slow test_infer_timeout;

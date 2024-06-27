@@ -59,14 +59,14 @@ let partition ~n:n_things ~into:m_buckets =
 
 let ternary_match_benchmark ~bitwidth ~max_tables ~max_keys =
   let open DependentTypeChecker in
-  (* Printf.printf "ternary,exact,time_ms,inferred_size,npaths\n%!"; *)
+  Printf.printf "nternary,nexact,ntables,is_mono,time_ms,inferred_size,npaths\n%!";
   let num_keys = max_keys in (* let%map num_keys = List.init max_keys ~f:Int.succ in *)
   let%bind num_ternary = List.init (num_keys + 1) ~f:Fn.id in
   let num_exact = num_keys - num_ternary in
-  let%bind encap = [true; false] in
-  let%bind num_tables = if encap then
-      List.init (max_tables - 1) ~f:(fun t -> t + 2) (* ensure at least 2 tables for encapuslation *)
-    else [1] in
+  let%bind mono = [true; false] in
+  let%bind num_tables = 
+      List.init (max_tables - 1) ~f:(fun t -> t + 1) 
+  in
   if num_tables > num_keys then [] else
   let keys_per_table = partition ~n:num_keys ~into:num_tables in
   let ternary_per_table = partition ~n:num_ternary ~into:num_tables in
@@ -77,19 +77,20 @@ let ternary_match_benchmark ~bitwidth ~max_tables ~max_keys =
         let num_exact = num_keys - num_ternary in
         let gcl = ternary_match_gen ~table_id ~bitwidth ~num_ternary ~num_exact in
         let hoare = HoareNet.of_gpl (GPL.of_gcl gcl) in
-        if encap then
+        (* if encap then
           HoareNet.triple BExpr.true_ hoare BExpr.true_
-        else
+        else *)
           hoare
       )
     |> HoareNet.sequence
   in
   Log.debug "%s" @@ lazy (HoareNet.to_string exp);
   let c = Clock.start () in
-  let exp = if encap then exp else HoareNet.triple BExpr.true_ exp BExpr.true_ in
-  let psi = HoareNet.infer exp None None in
+  let exp = HoareNet.triple BExpr.true_ exp BExpr.true_ in
+  let qe = if mono then `Conc else `Mono in
+  let psi = HoareNet.infer ~qe exp None None in
   let runtime = Clock.stop c in
-  Printf.printf "%d,%d,%d,%b,%f,%d,%d\n%!" num_ternary num_exact num_tables encap runtime (BExpr.size psi) Int.(2 ** num_ternary)
+  Printf.printf "%d,%d,%d,%b,%f,%d,%d\n%!" num_ternary num_exact num_tables mono runtime (BExpr.size psi) Int.(2 ** num_ternary)
   |> return
 
 (* BEGIN REPURPOSED AVENIR EXPERIMENTS *)
@@ -154,6 +155,7 @@ let gen_assignable_pipeline width ntables nacts nassigns =
   )
 
 let determined_forwarding ~bitwidth ~max_tables ~max_acts ~max_assigns =
+  let%bind mono = [true; false] in 
   let%bind ntables = List.init max_tables ~f:(Int.succ) in
   let%bind nacts = List.init max_acts ~f:(Int.succ) in
   let max_assigns = Int.min nacts max_assigns in
@@ -165,10 +167,10 @@ let determined_forwarding ~bitwidth ~max_tables ~max_acts ~max_assigns =
   let gcl = gen_assignable_pipeline bitwidth ntables nacts nassigns in
   let gcl = seq gcl @@ assert_ @@ not_ @@ eq_ (var outvar) (bvi 509 9) in
   let c = Clock.start () in
-  let psi = Qe.all_paths gcl None None in
-  Log.debug "got %s" @@ lazy (BExpr.to_smtlib psi);
+  let psi = if mono then Qe.mono gcl else Qe.concolic gcl in
+  Log.qe "got %s" @@ lazy (BExpr.to_smtlib psi);
   let time = Clock.stop c in
-  Printf.printf "%d,%d,%d,%f,%d,%d\n%!" ntables nacts nassigns time (BExpr.size psi) Int.(nacts ** ntables)
+  Printf.printf "%d,%d,%d,%b,%f,%d,%d\n%!" ntables nacts nassigns mono time (BExpr.size psi) Int.(nacts ** ntables)
 
 
 (* Join Conditions Benchmark*)
@@ -210,7 +212,7 @@ let gen_close close_name open_name bitwidth nouts =
   in
   (gen_exact_table close_name dp_keys actions, Expr.var hit)
 
-let gen_join_pair bitwidth nvars encap pair_idx =
+let gen_join_pair bitwidth nvars pair_idx =
   (* nvars is the number of variables used to join two tables together *)
   let open DependentTypeChecker in
   let open ASTs in
@@ -220,27 +222,20 @@ let gen_join_pair bitwidth nvars encap pair_idx =
   let close_table, close_hit = gen_close close_name open_name bitwidth nvars in
   let pipe = GPL.of_gcl @@ GCL.seq open_table close_table in
   let phi = BExpr.(eq_ open_hit close_hit) in
-  if encap then
-    (HoareNet.(triple BExpr.true_ (of_gpl pipe) phi), BExpr.true_)
-  else
-    (HoareNet.of_gpl pipe, phi)
+  HoareNet.of_gpl pipe, phi
 
 
 let join_conditions ~bitwidth ~max_joins ~max_join_vars =
   let open DependentTypeChecker in
   let%bind njoins = List.init max_joins ~f:(Int.succ) in
   let%bind nvars = List.init max_join_vars ~f:(Int.succ) in
-  let%map encap = [true; false] in
-  let exp, phi  = List.unzip @@ List.init njoins ~f:(gen_join_pair bitwidth nvars encap) in
-  let exp = if encap then
-      HoareNet.sequence exp
-    else
-      HoareNet.(triple BExpr.true_ (sequence exp) (BExpr.ands_ phi))
-  in
+  let%map mono = [true; false] in
+  let exp, phi  = List.unzip @@ List.init njoins ~f:(gen_join_pair bitwidth nvars) in
+  let exp = HoareNet.(triple BExpr.true_ (sequence exp) (BExpr.ands_ phi)) in
   Log.debug "%s" @@ lazy (HoareNet.to_string exp);
   let c = Clock.start () in
-  assert (HoareNet.check_annotations exp);
-  let psi = HoareNet.infer exp None None in
+  let qe = if mono then `Mono else `Conc in 
+  let psi = HoareNet.infer ~qe exp None None in
   let time_ms = Clock.stop c in
   Log.debug "Got %s" @@ lazy (BExpr.to_smtlib psi);
-  Printf.printf "%d,%d,%b,%f,%d,%d\n%!" njoins nvars encap time_ms (BExpr.size psi) Int.(4 ** njoins)
+  Printf.printf "%d,%d,%b,%f,%d,%d\n%!" njoins nvars mono time_ms (BExpr.size psi) Int.(4 ** njoins)

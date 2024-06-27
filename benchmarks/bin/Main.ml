@@ -12,6 +12,7 @@ let experiment : Command.t =
     let name = flag "-name" (required string) ~doc:"S experiment name"
     and out = flag "-out" (required string) ~doc:"F path to result info"
     and enum = flag "-enum" (no_arg) ~doc:"use naive enumeration method"
+    and replay = flag "-replay" (no_arg) ~doc:"log timestamps for each path condition. Measure number of paths covered by each condition"
     in fun () -> 
       Log.override ();
       Printf.printf "%s\n" name;
@@ -65,7 +66,12 @@ let experiment : Command.t =
       Out_channel.write_all (filename "size") ~data:(Int.to_string @@ BExpr.size phi);
       Out_channel.write_all (filename "tot_paths") ~data:(paths program);
       Out_channel.write_all (filename "count_paths") ~data:(num_cexs);
-      Out_channel.write_all (filename "time") ~data:time
+      Out_channel.write_all (filename "time") ~data:time;
+      if replay then
+        let time_series = Qe.replay (!Qe.data) (program |> HoareNet.annotated_to_gpl |> ASTs.GPL.encode_tables) in 
+        let time_series_str = List.map time_series ~f:(fun (t,n) -> Printf.sprintf "%f, %d\n" t n) |> String.concat ~sep:"" in 
+        Out_channel.write_all (filename "completion") ~data:(time_series_str)
+
   ]
 
 let infer : Command.t =

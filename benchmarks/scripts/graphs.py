@@ -67,9 +67,9 @@ def setrcparams():
 
   plt.rcParams['figure.figsize'] = onecolsize
 
-  plt.rcParams['pdf.fonttype'] = 42
-  plt.rcParams['ps.fonttype'] = 42
-  plt.rcParams['pdf.compression'] = 9
+  # plt.rcParams['pdf.fonttype'] = 42
+  # plt.rcParams['ps.fonttype'] = 42
+  # plt.rcParams['pdf.compression'] = 9
   # plt.rcParams['text.usetex'] = True
   # plt.rcParams['pgf.texsystem']= "pdflatex"
   # plt.rcParams["font.sans-serif"] = "Linux Libertine"
@@ -85,6 +85,7 @@ plt.rcParams['axes.spines.left'] = True
 plt.rcParams['axes.spines.bottom'] = True
 plt.rcParams["legend.columnspacing"] = 0.8
 plt.rcParams["legend.handletextpad"] = 0.4
+plt.rcParams["font.size"] = 4
 
 # Example plot
 
@@ -98,18 +99,29 @@ def read_data():
 
   return (data0, data1)
 
-def plot_series(data, name = "plot", xlabel = "LABELME", ylabel = "LABELME", yscale = "linear", xscale = "linear"):
-  fig = plt.figure(figsize=(3.7,1.5)) # Override fig size based on trial
+def plot_series(data, name = "plot", xlabel = "LABELME", ylabel = "LABELME", yscale = "linear", xscale = "linear", ylim = None, xlim = None):
+  fig = plt.figure(figsize=(1.5,1)) # Override fig size based on trial
   for xs, ys, label, marker in data:
-    plt.scatter(xs, ys, label=label, marker=marker)
+    if marker is None:
+      plt.plot(xs,ys, label=label)
+    else:
+      plt.scatter(xs, ys, label=label, marker=marker)
+  if ylim:
+    plt.ylim(ylim)
+  if xlim:
+    plt.xlim(xlim)
   plt.yscale(yscale)
   plt.xscale(xscale)
-  plt.ylabel(ylabel)
-  plt.xlabel(xlabel)
-  # plt.title(name)
+  plt.yticks(fontsize=4)
+  plt.xticks(fontsize=4)
+  plt.ylabel(ylabel, fontsize = 6)
+  plt.xlabel(xlabel, fontsize = 6)
+  plt.title(name, fontsize = 6)
   if len(data) > 1:
     plt.legend(bbox_to_anchor=(1,1))
-  fig.savefig("%s.pdf" % (name.replace(" ","_")))
+  name = "%s.pdf" % (name.replace(" ","_"))
+  fig.savefig(name)
+  print("saved to", name)
   plt.close(fig)
   print("done")
 
@@ -117,10 +129,11 @@ def det_fwd_file ():
   return "./data/determined_forwarding.csv"
 
 class DFData():
-  def __init__(self, ntables, nacts, nassigns, time, form_size, npaths):
+  def __init__(self, ntables, nacts, nassigns, mono, time, form_size, npaths):
     self.ntables = int(ntables)
     self.nacts = int(nacts)
     self.nassigns = int(nassigns)
+    self.mono = mono == "true"
     self.time_ms = float(time)
     self.time_s = self.time_ms / 1000.0
     self.form_size = int(form_size)
@@ -141,23 +154,28 @@ def plot_det_fwd():
     xlabel = "Number of program paths", xscale = "log",
     ylabel = "Inference time (ms)", yscale = "log",
     data = [
-      ([d.npaths for d in df_data if d.nassigns == o and d.nacts == a],
-       [d.time_ms for d in df_data if d.nassigns == o and d.nacts == a],
-       "A={0},O={1}".format(a,o),
-       markers[i]
-       )
-      for (i,(a,o)) in enumerate((a,o) for a in [1,2,3] for o in [1,2,3] if o <= a)
+      ([d.npaths for d in df_data if d.mono],
+       [d.time_ms for d in df_data if d.mono],
+       "QE",
+       markers[0]
+       ),
+      ([d.npaths for d in df_data if not d.mono],
+       [d.time_ms for d in df_data if not d.mono],
+       "CEGQE",
+       markers[-1]
+       ),
+
     ])
 
 def ternary_data_file():
-  return "./data/ternary_explosion_encapsulation.csv"
+  return "./data/ternary_explosion.csv"
 
 class TData():
-  def __init__(self, nternary, nexact, ntables, encap, time_ms, form_size, npaths):
+  def __init__(self, nternary, nexact, ntables, is_mono, time_ms, form_size, npaths):
     self.nternary = int(nternary)
     self.nexact = int(nexact)
     self.ntables = int(ntables)
-    self.encap = encap == "true"
+    self.mono = is_mono == "true"
     self.time_ms = float(time_ms)
     self.time_s = self.time_ms / 1000.0
     self.form_size = int(form_size)
@@ -171,12 +189,16 @@ def plot_ternary():
     xlabel = "Number of ternary matches",
     ylabel = "Inference time (ms)", yscale = "log",
     data = [
-      ([d.nternary for d in t_data if d.ntables == ntables],
-       [d.time_ms for d in t_data if d.ntables == ntables],
-       "Tables={0}".format(ntables),
-       markers[idx]
+      ([d.nternary for d in t_data if d.mono],
+       [d.time_ms for d in t_data if d.mono],
+       "QE",
+       markers[-1]
+       ),
+      ([d.nternary for d in t_data if not d.mono],
+       [d.time_ms for d in t_data if not d.mono],
+       "CEGQE",
+       markers[0]
        )
-      for idx,ntables in enumerate(range(1,max_tables,3))
     ]
   )
 
@@ -184,10 +206,10 @@ def joins_data_file():
   return "data/joins.csv"
 
 class JData():
-  def __init__(self, njoins, nvars, encap, time_ms, form_size, npaths):
+  def __init__(self, njoins, nvars, mono, time_ms, form_size, npaths):
     self.njoins = int(njoins)
     self.nvars = int(nvars)
-    self.encap = encap == "true"
+    self.mono = mono == "true"
     self.time_ms = float(time_ms)
     self.time_s = self.time_ms / 1000.0
     self.form_size = int(form_size)
@@ -200,17 +222,63 @@ def plot_joins():
     xlabel = "Number of open-close pairs",
     ylabel = "Inference Time (ms)", yscale = "log",
     data = [
-      ([d.njoins for d in j_data if d.encap],
-       [d.time_ms for d in j_data if d.encap],
-       "Annotated", 'o'),
-      ([d.njoins for d in j_data if not d.encap],
-       [d.time_ms for d in j_data if not d.encap],
-       "No Annotations", "s")
+      ([d.njoins for d in j_data if d.mono],
+       [d.time_ms for d in j_data if d.mono],
+       "QE", markers[-1]),
+      ([d.njoins for d in j_data if not d.mono],
+       [d.time_ms for d in j_data if not d.mono],
+       "CEGQE", markers[0])
       ]
     )
+  
+class Delta():
+  def __init__(self, timestamp, added_paths):
+    self.added_paths = int(added_paths)
+    self.timestamp = float(timestamp)
 
+class Completion():
+  def __init__(self, start_timestamp, paths_so_far, tot_paths, delta):
+    self.path_proportion = float(paths_so_far + delta.added_paths) / float(tot_paths)
+    self.elapsed_time = float(delta.timestamp) - float(start_timestamp)
+
+def cdf_of_deltas(deltas):
+  tot_paths = sum(int(d.added_paths) for d in deltas)
+  start_timestamp = deltas[0].timestamp
+  paths_so_far = 0
+  cdf = []
+  for d in deltas:
+    c = Completion(start_timestamp, paths_so_far, tot_paths, d)
+    paths_so_far += d.added_paths
+    cdf.append(c)
+  return cdf
+
+def plot_cdf(name, fn):
+  deltas = read_data(Delta, fn)
+  print("DELTAS")
+  for d in deltas:
+    print(d.timestamp, d.added_paths)
+  cdf = cdf_of_deltas(deltas)
+  print("CDF")
+  for c in cdf:
+    print(c.elapsed_time, c.path_proportion)
+  plot_series(
+    name = name,
+    xlabel = "Inference Time (ms)",
+    ylabel = "Path Coverage",
+    data = [(
+      [c.elapsed_time for c in cdf],
+      [c.path_proportion for c in cdf],
+      "CegQe", None)
+    ]
+  )
 
 if __name__ == "__main__":
-  plot_det_fwd()
-  plot_ternary()
-  plot_joins()
+  # plot_det_fwd()
+  # plot_ternary()
+  # plot_joins()
+  plot_cdf("arp", "data/arp_cegps_completion")
+  plot_cdf("heavy_hitter_1", "data/heavy_hitter_1_cegps_completion")
+  plot_cdf("heavy_hitter_2", "data/heavy_hitter_2_cegps_completion")
+  plot_cdf("flowlet", "data/flowlet_cegps_completion")
+  plot_cdf("07-multiprotocol", "data/07-multiprotocol_cegps_completion")
+  plot_cdf("simple_nat", "data/simple_nat_cegps_completion")

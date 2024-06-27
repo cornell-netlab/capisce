@@ -325,6 +325,7 @@ module HoareNet = struct
               match qe with
               | `Conc -> Qe.concolic prog
               | `Enum -> Qe.all_paths prog nprocs pid
+              | `Mono -> Qe.mono prog
             end
           | _, _ ->
             BExpr.true_

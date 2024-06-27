@@ -248,11 +248,23 @@ let path_generator gcl =
       | Some pi -> Some pi
       
 
+let mono (gcl : GCL.t) : BExpr.t = 
+  let phi = Psv.(vc @@ snd @@ passify gcl) in 
+  match solve_one ~solver:`Z3 ~qe:(nikolaj_please) phi with 
+  | Error _ -> 
+    failwith "Monolithic Solver Failed"
+  | Ok cpi -> 
+    if not (BExpr.qf cpi) then failwith "result was still quantified";
+    cpi
+
+
 let num_cexs = ref Bigint.zero
+let data = ref []
 
 let concolic (gcl : GCL.t) : BExpr.t =
   let get_new_path = path_generator gcl in
   num_cexs := Bigint.zero;
+  data := [Clock.now (), BExpr.true_];
   let rec loop phi_agg =
     Log.debug_s "checking implication...";
     match get_new_path phi_agg with
@@ -270,6 +282,7 @@ let concolic (gcl : GCL.t) : BExpr.t =
           Log.error "VC:\n%s-------\n" @@ lazy (BExpr.to_smtlib path_condition);
           failwith "SOLVERS COULD NOT SOLVE PATH"
         | Some control_plane_of_path ->
+          data := !data @ [Clock.now (), control_plane_of_path];
           if not (BExpr.qf control_plane_of_path) then failwith "result was still quantified";
           let cvs = snd @@ BExpr.vars control_plane_of_path in
           Log.path_gen "%s" @@ lazy (Var.list_to_smtlib_decls cvs);
@@ -279,6 +292,7 @@ let concolic (gcl : GCL.t) : BExpr.t =
             Printf.printf "the following path gave true when cpfed:\n%s\n%!" (GCL.to_string unsolved_path);
             failwith "found false"
           end else if sat then
+
             loop (BExpr.and_ control_plane_of_path phi_agg)
           else begin
             Log.warn "Uncontrollable path:%s" @@ lazy (GCL.to_string unsolved_path);
@@ -286,6 +300,17 @@ let concolic (gcl : GCL.t) : BExpr.t =
           end
   in
   loop BExpr.true_
+
+  let replay data gcl : (Float.t * int) list =
+    let paths = GCL.all_paths gcl in
+    let _, data = 
+    List.fold data ~init:(paths, []) ~f:(fun (unsolved, completion_data) (t, psi) -> 
+        Printf.printf "Replaying data from time %f\n%!" t;
+        let remain_unsolved = List.filter unsolved ~f:(fun pi -> Option.is_some (check_sufficiency pi psi)) in 
+        let num_paths_solved = List.length unsolved - List.length remain_unsolved in 
+        (remain_unsolved, completion_data @ [t, num_paths_solved])
+      ) in 
+    data
 
   let all_paths gcl nprocs pid =
     (* Log.path_gen "all_paths call #%d" @@ (lazy !nall_paths); Breakpoint.set (!nall_paths > 0);  Int.incr nall_paths; *)
