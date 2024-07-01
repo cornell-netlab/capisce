@@ -4,7 +4,7 @@ import os
 from sigfig import round
 
 def file(name, attribute):
-    return "./survey_data/{0}_cegps_{1}".format(name, attribute)
+    return "./survey_data_oopsla/{0}_cegps_{1}".format(name, attribute)
 
 def exists(filename : str) -> bool:
     return os.path.isfile(filename)

@@ -2,9 +2,9 @@ module P4Info = Info
 open Core
 module Info = P4Info
 
-let princess_exe = "~/inference/solvers/princess -inputFormat=smtlib +mostGeneralConstraint +incremental +stdin "
+let princess_exe = "~/capisce/solvers/princess -inputFormat=smtlib +mostGeneralConstraint +incremental +stdin "
 (* let z3_exe = "/usr/bin/z3 -smt2 -t:30000" *)
-let z3_exe = "~/inference/solvers/z3.4.8.13 -smt2 -in"
+let z3_exe = "~/capisce/solvers/z3.4.8.13 -smt2 -in"
 (* let z3_daemon = z3_exe ^ " -in" *)
 
 (* let z3_chan_in, z3_chan_out = Core_unix.open_process z3_daemon *)

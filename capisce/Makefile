@@ -20,4 +20,10 @@ check: all
 
 check-q: all
 	dune build ./test/tests.exe && ./_build/default/test/tests.exe test -q --tail-errors=500 -- ${TEST}
+
+survey:
+	./scripts/survey.sh
+
+survey-tex:
+	./scripts/survey_to_tex.py
 # end

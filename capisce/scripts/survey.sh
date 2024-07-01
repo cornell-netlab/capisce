@@ -8,33 +8,33 @@ mkdir $data_dir
 # rm -r $log_dir
 mkdir $log_dir
 
-function conc {
+function run {
     start=$(date +%s%N | cut -b1-13)
-    capisce exp -name $1 -out $data_dir 2>&1 > "${log_dir}/${1}"
+    ./capisce exp -name $1 -out $data_dir 2>&1 > "${log_dir}/${1}"
     finish=$(date +%s%N | cut -b1-13)
     echo $1
 }
 
-conc ecmp &\
-conc netpaxos_acceptor &\
-conc resubmit &\
-conc ndp_router &\
-conc heavy_hitter_1 &\
-conc arp &\
-conc "07-multiprotocol"&\
-conc mc_nat &\
-conc mc_nat_fixed &\
-conc ts_switching &\
-conc ts_switching_fixed &\
-conc heavy_hitter_2 &\
-conc heavy_hitter_2_fixed &\
-conc flowlet &\
-conc flowlet_fixed &\
-conc hula &\
-conc hula_fixed &\
-conc netchain &\
-conc simple_nat &\
-conc fabric &\
-conc fabric_fixed &\
-conc linearroad &\
-conc linearroad_fixed
+run ecmp;
+run netpaxos_acceptor;
+run resubmit;
+run ndp_router;
+run heavy_hitter_1;
+run arp;
+run "07-multiprotocol";
+run mc_nat;
+run mc_nat_fixed;
+run ts_switching;
+run ts_switching_fixed;
+run heavy_hitter_2;
+run heavy_hitter_2_fixed;
+run flowlet;
+run flowlet_fixed;
+run hula;
+run hula_fixed;
+run netchain;
+run simple_nat;
+run fabric;
+run fabric_fixed;
+run linearroad
+run linearroad_fixed;
