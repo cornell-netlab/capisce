@@ -1,6 +1,6 @@
 # Capisce -- OOPSLA '24
 
-Capisce exposes two pieces:
+Capisce LIB  two pieces:
 - an OCAML library for writing down and specifying data plane programs
 - an inference algorithm to infer control interface specifications for data plane programs
 
@@ -9,11 +9,11 @@ Capisce exposes two pieces:
 The easiest way to get Capisce running is using Docker.
 
 - First install Docker.
-- Next, unpack the included zip file to some directory $CAPISCE
-- Then `cd` into `$CAPISCE` and build and run the docker image
+- Next, unpack the included zip file (or pull from the git repository) to some directory `<capiscedir>`
+- Then `cd` into `<capiscedir>` and build and run the docker image
 ```
-docker build -it capisce .
-docker run -t capisce
+docker build -i capisce .
+docker run -it capisce
 ```
 
 Once this succeeds (it may take a while), you should be greeted with a shell prompt similar to the following:
