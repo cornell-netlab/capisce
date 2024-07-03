@@ -39,6 +39,18 @@ module GCL = struct
         | Assign (x,e) ->
           BExpr.subst x e phi
 
+    let rec all_paths = function 
+    | Prim p -> [prim p]
+    | Choice cs -> 
+      List.bind ~f:all_paths cs
+    | Seq cs -> 
+      List.fold cs ~init:[skip] ~f:(fun paths c ->
+        let open List.Let_syntax in 
+        let%bind c_path = all_paths c in 
+        let%map acc_path = paths in 
+        seq acc_path c_path
+      )
+
   (* let path_simplify_assumes (gcl : t) : t = *)
   (*   let rec listify = function *)
   (*     | Prim p -> [p] *)

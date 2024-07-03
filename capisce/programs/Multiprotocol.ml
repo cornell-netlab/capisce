@@ -6,13 +6,15 @@ open V1ModelUtils
 type ingress_metadata_t = {
   drop : Var.t;
   egress_port : Var.t;
-  packet_type : Var.t
+  packet_type : Var.t;
+  fwded : Var.t;
 }
 
 let ing_metadata = {
   drop = Var.make "meta.ing_metadata.drop" 1;
   egress_port = Var.make "meta.ing_metadata.egress_port" 9;
   packet_type = Var.make "meta.ing_metadata.packet_type" 4;
+  fwded = Var.make "forwarded" 1;
 }
 
 type my_metadata_t = {ing_metadata : ingress_metadata_t}
@@ -89,6 +91,7 @@ let multiproto_parser =
   in
   let start =
     sequence [
+      assign meta.ing_metadata.fwded bfalse;
       assign hdr.ethernet.isValid bfalse;
       assign hdr.ipv4.isValid bfalse;
       assign hdr.tcp.isValid bfalse;
@@ -153,10 +156,12 @@ let multiproto_ingress =
   let  udp_check = _check "udp_check"  hdr.udp.dstPort in
   let icmp_check = _check "icmp_check" hdr.icmp.type_ in
   let discard = [], Action.[
+      assign meta.ing_metadata.fwded btrue;
       assign standard_metadata.egress_spec @@ bvi 511 9
     ]
   in
   let send_packet = [], Action.[
+      assign meta.ing_metadata.fwded btrue;
       assign standard_metadata.egress_spec @@ var meta.ing_metadata.egress_port
     ]
   in
@@ -187,7 +192,8 @@ let multiproto_ingress =
           skip
       ]
     ];
-    set_egress
+    set_egress;
+    assert_ @@ eq_ btrue @@ var meta.ing_metadata.fwded; 
   ]
 
 let multiproto_egress =

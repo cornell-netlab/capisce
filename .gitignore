@@ -282,3 +282,4 @@ TSWLatexianTemp*
 **/*.json
 **/*.cpi
 **/*.gcl
+benchmarks/data

@@ -15,6 +15,6 @@ let test_concolic () =
     BExpr.true_
 
 let tests : unit Alcotest.test_case list = [
-  Alcotest.test_case "heavy_hitter_1 infer enum" `Quick test_infer;
+  Alcotest.test_case "heavy_hitter_1 infer enum" `Slow test_infer;
   Alcotest.test_case "heavy_hitter_1 infer conc" `Quick test_concolic;
 ]
