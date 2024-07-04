@@ -111,7 +111,7 @@ let hybrid_strategy vc =
 
 let check_sufficiency gcl =
   let _, psv = Psv.passify gcl in
-  Log.debug "[concolic] Passive :\n%s" @@ lazy (Psv.to_string psv);
+  Log.debug "[cegqe] Passive :\n%s" @@ lazy (Psv.to_string psv);
   let all_passive_consts = Psv.vars psv in
   let safety_condition = Psv.vc psv in
   let normal_executions = Psv.(normal (remove_asserts psv)) in
@@ -145,7 +145,7 @@ let path_generator gcl =
 let num_cexs = ref Bigint.zero
 let data = ref []      
 
-let concolic (gcl : GCL.t) : BExpr.t =
+let cegqe (gcl : GCL.t) : BExpr.t =
   let get_new_path = path_generator gcl in
   num_cexs := Bigint.zero;
   data := [Clock.now (), BExpr.true_];

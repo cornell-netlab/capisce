@@ -42,7 +42,7 @@ let experiment : Command.t =
       in
       let open DependentTypeChecker in
       let algorithm p = 
-        HoareNet.infer p None None ~qe:(if enum then `Enum else `Conc)
+        HoareNet.infer p None None ~qe:(if enum then `Enum else `Cegqe)
       in
       let paths p =
         HoareNet.annotated_to_gpl p

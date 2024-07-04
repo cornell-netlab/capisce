@@ -302,7 +302,7 @@ module HoareNet = struct
                postcondition = Some BExpr.true_})
 
     let ninfer = ref 0
-    let infer ?(qe = `Enum) (cmd:t) nprocs pid =
+    let infer ?(qe = `Cegqe) (cmd:t) nprocs pid =
       Log.path_gen "INFER CALL #%d" @@ lazy (!ninfer);
       (* Breakpoint.set (!ninfer > 0); *)
       Int.incr ninfer;
@@ -323,7 +323,7 @@ module HoareNet = struct
             else begin
               seen := prog::!seen;
               match qe with
-              | `Conc -> Qe.concolic prog
+              | `Cegqe -> Qe.cegqe prog
               | `Enum ->
                 let s = function None -> "NONE" | Some i -> Printf.sprintf "%d" i in 
                 failwithf "path enumeration (%s, %s) is no longer supported" (s nprocs) (s pid) ()
