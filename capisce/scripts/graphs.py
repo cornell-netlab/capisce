@@ -10,7 +10,6 @@ from collections import defaultdict
 import numpy as np
 import math
 
-locale.setlocale(locale.LC_ALL, 'en_US.UTF8')
 from IPython.display import set_matplotlib_formats
 
 onecolsize = (4, 1.5)   # Tweak based on figure's appearance in the paper

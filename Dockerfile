@@ -17,3 +17,6 @@ RUN opam install . --deps-only
 RUN opam install menhir
 
 RUN pip3 install sigfig
+RUN pip3 install matplotlib
+RUN pip3 install ipython
+
