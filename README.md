@@ -15,7 +15,7 @@ The easiest way to get Capisce running is using Docker.
 - Next, unpack the included zip file (or pull from this git repository) to some directory `<capiscedir>`
 - Then `cd` into `<capiscedir>` and build and run the docker image
 ```
-docker build -i capisce .
+docker build -t capisce .
 docker run -it capisce
 ```
 
