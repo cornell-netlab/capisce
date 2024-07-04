@@ -254,13 +254,7 @@ def cdf_of_deltas(deltas):
 
 def plot_cdf(name, fn):
   deltas = read_data(Delta, fn)
-  print("DELTAS")
-  for d in deltas:
-    print(d.timestamp, d.added_paths)
   cdf = cdf_of_deltas(deltas)
-  print("CDF")
-  for c in cdf:
-    print(c.elapsed_time, c.path_proportion)
   plot_series(
     name = name,
     xlabel = "Inference Time (ms)",
@@ -273,12 +267,9 @@ def plot_cdf(name, fn):
   )
 
 if __name__ == "__main__":
-  # plot_det_fwd()
-  # plot_ternary()
-  # plot_joins()
-  plot_cdf("arp", "data/arp_cegps_completion")
-  plot_cdf("heavy_hitter_1", "data/heavy_hitter_1_cegps_completion")
-  plot_cdf("heavy_hitter_2", "data/heavy_hitter_2_cegps_completion")
-  plot_cdf("flowlet", "data/flowlet_cegps_completion")
-  plot_cdf("07-multiprotocol", "data/07-multiprotocol_cegps_completion")
-  plot_cdf("simple_nat", "data/simple_nat_cegps_completion")
+  plot_cdf("arp", "survey_data_oopsla/arp_cegps_completion")
+  plot_cdf("heavy_hitter_1", "survey_data_oopsla/heavy_hitter_1_cegps_completion")
+  plot_cdf("heavy_hitter_2", "survey_data_oopsla/heavy_hitter_2_cegps_completion")
+  plot_cdf("flowlet", "survey_data_oopsla/flowlet_cegps_completion")
+  plot_cdf("07-multiprotocol", "survey_data_oopsla/07-multiprotocol_cegps_completion")
+  plot_cdf("simple_nat", "survey_data_oopsla/simple_nat_cegps_completion")
