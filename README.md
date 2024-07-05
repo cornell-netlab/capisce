@@ -239,11 +239,14 @@ the argument to `setport` supplied by the controller must not be equal to `47`.
 
 ## Step By Step Instructions
 
+We've provided instructions for automatically exercising the experiments using our scripts,
+and for running them manually.
+
+
 ### Exercising the Experiments
 
 Now you can run the experiments from the paper. These will take
-several days. If you would like to run them in parallel or run only a
-few of them, you can edit `./scripts/survey.sh`.
+several days.
 
 - `make survey` runs the experiments described in Figure 4. The output
   can be seen in `./survey_data_oopsla`. Running the experiments takes
@@ -255,13 +258,66 @@ few of them, you can edit `./scripts/survey.sh`.
 
 ### Running Experiments One-by-One
 
-### Survey (Figure 4)
+To run the experiments individually, execute the following command once for each pipeline:
+```
+./capisce exp -name NAME -out ./survey_data_oopsla
+```
+where `OUT` is the output directory in which you wish to store the results, and
+`NAME` is the name of the example program. The valid names are the following
+```
+ecmp
+netpaxos_acceptor
+resubmit
+ndp_router
+heavy_hitter_1
+arp
+"07-multiprotocol"
+mc_nat
+mc_nat_fixed
+ts_switching
+ts_switching_fixed
+heavy_hitter_2
+heavy_hitter_2_fixed
+flowlet
+flowlet_fixed
+hula
+hula_fixed
+fabric
+fabric_fixed
+linearroad
+linearroad_fixed
+```
 
-### Coverage (Figure 5)
+Most of these will finish in minutes, but the last four will take nearly two days. For precisetiming data, consult Figure 4.
+
+Once youve done this, you can generate Figure 4 using the script `./scripts/survey-to-tex.py`.
+```
+python3 ./scripts/survey-to-tex.py
+```
+Notice that you can run this script after any number of examples have been run, and you will
+get partial results.
+
+To reproduce Figure 5, re-run the relevant programs with the -replay
+flag. This will generate the additional data required to generate
+Figure 5. The coverage analysis is slow, and may take several
+hours. To generate the data run the following commands:
+```
+./capisce exp -name arp -replay -out survey_data_oopsla
+./capisce exp -name heavy_hitter_2 -replay -out survey_data_oopsla
+./capisce exp -name heavy_hitter_1 -replay -out survey_data_oopsla
+./capisce exp -name flowlet -replay -out survey_data_oopsla
+./capisce exp -name 07-multiprotocol -replay -out survey_data_oopsla
+./capisce exp -name simple_nat -replay -out survey_data_oopsla
+```
+Then, to produce the graphs as seen in Figure 5, run the following script:
+```
+python3 scripts/graphs.py
+```
+Running the script will output the relative paths to the pdfs it generates.
 
 ## Reusability Guide
 
-### Guarded Pipeline Langauge `GPL`
+### Guarded Pipeline Language `GPL`
 
 ### Instrumentation and Compiler
 
