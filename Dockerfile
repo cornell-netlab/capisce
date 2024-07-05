@@ -15,6 +15,7 @@ WORKDIR /home/opam/capisce/capisce
 RUN opam install dune
 RUN opam install . --deps-only
 RUN opam install menhir
+RUN opam install utop
 
 RUN pip3 install sigfig
 RUN pip3 install matplotlib
