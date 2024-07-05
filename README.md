@@ -93,7 +93,7 @@ make
 ```
 Verify your installation by running `./capisce exp -?`
 
-#### Processing the experimental results
+#### Dependencies for processing the experimental results
 
 The experimental results are processed using some python scripts.
 They have their own dependencies that need to be installed:
@@ -105,137 +105,19 @@ pip3 install matplotlib
 pip3 install ipython
 ```
 
-### Tutorial
+### Hello World: ARP
 
-Now that you've build `Capisce`, we'll show you how it works.
+Once you've installed `Capisce`, you can verify it works, by computing a specification for
+the `arp` program, which can be found in `programs/Arp.ml`.
 
-First run `dune utop`. This will load Capiscelib into a REPL.
-Now, open the `Capiscelib` module:
-```ocaml
-utop # open Capiscelib;;
+```
+./capisce exp -name arp -out ./survey_data_oopsla
 ```
 
-In this Hello-World tutorial, we'll write a program in our
-IR `GPL`, which represents the guarded pipeline language described in
-the paper. Then we'll write a specification that it must
-satisfy. Finally, we'll infer a Control Interface Spec (CIS) that will
-ensure the spec is satisfied.
+`capisce` will spit out a collection of SMT formulae whose conjunction
+corresponds to the control interface specification (CIS) that enforces
+there are no invalid header reads. It should take about 5 seconds.
 
-#### Part 1: Writing a program in GPL
-
-First, let open the Modules for the program syntax (`GPL`), including
-Bitvector Expressions (`Expr`) and Boolean Expressions (`BExpr`).
-```ocaml
-utop # open ASTs.GPL;; open Expr;; open BExpr;;
-```
-
-We'll now write a simple GPL program that uses a single forwarding table to
-set a single 9-bit field `port` based on the value of a 32-bit destination address `dst`. First, we can define the variables `port`and `dst`:
-```ocaml
-utop # let port = Var.make "port" 9;;
-val port : Var.t = <abstr>
-```
-```ocaml
-utop # let dst = Var.make "dst" 32;;
-val dst : Var.t = <abstr>
-```
-
-We'll use these variables to construct our table. Lets see how we might do that by inspecting the type of the constructor `table`:
-```ocaml
-utop # table;;
-```
-should produce
-```ocaml
-- : string ->
-    Var.t list ->
-    (Var.t list * Capiscelib.Primitives.Action.t list) list ->
-    Pack.t
-= <fun>
-```
-
-This tells us that to construct a `table`, we need 3 arguments: a `string` name, a list
-variable keys, then a list of `Var.t list *
-Primitives.Action.t list`. Each pair `(xs, as)` in this list corresponds to an
-anonymous function where `xs` occur free in a list of primitive actions. This list should be understood as sequential composition. Lets construct our first action.
-
-```ocaml
-utop # let nop = [], []
-```
-
-This action is the trivial action. It takes no arguments `[],` and
-executes noactions `[]`.
-
-Stepping it up a notch in complexity. We will define a action that
-takes in a single argument, indicated by parameter `p`, and assigns `p` to our
-previously-defined variable `port`;
-```ocaml
-utop # let setport =
-     let p = Var.make "p" 9 in
-     [p], Primitives.Action.[
-     	  assign_ port (var p)
-     ];;
-```
-The first line constructs the AST node for parameter `p`. Then the
-`[p],` says that `p` is an argument for the action, which is defined
-by the subsequent action list.
-
-Now we can define a table, called `simpletable` that reads the vpalue of `port`,
-and then either execute the `setport` action with some parameter, or take no action.
-```ocaml
-utop # let simpletable =
-    table "simpletable" [port] [setport; nop];;
-```
-
-#### Part 2: Writing a Specification
-
-Now, as an example specification, we can exclude a specific port value.
-Perhaps to indicate that this port value, say `47` is disabled.
-So we never want to forward a packet out on port `47`. We define a
-spec that ensures this as follows:
-```ocaml
-utop # let port_not_47 =
-     let prohibited = bvi 47 9 in
-     not_ (eq_ (var port) prohibited);;
-```
-
-Now we can use assertions to specify that our table must satisfy this spec:
-```ocaml
-utop # let program = sequence [
-    simpletable;
-    assert_ port_not_47
-];;
-```
-
-#### Part 3: Inferring A CIS
-
-Inferring the control interface specification (CIS) for the table
-requires two steps. First we encode the tables using the
-instrumentation strategy described in the paper, and then we run our
-inference algorithm.
-
-The encoding step eliminates tables, and converts a `GPL.t` program into
-a `GCL.t` program. `GCL` here stands for Dijkstra's _guarded command language_.
-We run this using the `GPL.encode_tables` function:
-```ocaml
-utop # let gcl = GPL.encode_tables program;;
-```
-To see a pretty printed version of the table-free program, run the following:
-```ocaml
-utop # Printf.printf "%s" @@ ASTs.GCL.to_string gcl;;
-```
-
-Now we can infer the specification for this program by running the `CEGQE` algorithm:
-```ocaml
-utop # let cis = Qe.cegqe gcl;;
-```
-To pretty print the result in SMTLIB format, run the following command:
-
-```ocaml
-utop # Printf.printf "%s" @@ to_smtlib cis;;
-```
-
-This specification, says that whenever the action is `setport`,
-the argument to `setport` supplied by the controller must not be equal to `47`.
 
 ## Step By Step Instructions
 
@@ -317,11 +199,206 @@ Running the script will output the relative paths to the pdfs it generates.
 
 ## Reusability Guide
 
+Our artifact supports three key pieces for reusability.
+
+- The pipeline specification IR `GPL`, which can be found in
+  `ASTs.GPL`. This AST can be used as a compiler backend for related
+  dataplane analysis tools like `petr4`, `p4cub`, `p4k`, `p4-constraints`,
+  or `PI4`.
+
+- The compiler infrastructure for `GPL.t` allows for programmers to easily
+  extend the core set of primitives, in a way that supports efficient reuse.
+
+- The Counterexample-guided inductive quantifier elimination algorithm
+  `QE.cegqe` is succinctly stated, and can be reimplemented or adapted to
+  as new algorithms are discovered.
+
+
+### Tutorial
+
+Now that you've build `Capisce`, we'll show you how it works.
+
+First run `dune utop`. This will load Capiscelib into a REPL.
+Now, open the `Capiscelib` module:
+```ocaml
+utop # open Capiscelib;;
+```
+
+In this Hello-World tutorial, we'll write a program in our
+IR `GPL`, which represents the guarded pipeline language described in
+the paper. Then we'll write a specification that it must
+satisfy. Finally, we'll infer a Control Interface Spec (CIS) that will
+ensure the spec is satisfied.
+
+#### Part 1: Writing a program in GPL
+
+First, let open the Modules for the program syntax (`GPL`), including
+Bitvector Expressions (`Expr`) and Boolean Expressions (`BExpr`).
+```ocaml
+utop # open ASTs.GPL;; open Expr;; open BExpr;;
+```
+
+We'll now write a simple GPL program that uses a single forwarding table to
+set a single 9-bit field `port` based on the value of a 32-bit destination address `dst`. First, we can define the variables `port`and `dst`:
+```ocaml
+utop # let port = Var.make "port" 9;;
+val port : Var.t = <abstr>
+```
+```ocaml
+utop # let dst = Var.make "dst" 32;;
+val dst : Var.t = <abstr>
+```
+
+We'll use these variables to construct our table. Lets see how we might do that by inspecting the type of the constructor `table`:
+```ocaml
+utop # table;;
+```
+should produce
+```ocaml
+- : string ->
+    Var.t list ->
+    (Var.t list * Capiscelib.Primitives.Action.t list) list ->
+    Pack.t
+= <fun>
+```
+
+This tells us that to construct a `table`, we need 3 arguments: a
+`string` name, a list variable keys, then a list of `Var.t list *
+Primitives.Action.t list`. Each pair `(xs, as)` in this list
+corresponds to an anonymous function where `xs` occur free in a list
+of primitive actions. This list should be understood as sequential
+composition. Lets construct our first action.
+
+```ocaml
+utop # let nop = [], []
+```
+
+This action is the trivial action. It takes no arguments `[],` and
+executes noactions `[]`.
+
+Stepping it up a notch in complexity. We will define a action that
+takes in a single argument, indicated by parameter `p`, and assigns `p` to our
+previously-defined variable `port`;
+```ocaml
+utop # let setport =
+     let p = Var.make "p" 9 in
+     [p], Primitives.Action.[
+     	  assign_ port (var p)
+     ];;
+```
+The first line constructs the AST node for parameter `p`. Then the
+`[p],` says that `p` is an argument for the action, which is defined
+by the subsequent action list.
+
+Now we can define a table, called `simpletable` that reads the vpalue of `port`,
+and then either execute the `setport` action with some parameter, or take no action.
+```ocaml
+utop # let simpletable =
+    table "simpletable" [port] [setport; nop];;
+```
+
+#### Part 2: Writing a Specification
+
+Now, as an example specification, we can exclude a specific port value.
+Perhaps to indicate that this port value, say `47` is disabled.
+So we never want to forward a packet out on port `47`. We define a
+spec that ensures this as follows:
+```ocaml
+utop # let port_not_47 =
+     let prohibited = bvi 47 9 in
+     not_ (eq_ (var port) prohibited);;
+```
+
+Now we can use assertions to specify that our table must satisfy this spec:
+```ocaml
+utop # let program = sequence [
+    simpletable;
+    assert_ port_not_47
+];;
+```
+
+#### Part 3: Inferring A CIS
+
+Inferring the control interface specification (CIS) for the table
+requires two steps. First we encode the tables using the
+instrumentation strategy described in the paper, and then we run our
+inference algorithm.
+
+The encoding step eliminates tables, and converts a `GPL.t` program into
+a `GCL.t` program. `GCL` here stands for Dijkstra's _guarded command language_.
+We run this using the `GPL.encode_tables` function:
+```ocaml
+utop # let gcl = GPL.encode_tables program;;
+```
+To see a pretty printed version of the table-free program, run the following:
+```ocaml
+utop # Printf.printf "%s" @@ ASTs.GCL.to_string gcl;;
+```
+
+Now we can infer the specification for this program by running the `CEGQE` algorithm:
+```ocaml
+utop # let cis = Qe.cegqe gcl;;
+```
+To pretty print the result in SMTLIB format, run the following command:
+
+```ocaml
+utop # Printf.printf "%s" @@ to_smtlib cis;;
+```
+
+This specification, says that whenever the action is `setport`,
+the argument to `setport` supplied by the controller must not be equal to `47`.
+
 ### Guarded Pipeline Language `GPL`
+
+Here we provide documentation of the core interface for writing `GPL.t` programs.
+
+The `GPL` module, defined in `ASTs.ml` defines programs.
+```ocaml
+type t
+```
+It has a type `t` that corresponds to `GPL` programs themselves.
+
+We can construct trivial programs
+```ocaml
+val skip : t
+```
+
+Sequential compositions of programs;
+```ocaml
+val sequence : t list -> t
+```
+
+Nondeterministic choice between programs:
+```ocaml
+val choice : t list -> ts
+```
+
+We can also construct variable assignments
+```ocaml
+val assign_ : Var.t -> Expr.t -> t
+```
+
+and the most important constuct, tables:
+```ocaml
+val table : string -> Var.t list -> ( Var.t * Primtives.Action.t list) list -> t
+```
+
+As described above `table name keys actions` constructs a table named
+`name` that chooses an action `a` in `actions` by inspecting the variables in `keys`.
+
+More about `Primitives.Action` can be found in the next section.
+
 
 ### Instrumentation and Compiler
 
+Here we describe the instrumentation of the compiler and show how to
+add an operator for introducing parallelism.
+
 ### Specification Inference and Modelling
+
+The algorithm `Qe.ceqge` in the `Qe.ml` file is succinct. The
+experimental setup supports swapping in different algorithms for
+performing the quantifier elimination.
 
 
 
