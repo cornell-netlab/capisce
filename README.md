@@ -63,7 +63,7 @@ Now to build Capisce, run `make`.
 
 Verify your build by running `./capisce exp -?`
 
-### Installing from source.
+### Installing from source
 
 Capiscelib is an ocaml library, so we first need to install `opam`.
 Then, `switch` to the supported ocaml compiler version
@@ -111,7 +111,7 @@ Now that you've build `Capisce`, we'll show you how it works.
 
 First run `dune utop`. This will load Capiscelib into a REPL.
 Now, open the `Capiscelib` module:
-```
+```ocaml
 utop # open Capiscelib;;
 ```
 
@@ -125,27 +125,27 @@ ensure the spec is satisfied.
 
 First, let open the Modules for the program syntax (`GPL`), including
 Bitvector Expressions (`Expr`) and Boolean Expressions (`BExpr`).
-```
+```ocaml
 utop # open ASTs.GPL;; open Expr;; open BExpr;;
 ```
 
 We'll now write a simple GPL program that uses a single forwarding table to
 set a single 9-bit field `port` based on the value of a 32-bit destination address `dst`. First, we can define the variables `port`and `dst`:
-```
+```ocaml
 utop # let port = Var.make "port" 9;;
 val port : Var.t = <abstr>
 ```
-```
+```ocaml
 utop # let dst = Var.make "dst" 32;;
 val dst : Var.t = <abstr>
 ```
 
 We'll use these variables to construct our table. Lets see how we might do that by inspecting the type of the constructor `table`:
-```
+```ocaml
 utop # table;;
 ```
 should produce
-```
+```ocaml
 - : string ->
     Var.t list ->
     (Var.t list * Capiscelib.Primitives.Action.t list) list ->
@@ -158,7 +158,7 @@ variable keys, then a list of `Var.t list *
 Primitives.Action.t list`. Each pair `(xs, as)` in this list corresponds to an
 anonymous function where `xs` occur free in a list of primitive actions. This list should be understood as sequential composition. Lets construct our first action.
 
-```
+```ocaml
 utop # let nop = [], []
 ```
 
@@ -168,7 +168,7 @@ executes noactions `[]`.
 Stepping it up a notch in complexity. We will define a action that
 takes in a single argument, indicated by parameter `p`, and assigns `p` to our
 previously-defined variable `port`;
-```
+```ocaml
 utop # let setport =
      let p = Var.make "p" 9 in
      [p], Primitives.Action.[
@@ -181,7 +181,7 @@ by the subsequent action list.
 
 Now we can define a table, called `simpletable` that reads the vpalue of `port`,
 and then either execute the `setport` action with some parameter, or take no action.
-```
+```ocaml
 utop # let simpletable =
     table "simpletable" [port] [setport; nop];;
 ```
@@ -192,21 +192,21 @@ Now, as an example specification, we can exclude a specific port value.
 Perhaps to indicate that this port value, say `47` is disabled.
 So we never want to forward a packet out on port `47`. We define a
 spec that ensures this as follows:
-```
+```ocaml
 utop # let port_not_47 =
      let prohibited = bvi 47 9 in
      not_ (eq_ (var port) prohibited);;
 ```
 
 Now we can use assertions to specify that our table must satisfy this spec:
-```
+```ocaml
 utop # let program = sequence [
     simpletable;
     assert_ port_not_47
 ];;
 ```
 
-### Part 3: Inferring A CIS
+#### Part 3: Inferring A CIS
 
 Inferring the control interface specification (CIS) for the table
 requires two steps. First we encode the tables using the
@@ -216,21 +216,21 @@ inference algorithm.
 The encoding step eliminates tables, and converts a `GPL.t` program into
 a `GCL.t` program. `GCL` here stands for Dijkstra's _guarded command language_.
 We run this using the `GPL.encode_tables` function:
-```
+```ocaml
 utop # let gcl = GPL.encode_tables program;;
 ```
 To see a pretty printed version of the table-free program, run the following:
-```
+```ocaml
 utop # Printf.printf "%s" @@ ASTs.GCL.to_string gcl;;
 ```
 
 Now we can infer the specification for this program by running the `CEGQE` algorithm:
-```
+```ocaml
 utop # let cis = Qe.cegqe gcl;;
 ```
 To pretty print the result in SMTLIB format, run the following command:
 
-```
+```ocaml
 utop # Printf.printf "%s" @@ to_smtlib cis;;
 ```
 
