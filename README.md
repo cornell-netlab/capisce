@@ -5,7 +5,7 @@ Capisce is described in the In-Revision OOPSLA paper 369 entitled _Computing Pre
 The Capisce library comprises two key pieces:
 - an OCAML library for writing down and specifying data plane programs called GPL.
   * Example programs can be seen in the `capisce/programs`.
-  * The core interface for writing programs can be found in capisce/lib/ASTs.ml.
+n  * The core interface for writing programs can be found in capisce/lib/ASTs.ml.
 - an instrumentation algorithm to translate `GPL` programs into programs in the guarded command langauge
   * the instrumentation algorithm `GPL.encode_tables` van be found in `capisce/lib/AST.ml`
 - an inference algorithm to infer control interface specifications for data plane programs
@@ -382,23 +382,83 @@ and the most important constuct, tables:
 ```ocaml
 val table : string -> Var.t list -> ( Var.t * Primtives.Action.t list) list -> t
 ```
-
 As described above `table name keys actions` constructs a table named
 `name` that chooses an action `a` in `actions` by inspecting the variables in `keys`.
 
 More about `Primitives.Action` can be found in the next section.
 
+To specify desired behaviors we have two primitives, `assume` and `assert`.
+```ocaml
+assume : BExpr.t -> t
+assert_ : BExpr.t -> t
+```
+The _assume_ primitive is 
+
+
 
 ### Instrumentation and Compiler
 
-Here we describe the instrumentation of the compiler and show how to
-add an operator for introducing parallelism.
+`GPL.t` is constructed using a functor `Cmd.Make` that allows users to produce
+simple loop-free imperative programs with demonic nondeterminism.
+
+`Cmd.Make` has a single module argument which must have module type `Primitive` shown below:
+
+```ocaml
+module type Primitive = sig
+  type t [@@deriving quickcheck, eq, hash, sexp, compare]
+  val assume : BExpr.t -> t
+  val assert_ : BExpr.t -> t
+  val contra : t -> t -> bool
+  val to_smtlib : t -> string
+  val size : t -> int
+  val vars : t -> Var.t list
+end
+```
+
+The `assume` and `assert_` functions construct assumptions and
+assertions as before; `contra` describes when two assumptions and/or
+assertions are contradictory; `to_smtlib` converts `t` into an string
+that uses smtlib syntax for expressions and variables; `size` computes
+the size of a primitive, and `vars` computes the variables used in a
+primitive.
+
+This structure is extremely extensible and facilitates easy reuse of
+our code.  The file `Primitives.ml` serves as a great tutorial for how
+to build up a higherarchical set of Primitives.  Then `ASTs.ml` uses
+these Primtives to build a set of IRs and a compiler pipeline between
+them.  We summarize it here.
+
+Our compiler pipeline starts with  `GPL` and then uses `encode_tables`
+to produce  a `GCL` program.  Then passify  produces a program  in the
+passive form `Psv.t`  as defined in Section 3.4 of  the paper. Then we
+use standard verification generation technqiues to produce formulae in
+SMTLIB.
+
+Each of these passes is a fundamentally a catamorphism over the core
+structure of the programs, and eliminates a single primitive at a
+time: `encode_tables` eliminates tables, and `passify` eliminates
+assignments. This is captured in the types.
+
+Starting from the bottom, `Psv.t = Cmd.Make(Passive).t`, where
+`Passive.t` is either an `Assume` or an `Assert`.  Then `GCL =
+Cmd.Make(Active).t`, where `Active.t` is either a `Passive.t` or an
+`Assign`ment. Finally `GPL = Cmd.Make(Pipeline).t`, where `Pipeline.t`
+is either a `Table` or an `Active`. The transformation functions
+`encode_tables` and `passify` defined in `ASTs.ml` define this
+clearly.
+
+With this compiler infrastructure in place, it would be easy for
+future researchers to extend our work with additional features. Just
+as writing the compiler for `GPL` leverages the existing compiler for
+`GCL`, futurue work could extend GPL add primitives for
+multiple-assignment, hash functions, or stateful operations. Simply by
+writing elimination passes, researchers could make ready use of our
+existing verification generation and specification inference code.
 
 ### Specification Inference and Modelling
 
-The algorithm `Qe.ceqge` in the `Qe.ml` file is succinct. The
-experimental setup supports swapping in different algorithms for
-performing the quantifier elimination.
-
-
-
+The algorithm `Qe.ceqge` in the `Qe.ml` file is straightfoward and
+easy to modify. The experimental setup defined in `bin/Main.ml`
+supports swapping in different algorithms for performing the
+inference, which will allow future researchers to directly measure
+their improvements over CegQe.
