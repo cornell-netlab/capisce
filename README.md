@@ -389,8 +389,8 @@ More about `Primitives.Action` can be found in the next section.
 
 To specify desired behaviors we have two primitives, `assume` and `assert`.
 ```ocaml
-assume : BExpr.t -> t
-assert_ : BExpr.t -> t
+val assume : BExpr.t -> t
+val assert_ : BExpr.t -> t
 ```
 The _assume_ primitive is 
 
