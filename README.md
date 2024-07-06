@@ -3,15 +3,23 @@
 Capisce is described in the In-Revision OOPSLA paper 369 entitled _Computing Precise Control Invariant Specifications_.
 
 The Capisce library comprises two key pieces:
+
 - an OCAML library for writing down and specifying data plane programs called GPL.
+
   * Example programs can be seen in the `capisce/programs`.
-n  * The core interface for writing programs can be found in capisce/lib/ASTs.ml.
-- an instrumentation algorithm to translate `GPL` programs into programs in the guarded command langauge
+
+  * The core interface for writing programs can be found in `capisce/lib/ASTs.ml`.
+
+- an instrumentation algorithm to translate `GPL` programs into programs in the guarded command language
+
   * the instrumentation algorithm `GPL.encode_tables` van be found in `capisce/lib/AST.ml`
+
 - an inference algorithm to infer control interface specifications for data plane programs
+
   * The core algorithm (`cegqe`) can be found in `capisce/lib/Qe.ml`.
 
 Here we list the claims in the paper and how they are supported by the artifact:
+
 1. _Capisce compute control interface specifications for real programs._
    This artifact supports this via its survey of real world programs that have
    been implemented in our library. We have provided scripts to automatically
