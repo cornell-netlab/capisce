@@ -400,9 +400,8 @@ To specify desired behaviors we have two primitives, `assume` and `assert`.
 val assume : BExpr.t -> t
 val assert_ : BExpr.t -> t
 ```
-The _assume_ primitive is 
-
-
+The `assume` primitive is angelic---if it can be satisfied the program assumes it is.
+Conversely, `assert_` is demonic---if it can ba falsified the program assumes it is.
 
 ### Instrumentation and Compiler
 
