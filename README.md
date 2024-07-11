@@ -69,7 +69,7 @@ opam@1497723f4b4d:~/capisce/capisce$
 
 Now to build Capisce, run `make`.
 
-Verify your build by running `./capisce exp -?`
+Verify your build by running `./capisce exp -help`
 
 ### Installing from source
 
@@ -118,15 +118,24 @@ pip3 install ipython
 Once you've installed `Capisce`, you can verify it works, by computing a specification for
 the `arp` program, which can be found in `programs/Arp.ml`.
 
-```
+```bash
+# wd: capisce/capisce
 mkdir ./survey_data_oopsla
-./capisce exp -name arp -out ./survey_data_oopsla -z3 ../solvers/z3.4.8.13
+./capisce exp -name arp -out ./survey_data_oopsla
 ```
 
 `capisce` will spit out a collection of SMT formulae whose conjunction
 corresponds to the control interface specification (CIS) that enforces
 there are no invalid header reads. It should take about 5 seconds.
 
+If the above command fails, with an error complaining about not being able to find
+`../solvers/z3.4.8.13` or `../solvers/princess`, you can specify the path to these 
+solvers (in the `solvers` directory) manually by using the `-z3` and `-princess` flags.
+For instance:
+```bash
+./capisce exp -name arp -out ./survey_data_oopsla -z3 /path/to/z3 -princess /path/to/princess
+```
+In the sequel we will omit the explicit paths flags, but they may always be added if needed.
 
 ## Step By Step Instructions
 
@@ -182,7 +191,7 @@ linearroad_fixed
 Most of these will finish in minutes, but the last four will take nearly two days. For precisetiming data, consult Figure 4.
 
 Once youve done this, you can generate Figure 4 using the script `./scripts/survey-to-tex.py`.
-```
+```bash
 python3 ./scripts/survey-to-tex.py
 ```
 Notice that you can run this script after any number of examples have been run, and you will
@@ -192,7 +201,8 @@ To reproduce Figure 5, re-run the relevant programs with the -replay
 flag. This will generate the additional data required to generate
 Figure 5. The coverage analysis is slow, and may take several
 hours. To generate the data run the following commands:
-```
+
+```bash
 ./capisce exp -name arp -replay -out survey_data_oopsla
 ./capisce exp -name heavy_hitter_2 -replay -out survey_data_oopsla
 ./capisce exp -name heavy_hitter_1 -replay -out survey_data_oopsla
@@ -200,8 +210,10 @@ hours. To generate the data run the following commands:
 ./capisce exp -name 07-multiprotocol -replay -out survey_data_oopsla
 ./capisce exp -name simple_nat -replay -out survey_data_oopsla
 ```
+
 Then, to produce the graphs as seen in Figure 5, run the following script:
-```
+
+```bash
 python3 scripts/graphs.py
 ```
 Running the script will output the relative paths to the pdfs it generates.
@@ -243,26 +255,32 @@ ensure the spec is satisfied.
 
 First, let open the Modules for the program syntax (`GPL`), including
 Bitvector Expressions (`Expr`) and Boolean Expressions (`BExpr`).
+
 ```ocaml
 utop # open ASTs.GPL;; open Expr;; open BExpr;;
 ```
 
 We'll now write a simple GPL program that uses a single forwarding table to
 set a single 9-bit field `port` based on the value of a 32-bit destination address `dst`. First, we can define the variables `port`and `dst`:
+
 ```ocaml
 utop # let port = Var.make "port" 9;;
 val port : Var.t = <abstr>
 ```
+
 ```ocaml
 utop # let dst = Var.make "dst" 32;;
 val dst : Var.t = <abstr>
 ```
 
 We'll use these variables to construct our table. Lets see how we might do that by inspecting the type of the constructor `table`:
+
 ```ocaml
 utop # table;;
 ```
+
 should produce
+
 ```ocaml
 - : string ->
     [> `Exact of Var.t | `Maskable of Var.t | `MaskableDegen of Var.t ] list ->
@@ -286,7 +304,8 @@ executes noactions `[]`.
 
 Stepping it up a notch in complexity. We will define a action that
 takes in a single argument, indicated by parameter `p`, and assigns `p` to our
-previously-defined variable `port`;
+previously-defined variable `port`:
+
 ```ocaml
 utop # let setport =
      let p = Var.make "p" 9 in
@@ -294,12 +313,14 @@ utop # let setport =
      	  assign port (Expr.var p)
      ];;
 ```
+
 The first line constructs the AST node for parameter `p`. Then the
 `[p],` says that `p` is an argument for the action, which is defined
 by the subsequent action list.
 
 Now we can define a table, called `simpletable` that reads the vpalue of `port`,
 and then either execute the `setport` action with some parameter, or take no action.
+
 ```ocaml
 utop # let simpletable =
     table "simpletable" [`Exact port] [setport; nop];;
