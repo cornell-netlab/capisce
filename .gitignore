@@ -283,3 +283,5 @@ TSWLatexianTemp*
 **/*.cpi
 **/*.gcl
 benchmarks/data
+capisce/survey_data_oopsla/*
+artifact.html
