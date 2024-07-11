@@ -121,7 +121,7 @@ let npa_ingress =
     ]
   in
   let drop_tbl =
-    table ("drop_tbl", [], [_drop; nop]) (* adding dummy default action noop *)
+    instr_table ("drop_tbl", [], [_drop; nop]) (* adding dummy default action noop *)
   in
   sequence [
     ifte_seq (eq_ (var hdr.ipv4.isValid) btrue)

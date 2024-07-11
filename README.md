@@ -265,21 +265,20 @@ utop # table;;
 should produce
 ```ocaml
 - : string ->
-    Var.t list ->
+    [> `Exact of Var.t | `Maskable of Var.t | `MaskableDegen of Var.t ] list ->
     (Var.t list * Capiscelib.Primitives.Action.t list) list ->
     Pack.t
 = <fun>
 ```
 
 This tells us that to construct a `table`, we need 3 arguments: a
-`string` name, a list variable keys, then a list of `Var.t list *
-Primitives.Action.t list`. Each pair `(xs, as)` in this list
+`string` name, a list variable keys tagged with their matchkind (`Exact`, `Maskable`, and `MaskableDegen`), then a list of `Var.t list * Primitives.Action.t list`. Each pair `(xs, as)` in this list
 corresponds to an anonymous function where `xs` occur free in a list
 of primitive actions. This list should be understood as sequential
 composition. Lets construct our first action.
 
 ```ocaml
-utop # let nop = [], []
+utop # let nop : Var.t list * Primitives.Action.t list = [],[];;
 ```
 
 This action is the trivial action. It takes no arguments `[],` and
@@ -292,7 +291,7 @@ previously-defined variable `port`;
 utop # let setport =
      let p = Var.make "p" 9 in
      [p], Primitives.Action.[
-     	  assign_ port (var p)
+     	  assign port (Expr.var p)
      ];;
 ```
 The first line constructs the AST node for parameter `p`. Then the
@@ -303,8 +302,14 @@ Now we can define a table, called `simpletable` that reads the vpalue of `port`,
 and then either execute the `setport` action with some parameter, or take no action.
 ```ocaml
 utop # let simpletable =
-    table "simpletable" [port] [setport; nop];;
+    table "simpletable" [`Exact port] [setport; nop];;
 ```
+
+The `Exact` matchkind tells us that `simpletable` must precisely read the bits of `port`.
+Using `Maskable` corresponds unifies the notions of `ternary`, `lpm` and `optional`, all 
+of which allow the the table to skip reading that specific key. `MaskableDegen` is semantically
+equivalent to `Exact`, but allows us to differentiate between truly maskable match data 
+and degenerate cases described in the paper
 
 #### Part 2: Writing a Specification
 
@@ -314,8 +319,8 @@ So we never want to forward a packet out on port `47`. We define a
 spec that ensures this as follows:
 ```ocaml
 utop # let port_not_47 =
-     let prohibited = bvi 47 9 in
-     not_ (eq_ (var port) prohibited);;
+    let prohibited = Expr.bvi 47 9 in
+    BExpr.(not_ (eq_ (Expr.var port) prohibited));;
 ```
 
 Now we can use assertions to specify that our table must satisfy this spec:
@@ -337,7 +342,7 @@ The encoding step eliminates tables, and converts a `GPL.t` program into
 a `GCL.t` program. `GCL` here stands for Dijkstra's _guarded command language_.
 We run this using the `GPL.encode_tables` function:
 ```ocaml
-utop # let gcl = GPL.encode_tables program;;
+utop # let gcl = ASTs.GPL.encode_tables program;;
 ```
 To see a pretty printed version of the table-free program, run the following:
 ```ocaml
@@ -351,11 +356,22 @@ utop # let cis = Qe.cegqe gcl;;
 To pretty print the result in SMTLIB format, run the following command:
 
 ```ocaml
-utop # Printf.printf "%s" @@ to_smtlib cis;;
+utop # Printf.printf "%s" @@ BExpr.to_smtlib cis;;
 ```
 
-This specification, says that whenever the action is `setport`,
-the argument to `setport` supplied by the controller must not be equal to `47`.
+The resulting specification has two conjucts. The first, shown below, says that whenever the action is has index `0`, that is when it corresponds to `setport`, the argument to `setport` must not be `47`.
+```lisp
+  (not (and
+          (= _symb$simpletable$action$_$0 (_ bv1 1))
+          (= _symb$simpletable$1$p$_$0 (_ bv47 9))))
+``` 
+The second conjunct, replicated below, says that whenever the action is `setport`,
+the key that was matched by `simpletable` must not be equal to `47`.
+```lisp
+  (not (and
+          (= _symb$simpletable$action$_$0 (_ bv0 1))
+          (= _symb$simpletable$match_0$_$0 (_ bv47 9))))
+```
 
 ### Guarded Pipeline Language `GPL`
 
@@ -389,7 +405,9 @@ val assign_ : Var.t -> Expr.t -> t
 
 and the most important constuct, tables:
 ```ocaml
-val table : string -> Var.t list -> ( Var.t * Primtives.Action.t list) list -> t
+val table : string 
+  -> [> `Exact of Var.t list | `Maskable of Var.t list | `MaskableDegen of Var.t ] list 
+  -> ( Var.t * Primtives.Action.t list) list -> t
 ```
 As described above `table name keys actions` constructs a table named
 `name` that chooses an action `a` in `actions` by inspecting the variables in `keys`.
