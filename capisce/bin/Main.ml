@@ -11,8 +11,13 @@ let experiment : Command.t =
     and out = flag "-out" (required string) ~doc:"F path to result info"
     and enum = flag "-enum" (no_arg) ~doc:"use naive enumeration method (DEPRECATED)"
     and replay = flag "-replay" (no_arg) ~doc:"log timestamps for each path condition. Measure number of paths covered by each condition."
-    in fun () -> 
-      Log.override ();
+    and z3 = flag "-z3" (optional string) ~doc:("Z the path to the Z3 binary. default is " ^ !Solver.z3_path)
+    and princess = flag "-princess" (optional string) ~doc:("P the path to the princess binary. default is " ^ !Solver.princess_path)
+    in fun () ->
+      Solver.z3_path := Option.value z3 ~default:(!Solver.z3_path);
+      Log.smt "Using z3 binary at %s" @@ lazy (!Solver.z3_path);
+      Solver.princess_path := Option.value princess ~default:(!Solver.princess_path);
+      Log.smt "Using princess binary at %s" @@ lazy (!Solver.princess_path);
       Printf.printf "%s\n" name;
       let program = match String.lowercase name with
       | "ecmp" -> ECMP.ecmp

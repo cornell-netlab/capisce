@@ -4,7 +4,7 @@ Capisce is described in the In-Revision OOPSLA paper 369 entitled _Computing Pre
 
 The Capisce library comprises two key pieces:
 
-- an OCAML library for writing down and specifying data plane programs called GPL.
+- an OCAML library for writing down and specifying data plane programs called `GPL`.
 
   * Example programs can be seen in the `capisce/programs`.
 
@@ -87,7 +87,7 @@ opam install utop
 ```
 As well as a system dependency:
 ```
-sudo install libgmp-dev -y
+sudo apt install libgmp-dev -y
 ```
 Now, change into the nested `capisce` directory (i.e. `/path/to/repo/capisce/capisce`),
 and install the dependencies in the `capisce.opam` file:
@@ -99,7 +99,7 @@ Now you should be ready to build `capisce` by running `make`
 ```
 make
 ```
-Verify your installation by running `./capisce exp -?`
+Verify your installation by running `./capisce exp -help`
 
 #### Dependencies for processing the experimental results
 
@@ -119,7 +119,8 @@ Once you've installed `Capisce`, you can verify it works, by computing a specifi
 the `arp` program, which can be found in `programs/Arp.ml`.
 
 ```
-./capisce exp -name arp -out ./survey_data_oopsla
+mkdir ./survey_data_oopsla
+./capisce exp -name arp -out ./survey_data_oopsla -z3 ../solvers/z3.4.8.13
 ```
 
 `capisce` will spit out a collection of SMT formulae whose conjunction

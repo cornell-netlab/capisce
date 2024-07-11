@@ -14,8 +14,6 @@ let solve_wto solver ?(with_timeout:int option) cvs smt =
     Solver.run_z3 (Smt.assert_apply cvs smt)
   | `Z3Light,_ ->
     Solver.run_z3 (Smt.assert_apply_light cvs smt)
-  | `CVC4,_ ->
-    Solver.run_cvc4 (Smt.simplify cvs smt)
   | `Princess, _ ->
     Solver.run_princess (Smt.simplify cvs smt)
 

@@ -2,14 +2,13 @@ module P4Info = Info
 open Core
 module Info = P4Info
 
-let princess_exe = "~/capisce/solvers/princess -inputFormat=smtlib +mostGeneralConstraint +incremental +stdin "
-(* let z3_exe = "/usr/bin/z3 -smt2 -t:30000" *)
-let z3_exe = "~/capisce/solvers/z3.4.8.13 -smt2 -in"
-(* let z3_daemon = z3_exe ^ " -in" *)
+let z3_path = ref "../solvers/z3.4.8.13"
+let princess_path = ref "../solvers/princess"
 
-(* let z3_chan_in, z3_chan_out = Core_unix.open_process z3_daemon *)
+let princess_exe () = Printf.sprintf "%s -inputFormat=smtlib +mostGeneralConstraint +incremental +stdin " (!princess_path)
 
-let cvc4_exe = "/usr/bin/cvc5 --lang smt2" 
+let z3_exe () = Printf.sprintf "%s -smt2 -in" (!z3_path)
+
 
 let close_process_in in_chan =
   try
@@ -42,7 +41,7 @@ let run_proc_file p str =
 (*   String.concat lines ~sep:"\n" *)
 
   
-let run_princess = run_proc_file princess_exe
+let run_princess = run_proc_file (princess_exe ())
 let run_z3 str =
   (* let table = String.Table.create () in *)
   (* fun str ->
@@ -50,11 +49,9 @@ let run_z3 str =
   | Some res ->
      res
   | None -> *)
-     let res = run_proc_file z3_exe str in
+     let res = run_proc_file (z3_exe ()) str in
      (* String.Table.set table ~key:str ~data:res; *)
      res
-     
-let run_cvc4 = run_proc_file cvc4_exe
 
 let of_smtlib ~cvs ~dvs smt : BExpr.t =
   (* Log.print @@ lazy (Printf.sprintf "parsing string with vars:\n control %s,\n data %s\n%!"
@@ -134,4 +131,4 @@ let check_iff_str ?(timeout=None)  (b1 : BExpr.t) (b2 : BExpr.t) : string =
   let smtlib_exp = BExpr.equivalence b1 b2
                    |> BExpr.to_smtlib
                    |> Smt.check_sat ~timeout [] in
-  run_z3 smtlib_exp                 
+  run_z3 smtlib_exp
