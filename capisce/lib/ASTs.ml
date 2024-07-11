@@ -51,38 +51,6 @@ module GCL = struct
         seq acc_path c_path
       )
 
-  (* let path_simplify_assumes (gcl : t) : t = *)
-  (*   let rec listify = function *)
-  (*     | Prim p -> [p] *)
-  (*     | Seq cs -> List.bind cs ~f:listify *)
-  (*     | Choice _ -> failwith "[listify failed] got a choice => not a path" *)
-  (*   in *)
-    (* let rec heuristic_elim info_flow_state (prims : Active.t list) = *)
-    (*   (\* info_flow_state maintains all variables that flow to the key *\) *)
-    (*   match prims with *)
-    (*   | (Assign(x,e))::prims -> *)
-    (*     let evars = Expr.vars e |> Util.uncurry (@) in *)
-    (*     let flow_to_x = *)
-    (*       List.bind evars ~f:(fun y -> *)
-    (*           Var.Map.find info_flow_state y *)
-    (*           |> Option.value ~default:[]) *)
-    (*     in *)
-    (*     let info_flow_state = Var.Map.set info_flow_state ~key:x ~data:flow_to_x in *)
-    (*     assign x e :: heuristic_elim info_flow_state prims *)
-    (*   | (Passive (Assume phi)) :: prims -> *)
-    (*     begin match BExpr.get_equality phi with *)
-    (*     | Some (x, e) -> *)
-    (*       let phi_vars = BExpr.vars phi in *)
-    (*       (\* if everything that contributes to the value of e is a constant or a control var, keep it. *\) *)
-    (*       (\* that doesnt quite work the way that I would like either *\) *)
-
-    (*     end *)
-    (*     | (Passive (Assert phi)) :: prims -> *)
-    (*       assert_ phi :: heuristic_elim info_flow_state prims *)
-    (* in *)
-    (* listify gcl *)
-    (* |> heuristic_elim Var.Map.empty *)
-
   let single_assert_nf c : t list =
     (* convert the program into single-assert normal form, that is, *)
     (* a list of programs where each program has exactly one assert, the last one *)
@@ -164,7 +132,7 @@ module GCL = struct
               let sz = Var.size x in
               let ctx = Var.Map.set ctx ~key:x ~data:(v,sz) in
               if BExpr.(phi = false_) then
-                Log.debug "got a false assumption %s" @@ lazy BExpr.(to_smtlib phi);
+                Log.rewrites "[WARNING] got a false assumption %s" @@ lazy BExpr.(to_smtlib phi);
               (ctx, ctor phi')
             | None ->
               (ctx, ctor phi')
@@ -195,9 +163,9 @@ module GCL = struct
       | Choice _ ->
         failwith "choices disallowed in const prop"
     in
-    Log.debug "Before optimization: %s\n%!" @@ lazy (to_string gcl);
+    Log.irs "Before optimization: %s\n%!" @@ lazy (to_string gcl);
     let _, gcl' = const_prop_inner Var.Map.empty gcl in
-    Log.debug "After constant propagation: %s\n%!" @@ lazy (to_string gcl');
+    Log.irs "After constant propagation: %s\n%!" @@ lazy (to_string gcl');
     let _ , gcl'' = dead_code_elim_inner Var.Set.empty gcl' in
     gcl''
   end
@@ -206,9 +174,9 @@ module GCL = struct
       module P = Active
       include Pack
       let prim_const_prop m p =
-        Log.debug "\tSTART:%s" @@ lazy (Active.to_smtlib p);
+        Log.irs "\tSTART:%s" @@ lazy (Active.to_smtlib p);
         let p,m = Active.const_prop m p in
-        Log.debug "\t  END:%s" @@ lazy (Active.to_smtlib p);
+        Log.irs "\t  END:%s" @@ lazy (Active.to_smtlib p);
         p,m
     end)
   let const_prop = CP.propagate_exn
@@ -224,9 +192,9 @@ module GCL = struct
         reads, p
 
       let prim_const_prop m p =
-        Log.debug "\tSTART:%s" @@ lazy (Active.to_smtlib p);
+        Log.irs "\tSTART:%s" @@ lazy (Active.to_smtlib p);
         let p,m = Active.const_prop m p in
-        Log.debug "\t  END:%s" @@ lazy (Active.to_smtlib p);
+        Log.irs "\t  END:%s" @@ lazy (Active.to_smtlib p);
         Active.const_prop m p
     end
     )
@@ -319,7 +287,7 @@ module Psv = struct
 
   let vc (c : t) : BExpr.t =
     let phi = wrong c in
-    Log.debug "wrong_execs: %s" @@ lazy (BExpr.to_smtlib phi);
+    Log.smt "wrong_execs: %s" @@ lazy (BExpr.to_smtlib phi);
     BExpr.not_ phi
     (* |> BExpr.simplify *)
 
@@ -479,9 +447,9 @@ end
       module P = Pipeline
       let prim_dead_code_elim = Pipeline.dead_code_elim
       let prim_const_prop m p =
-        Log.debug "\t%s" @@ lazy (Pipeline.to_smtlib p);
+        Log.irs "\t%s" @@ lazy (Pipeline.to_smtlib p);
         let p, m = Pipeline.const_prop m p in
-        Log.debug "\t%s" @@ lazy (Pipeline.to_smtlib p);
+        Log.irs "\t%s" @@ lazy (Pipeline.to_smtlib p);
         p, m
       end)
   let optimize = O.optimize
@@ -526,7 +494,6 @@ module Concrete = struct
     let rec slice_aux model cmd : (Model.t * t) option =
     match cmd with
     | Prim p ->
-      Log.debug "%s" @@ lazy (Active.to_smtlib p);
       begin match p.data with
       | Assign (x,e) ->
         let value = Expr.eval model e |> Result.ok_or_failwith in
@@ -534,8 +501,7 @@ module Concrete = struct
         Some (model, Prim p)
       | (Passive (Assume phi)) when BExpr.eval model phi->
         Some (model, Prim p)
-      | (Passive (Assume phi)) ->
-        Log.debug "Assume failed %s" @@ lazy (BExpr.to_smtlib phi);
+      | (Passive (Assume _)) ->
         None
       | Passive (Assert _) ->
         Some (model, Prim p)
@@ -560,5 +526,4 @@ end
 
 let passive_vc (c : GCL.t) : BExpr.t =
   let _, passive_form = Psv.passify c in
-  Log.debug "Passive form -----\n%s\n----------" @@ lazy (Psv.to_string passive_form);
   Psv.vc passive_form

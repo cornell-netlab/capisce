@@ -32,7 +32,6 @@ let of_alist_exn alist = Var.Map.of_alist_exn alist
 let of_map m = m
 
 let project_inputs (passive_model : t) : t =
-  Log.debug "Projecting passive_model: \n%s" @@ lazy (to_string passive_model);
   let keys =
     passive_model
     |> Var.Map.keys
@@ -42,13 +41,10 @@ let project_inputs (passive_model : t) : t =
   in
   List.fold keys ~init:empty
     ~f:(fun active_model k ->
-        Log.debug "Finding value for %s" @@ lazy (Var.str k);
         let k0 = Var.index k 0 in
-        Log.debug "\t by looking up %s" @@ lazy (Var.str k0);
         match lookup passive_model k0 with
         | None ->
           active_model
         | Some v ->
-          Log.debug "\t found a value %s" @@ lazy (Bigint.to_string @@ fst v);
           update active_model k v
       )

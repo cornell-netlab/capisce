@@ -124,7 +124,6 @@ let eval (model : Model.t) expr : ((Bigint.t * int), string) Result.t =
             (Var.str x) (Model.to_string model)
           |> Result.fail
         | Some v ->
-          Log.debug_s @@ Printf.sprintf "\t{ %s |--> %s }" (Var.str x) (Bigint.to_string (fst v));
           return v
       end
     | UnOp (op, e) ->

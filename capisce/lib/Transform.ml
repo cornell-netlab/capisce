@@ -189,7 +189,7 @@ module Optimizer ( Cmd : sig
     let cp (c1, c2) = cp_o (c1,c2) |> Option.value_exn ~message:"[optimize_seq_pair] constant_propagation failed" in
     let equal (c1,c2) (c1',c2') = Cmd.equal c1 c1' && Cmd.equal c2 c2' in
     let o (c1,c2) =
-      Log.debug "FIX:\n%s" @@ lazy (Cmd.to_string c1);
+      Log.irs "FIX:\n%s" @@ lazy (Cmd.to_string c1);
       dce @@ cp (c1,c2)  in
     Util.fix ~equal o (c1,c2)
 

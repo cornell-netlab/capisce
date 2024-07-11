@@ -82,8 +82,8 @@ let implies phi1 phi2 =
     ~timeout:(Some 2000)
 
 let implies_model consts phi1 phi2 : Model.t option =
-  Log.debug "PREMISE:\n%s\n------" @@ lazy (BExpr.to_smtlib phi1);
-  Log.debug "CONSEQU:\n%s\n------" @@ lazy (BExpr.to_smtlib phi2);
+  Log.smt "PREMISE:\n%s\n------" @@ lazy (BExpr.to_smtlib phi1);
+  Log.smt "CONSEQU:\n%s\n------" @@ lazy (BExpr.to_smtlib phi2);
   let cond = BExpr.(and_ phi1 (not_ phi2)) in
   Solver.check_sat_model consts cond
     ~timeout:(Some 2000)
@@ -91,7 +91,7 @@ let implies_model consts phi1 phi2 : Model.t option =
 let sufficient ~vc ~prog =
   let program_spec = vc prog in
   fun phi ->
-  Log.debug_s "Checking sufficiency";
+  Log.qe_s "Checking sufficiency";
   implies phi program_spec
 
 let nall_paths = ref 0
@@ -109,7 +109,7 @@ let hybrid_strategy vc =
 
 let check_sufficiency gcl =
   let _, psv = Psv.passify gcl in
-  Log.debug "[cegqe] Passive :\n%s" @@ lazy (Psv.to_string psv);
+  Log.qe "[cegqe] Passive :\n%s" @@ lazy (Psv.to_string psv);
   let all_passive_consts = Psv.vars psv in
   let safety_condition = Psv.vc psv in
   let normal_executions = Psv.(normal (remove_asserts psv)) in
@@ -128,11 +128,11 @@ let path_generator gcl =
   fun condition ->
     match suffices condition with
     | None ->
-      Log.debug_s "found a sufficiently strong formula";
+      Log.qe_s "found a sufficiently strong formula";
       None
     | Some counterexample ->
       let input_packet = Model.project_inputs counterexample in
-      Log.debug "%s" @@ lazy Model.(to_string input_packet);
+      Log.qe "%s" @@ lazy Model.(to_string input_packet);
       match Concrete.slice input_packet gcl with
       | None ->
         Log.error "Failed to slice(GCL):\n%s\n----------" @@ lazy (GCL.to_string gcl);
@@ -148,7 +148,7 @@ let cegqe (gcl : GCL.t) : BExpr.t =
   num_cexs := Bigint.zero;
   data := [Clock.now (), BExpr.true_];
   let rec loop phi_agg =
-    Log.debug_s "checking implication...";
+    Log.qe_s "checking implication...";
     match get_new_path phi_agg with
     | None -> 
       (* TERMINATION *)

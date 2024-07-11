@@ -250,10 +250,7 @@ module HoareNet = struct
         | Prim triple ->
           begin match triple.precondition, triple.postcondition with
             | None, None ->
-              Log.debug "unmodular program is %s" @@ lazy (GPL.to_string triple.cmd);
-              Log.debug "postcondition is %s" @@ lazy (BExpr.to_smtlib postcond);
               let postcond = GPL.wp triple.cmd postcond in
-              Log.debug "new postcondition is %s" @@ lazy (BExpr.to_smtlib postcond);
               postcond
             | Some p, Some q ->
               let phi = BExpr.(and_ q @@ not_ postcond) in
@@ -303,8 +300,6 @@ module HoareNet = struct
 
     let ninfer = ref 0
     let infer ?(qe = `Cegqe) (cmd:t) nprocs pid =
-      Log.path_gen "INFER CALL #%d" @@ lazy (!ninfer);
-      (* Breakpoint.set (!ninfer > 0); *)
       Int.incr ninfer;
       let seen = ref [] in
       let rec loop = function

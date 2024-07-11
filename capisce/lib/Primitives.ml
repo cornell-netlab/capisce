@@ -351,8 +351,6 @@ module Action = struct
       ((params : Var.t list), (body : t list)) : (BExpr.t * t list) =
     let act_choice =
       let c = if idx >= num_actions - 1 then BExpr.uge_ else BExpr.eq_ in
-      if String.(name = "classifier") then
-        Log.debug "[symbolize] classifier action_size = %d" @@ lazy act_size;
       c (cp_action name act_size |> Expr.var ) (Expr.bvi idx act_size)
     in
     let symb param = Expr.var (cp_data name idx param) in
@@ -480,8 +478,6 @@ module Table = struct
     |> Var.dedup
 
   let symbolic_interface tbl : Var.t list =
-    if String.(tbl.name = "classifier") then
-      Log.debug "[symbolic_interface] classifier action_size = %d" @@ lazy (act_size tbl);
     Action.cp_action tbl.name (act_size tbl)
     :: List.bind tbl.keys ~f:(fun k -> [k; Var.make (Var.str k ^ "$DONT_CARE") 1])
     @ List.bind ~f:fst tbl.actions
