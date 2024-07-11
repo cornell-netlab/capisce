@@ -1,5 +1,7 @@
 open Core
 open Base_quickcheck
+
+(** BExpr defines boolean expressions over BitVector Expressions. *)
    
 type bop =
   | LAnd

@@ -1,4 +1,4 @@
 (library
   (name programs)
-  (libraries capiscelib)
+  (libraries capisce)
   (preprocess (pps ppx_jane ppx_deriving.std)))

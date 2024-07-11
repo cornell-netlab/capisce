@@ -1,4 +1,4 @@
-open Capiscelib
+open Capisce
 open Equivalences   
 
    

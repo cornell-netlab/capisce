@@ -52,8 +52,6 @@ module GCL = struct
       )
 
   let single_assert_nf c : t list =
-    (* convert the program into single-assert normal form, that is, *)
-    (* a list of programs where each program has exactly one assert, the last one *)
     let rec assumeize c =
       match c with
       | Prim {data = Passive (Assert phi); alt = _} ->
@@ -488,35 +486,6 @@ end
   let optimize = O.optimize
   let optimize_seq_pair = O.optimize_seq_pair
   include Pack
-end
-
-module TFG = struct
-  module T = struct
-    include Pipeline
-    let is_node = function
-      | Table _ -> true
-      | _ -> false
-  end
-  include Cmd.Make(T)
-
-  let rec project (gpl : GPL.t) : t =
-    match gpl with
-    | Prim (Pipeline.Active a) ->
-      prim (T.Active a)
-    | Prim (Pipeline.Table t) ->
-      prim (T.Table t)
-    | Seq cs ->
-      List.map cs ~f:project |> sequence
-    | Choice cs ->
-      List.map cs ~f:project |> choices
-
-  let rec inject (tfg : t) : GPL.t =
-    match tfg with
-    | Prim p -> GPL.prim p
-    | Seq cs ->
-      GPL.sequence_map cs ~f:inject
-    | Choice cs ->
-      GPL.choices_map cs ~f:inject
 end
 
 module Concrete = struct

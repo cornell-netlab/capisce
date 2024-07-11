@@ -1,5 +1,5 @@
 open Core
-open Capiscelib
+open Capisce
 open Base_quickcheck
 open Equivalences
 

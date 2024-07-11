@@ -1,5 +1,5 @@
 open Core
-open Capiscelib
+open Capisce
 module Qe = Qe
 
 let experiment : Command.t =

@@ -1,5 +1,5 @@
 open Core
-open Capiscelib
+open Capisce
 open DependentTypeChecker
 open V1ModelUtils
 open Primitives

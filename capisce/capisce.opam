@@ -2,6 +2,7 @@
 opam-version: "2.0"
 synopsis:
   "library to write pipeline programs and infer their control interface specifications"
+doc: "mld_files"
 depends: [
   "dune" {>= "2.9"}
   "core" {= "v0.15.1"}

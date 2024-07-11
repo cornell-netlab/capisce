@@ -1,4 +1,4 @@
-open Capiscelib
+open Capisce
 open Info
 
 let info : t = {

@@ -1,4 +1,4 @@
 (test
   (name tests)
-  (libraries capiscelib programs alcotest async)
+  (libraries capisce programs alcotest async)
   (preprocess (pps ppx_jane ppx_deriving.std)))

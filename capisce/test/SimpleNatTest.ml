@@ -1,5 +1,5 @@
 open Core
-open Capiscelib
+open Capisce
 open Programs.SimpleNat
 open DependentTypeChecker
 
