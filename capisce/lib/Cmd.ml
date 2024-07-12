@@ -164,11 +164,6 @@ module Make (P : Primitive) = struct
       in
       vars_set c |> Var.Set.to_list
 
-    (* Monoids *)
-    let zero = dead
-    let ( + ) = choice
-    let one = skip
-    let ( * ) = seq
   end
 
   include Cmd

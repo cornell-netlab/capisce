@@ -117,11 +117,6 @@ module HoareNet = struct
               cmd = GPL.assign x e;
               postcondition = None})
 
-    let raw_table ?(pre = None) ?(post = None) (name, keys, actions) =
-      prim ({ precondition = pre;
-              cmd = GPL.raw_table name keys actions;
-              postcondition = post})
-
     let instr_table ?(pre = None) ?(post = None) (name, real_keys, actions) =
       prim({ precondition = pre;
              cmd = GPL.table name real_keys actions;

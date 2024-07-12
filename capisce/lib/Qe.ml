@@ -21,8 +21,6 @@ let dp_removed phi =
   let dvs, _ = BExpr.vars phi in
   List.is_empty dvs && BExpr.qf phi 
 
-let z3_simplify cvs phi = Solver.run_z3 (Smt.simplify cvs (BExpr.to_smtlib (BExpr.simplify phi)))
-
 let solve_one ?(solver=`Z3) ~qe phi : (BExpr.t, BExpr.t) Result.t =
   let open Result.Let_syntax in
   Log.qe "solve_one(%s)" @@ lazy (solver_to_string solver);
@@ -35,10 +33,6 @@ let solve_one ?(solver=`Z3) ~qe phi : (BExpr.t, BExpr.t) Result.t =
     Result.Ok qf_phi
   else
     Result.Error qf_phi
-
-let solve_one_option ?(solver=`Z3) ~qe phi =
-  solve_one ~solver ~qe phi
-  |> Result.ok
 
 let nikolaj_please (solver : ?with_timeout:int -> Var.t list -> string -> string) phi : (BExpr.t, BExpr.t) Result.t =
   Log.qe_s "Nikolaj pleaseeeeeee";
@@ -74,27 +68,6 @@ let rec orelse thunks ~input =
     match thunk input with
     | None -> orelse more_thunks ~input
     | Some x -> Some x
-
-let implies phi1 phi2 =
-  let cond = BExpr.(and_ phi1 (not_ phi2)) in
-  let cvs = BExpr.vars cond |> Tuple2.uncurry (@) in
-  Solver.check_unsat cvs cond
-    ~timeout:(Some 2000)
-
-let implies_model consts phi1 phi2 : Model.t option =
-  Log.smt "PREMISE:\n%s\n------" @@ lazy (BExpr.to_smtlib phi1);
-  Log.smt "CONSEQU:\n%s\n------" @@ lazy (BExpr.to_smtlib phi2);
-  let cond = BExpr.(and_ phi1 (not_ phi2)) in
-  Solver.check_sat_model consts cond
-    ~timeout:(Some 2000)
-
-let sufficient ~vc ~prog =
-  let program_spec = vc prog in
-  fun phi ->
-  Log.qe_s "Checking sufficiency";
-  implies phi program_spec
-
-let nall_paths = ref 0
 
 let hybrid_strategy vc = 
   orelse ~input:vc
@@ -192,16 +165,3 @@ let replay data gcl : (Float.t * int) list =
       (remain_unsolved, completion_data @ [t, num_paths_solved])
   ) in 
   data
-
-  
-let check_for_parser prsr gpl_prsr =
-  match prsr with
-    | `Use  ->
-      gpl_prsr
-    | `Skip ->
-      GPL.skip
-
-let preprocess ~prsr gpl_pair =
-  gpl_pair
-  |> Tuple2.map_fst ~f:(check_for_parser prsr)
-  |> Tuple2.map     ~f:(GPL.normalize_names)

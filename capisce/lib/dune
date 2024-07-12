@@ -1,5 +1,6 @@
 (library
   (name capisce)
+  (public_name capisce)
   (libraries core core_unix bignum ANSITerminal)
   (preprocess (pps ppx_jane ppx_deriving.std)))
 

@@ -14,6 +14,7 @@ opaminstall: all
 
 clean:
 	rm -fr _build
+	rm -fr ./doc
 
 check: all
 	dune build ./test/tests.exe && ./_build/default/test/tests.exe test -- ${TEST}
@@ -26,4 +27,10 @@ survey:
 
 survey-tex:
 	./scripts/survey_to_tex.py
+
+
+doc: 
+	dune build @doc;
+	cp -r _build/default/_doc/_html/ ./doc
+	xdg-open ./doc/capisce/index.html
 # end

@@ -473,18 +473,6 @@ end
     end)
   let const_prop = C.propagate_with_map
 
-  module O = Transform.Optimizer (struct
-      include Pack
-      module P = Pipeline
-      let prim_dead_code_elim = Pipeline.dead_code_elim
-      let prim_const_prop m p =
-        Log.irs "\t%s" @@ lazy (Pipeline.to_smtlib p);
-        let p, m = Pipeline.const_prop m p in
-        Log.irs "\t%s" @@ lazy (Pipeline.to_smtlib p);
-        p, m
-      end)
-  let optimize = O.optimize
-  let optimize_seq_pair = O.optimize_seq_pair
   include Pack
 end
 

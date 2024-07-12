@@ -239,10 +239,10 @@ Our artifact supports three key pieces for reusability.
 
 Now that you've build `Capisce`, we'll show you how it works.
 
-First run `dune utop`. This will load Capiscelib into a REPL.
-Now, open the `Capiscelib` module:
+First run `dune utop`. This will load `Capisce` into a REPL.
+Now, open the `Capisce` module:
 ```ocaml
-utop # open Capiscelib;;
+utop # open Capisce;;
 ```
 
 In this Hello-World tutorial, we'll write a program in our
@@ -442,6 +442,16 @@ val assert_ : BExpr.t -> t
 ```
 The `assume` primitive is angelic---if it can be satisfied the program assumes it is.
 Conversely, `assert_` is demonic---if it can ba falsified the program assumes it is.
+
+#### Building the Documentation
+
+The full documentation can be viewed using the following commands
+```
+opam install odoc
+make doc
+```
+
+The core documentation can be by navigating to modules `Cmd`, `ASTs`, and `Qe`.
 
 ### Instrumentation and Compiler
 
