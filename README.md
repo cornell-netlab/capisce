@@ -447,11 +447,14 @@ Conversely, `assert_` is demonic---if it can ba falsified the program assumes it
 
 The full documentation can be viewed using the following commands
 ```
-opam install odoc
-make doc
+make doc -B
 ```
 
-The core documentation can be by navigating to modules `Cmd`, `ASTs`, and `Qe`.
+This will open the documentation in your systems default web
+browser. In the docker container this will be w3m (press enter to follow links and q to quit).
+
+The documentation for the core modules can be found by clicking on
+`capisce` and then navigating to modules `Cmd`, `ASTs`, and `Qe`.
 
 ### Instrumentation and Compiler
 
