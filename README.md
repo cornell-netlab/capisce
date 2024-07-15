@@ -121,19 +121,19 @@ the `arp` program, which can be found in `programs/Arp.ml`.
 ```bash
 # wd: capisce/capisce
 mkdir ./survey_data_oopsla
-./capisce exp -name arp -out ./survey_data_oopsla
+./capisce exp arp -out ./survey_data_oopsla -hv
 ```
 
 `capisce` will spit out a collection of SMT formulae whose conjunction
 corresponds to the control interface specification (CIS) that enforces
-there are no invalid header reads. It should take about 5 seconds.
+there are no invalid header reads (`-hv`). It should take about 5 seconds.
 
 If the above command fails, with an error complaining about not being able to find
 `../solvers/z3.4.8.13` or `../solvers/princess`, you can specify the path to these 
 solvers (in the `solvers` directory) manually by using the `-z3` and `-princess` flags.
 For instance:
 ```bash
-./capisce exp -name arp -out ./survey_data_oopsla -z3 /path/to/z3 -princess /path/to/princess
+./capisce exp -name arp -hv -out ./survey_data_oopsla -z3 /path/to/z3 -princess /path/to/princess
 ```
 In the sequel we will omit the explicit paths flags, but they may always be added if needed.
 
@@ -160,55 +160,34 @@ several days.
 
 To run the experiments individually, execute the following command once for each pipeline:
 ```
-./capisce exp -name NAME -out ./survey_data_oopsla
+./capisce exp NAME -out ./survey_data_oopsla
 ```
 where `OUT` is the output directory in which you wish to store the results, and
-`NAME` is the name of the example program. The valid names are the following
-```
-ecmp
-netpaxos_acceptor
-resubmit
-ndp_router
-heavy_hitter_1
-arp
-"07-multiprotocol"
-mc_nat
-mc_nat_fixed
-ts_switching
-ts_switching_fixed
-heavy_hitter_2
-heavy_hitter_2_fixed
-flowlet
-flowlet_fixed
-hula
-hula_fixed
-fabric
-fabric_fixed
-linearroad
-linearroad_fixed
-```
+`NAME` is the name of the example program. The valid names can be seen by typing `./capisce exp`.
 
-Most of these will finish in minutes, but the last four will take nearly two days. For precisetiming data, consult Figure 4.
+Most of these will finish in minutes, but several will take nearly two days. 
+For precise timing expectations, consult Figure 4.
 
-Once youve done this, you can generate Figure 4 using the script `./scripts/survey-to-tex.py`.
+Once you've done this, you can generate Figure 4 using the script `./scripts/survey-to-tex.py`.
 ```bash
 python3 ./scripts/survey-to-tex.py
 ```
-Notice that you can run this script after any number of examples have been run, and you will
-get partial results.
+You may run this script after any number of examples have been run, and you will
+get partial results. Those results that haven't finished running yet will be 
+indicated by an infinity symbol in the "Result" column.
 
-To reproduce Figure 5, re-run the relevant programs with the -replay
+To reproduce Figure 5, re-run the relevant programs with the `-replay`
 flag. This will generate the additional data required to generate
 Figure 5. The coverage analysis is slow, and may take several
 hours. To generate the data run the following commands:
 
 ```bash
-./capisce exp -name arp -replay -out survey_data_oopsla
-./capisce exp -name heavy_hitter_2 -replay -out survey_data_oopsla
-./capisce exp -name heavy_hitter_1 -replay -out survey_data_oopsla
-./capisce exp -name flowlet -replay -out survey_data_oopsla
-./capisce exp -name 07-multiprotocol -replay -out survey_data_oopsla
-./capisce exp -name simple_nat -replay -out survey_data_oopsla
+./capisce exp arp -replay -out survey_data_oopsla -hv
+./capisce exp heavy_hitter_2 -replay -out survey_data_oopsla -hv
+./capisce exp heavy_hitter_1 -replay -out survey_data_oopsla -hv
+./capisce exp flowlet -replay -out survey_data_oopsla -hv
+./capisce exp 07-multiprotocol -replay -out survey_data_oopsla -hv
+./capisce exp simple_nat -replay -out survey_data_oopsla -hv
 ```
 
 Then, to produce the graphs as seen in Figure 5, run the following script:

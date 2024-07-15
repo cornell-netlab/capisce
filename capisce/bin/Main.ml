@@ -53,7 +53,7 @@ let example (name : string) program : Command.t =
       Out_channel.write_all (filename "count_paths") ~data:(num_cexs);
       Out_channel.write_all (filename "time") ~data:time;
       if replay then
-        let time_series = Qe.replay (!Qe.data) (program |> HoareNet.annotated_to_gpl |> ASTs.GPL.encode_tables) in 
+        let time_series = Qe.replay (!Qe.data) (program |> instrument |> HoareNet.annotated_to_gpl |> ASTs.GPL.encode_tables) in 
         let time_series_str = List.map time_series ~f:(fun (t,n) -> Printf.sprintf "%f, %d\n" t n) |> String.concat ~sep:"" in 
         Out_channel.write_all (filename "completion") ~data:(time_series_str)
   ]
