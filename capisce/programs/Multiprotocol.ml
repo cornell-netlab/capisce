@@ -202,4 +202,3 @@ let multiproto_egress =
 
 let multiprotocol =
   pipeline multiproto_parser multiproto_ingress multiproto_egress
-  |> HoareNet.assert_valids

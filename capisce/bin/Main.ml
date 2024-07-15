@@ -2,52 +2,30 @@ open Core
 open Capisce
 module Qe = Qe
 
-let experiment : Command.t =
-  let open Programs in 
+let example (name : string) program : Command.t =
   let open Command.Let_syntax in
-  Command.basic ~summary:"runs hand-translated experiment"
+  Command.basic ~summary:("runs example " ^ name)
   [%map_open
-    let name = flag "-name" (required string) ~doc:"S experiment name"
-    and out = flag "-out" (required string) ~doc:"F path to result info"
-    and enum = flag "-enum" (no_arg) ~doc:"use naive enumeration method (DEPRECATED)"
+    let out = flag "-out" (required string) ~doc:"F path to result info"
     and replay = flag "-replay" (no_arg) ~doc:"log timestamps for each path condition. Measure number of paths covered by each condition."
     and z3 = flag "-z3" (optional string) ~doc:("Z the path to the Z3 binary. default is " ^ !Solver.z3_path)
     and princess = flag "-princess" (optional string) ~doc:("P the path to the princess binary. default is " ^ !Solver.princess_path)
+    and hv = flag "-hv" (no_arg) ~doc:"instrument example program to check the header validity property"
+    and df = flag "-df" (no_arg) ~doc:"instrument example program to check the determined forwarding property"
     in fun () ->
       Solver.z3_path := Option.value z3 ~default:(!Solver.z3_path);
       Log.smt "Using z3 binary at %s" @@ lazy (!Solver.z3_path);
       Solver.princess_path := Option.value princess ~default:(!Solver.princess_path);
       Log.smt "Using princess binary at %s" @@ lazy (!Solver.princess_path);
       Printf.printf "%s\n" name;
-      let program = match String.lowercase name with
-      | "ecmp" -> ECMP.ecmp
-      | "netpaxos_acceptor" -> NetpaxosAcceptor.netpaxos_acceptor
-      | "resubmit" -> Resubmit.resubmit
-      | "ndp_router" -> NDPRouter.ndp_router
-      | "heavy_hitter_1" | "hh1" -> HeavyHitter1.heavy_hitter_1
-      | "arp" -> Arp.arp
-      | "07-multiprotocol" -> Multiprotocol.multiprotocol
-      | "mc_nat" -> MCNat.mc_nat false
-      | "mc_nat_fixed" -> MCNat.mc_nat true
-      | "ts_switching" -> TSSwitching.ts_switching false
-      | "ts_switching_fixed" -> TSSwitching.ts_switching true
-      | "heavy_hitter_2" | "hh2" -> HeavyHitter2.heavy_hitter_2 false
-      | "heavy_hitter_2_fixed" | "hh2_fixed" -> HeavyHitter2.heavy_hitter_2 true
-      | "flowlet" -> Flowlet.flowlet false
-      | "flowlet_fixed" -> Flowlet.flowlet true
-      | "hula" -> Hula.hula false
-      | "hula_fixed" -> Hula.hula true
-      | "linearroad" -> Linearroad.linearroad false
-      | "linearroad_fixed" -> Linearroad.linearroad true
-      | "netchain" -> NetChain.netchain
-      | "simple_nat" | "simplenat" -> SimpleNat.simple_nat
-      | "fabric" -> Fabric.fabric false
-      | "fabric_fixed" -> Fabric.fabric true
-      | _ -> failwithf "unrecognized program:%s" name ()
-      in
       let open DependentTypeChecker in
+      let instrument p = 
+        let p = if hv then HoareNet.assert_valids p else p in 
+        let p = if df then HoareNet.track_assigns Programs.V1ModelUtils.standard_metadata.egress_spec p else p in 
+        p
+      in
       let algorithm p = 
-        HoareNet.infer p None None ~qe:(if enum then `Enum else `Cegqe)
+        HoareNet.infer p None None ~qe:`Cegqe
       in
       let paths p =
         HoareNet.annotated_to_gpl p
@@ -56,7 +34,11 @@ let experiment : Command.t =
       in
       let st = Clock.start () in
       let phi = 
-        try algorithm program with
+        try 
+          program |> 
+          instrument |>
+          algorithm
+        with
         | Failure msg -> 
           if String.(msg = "unsolveable") then
             BExpr.false_
@@ -64,7 +46,7 @@ let experiment : Command.t =
       in
       let num_cexs = !Qe.num_cexs |> Bigint.to_string in
       let time = Clock.stop st  |> Float.to_string in
-      let filename f = Printf.sprintf "%s/%s_%s_%s" out name (if enum then "enum" else "cegps") f in
+      let filename f = Printf.sprintf "%s/%s_%s_%s" out name "cegps" f in
       Out_channel.write_all (filename "formula") ~data:(BExpr.to_smtlib phi);
       Out_channel.write_all (filename "size") ~data:(Int.to_string @@ BExpr.size phi);
       Out_channel.write_all (filename "tot_paths") ~data:(paths program);
@@ -88,10 +70,43 @@ let smtlib : Command.t =
          Printf.printf "%s\n%!" (BExpr.to_smtlib b);
     ]
 
+let examples =
+  let open Programs in 
+  let programs = [
+    "ecmp", ECMP.ecmp;
+    "netpaxos-acceptor", NetpaxosAcceptor.netpaxos_acceptor;
+    "resubmit", Resubmit.resubmit;
+    "ndp-router",  NDPRouter.ndp_router;
+    "heavy-hitter-1", HeavyHitter1.heavy_hitter_1;
+    "arp", Arp.arp;
+    "07-multiprotocol", Multiprotocol.multiprotocol;
+    "mc-nat", MCNat.mc_nat false;
+    "mc-nat-fixed", MCNat.mc_nat true;
+    "ts-switching", TSSwitching.ts_switching false;
+    "ts-switching-fixed", TSSwitching.ts_switching true;
+    "heavy-hitter-2", HeavyHitter2.heavy_hitter_2 false;
+    "heavy-hitter-2-fixed", HeavyHitter2.heavy_hitter_2 true;
+    "flowlet", Flowlet.flowlet false;
+    "flowlet-fixed", Flowlet.flowlet true;
+    "hula", Hula.hula false;
+    "hula-fixed", Hula.hula true;
+    "linearroad", Linearroad.linearroad false;
+    "linearroad-fixed", Linearroad.linearroad true;
+    "netchain", NetChain.netchain;
+    "simple-nat", SimpleNat.simple_nat;
+    "fabric", Fabric.fabric false;
+    "fabric-fixed", Fabric.fabric true;
+  ]
+  in
+  Command.group ~summary:"Example programs" @@
+  let open List.Let_syntax in 
+  let%map name, program = programs in 
+  name, example name program
+
 let main =
   Command.group ~summary:"research toy for exploring verification & synthesis of p4 programs"
     [("smtlib", smtlib);
-     ("exp", experiment)
+     ("exp", examples)
     ]
 
 let () = Command_unix.run main    

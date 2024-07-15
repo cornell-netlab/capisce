@@ -292,4 +292,3 @@ let hula_egress =
 
 let hula fixed =
   pipeline hula_parser (hula_ingress fixed) hula_egress
-  |> HoareNet.assert_valids

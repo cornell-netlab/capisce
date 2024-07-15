@@ -134,6 +134,16 @@ module HoareNet = struct
         List.map cxs ~f:assert_valids
         |> choices
 
+    let rec track_assigns x cmd =
+      match cmd with
+      | Prim triple ->
+        let cmd = GPL.track_assigns x triple.cmd in
+        Prim {triple with cmd}
+      | Seq cs ->
+        sequence_map cs ~f:(track_assigns x)
+      | Choice cxs ->
+        choices_map cxs ~f:(track_assigns x)
+
 
     let of_gpl cmd =
       prim( {precondition = None;

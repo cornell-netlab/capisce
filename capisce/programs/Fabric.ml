@@ -1117,4 +1117,3 @@ let fabric_egress =
 
 let fabric fixed =
   pipeline fabric_parser (fabric_ingress fixed) fabric_egress
-  |> HoareNet.assert_valids

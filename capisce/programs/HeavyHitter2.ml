@@ -192,4 +192,3 @@ let hh2_egress =
 
 let heavy_hitter_2 fixed =
   pipeline hh2_parser (hh2_ingress fixed) hh2_egress
-  |> HoareNet.assert_valids

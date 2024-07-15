@@ -398,4 +398,3 @@ let netchain_egress =
 
 let netchain =
   pipeline netchain_parser netchain_ingress netchain_egress
-  |> HoareNet.assert_valids

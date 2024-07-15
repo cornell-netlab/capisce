@@ -386,7 +386,9 @@ let pipeline prsr ingr egr =
           assign standard_metadata.egress_port (var standard_metadata.egress_spec);
           egr
         ]
-      ] [skip]
+      ] [
+        assign standard_metadata.egress_spec @@ bvi 511 9;
+      ]
     ]
   in
   triple true_ pipe true_

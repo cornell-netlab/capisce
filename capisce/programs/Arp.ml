@@ -149,7 +149,9 @@ let arp_ingress =
   in
   sequence [
     assign meta.my_mac @@ bvi 000102030405 48;
-    ifte_seq (eq_ btrue @@ var zombie.exited) [] [
+    ifte_seq (eq_ btrue @@ var zombie.exited) [
+      assign standard_metadata.egress_spec @@ bvi 511 9
+    ] [
       ipv4_lpm;
       forward
     ]
@@ -164,4 +166,3 @@ let arp_egress =
 
 let arp =
   pipeline arp_parser arp_ingress arp_egress
-  |> HoareNet.assert_valids

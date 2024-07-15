@@ -247,4 +247,3 @@ let simple_nat_egress =
 
 let simple_nat =
   pipeline simple_nat_parser simple_nat_ingress simple_nat_egress
-  |> HoareNet.assert_valids

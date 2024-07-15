@@ -429,6 +429,51 @@ end
           in
           seq asserts cmd
 
+    let track_assigns x (cmd : t) : t =
+      let did_assign = Var.make (Printf.sprintf "%s$set" (Var.str x)) 1 in 
+      let track_assigns_active = 
+        let open Active in function
+        | Passive p -> 
+          [passive p]
+        | Assign (y,e) ->
+          if Var.equal y x then 
+            [ 
+              assign y e;
+              assign did_assign @@ Expr.bvi 1 1;
+            ]
+          else 
+            [assign y e]
+      in
+      let rec loop cmd = 
+        match cmd with 
+        | Seq cs ->
+          sequence_map cs ~f:loop
+        | Choice cxs ->
+          choices_map cxs ~f:loop
+        | Prim p -> 
+          match p with 
+          | Table {name;keys; actions} -> 
+            let actions = 
+              List.map actions ~f:(fun (keys,actions) -> 
+                keys, 
+                List.bind actions ~f:(fun act_prim -> 
+                  track_assigns_active act_prim.data
+                )
+              )
+            in
+            prim (Table {name; keys; actions})
+          | Active a -> 
+            track_assigns_active a.data
+            |> sequence_map ~f:(fun x -> prim (Active x))
+      in
+      let open BExpr in 
+      let open Expr in 
+      sequence [
+        assign did_assign @@ Expr.bvi 0 1;
+        loop cmd;
+        assert_ @@ eq_ (var did_assign) @@ bvi 1 1;
+      ]
+
     let wp cmd phi =
       let cmd = encode_tables cmd in
       GCL.wp cmd phi

@@ -117,4 +117,3 @@ let mc_nat_egress =
 
 let mc_nat fixed =
   pipeline mc_nat_parser (mc_nat_ingress fixed) mc_nat_egress
-  |> HoareNet.assert_valids

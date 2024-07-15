@@ -217,5 +217,4 @@ let ndp_egress =
 
 let ndp_router =
   pipeline ndp_parser ndp_ingress ndp_egress
-  |> HoareNet.assert_valids
 

@@ -144,5 +144,4 @@ let ecmp_egress =
 
 let ecmp =
   pipeline ecmp_parser ecmp_ingress ecmp_egress
-  |> HoareNet.assert_valids
 

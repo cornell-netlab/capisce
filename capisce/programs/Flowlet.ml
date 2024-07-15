@@ -199,4 +199,3 @@ let flowlet_egress =
 
 let flowlet fixed =
   pipeline flowlet_parser (flowlet_ingress fixed) flowlet_egress
-  |> HoareNet.assert_valids

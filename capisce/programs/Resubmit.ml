@@ -59,4 +59,3 @@ let resubmit_egress = HoareNet.skip
 
 let resubmit =
   pipeline resubmit_parser resubmit_ingress resubmit_egress
-  |> HoareNet.assert_valids

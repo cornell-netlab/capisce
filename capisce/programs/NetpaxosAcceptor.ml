@@ -140,4 +140,3 @@ let npa_egress = HoareNet.skip
 
 let netpaxos_acceptor =
   pipeline npa_parser npa_ingress npa_egress
-  |> HoareNet.assert_valids

@@ -1152,5 +1152,4 @@ let linearroad_egress =
 
 let linearroad annotated =
   pipeline linearroad_parser (linearroad_ingress annotated) linearroad_egress
-  |> HoareNet.assert_valids
 
