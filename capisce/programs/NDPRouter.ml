@@ -168,8 +168,13 @@ let ndp_ingress =
       ];
       forward
     ] [
+      (* FIX-- set egress spec*)
+      assign standard_metadata.egress_spec @@ bvi 511 9;
     ]
-  ] []
+  ] [
+    (* FIX-- set egress spec*)
+    assign standard_metadata.egress_spec @@ bvi 511 9;
+  ]
 
 let ndp_egress =
   let open HoareNet in

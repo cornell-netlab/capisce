@@ -126,13 +126,18 @@ let npa_ingress =
   sequence [
     ifte_seq (eq_ (var hdr.ipv4.isValid) btrue)
       [fwd_tbl]
-      [];
+      [ (* FIX-- DELETED ] *)
     ifte_seq (eq_ (var hdr.paxos.isValid) btrue)
       [round_tbl;
        ifte_seq (ule_ (var meta.local_metadata.proposal) (var hdr.paxos.proposal))
          [paxos_tbl]
          [drop_tbl]
-      ] []
+      ] [
+        (* FIX-- ADDED assignment*)
+        assign standard_metadata.egress_spec @@ bvi 511 9;
+      ];
+    (* FIX-- ADDED ] *)
+    ]
   ]
 
 

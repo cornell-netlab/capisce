@@ -14,9 +14,9 @@ let example (name : string) program : Command.t =
     and df = flag "-df" (no_arg) ~doc:"instrument example program to check the determined forwarding property"
     in fun () ->
       Solver.z3_path := Option.value z3 ~default:(!Solver.z3_path);
-      Log.smt "Using z3 binary at %s" @@ lazy (!Solver.z3_path);
+      Log.smt "Running z3 via %s" @@ lazy (Solver.z3_exe ());
       Solver.princess_path := Option.value princess ~default:(!Solver.princess_path);
-      Log.smt "Using princess binary at %s" @@ lazy (!Solver.princess_path);
+      Log.smt "Running princess via %s" @@ lazy (Solver.princess_exe ());
       Printf.printf "%s\n" name;
       let open DependentTypeChecker in
       let instrument p = 

@@ -313,7 +313,12 @@ let ifte_seq guard true_seqs false_seqs =
 
 let exited = Var.make "exit" 1
 let exit_ = HoareNet.assign exited btrue
-let check_exit = ifte (BExpr.eq_ btrue @@ Expr.var exited) HoareNet.skip
+let unexit = HoareNet.assign exited bfalse
+let check_exit k = 
+  HoareNet.sequence [
+    ifte (BExpr.eq_ btrue @@ Expr.var exited) HoareNet.skip k;
+    unexit;
+  ]
 
 let transition_accept =
   let open HoareNet in

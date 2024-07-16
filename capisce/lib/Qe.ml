@@ -137,7 +137,7 @@ let cegqe (gcl : GCL.t) : BExpr.t =
           Log.error "VC:\n%s-------\n" @@ lazy (BExpr.to_smtlib path_condition);
           failwith "SOLVERS COULD NOT SOLVE PATH"
         | Some control_plane_of_path ->
-	  data := !data @ [Clock.now(), control_plane_of_path];
+	        data := !data @ [Clock.now(), control_plane_of_path];
           if not (BExpr.qf control_plane_of_path) then failwith "result was still quantified";
           let cvs = snd @@ BExpr.vars control_plane_of_path in
           Log.path_gen "%s" @@ lazy (Var.list_to_smtlib_decls cvs);
@@ -145,6 +145,7 @@ let cegqe (gcl : GCL.t) : BExpr.t =
           let sat = Solver.check_sat cvs control_plane_of_path in
           if BExpr.(control_plane_of_path = true_) then begin
             Printf.printf "the following path gave true when cpfed:\n%s\n%!" (GCL.to_string unsolved_path);
+            Printf.printf "it simplified to the following:\n%s\n%!" (GCL.to_string simplified_unsolved_path);
             failwith "found false"
           end else if sat then
             loop (BExpr.and_ control_plane_of_path phi_agg)

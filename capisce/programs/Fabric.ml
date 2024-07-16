@@ -470,7 +470,12 @@ let fabric_parser =
     ] strip_packet_out
   ] in
   let start = sequence [
-    assign last_ipv4_dscp @@ bvi 0 6;   
+    (* added annotations *)
+    unexit;
+    assign fabric_metadata.is_controller_packet_out bfalse;
+    assign hdr.packet_out.isValid bfalse;
+    (* end added annotations*)
+    assign last_ipv4_dscp @@ bvi 0 6;
     select (var standard_metadata.ingress_port) [
       bvi 510 9, check_packet_out;
     ] parse_ethernet
@@ -942,12 +947,14 @@ let pkt_io_ingress =
   let open HoareNet in
   let open Expr in
   let open BExpr in
-  ifte_seq (eq_ btrue @@ var hdr.packet_out.isValid) [
-    assign standard_metadata.egress_spec @@ var hdr.packet_out.egress_port;
-    assign hdr.packet_out.isValid bfalse;
-    assign fabric_metadata.is_controller_packet_out btrue;
-    exit_; 
-  ] []
+  sequence [
+    ifte_seq (eq_ btrue @@ var hdr.packet_out.isValid) [
+      assign standard_metadata.egress_spec @@ var hdr.packet_out.egress_port;
+      assign hdr.packet_out.isValid bfalse;
+      assign fabric_metadata.is_controller_packet_out btrue;
+      exit_; 
+    ] []
+  ]
 
 let fabric_ingress fixed =
   let open HoareNet in
@@ -955,19 +962,24 @@ let fabric_ingress fixed =
   let open BExpr in
   sequence [
     lkp_md_init;
-    pkt_io_ingress; check_exit @@
-    slice_tc_classifier;
-    ifte_seq (eq_ bfalse (var fabric_metadata.is_controller_packet_out)) [
-      filtering;
-      ifte (eq_ bfalse (var fabric_metadata.skip_forwarding))
-        forwarding skip;
-      ifte (eq_ bfalse (var fabric_metadata.skip_next))
-        pre_next skip;
-      acl fixed;
-      ifte (eq_ bfalse (var fabric_metadata.skip_next))
-        next skip;
-      qos;
-    ] []
+    pkt_io_ingress; 
+    (* check_exit @@ sequence [
+      assign standard_metadata.egress_spec @@ bvi 511 9;
+    ] *)
+    check_exit @@ sequence [
+      slice_tc_classifier;
+      ifte_seq (eq_ bfalse (var fabric_metadata.is_controller_packet_out)) [
+        filtering;
+        ifte (eq_ bfalse (var fabric_metadata.skip_forwarding))
+          forwarding skip;
+        ifte (eq_ bfalse (var fabric_metadata.skip_next))
+          pre_next skip;
+        acl fixed;
+        ifte (eq_ bfalse (var fabric_metadata.skip_next))
+         next skip;
+        qos;
+      ] [] 
+    ]
   ]
 
 let pkt_io_egress =  

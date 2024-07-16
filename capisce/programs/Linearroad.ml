@@ -903,7 +903,10 @@ let linearroad_ingress annot =
     ];
     ipv4_lpm;
     forward
-  ] []
+  ] [
+    (*FIX--DROP THE PACKET*)
+    assign standard_metadata.egress_spec @@ bvi 511 9;
+  ]
 
 let linearroad_egress =
   let open HoareNet in

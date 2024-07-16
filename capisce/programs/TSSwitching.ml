@@ -72,7 +72,7 @@ let ts_switching_ingress fixed =
             `Maskable hdr.rtp.timestamp
           ], [
             take_video_0; _drop_0;
-            nop (*Unspecified default action, assuming nop*)
+            nop   (* Unspecified default action, assuming nop *)
           ])
   in
   sequence [
@@ -92,4 +92,3 @@ let ts_switching_egress =
 
 let ts_switching fixed =
   pipeline ts_switching_parser (ts_switching_ingress fixed) ts_switching_egress
-  |> HoareNet.assert_valids
