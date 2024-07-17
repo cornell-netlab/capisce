@@ -30,6 +30,7 @@ val nary : (t -> t -> t) -> t list -> t
   
 (* Unary-ish Operators *)
 val bnot : t -> t
+val bneg : t -> t
 val bcast : int -> t -> t
 val bslice : int -> int -> t -> t
 

@@ -21,6 +21,7 @@
 %token UNDERSCORE
 %token BITVEC
 %token BVNOT
+%token BVNEG
 %token BVAND
 %token BVOR
 %token BVADD
@@ -29,6 +30,7 @@
 %token BVXOR
 %token BVCONCAT
 %token BVEXTRACT 
+%token ZEROEXTEND
 %token SHL
 %token LSHR
 %token ASHR
@@ -96,6 +98,8 @@ term :
     { SmtAst.(Id (x, Unknown)) } 
   | bv = bitvec;
     { bv }
+  | LPAREN; LPAREN; UNDERSCORE; ZEROEXTEND; w=ID; RPAREN; t = term; RPAREN;
+    { SmtAst.( BVConcat [ BV(Bigint.zero, Bigint.(of_string w |> to_int_exn )); t] ) }
   | LPAREN; FORALL; LPAREN; xs = qvars; RPAREN; t = term; RPAREN;
     { SmtAst.(Forall (TypeContext.to_list xs, t)) }
   | LPAREN; EXISTS; LPAREN; xs = qvars; RPAREN; t = term; RPAREN;
@@ -104,6 +108,8 @@ term :
     { SmtAst.Let (bindings, t)  }
   | LPAREN; BVNOT; t = term; RPAREN;
     { SmtAst.BVNot t }
+  | LPAREN; BVNEG; t = term; RPAREN;
+    { SmtAst.BVNeg t }
   | LPAREN; op=expr_nary_op; ts = term_list; RPAREN;
     { op ts }
   | LPAREN; SHL; t1 = term; t2 = term; RPAREN;

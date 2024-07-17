@@ -1,6 +1,6 @@
 open Core
-open Base_quickcheck   
-   
+open Base_quickcheck  
+
 type bop =
   | BAnd
   | BOr
@@ -28,16 +28,19 @@ let bop_to_smtlib = function
 
 type uop =
   | UNot
+  | UNeg
   | USlice of int * int (* lo, hi *)
   [@@deriving eq, sexp, hash, compare, quickcheck]
 
             
 let uop_to_smtlib = function
   | UNot ->
-     "bvnot"
+    "bvnot"
+  | UNeg -> 
+    "bvneg"
   | USlice (lo, hi) ->
-     (* Intentionally swap the order here*)
-     Printf.sprintf "(_ extract %d %d)" hi lo    
+    (* Intentionally swap the order here*)
+    Printf.sprintf "(_ extract %d %d)" hi lo    
 
 type t =
   | BV of Bigint.t * int
@@ -94,16 +97,18 @@ let eval2 op e1 e2 =
 let eval1 op e1 =
   match e1 with
   | BV(v1, w1) ->
-     begin match op with
-     | UNot ->
+      begin match op with
+      | UNot ->
         bv Bigint.(lnot v1) w1
-     | USlice (lo,hi) ->
-       (* make [hi] exclusive for easier math *)
-       let hi = hi + 1 in
-       let width = hi - lo in
-       let ones = Bigint.(((of_int 2) ** of_int width) - one) in
-       bv Bigint.((shift_right v1 lo) land ones) (hi - lo)
-     end
+      | UNeg -> 
+        bv (Bigint.(zero - (v1 % ((of_int 2 ** of_int w1) - one)))) w1
+      | USlice (lo,hi) ->
+        (* make [hi] exclusive for easier math *)
+        let hi = hi + 1 in
+        let width = hi - lo in
+        let ones = Bigint.(((of_int 2) ** of_int width) - one) in
+        bv Bigint.((shift_right v1 lo) land ones) (hi - lo)
+      end
   | _ -> UnOp(op, e1)
 
 let get_value = function
@@ -150,7 +155,7 @@ let rec get_width = function
      end
   | UnOp(op, e) ->
      match op with
-     | UNot -> get_width e
+     | UNot | UNeg -> get_width e
      | USlice (lo,hi) -> hi - lo
           
 let var v = Var v
@@ -226,6 +231,7 @@ let ashr_ e1 e2 = BinOp(BAshr, e1, e2)|> fold_consts_default
 let lshr_ e1 e2 = BinOp(BLshr, e1, e2)|> fold_consts_default             
                 
 let bnot e = UnOp(UNot, e)|> fold_consts_default
+let bneg e = UnOp(UNeg, e) |> fold_consts_default
 let bslice lo hi e =  UnOp(USlice(lo, hi), e) |> fold_consts_default        
 let bcast width e =
   let ew = get_width e in
@@ -239,6 +245,7 @@ let bcast width e =
 let get_smart1 op =
   match op with
   | UNot -> bnot 
+  | UNeg -> bneg
   | USlice(lo,hi) -> bslice lo hi
 
 let get_smart2 op =
@@ -380,7 +387,7 @@ let rec width = function
   | BV(_, w) -> w
   | Var x -> Var.size x
   | UnOp(USlice (lo, hi), _) -> hi - lo + 1
-  | UnOp(UNot, e) -> width e
+  | UnOp(_, e) -> width e
   | BinOp(BConcat, e1, e2) -> width e1 + width e2
   | BinOp(_ , e1, e2) ->
      let w1 = width e1 in
@@ -390,9 +397,6 @@ let rec width = function
      else
        failwith "Type Error. sub expressions had different widths"
      
-     
-
-
 let rec label (ctx : Context.t) (e : t) =
   match e with
   | BV _ -> e

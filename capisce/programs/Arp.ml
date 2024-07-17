@@ -150,6 +150,7 @@ let arp_ingress =
   sequence [
     assign meta.my_mac @@ bvi 000102030405 48;
     ifte_seq (eq_ btrue @@ var zombie.exited) [
+      (** FIX--ADDED*)
       assign standard_metadata.egress_spec @@ bvi 511 9
     ] [
       ipv4_lpm;

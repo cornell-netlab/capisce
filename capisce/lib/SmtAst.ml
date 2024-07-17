@@ -23,6 +23,7 @@ type t = True
        | And of t list
        | Eq of t * t (* Ambiguous *)
        | BVNot of t
+       | BVNeg of t
        | BVAnd of t list
        | BVOr of t list
        | BVAdd of t list
@@ -157,6 +158,9 @@ let rec subst (sigma : t String.Map.t) term : t =
   | BVNot b ->
      f b
      |> BVNot
+  | BVNeg b -> 
+    f b
+    |> BVNeg
   | BVAnd bs ->
      List.map bs ~f
      |> BVAnd
@@ -310,6 +314,10 @@ let rec infer_type (gamma : ctx) (term : t) typ : (t * ctx * typ) =
   | BVNot e, _ ->
      let e, gamma, _ = infer_type gamma e BitVec |> expect_bitvec "BVNot argument must be a bitvec" in
      BVNot e, gamma, BitVec     
+  | BVNeg _, Bool -> mismatch_error "BVNeg does not produces a boolean "
+  | BVNeg e, _ -> 
+    let e, gamma, _ = infer_type gamma e BitVec |> expect_bitvec "BVNeg argument must be a bitvec" in 
+    BVNeg e, gamma, BitVec
 
   | BVAnd _, Bool -> mismatch_error "BVAnd does not produce a boolean "
   | BVAnd es, _ ->
@@ -537,7 +545,10 @@ let rec to_either_b_expr_inner gamma ~cvs ~dvs term : (BExpr.t, Expr.t) Either.t
      end
   | BVNot b ->
      to_either_b_expr_inner gamma b ~cvs ~dvs 
-     |> snd_map @@ Expr.bnot 
+     |> snd_map @@ Expr.bnot
+  | BVNeg b -> 
+    to_either_b_expr_inner gamma b ~cvs ~dvs
+    |> snd_map @@ Expr.bneg
   | BVAnd bs ->
      List.map bs ~f:(to_either_b_expr_inner gamma ~cvs ~dvs)
      |> commute_snd
