@@ -46,11 +46,14 @@ let nikolaj_please (solver : ?with_timeout:int -> Var.t list -> string -> string
       Result.Error phi
   else
     let () = Log.smt "Solver failed with message:\n%s" @@ lazy res in
-    if String.is_substring res ~substring:"canceled" then
+    if 
+      String.is_substring res ~substring:"canceled" || (* timed out*)
+      String.is_substring res ~substring:"Int)"        (* [Princess only] -- returned something in an integral theory *)
+    then
       Result.Error phi
     else
-      let partial_fee = Solver.of_smtlib ~dvs:[] ~cvs res in
-      Result.Error partial_fee
+      let partial_phi = Solver.of_smtlib ~dvs:[] ~cvs res in
+      Result.Error partial_phi
 
 let rec and_then tactics input =
   match tactics with
