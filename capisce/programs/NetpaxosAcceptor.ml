@@ -59,7 +59,7 @@ let npa_ingress =
   in
   let fwd_tbl =
     instr_table ("fwd_tbl",
-                 [`Exact standard_metadata.ingress_port],
+                 [standard_metadata.ingress_port, Exact],
                  [forward; _drop;
                   nop (*No default action assuming noop*)
                  ])
@@ -110,7 +110,7 @@ let npa_ingress =
     sequence [
       (* assert_ @@ eq_ btrue @@ var hdr.paxos.isValid; *)
       instr_table ("paxos_tbl",
-                   [ `Exact hdr.paxos.msgtype ],
+                   [ hdr.paxos.msgtype, Exact ],
                    [ handle_phase1a;
                      handle_phase2a;
                      _no_op;

@@ -142,8 +142,8 @@ let hula_ingress _ =
   let hula_fwd =
     instr_table(
       "hula_fwd",
-      [`Exact hdr.ipv4.dstAddr;
-       `Exact hdr.ipv4.srcAddr],
+      [hdr.ipv4.dstAddr, Exact;
+       hdr.ipv4.srcAddr, Exact],
       [hula_dst; srcRoute_nhop (* default *) ]
     )
   in
@@ -173,7 +173,7 @@ let hula_ingress _ =
   in
   let hula_bwd =
     instr_table ("hula_bwd",
-                [`Maskable hdr.ipv4.dstAddr],
+                [hdr.ipv4.dstAddr, Maskable],
                 [
                   hula_set_nhop;
                   nop; (* Unspecified default action, assuming nop *)
@@ -185,7 +185,7 @@ let hula_ingress _ =
   in
   let hula_src =
     instr_table ("hula_src",
-                 [`Exact hdr.ipv4.srcAddr],
+                 [hdr.ipv4.srcAddr, Exact],
                  [_drop; srcRoute_nhop; (*default*)]
                 )
   in
@@ -200,7 +200,7 @@ let hula_ingress _ =
   in
   let hula_nhop =
     instr_table ("hula_nhop",
-                [`Maskable hdr.ipv4.dstAddr],
+                [hdr.ipv4.dstAddr, Maskable],
                 [hula_get_nhop; _drop (* default *)])
   in
   let set_dmac =
@@ -213,7 +213,7 @@ let hula_ingress _ =
   let nop = [],[] in
   let dmac =
     instr_table ("dmac",
-                 [`Exact standard_metadata.egress_spec],
+                 [standard_metadata.egress_spec, Exact],
                  [set_dmac; nop (* default *)]
                 )
   in

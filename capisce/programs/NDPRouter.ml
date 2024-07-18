@@ -74,7 +74,7 @@ let ndp_ingress =
   let ipv4_lpm =
     sequence [
       instr_table ("ipv4_lpm", [
-        `Maskable hdr.ipv4.dstAddr
+        hdr.ipv4.dstAddr, Maskable
         ], [
           set_nhop; _drop; 
           nop (*Unspecified default action, assuming noop*)
@@ -91,7 +91,7 @@ let ndp_ingress =
   let directtoprio =
     instr_table ("directtoprio", 
     [
-      `MaskableDegen meta.meta.register_tmp
+      meta.meta.register_tmp, MaskableDegen
     ], [
       directpriohigh;
       nop (*Unspecified default action, assuming noop*)
@@ -104,7 +104,7 @@ let ndp_ingress =
   in
   let readbuffersense =
     instr_table ("readbuffersense", [
-      `MaskableDegen meta.meta.register_tmp
+      meta.meta.register_tmp, MaskableDegen
       ], [
         readbuffer;
         nop (*Unspecified default action, assuming noop*)
@@ -130,7 +130,7 @@ let ndp_ingress =
   in
   let setprio =
     instr_table ("setprio", [
-      `MaskableDegen meta.meta.register_tmp
+      meta.meta.register_tmp, MaskableDegen
       ], [
         setpriolow; setpriohigh;
         nop (* unspecified default action, adding noop  *)
@@ -146,7 +146,7 @@ let ndp_ingress =
   in
   let forward =
     instr_table ("forward", [
-      `Exact meta.routing_metadata.nhop_ipv4
+      meta.routing_metadata.nhop_ipv4, Exact
       ], [
         set_dmac; _drop;
         nop (* unspecified default action, adding noop  *)
@@ -192,7 +192,7 @@ let ndp_egress =
   let cont = [], [] in
   let dec_counter =
     instr_table ("dec_counter",
-                 [`MaskableDegen meta.meta.ndpflags],
+                 [meta.meta.ndpflags, MaskableDegen],
                  [decreasereg; cont;
                   nop (* unspecified default action assuming noop *) 
                  ])
@@ -210,7 +210,7 @@ let ndp_egress =
   in
   let send_frame =
     instr_table ("send_frame",
-                 [`Exact standard_metadata.egress_port],
+                 [standard_metadata.egress_port, Exact],
                  [rewrite_mac; _drop;
                  nop (* unspecified default action assuming noop *)
                  ])

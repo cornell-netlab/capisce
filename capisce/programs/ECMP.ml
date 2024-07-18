@@ -60,7 +60,7 @@ let ecmp_ingress =
   let ecmp_group =
     instr_table
       ("ecmp_group",
-       [ `Maskable hdr.ipv4.dstAddr],
+       [ hdr.ipv4.dstAddr, Maskable],
        [ (*_drop*)
          [],
          Primitives.Action.[
@@ -83,7 +83,7 @@ let ecmp_ingress =
   let forward =
     instr_table (
       "forward",
-      [ `MaskableDegen meta.routing_metadata.nhop_ipv4],
+      [ meta.routing_metadata.nhop_ipv4, MaskableDegen],
       [ (* set_dmac  *)
         [dmac],
         Primitives.Action.[
@@ -125,7 +125,7 @@ let ecmp_egress =
   let send_frame =
     instr_table (
       "send_frame",
-      [ `Exact standard_metadata.egress_port ],
+      [ standard_metadata.egress_port, Exact ],
       [ [smac],
         Primitives.Action.[
           (* assert_ @@ eq_ (var hdr.ethernet.isValid) (bvi 1 1); *)

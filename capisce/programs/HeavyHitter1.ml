@@ -75,7 +75,7 @@ let hh_ingress =
   in
   let count_table =
     instr_table ("count_table", [
-      `Maskable hdr.ipv4.srcAddr
+      hdr.ipv4.srcAddr, Maskable
       ], [
       count_action; _drop;
       nop (* Unspecified default action, assuming noop *)
@@ -94,7 +94,7 @@ let hh_ingress =
   in
   let ipv4_lpm =
     instr_table ("ipv4_lpm", [
-      `Maskable hdr.ipv4.dstAddr
+      hdr.ipv4.dstAddr, Maskable
       ], [
         set_nhop; _drop;
         nop (* Unspecified default action, assuming noop *)
@@ -109,7 +109,7 @@ let hh_ingress =
   in
   let forward =
     instr_table ("forward", [
-      `Exact meta.custom_metadata.nhop_ipv4
+      meta.custom_metadata.nhop_ipv4, Exact
       ], [
         set_dmac; _drop;
         nop (* Unspecified default action, assuming noop *)
@@ -141,7 +141,7 @@ let hh_egress =
   let send_frame =
     instr_table (
       "send_frame", [
-        `Exact standard_metadata.egress_port
+        standard_metadata.egress_port, Exact
         ], [
           rewrite_mac; _drop;
           nop (* Unspecified default action, assuming noop *)

@@ -567,12 +567,12 @@ let slice_tc_classifier =
   let classifier =
     instr_table ("classifier",  
       [ 
-        `Exact standard_metadata.ingress_port
-      ; `Exact fabric_metadata.lkp.ipv4_src
-      ; `Exact fabric_metadata.lkp.ipv4_dst
-      ; `Exact fabric_metadata.lkp.ip_proto
-      ; `Exact fabric_metadata.lkp.l4_sport
-      ; `Exact fabric_metadata.lkp.l4_dport
+        standard_metadata.ingress_port, Exact
+      ; fabric_metadata.lkp.ipv4_src, Exact
+      ; fabric_metadata.lkp.ipv4_dst, Exact
+      ; fabric_metadata.lkp.ip_proto, Exact
+      ; fabric_metadata.lkp.l4_sport, Exact
+      ; fabric_metadata.lkp.l4_dport, Exact
       ],
       [set_slice_id_tc; trust_dscp;
       (* default *)
@@ -609,9 +609,9 @@ let filtering =
   let ingress_port_vlan = 
     instr_table ("ingress_port_vlan",
       [
-        `Exact standard_metadata.ingress_port;
-        `Exact hdr.vlan_tag.isValid ;
-        `Maskable hdr.vlan_tag.vlan_id;
+        standard_metadata.ingress_port, Exact;
+        hdr.vlan_tag.isValid, Exact ;
+        hdr.vlan_tag.vlan_id, Maskable;
       ], [
         deny; (* default *)
         permit; permit_with_internal_vlan;
@@ -633,10 +633,10 @@ let filtering =
   in
   let fwd_classifier = 
     instr_table ("fwd_classifier", [
-      `Exact standard_metadata.ingress_port;
-      `Exact hdr.ethernet.dstAddr;
-      `Exact hdr.eth_type.value;
-      `Exact fabric_metadata.ip_eth_type;  
+      standard_metadata.ingress_port, Exact;
+      hdr.ethernet.dstAddr, Exact;
+      hdr.eth_type.value, Exact;
+      fabric_metadata.ip_eth_type, Exact;  
       ],[
         set_forwarding_type; 
         set_forwarding_type_bridging (*default*)
@@ -671,8 +671,8 @@ let forwarding =
   let bridging = 
     instr_table ("bridging",
       [
-        `Exact fabric_metadata.vlan_id;
-        `Exact hdr.ethernet.dstAddr;
+        fabric_metadata.vlan_id, Exact;
+        hdr.ethernet.dstAddr, Exact;
       ] , [
         set_next_id_bridging; 
         nop (*defaultonly*)
@@ -690,7 +690,7 @@ let forwarding =
   let mpls = 
     instr_table ("mpls",
       [
-        `Exact fabric_metadata.mpls_label; 
+        fabric_metadata.mpls_label, Exact; 
       ], [
         pop_mpls_and_next; 
         nop (* nop *)
@@ -706,7 +706,7 @@ let forwarding =
   let routing_v4 = 
       instr_table ("routing_v4",
         [
-          `Exact fabric_metadata.ipv4_dst_addr;
+          fabric_metadata.ipv4_dst_addr, Exact;
         ],[
           set_next_id_routing_v4; nop_routing_v4; 
           nop (*defaultonly*)
@@ -732,7 +732,7 @@ let pre_next =
   let next_mpls = 
     instr_table ("next_mpls",
       [
-        `Exact fabric_metadata.next_id; 
+        fabric_metadata.next_id, Exact; 
       ], [
         set_mpls_label; nop
       ]
@@ -747,7 +747,7 @@ let pre_next =
   let next_vlan = 
     instr_table ( "next_vlan", 
       [
-        `Exact fabric_metadata.next_id; 
+        fabric_metadata.next_id, Exact; 
       ], [
         set_vlan; 
         nop (* defaultonly *)
@@ -790,23 +790,23 @@ let acl fixed =
   let acl =
     instr_table  ("acl",
       [ 
-        `MaskableDegen standard_metadata.ingress_port;
-        `MaskableDegen hdr.ethernet.dstAddr;     
-        `MaskableDegen hdr.ethernet.srcAddr;         
-        `Maskable      hdr.vlan_tag.vlan_id;          
-        `MaskableDegen hdr.eth_type.value;            
-        `MaskableDegen fabric_metadata.lkp.ipv4_src;        
-        `MaskableDegen fabric_metadata.lkp.ipv4_dst;
-        `MaskableDegen fabric_metadata.lkp.ip_proto;
+        standard_metadata.ingress_port, MaskableDegen;
+        hdr.ethernet.dstAddr, MaskableDegen;     
+        hdr.ethernet.srcAddr, MaskableDegen;         
+        hdr.vlan_tag.vlan_id, Maskable;          
+        hdr.eth_type.value, MaskableDegen;            
+        fabric_metadata.lkp.ipv4_src, MaskableDegen;        
+        fabric_metadata.lkp.ipv4_dst, MaskableDegen;
+        fabric_metadata.lkp.ip_proto, MaskableDegen;
         if fixed 
-        then `MaskableDegen fabric_metadata.lkp.icmp_type
-        else `Maskable      hdr.icmp.type_;
+        then fabric_metadata.lkp.icmp_type, MaskableDegen
+        else hdr.icmp.type_, Maskable;
         if fixed
-        then `MaskableDegen fabric_metadata.lkp.icmp_code
-        else `Maskable      hdr.icmp.code;
-        `MaskableDegen fabric_metadata.lkp.l4_sport;
-        `MaskableDegen fabric_metadata.lkp.l4_dport;
-        `MaskableDegen fabric_metadata.port_type;
+        then fabric_metadata.lkp.icmp_code, MaskableDegen
+        else hdr.icmp.code, Maskable;
+        fabric_metadata.lkp.l4_sport, MaskableDegen;
+        fabric_metadata.lkp.l4_dport, MaskableDegen;
+        fabric_metadata.port_type, MaskableDegen;
       ], [
         set_next_id_acl;
         punt_to_cpu;
@@ -840,8 +840,8 @@ let next =
   let xconnect =
     instr_table ("xconnect",
       [
-        `Exact standard_metadata.ingress_port;
-        `Exact fabric_metadata.next_id;
+        standard_metadata.ingress_port, Exact;
+        fabric_metadata.next_id, Exact;
       ], [
         output_xconnect; set_next_id_xconnect; 
         nop; (* default*)
@@ -869,7 +869,7 @@ let next =
   let hashed =
     instr_table ("hashed",
       [
-        `Exact fabric_metadata.next_id;
+        fabric_metadata.next_id, Exact;
         (* `Exact fabric_metadata.ipv4_src_addr; (* selector *)
         `Exact fabric_metadata.ipv4_dst_addr; (* selector *)
         `Exact fabric_metadata.ip_proto; (* selector *)
@@ -892,7 +892,7 @@ let next =
   let multicast = 
     instr_table ("multicast",
     [
-      `Exact fabric_metadata.next_id;
+      fabric_metadata.next_id, Exact;
     ], [
       set_mcast_group_id; 
       nop (* multicast *)
@@ -927,9 +927,9 @@ let qos =
   let queues =
     instr_table ("queues",
     [
-      `Exact fabric_metadata.slice_id;
-      `Exact fabric_metadata.tc;
-      `Exact fabric_metadata.packet_color;
+      fabric_metadata.slice_id, Exact;
+      fabric_metadata.tc, Exact;
+      fabric_metadata.packet_color, Exact;
     ], [
       set_queue; meter_drop;
       set_queue_default
@@ -1025,8 +1025,8 @@ let egress_next =
   let egress_vlan =
     instr_table("egress_vlan", 
       [
-        `Exact fabric_metadata.vlan_id;
-        `Exact standard_metadata.egress_port;
+        fabric_metadata.vlan_id, Exact;
+        standard_metadata.egress_port, Exact;
       ], [
         push_vlan; pop_vlan; 
         drop (*defaultonly*)
@@ -1093,7 +1093,7 @@ let dscp_rewriter =
   let nop = [], [action 2] in
   let rewriter = 
     instr_table ("rewriter",[
-      `Exact standard_metadata.egress_port;
+      standard_metadata.egress_port, Exact;
     ],[
      rewrite; clear; 
      nop (*defaultonly*)

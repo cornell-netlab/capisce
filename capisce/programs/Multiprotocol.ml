@@ -123,7 +123,7 @@ let multiproto_ingress =
   let mim_packet  = packet_type 4 in
   let ethertype_match =
     instr_table ("ethertype_match",
-                 [`Exact hdr.ethernet.etherType],
+                 [hdr.ethernet.etherType, Exact],
                  [l2_packet;
                   ipv4_packet; ipv6_packet;
                   mpls_packet; mim_packet; 
@@ -142,13 +142,13 @@ let multiproto_ingress =
       ]
   in
   let _match name key =
-    instr_table (name, [`Exact key], [nop; set_egress_port])
+    instr_table (name, [key, Exact], [nop; set_egress_port])
   in
   let ipv4_match = _match "ipv4_match" hdr.ipv4.dstAddr in
   let ipv6_match = _match "ipv6_match" hdr.ipv6.dstAddr in
   let l2_match   = _match "l2_match"   hdr.ethernet.dstAddr in
   let _check name key =
-    instr_table (name, [`Exact key], [nop; _drop])
+    instr_table (name, [key, Exact], [nop; _drop])
     (*  none of the check tables have specified default actions, assuming noop *)
     (*  no change made since they already have   noop *)
   in
@@ -167,7 +167,7 @@ let multiproto_ingress =
   in
   let set_egress =
     instr_table ("set_egress",
-                  [`Exact meta.ing_metadata.drop],
+                  [meta.ing_metadata.drop, Exact],
                   [
                     discard; send_packet;
                     nop; (*  unspecified default action, assuming noop *)

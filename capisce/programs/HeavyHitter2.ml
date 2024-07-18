@@ -127,7 +127,7 @@ let hh2_ingress fixed =
   let ipv4_lpm =
     instr_table (
       "ipv4_lpm",
-      [`Maskable hdr.ipv4.dstAddr], [
+      [hdr.ipv4.dstAddr, Maskable], [
         set_nhop; _drop;
         nop (*Unspecified default action, assuming nop*)
       ]
@@ -142,7 +142,7 @@ let hh2_ingress fixed =
   let forward =
     instr_table (
       "forward",
-      [`Exact meta.custom_metadata.nhop_ipv4],[
+      [meta.custom_metadata.nhop_ipv4, Exact],[
         set_dmac; _drop;
         nop (*Unspecified default action, assuming nop*)  
       ]
@@ -181,7 +181,7 @@ let hh2_egress =
   in
   let send_frame =
     instr_table ("send_frame",
-                  [`Exact standard_metadata.egress_port],
+                  [standard_metadata.egress_port, Exact],
                   [
                     rewrite_mac; _drop;
                     nop (*Unspecified default action, assuming nop*)

@@ -653,8 +653,8 @@ let linearroad_ingress annot =
   in
   let update_vol_state =
     instr_table ("update_vol_state",
-                 [`Exact meta.v_state.new_;
-                  `Exact meta.v_state.new_seg
+                 [meta.v_state.new_, Exact;
+                  meta.v_state.new_seg, Exact
                  ], [
                    load_vol;
                    load_and_inc_vol;
@@ -718,7 +718,7 @@ let linearroad_ingress annot =
   let update_ewma_spd =
     instr_table ("update_ewma_spd",
                 firsts [
-                  `Exact meta.seg_meta.vol |> if annot then Either.second else Either.first
+                  (meta.seg_meta.vol, Table.Exact) |> if annot then Either.second else Either.first
                 ],
                 [set_spd; calc_ewma_spd (* default *)])
   in
@@ -806,12 +806,13 @@ let linearroad_ingress annot =
     ]
   in
   let check_toll =
+    let open Table in 
     instr_table ("check_toll",
                  firsts
-                 [`Exact meta.v_state.new_seg |> Either.first;
-                  `MaskableDegen meta.seg_meta.ewma_spd |> if annot then Either.second else Either.first;
-                  `MaskableDegen meta.seg_meta.vol |> if annot then Either.second else Either.first;
-                  `MaskableDegen meta.accident_meta.has_accident_ahead |> Either.first
+                 [(meta.v_state.new_seg, Exact) |> Either.first;
+                  (meta.seg_meta.ewma_spd, MaskableDegen) |> if annot then Either.second else Either.first;
+                  (meta.seg_meta.vol, MaskableDegen) |> if annot then Either.second else Either.first;
+                  (meta.accident_meta.has_accident_ahead, MaskableDegen) |> Either.first
                 ],
                 [
                   issue_toll;
@@ -844,7 +845,7 @@ let linearroad_ingress annot =
   in
   let ipv4_lpm =
     instr_table ("ipv4_lpm",
-                [`Maskable hdr.ipv4.dstAddr],
+                [hdr.ipv4.dstAddr, Maskable],
                 [
                   set_nhop; _drop;
                   nop (* Unspecified default action, assuming nop *)
@@ -858,7 +859,7 @@ let linearroad_ingress annot =
   in
   let forward =
     instr_table ("forward",
-                 [`Exact hdr.ipv4.dstAddr],
+                 [hdr.ipv4.dstAddr, Exact],
                  [
                   set_dmac; _drop;
                   nop (* Unspecified default action, assuming nop *)
@@ -934,8 +935,8 @@ let linearroad_egress =
   in
   let send_accident_alert =
     instr_table ("send_accident_alert",
-                [`Exact meta.accident_meta.has_accident_ahead;
-                 `Exact meta.accident_egress_meta.recirculate ],
+                [meta.accident_meta.has_accident_ahead, Exact;
+                 meta.accident_egress_meta.recirculate, Exact ],
                 [ 
                   accident_alert_e2e; 
                   make_accident_alert;
@@ -964,8 +965,8 @@ let linearroad_egress =
   in
   let send_toll_notification =
     instr_table ("send_toll_notification",
-                [`Exact meta.toll_meta.has_toll;
-                 `Exact meta.toll_egress_meta.recirculate],
+                [meta.toll_meta.has_toll, Exact;
+                 meta.toll_egress_meta.recirculate, Exact],
                 [
                   toll_notification_e2e; make_toll_notification;
                   nop (* Unspecified default action, assuming nop *)
@@ -993,7 +994,7 @@ let linearroad_egress =
   in
   let send_accnt_bal =
     instr_table ("send_accnt_bal",
-                [`Exact meta.accnt_bal_egress_meta.recirculate],
+                [meta.accnt_bal_egress_meta.recirculate, Exact],
                 [
                   accnt_bal_e2e; make_accnt_bal;
                   nop (* Unspecified default action, assuming nop *)
@@ -1016,9 +1017,9 @@ let linearroad_egress =
   in
   let daily_expenditure =
     instr_table ("daily_expenditure",
-                [`Exact hdr.expenditure_req.vid;
-                 `Exact hdr.expenditure_req.day;
-                 `Exact hdr.expenditure_req.xway
+                [hdr.expenditure_req.vid, Exact;
+                 hdr.expenditure_req.day, Exact;
+                 hdr.expenditure_req.xway, Exact
                 ],
                 [
                   make_expenditure_report;
@@ -1061,11 +1062,11 @@ let linearroad_egress =
   in
   let travel_estimate_history =
     instr_table ("travel_estimate_history",
-                [`Exact hdr.travel_estimate_req.dow;
-                 `Exact hdr.travel_estimate_req.tod;
-                 `Exact hdr.travel_estimate_req.xway;
-                 `Exact meta.te_md.dir;
-                 `Exact meta.te_md.seg_cur
+                [hdr.travel_estimate_req.dow, Exact;
+                 hdr.travel_estimate_req.tod, Exact;
+                 hdr.travel_estimate_req.xway, Exact;
+                 meta.te_md.dir, Exact;
+                 meta.te_md.seg_cur, Exact;
                 ], [
                   update_travel_estimate;
                   nop (* Unspecified default action, assuming nop *)
@@ -1118,7 +1119,7 @@ let linearroad_egress =
   in
   let send_frame =
     instr_table("send_frame",
-                [`Exact standard_metadata.egress_port],
+                [standard_metadata.egress_port, Exact],
                 [
                   rewrite_mac; _drop;
                   nop (*  unspecified default action, assuming nop *)

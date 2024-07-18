@@ -73,7 +73,7 @@ let mc_nat_ingress fixed =
   in
   let set_mcg =
     instr_table("set_mcg",
-         [`Exact hdr.ipv4.dstAddr ],
+         [hdr.ipv4.dstAddr, Exact ],
          [set_output_mcg; _drop;
           nop (*Unspecified default action, assuming nop*)
          ])
@@ -102,8 +102,8 @@ let mc_nat_egress =
   in
   let nat_table =
     instr_table ( "nat_table",
-                  [`Exact meta.intrinsic_metadata.egress_rid;
-                   `Exact hdr.ipv4.dstAddr],
+                  [meta.intrinsic_metadata.egress_rid, Exact;
+                   hdr.ipv4.dstAddr, Exact],
                   [
                     do_nat; _drop;
                     nop (*Unspecified default action, assuming nop*)

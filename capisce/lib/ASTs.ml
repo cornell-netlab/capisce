@@ -309,30 +309,28 @@ end
     let raw_table name keys actions =
       prim (Table {name; keys; actions})
 
-    let table name real_keys actions =
+    let table name (real_keys : (Var.t * Table.kind) list) actions =
       let open BExpr in
       let open Expr in
       let new_keys =
-        List.mapi real_keys ~f:(fun i key ->
-            match key with
-            | `MaskableDegen key_var
-            | `Maskable key_var
-            | `Exact key_var ->
-              Var.rename key_var (Printf.sprintf "_symb$%s$match_%d" name i))
+        List.mapi real_keys ~f:(fun i (key, kind) ->
+          let new_key = Var.rename key (Printf.sprintf "_symb$%s$match_%d" name i) in
+          (new_key, kind)
+        )
       in
-      let key_assumes  =
-        List.mapi real_keys ~f:(fun i key ->
-            match key with
-            | `MaskableDegen key_var | `Exact key_var  ->
-              let symb_key = Var.rename key_var (Printf.sprintf "_symb$%s$match_%d" name i) in
-              assume @@ eq_ (var symb_key) (var key_var)
-            | `Maskable key_var ->
-              let symb_key = Var.rename key_var (Printf.sprintf "_symb$%s$match_%d" name i) in
+      let key_assumes =
+        List.mapi real_keys ~f:(fun i (key, kind) ->
+            match kind with
+            | MaskableDegen | Exact ->
+              let symb_key = Var.rename key (Printf.sprintf "_symb$%s$match_%d" name i) in
+              assume @@ eq_ (var symb_key) (var key)
+            | Maskable ->
+              let symb_key = Var.rename key (Printf.sprintf "_symb$%s$match_%d" name i) in
               let symb_key_dc = Var.make (Printf.sprintf "_symb$%s$match_%d$DONT_CARE" name i) 1 in
               choice_seqs [
                 [assume @@ eq_ (bvi 1 1) (var symb_key_dc)];
                 [assume @@ not_ @@ eq_ (bvi 1 1) (var symb_key_dc);
-                  assume @@ eq_ (var symb_key) (var key_var)]
+                  assume @@ eq_ (var symb_key) (var key)]
                 ]
           )
         |> sequence
@@ -415,7 +413,9 @@ end
         match p with
         | Table table ->
           let key_asserts =
-            PAsserter.from_vars table.keys
+            table.keys
+            |> List.map ~f:fst
+            |> PAsserter.from_vars
             |> List.map ~f:prim
             |> sequence
           in

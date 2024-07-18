@@ -68,8 +68,8 @@ let ts_switching_ingress fixed =
   let schedule_table =
     instr_table ("schedule_table",
           [ 
-            `Exact hdr.ipv4.dstAddr;
-            `Maskable hdr.rtp.timestamp
+            hdr.ipv4.dstAddr, Exact;
+            hdr.rtp.timestamp, Maskable
           ], [
             take_video_0; _drop_0;
             nop   (* Unspecified default action, assuming nop *)

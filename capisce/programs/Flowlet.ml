@@ -122,7 +122,7 @@ let flowlet_ingress fixed =
   in
   let ecmp_group = instr_table (
       "ecmp_group",
-      [`Maskable hdr.ipv4.dstAddr],
+      [hdr.ipv4.dstAddr, Maskable],
       [
         _drop; set_ecmp_select;
         nop (* Undefined default action, assuming nop *)
@@ -140,7 +140,7 @@ let flowlet_ingress fixed =
   in
   let ecmp_nhop = instr_table (
       "ecmp_nhop",
-      [`Exact meta.ingress_metadata.ecmp_offset],
+      [meta.ingress_metadata.ecmp_offset, Exact],
       [
         _drop; set_nhop;
         nop (* Undefined default action, assuming nop *)
@@ -154,7 +154,7 @@ let flowlet_ingress fixed =
   in
   let forward = instr_table (
       "forward",
-      [`Exact meta.ingress_metadata.nhop_ipv4],
+      [meta.ingress_metadata.nhop_ipv4, Exact],
       [
         set_dmac; _drop;
         nop (* Undefined default action, assuming nop *)
@@ -189,7 +189,7 @@ let flowlet_egress =
   in
   let send_frame =
     instr_table ("send_frame",
-                 [`Exact standard_metadata.egress_port],
+                 [standard_metadata.egress_port, Exact],
                  [
                   rewrite_mac; _drop;
                   nop (* Undefined default action, assuming nop *)

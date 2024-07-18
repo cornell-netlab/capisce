@@ -229,7 +229,7 @@ let rename_keys table keys =
 let to_smtlib {schema; body} info =
   let open Option.Let_syntax in
   let table = schema.name in
-  let symbolic_keys = schema.keys in
+  let symbolic_keys = List.map ~f:fst schema.keys in
   let semantic_keys =
     let table_info = Info.find_one_table_by_name info schema.name in
     List.map table_info.match_fields ~f:(fun f -> Var.make f.name f.bitwidth)

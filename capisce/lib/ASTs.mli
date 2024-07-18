@@ -206,17 +206,14 @@ module GPL : sig
      an [exact] match kind as in p4, meaning that every bit must be
      read. [`Maskable] indicates the other extreme 
      ([ternary], [lpm], [optional], etc), where it is possible
-     to skip reading any and every bit. [`MaskableDegen] is semantically 
-     equivalent to [`Exact] and is used to capture the case when the
-     key is [`Maskable], AND we can detect that safety does not
+     to skip reading any and every bit. [MaskableDegen] is semantically 
+     equivalent to `Exact] and is used to capture the case when the
+     key is [Maskable], AND we can detect that safety does not
      require masking. For example, when checking header validity,
      if the key is a metadata field (metadata fields are always valid).
   *)
-  val table : string -> [<
-      `Exact of Var.t 
-    | `Maskable of Var.t 
-    | `MaskableDegen of Var.t
-  ] list 
+  val table : string 
+  -> (Var.t * Table.kind) list 
   -> (Var.t list * Primitives.Action.t list) list
   -> t
 

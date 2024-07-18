@@ -89,7 +89,7 @@ let arp_ingress =
   in
   let ipv4_lpm =
     instr_table ("ipv4_lpm", [
-      `MaskableDegen meta.dst_ipv4
+      meta.dst_ipv4, MaskableDegen
       ], [
         set_dst_info; drop (*default*)
         ])
@@ -136,12 +136,12 @@ let arp_ingress =
   in
   let forward =
     instr_table ("forward",
-                 [`Exact hdr.arp.isValid;
-                  `MaskableDegen hdr.arp.oper;
-                  `Exact hdr.arp_ipv4.isValid;
-                  `Exact hdr.ipv4.isValid;
-                  `Exact hdr.icmp.isValid;
-                  `Maskable hdr.icmp.type_
+                 [hdr.arp.isValid, Exact;
+                  hdr.arp.oper, MaskableDegen;
+                  hdr.arp_ipv4.isValid, Exact;
+                  hdr.ipv4.isValid, Exact;
+                  hdr.icmp.isValid, Exact;
+                  hdr.icmp.type_, Maskable
                   ],[
                   forward_ipv4; send_arp_reply; send_icmp_reply;
                   drop (* default *)

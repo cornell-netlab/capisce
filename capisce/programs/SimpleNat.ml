@@ -104,7 +104,7 @@ let simple_nat_ingress =
     ]
   in
   let if_info = instr_table ("if_info", [
-      `Exact meta.meta.if_index
+      meta.meta.if_index, Exact
     ], [
       set_if_info; _drop;
       nop (* Unspecified default action, assuming nop *)
@@ -138,13 +138,13 @@ let simple_nat_ingress =
   in
   let nat =
     instr_table ("nat",
-                 [`Exact meta.meta.is_ext_if;
-                  `Exact hdr.ipv4.isValid;
-                  `Exact hdr.tcp.isValid;
-                  `Maskable hdr.ipv4.srcAddr;
-                  `Maskable hdr.ipv4.dstAddr;
-                  `Maskable hdr.tcp.srcPort;
-                  `Maskable hdr.tcp.dstPort
+                 [ meta.meta.is_ext_if, Exact;
+                   hdr.ipv4.isValid, Exact;
+                   hdr.tcp.isValid, Exact;
+                   hdr.ipv4.srcAddr, Maskable;
+                   hdr.ipv4.dstAddr, Maskable;
+                   hdr.tcp.srcPort, Maskable;
+                   hdr.tcp.dstPort, Maskable
                  ],
                  [_drop;
                   nat_miss_int_to_ext;
@@ -166,7 +166,7 @@ let simple_nat_ingress =
     ]
   in
   let ipv4_lpm = instr_table ("ipv4_lpm", [
-    `MaskableDegen meta.meta.ipv4_da
+    meta.meta.ipv4_da, MaskableDegen
     ], [
       set_nhop; _drop;
       nop (*Unspecified default action, assuming nop*)
@@ -178,7 +178,7 @@ let simple_nat_ingress =
     ]
   in
   let forward = instr_table ("forward", [
-    `Exact meta.meta.nhop_ipv4
+    meta.meta.nhop_ipv4, Exact
     ], [
       set_dmac; _drop;
       nop (*Unspecified default action, assuming nop*)
@@ -218,7 +218,7 @@ let simple_nat_egress =
   in
   let send_frame =
     instr_table("send_frame",
-                [`Exact standard_metadata.egress_port],
+                [standard_metadata.egress_port, Exact],
                 [
                   do_rewrites; _drop;
                   nop (*Unspecified default action, assuming nop*)

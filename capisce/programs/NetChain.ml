@@ -198,7 +198,7 @@ let netchain_ingress =
   in
   let get_my_address = 
     instr_table ("get_my_address",
-      [`Exact hdr.nc_hdr.op],
+      [hdr.nc_hdr.op, Exact],
       [
         get_my_address_act;
         nop (*Unspecified default action, assuming nop*)
@@ -212,7 +212,7 @@ let netchain_ingress =
   in
   let find_index = 
     instr_table ("find_index",
-      [`Exact hdr.nc_hdr.key],
+      [hdr.nc_hdr.key, Exact],
       [
         find_index_act;
         nop (*Unspecified default action, assuming nop*)
@@ -320,9 +320,9 @@ let netchain_ingress =
   let nop = [],[] in
   let failure_recovery =
     instr_table ("failure_recovery", 
-    [ `Maskable hdr.ipv4.dstAddr;
-      `Maskable (overlay 1).swip;
-      `Maskable hdr.nc_hdr.vgroup;
+    [ hdr.ipv4.dstAddr, Maskable;
+      (overlay 1).swip, Maskable;
+      hdr.nc_hdr.vgroup, Maskable;
     ], 
     [failover_act; failover_write_reply_act; 
     failure_recovery_act; nop; drop_packet_act])
@@ -336,7 +336,7 @@ let netchain_ingress =
     ]
   in
   let ipv4_route =  
-      instr_table ("ipv4_route",[`Exact hdr.ipv4.dstAddr],[
+      instr_table ("ipv4_route",[hdr.ipv4.dstAddr, Exact],[
         set_egress;
         nop (*Unspecified default action, assuming nop*)
       ])
@@ -388,7 +388,7 @@ let netchain_egress =
   in
   let ethernet_set_mac =
     instr_table ("ethernet_set_mac"
-                ,[`Exact standard_metadata.egress_spec]
+                ,[standard_metadata.egress_spec, Exact]
                 ,[ 
                   ethernet_set_mac_act;
                   nop (*Unspecified default action, assuming nop*)
