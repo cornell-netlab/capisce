@@ -2,7 +2,7 @@ open Core
 open Capisce
 module Qe = Qe
 
-let example (name : string) program : Command.t =
+let example (name : string) (program : ASTs.GPL.t) : Command.t =
   let open Command.Let_syntax in
   Command.basic ~summary:("runs example " ^ name)
   [%map_open
@@ -18,24 +18,25 @@ let example (name : string) program : Command.t =
       Solver.princess_path := Option.value princess ~default:(!Solver.princess_path);
       Log.smt "Running princess via %s" @@ lazy (Solver.princess_exe ());
       Printf.printf "%s\n" name;
-      let open DependentTypeChecker in
+      let open ASTs in
       let instrument p = 
-        let p = if hv then HoareNet.assert_valids p else p in 
-        let p = if df then HoareNet.track_assigns Programs.V1ModelUtils.standard_metadata.egress_spec p else p in 
+        assert (not (hv && df));
+        let p = if hv then GCL.assert_valids p else p in 
+        let p = if df then GCL.track_assigns Programs.V1ModelUtils.standard_metadata.egress_spec p else p in 
         p
       in
       let algorithm p = 
-        HoareNet.infer p None None ~qe:`Cegqe
+        Qe.cegqe p
       in
       let paths p =
-        HoareNet.annotated_to_gpl p
-        |> ASTs.GPL.count_paths
+        ASTs.GPL.count_paths p
         |> Bigint.to_string
       in
       let st = Clock.start () in
       let phi = 
         try 
           program |> 
+          GPL.encode_tables |> 
           instrument |>
           algorithm
         with
@@ -53,7 +54,7 @@ let example (name : string) program : Command.t =
       Out_channel.write_all (filename "count_paths") ~data:(num_cexs);
       Out_channel.write_all (filename "time") ~data:time;
       if replay then
-        let time_series = Qe.replay (!Qe.data) (program |> instrument |> HoareNet.annotated_to_gpl |> ASTs.GPL.encode_tables) in 
+        let time_series = Qe.replay (!Qe.data) (program |> GPL.encode_tables |> instrument) in 
         let time_series_str = List.map time_series ~f:(fun (t,n) -> Printf.sprintf "%f, %d\n" t n) |> String.concat ~sep:"" in 
         Out_channel.write_all (filename "completion") ~data:(time_series_str)
   ]

@@ -1,6 +1,6 @@
 open Core
 open Capisce
-open DependentTypeChecker
+open ASTs.GPL
 open V1ModelUtils
 
 type ingress_metadata_t = {
@@ -37,8 +37,7 @@ type meta_t =  {
 let meta : meta_t = {ingress_metadata; intrinsic_metadata}
 
 let flowlet_parser =
-  let open HoareNet in
-  let open BExpr in
+  let open BExpr in 
   let open Expr in
   let parse_tcp =
     sequence [
@@ -77,7 +76,6 @@ let flowlet_parser =
   start
 
 let flowlet_ingress fixed =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   let lookup_flowlet_map = [], 
@@ -94,10 +92,10 @@ let flowlet_ingress fixed =
       register_write "flowlet_lasttime_lookup_flowlet_map" (var meta.ingress_metadata.flowlet_map_index) (var meta.intrinsic_metadata.ingress_global_timestamp);
     ] |> List.concat
   in
-  let flowlet = instr_table ("flowlet", [], [
-    lookup_flowlet_map;
-    nop (* Undefined default action, assuming nop *)
-    ]) in
+  let flowlet = table "flowlet" [] [
+      lookup_flowlet_map;
+      nop (* Undefined default action, assuming nop *)
+    ] in
   let update_flowlet_id =
     [], Primitives.Action.[
         [assign meta.ingress_metadata.flowlet_id @@ badd (var meta.ingress_metadata.flowlet_id) (bvi 1 16)];
@@ -105,10 +103,10 @@ let flowlet_ingress fixed =
         register_write "flowlet_id_update_flowlet_id" (var meta.ingress_metadata.flowlet_map_index) (var meta.ingress_metadata.flowlet_id);
       ] |> List.concat
   in
-  let new_flowlet = instr_table ("new_flowlet", [], [
-    update_flowlet_id;
-    nop (* Undefined default action, assuming nop *)
-    ]) in
+  let new_flowlet = table "new_flowlet" [] [
+      update_flowlet_id;
+      nop (* Undefined default action, assuming nop *)
+    ] in
   let _drop = [], Primitives.Action.[
       assign standard_metadata.egress_spec @@ bvi 511 9;
     ]
@@ -120,13 +118,13 @@ let flowlet_ingress fixed =
       (* hash(meta.ingress_metadata.ecmp_offset, HashAlgorithm.crc16, (bit<10>)ecmp_base, { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.ipv4.protocol, hdr.tcp.srcPort, hdr.tcp.dstPort, meta.ingress_metadata.flowlet_id }, (bit<20>)ecmp_count); *)
       hash_ meta.ingress_metadata.ecmp_offset "crc16" (var ecmp_base) [var hdr.ipv4.srcAddr; var hdr.ipv4.dstAddr; var hdr.ipv4.protocol; var hdr.tcp.srcPort; var hdr.tcp.dstPort; var meta.ingress_metadata.flowlet_id] (var ecmp_count) "set_ecmp_select";
   in
-  let ecmp_group = instr_table (
-      "ecmp_group",
-      [hdr.ipv4.dstAddr, Maskable],
-      [
-        _drop; set_ecmp_select;
-        nop (* Undefined default action, assuming nop *)
-      ])
+  let ecmp_group = table "ecmp_group"
+    [
+      hdr.ipv4.dstAddr, Maskable
+    ] [
+      _drop; set_ecmp_select;
+      nop (* Undefined default action, assuming nop *)
+    ]
   in
   let set_nhop =
     let nhop_ipv4 = Var.make "nhop_ipv4" 32 in
@@ -138,13 +136,14 @@ let flowlet_ingress fixed =
     ]
 
   in
-  let ecmp_nhop = instr_table (
-      "ecmp_nhop",
-      [meta.ingress_metadata.ecmp_offset, Exact],
-      [
-        _drop; set_nhop;
-        nop (* Undefined default action, assuming nop *)
-      ])
+  let ecmp_nhop = table "ecmp_nhop"
+    [
+      meta.ingress_metadata.ecmp_offset, Exact
+    ]
+    [
+      _drop; set_nhop;
+      nop (* Undefined default action, assuming nop *)
+    ]
   in
   let set_dmac =
     let dmac = Var.make "dmac" 48 in
@@ -152,13 +151,14 @@ let flowlet_ingress fixed =
         assign hdr.ethernet.dstAddr @@ var dmac
     ]
   in
-  let forward = instr_table (
-      "forward",
-      [meta.ingress_metadata.nhop_ipv4, Exact],
-      [
-        set_dmac; _drop;
-        nop (* Undefined default action, assuming nop *)
-      ]) in
+  let forward = table "forward"
+    [
+      meta.ingress_metadata.nhop_ipv4, Exact
+    ] [
+      set_dmac; _drop;
+      nop (* Undefined default action, assuming nop *)
+    ]
+  in
   sequence [
     begin if fixed then assume @@ ands_ [
         eq_ btrue @@ var hdr.ipv4.isValid;
@@ -175,7 +175,6 @@ let flowlet_ingress fixed =
   ]
 
 let flowlet_egress =
-  let open HoareNet in
   let open Expr in
   let rewrite_mac =
     let smac = Var.make "smac" 48 in
@@ -188,12 +187,14 @@ let flowlet_egress =
     ]
   in
   let send_frame =
-    instr_table ("send_frame",
-                 [standard_metadata.egress_port, Exact],
-                 [
-                  rewrite_mac; _drop;
-                  nop (* Undefined default action, assuming nop *)
-                  ])
+    table "send_frame"
+      [
+        standard_metadata.egress_port, Exact
+      ]
+      [
+        rewrite_mac; _drop;
+        nop (* Undefined default action, assuming nop *)
+      ]
   in
   send_frame
 

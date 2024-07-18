@@ -1,6 +1,6 @@
 open Core
 open Capisce
-open DependentTypeChecker
+open ASTs.GPL
 open V1ModelUtils
 
 type location_t = {
@@ -73,14 +73,13 @@ let overlay i : overlay_t =
     swip = field "swip" 32}
 
 let overlay_pop_front ident max i =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   let rec pop_front_aux cur =
     let cur_header = overlay cur in 
     let next_header_index = Int.(cur + i) in
     let havoc_var = Printf.sprintf "havoc_%s_%i" ident next_header_index in
-    let havoc hdr = havoc hdr havoc_var |> of_action in
+    let havoc hdr = havoc hdr havoc_var |> active in
     if next_header_index >= max then
       [ assign cur_header.isValid bfalse;
         havoc cur_header.swip;
@@ -99,7 +98,6 @@ let overlay_pop_front ident max i =
   pop_front_aux 0
 
 let netchain_parser =
-  let open HoareNet in
   let open Expr in
   let open BExpr in
   let parse_nc_hdr =
@@ -184,7 +182,6 @@ let netchain_parser =
   ]
 
 let netchain_ingress =
-  let open HoareNet in
   let open Expr in
   let open BExpr in
   let open Primitives in
@@ -197,12 +194,12 @@ let netchain_ingress =
     ]
   in
   let get_my_address = 
-    instr_table ("get_my_address",
-      [hdr.nc_hdr.op, Exact],
+   table "get_my_address"
+      [hdr.nc_hdr.op, Exact]
       [
         get_my_address_act;
         nop (*Unspecified default action, assuming nop*)
-      ])
+      ]
   in
   let find_index_act = 
     let index = Var.make "index" 16 in
@@ -211,12 +208,12 @@ let netchain_ingress =
     ]
   in
   let find_index = 
-    instr_table ("find_index",
-      [hdr.nc_hdr.key, Exact],
+    table "find_index"
+      [hdr.nc_hdr.key, Exact]
       [
         find_index_act;
         nop (*Unspecified default action, assuming nop*)
-      ])
+      ]
   in
   let get_sequence_act =
     [], 
@@ -225,10 +222,10 @@ let netchain_ingress =
     
   in
   let get_sequence =
-    instr_table ("get_sequence", [], [
+    table "get_sequence" [] [
       get_sequence_act;
       nop (*Unspecified default action, assuming nop*)
-    ])
+    ]
   in
   let read_value_act =
     [], 
@@ -236,10 +233,10 @@ let netchain_ingress =
       register_read "value_reg_read_value_act" hdr.nc_hdr.value (var meta.location.index)
   in
   let read_value =
-    instr_table ("read_value", [], [
+    table "read_value" [] [
       read_value_act;
       nop (*Unspecified default action, assuming nop*)
-    ])
+    ]
   in
   let maintain_sequence_act =
     [], Action.[
@@ -251,10 +248,10 @@ let netchain_ingress =
     ] |> List.concat
   in
   let maintain_sequence =
-    instr_table ("maintain_sequence", [], [
+    table "maintain_sequence" [] [
       maintain_sequence_act;
       nop (*Unspecified default action, assuming nop*)
-    ])
+    ]
   in
   let assign_value_act = 
     [], 
@@ -264,10 +261,10 @@ let netchain_ingress =
       register_write "value_reg_assign_value_act" (var meta.location.index) (var hdr.nc_hdr.value)
   in
   let assign_value =
-    instr_table ("assign_value", [], [
+    table "assign_value" [] [
       assign_value_act;
       nop (*Unspecified default action, assuming nop*)
-    ])
+    ]
   in
   let did_pop_front = Var.make "did_pop_front" 1 in
   let pop_chain_act = 
@@ -282,10 +279,10 @@ let netchain_ingress =
   let pop_chain =
     sequence [
       assign did_pop_front bfalse;
-      instr_table ("pop_chain", [], [
+      table "pop_chain" [] [
         pop_chain_act;
         nop (*Unspecified default action, assuming nop*)
-      ]);
+      ];
       ifte_seq (eq_ btrue @@ var did_pop_front) 
         (overlay_pop_front "pop_chain" 9 1) [];
     ]
@@ -294,10 +291,10 @@ let netchain_ingress =
     [], [mark_to_drop]
   in
   let drop_packet =
-    instr_table ("drop_packet", [], [
+    table "drop_packet" [] [
       drop_packet_act;
       nop (*Unspecified default action, assuming nop*)
-    ])
+    ]
   in
   let failover_act = [], Action.[
     assign hdr.ipv4.dstAddr @@ var @@ (overlay 1).swip] 
@@ -319,13 +316,13 @@ let netchain_ingress =
   ] in
   let nop = [],[] in
   let failure_recovery =
-    instr_table ("failure_recovery", 
+    table "failure_recovery"
     [ hdr.ipv4.dstAddr, Maskable;
       (overlay 1).swip, Maskable;
       hdr.nc_hdr.vgroup, Maskable;
-    ], 
+    ]
     [failover_act; failover_write_reply_act; 
-    failure_recovery_act; nop; drop_packet_act])
+    failure_recovery_act; nop; drop_packet_act]
     (*Unspecified default action, assuming extant nop*)
   in
   let set_egress =
@@ -336,10 +333,12 @@ let netchain_ingress =
     ]
   in
   let ipv4_route =  
-      instr_table ("ipv4_route",[hdr.ipv4.dstAddr, Exact],[
-        set_egress;
-        nop (*Unspecified default action, assuming nop*)
-      ])
+      table "ipv4_route"
+        [hdr.ipv4.dstAddr, Exact]
+        [
+          set_egress;
+          nop (*Unspecified default action, assuming nop*)
+        ]
   in
   sequence [
     ifte_seq (eq_ (var hdr.nc_hdr.isValid) btrue) [
@@ -373,7 +372,6 @@ let netchain_ingress =
   ]
 
 let netchain_egress =
-  let open HoareNet in
   let open Expr in
   let open Primitives in
   let ethernet_set_mac_act =
@@ -387,12 +385,12 @@ let netchain_egress =
 
   in
   let ethernet_set_mac =
-    instr_table ("ethernet_set_mac"
-                ,[standard_metadata.egress_spec, Exact]
-                ,[ 
-                  ethernet_set_mac_act;
-                  nop (*Unspecified default action, assuming nop*)
-                 ])
+    table "ethernet_set_mac"
+      [standard_metadata.egress_spec, Exact]
+      [ 
+        ethernet_set_mac_act;
+        nop (*Unspecified default action, assuming nop*)
+      ]
   in
   ethernet_set_mac
 

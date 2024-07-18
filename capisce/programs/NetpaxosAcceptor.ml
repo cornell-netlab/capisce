@@ -1,5 +1,5 @@
 open Capisce
-open DependentTypeChecker
+open ASTs.GPL
 open V1ModelUtils
 
 
@@ -16,7 +16,6 @@ type meta_t = {
 let meta : meta_t = {local_metadata}
 
 let npa_parser =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   sequence [
@@ -47,7 +46,6 @@ let npa_parser =
   ]
 
 let npa_ingress =
-  let open HoareNet in
   let open Expr in
   let open BExpr in
   let forward =
@@ -58,19 +56,18 @@ let npa_ingress =
     [], Primitives.Action.[assign standard_metadata.egress_spec (bvi 511 9)]
   in
   let fwd_tbl =
-    instr_table ("fwd_tbl",
-                 [standard_metadata.ingress_port, Exact],
-                 [forward; _drop;
-                  nop (*No default action assuming noop*)
-                 ])
-  in
+    table "fwd_tbl"
+      [standard_metadata.ingress_port, Exact]
+      [ forward; _drop;
+        nop (*No default action assuming noop*)
+  ] in
   let read_round =
     [],   
       (*proposal_register.read(meta.local_metadata.proposal, hdr.paxos.inst)*)
       register_read "proposal_register_read_round" meta.local_metadata.proposal (var hdr.paxos.inst)
   in
   let round_tbl =
-    instr_table ("round_tbl", [], [read_round; nop]) (* no default action assuming noop*)
+    table "round_tbl" [] [read_round; nop] (* no default action assuming noop*)
   in
   let _no_op = [],[] in
   let handle_phase1a =
@@ -107,21 +104,18 @@ let npa_ingress =
       ]
   in
   let paxos_tbl =
-    sequence [
-      (* assert_ @@ eq_ btrue @@ var hdr.paxos.isValid; *)
-      instr_table ("paxos_tbl",
-                   [ hdr.paxos.msgtype, Exact ],
-                   [ handle_phase1a;
-                     handle_phase2a;
-                     _no_op;
-                     (* no default action specified assuming noop, 
-                        but making no changes,
-                        because we already have an action _no_op*)
-                   ])
-    ]
-  in
+    table "paxos_tbl"
+      [ hdr.paxos.msgtype, Exact ]
+      [ handle_phase1a;
+        handle_phase2a;
+        _no_op;
+        (* no default action specified assuming noop, 
+          but making no changes,
+          because we already have an action _no_op*)
+      ]
+in
   let drop_tbl =
-    instr_table ("drop_tbl", [], [_drop; nop]) (* adding dummy default action noop *)
+    table "drop_tbl" [] [_drop; nop] (* adding dummy default action noop *)
   in
   sequence [
     ifte_seq (eq_ (var hdr.ipv4.isValid) btrue)
@@ -141,7 +135,7 @@ let npa_ingress =
   ]
 
 
-let npa_egress = HoareNet.skip
+let npa_egress = skip
 
 let netpaxos_acceptor =
   pipeline npa_parser npa_ingress npa_egress

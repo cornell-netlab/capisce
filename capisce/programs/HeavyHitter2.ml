@@ -1,6 +1,6 @@
 open Core
 open Capisce
-open DependentTypeChecker
+open ASTs.GPL
 open V1ModelUtils
 
 type custom_metadata_t = {
@@ -26,7 +26,6 @@ type meta_t =  {
 let meta : meta_t = {custom_metadata}
 
 let hh2_parser =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   let parse_tcp =
@@ -64,7 +63,6 @@ let hh2_parser =
   start
 
 let hh2_ingress fixed =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   let set_heavy_hitter_count =
@@ -93,13 +91,12 @@ let hh2_ingress fixed =
       ] |> List.concat
   in
   let set_heavy_hitter_count_table =
-    instr_table (
-      "set_heavy_hitter_count_table",
-      [], [
+    table "set_heavy_hitter_count_table"
+      [] 
+      [
         set_heavy_hitter_count;
         nop (*Unspecified default action, assuming nop*);
       ]
-    )
   in
   let _drop =
     [], Primitives.Action.[
@@ -107,13 +104,11 @@ let hh2_ingress fixed =
       ]
   in
   let drop_heavy_hitter_table =
-    instr_table (
-      "drop_heavy_hitter_table",
-      [],[
+    table "drop_heavy_hitter_table"
+      [] [
         _drop;
         nop (*Unspecified default action, assuming nop*)
       ]
-    )
   in
   let set_nhop  =
     let nhop_ipv4 = Var.make "nhop_ipv4" 32 in
@@ -125,13 +120,12 @@ let hh2_ingress fixed =
       ]
   in
   let ipv4_lpm =
-    instr_table (
-      "ipv4_lpm",
-      [hdr.ipv4.dstAddr, Maskable], [
+    table "ipv4_lpm"
+      [hdr.ipv4.dstAddr, Maskable]
+      [
         set_nhop; _drop;
         nop (*Unspecified default action, assuming nop*)
       ]
-    )
   in
   let set_dmac =
     let dmac = Var.make "dmac" 48 in
@@ -140,13 +134,13 @@ let hh2_ingress fixed =
       ]
   in
   let forward =
-    instr_table (
-      "forward",
-      [meta.custom_metadata.nhop_ipv4, Exact],[
+    table "forward"
+      [
+        meta.custom_metadata.nhop_ipv4, Exact
+      ] [
         set_dmac; _drop;
         nop (*Unspecified default action, assuming nop*)  
       ]
-    )
   in
   sequence [
     begin if fixed then assume @@ ands_ [
@@ -167,7 +161,6 @@ let hh2_ingress fixed =
   ]
 
 let hh2_egress =
-  let open HoareNet in
   let open Expr in
   let rewrite_mac =
     let smac = Var.make "smac" 48 in
@@ -180,13 +173,12 @@ let hh2_egress =
     ]
   in
   let send_frame =
-    instr_table ("send_frame",
-                  [standard_metadata.egress_port, Exact],
-                  [
-                    rewrite_mac; _drop;
-                    nop (*Unspecified default action, assuming nop*)
-                  ]
-                )
+    table "send_frame"
+      [standard_metadata.egress_port, Exact]
+      [
+        rewrite_mac; _drop;
+        nop (*Unspecified default action, assuming nop*)
+      ]
   in
   send_frame
 

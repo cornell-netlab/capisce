@@ -57,6 +57,18 @@ module GCL : sig
   (** [normalize_names c] reformats all of the variables in [c] so
     that they are well-defined SMTLIB variable names.*)
   val normalize_names : t -> t
+
+  (** [assert_valids c] instruments [c] with assertions
+    that ensure that anytime a variable with the prefix "hdr." 
+    is read, its validity bit is set to 1 *)
+    val assert_valids : t -> t 
+
+  (** [track_assigns x c] instruments [c] with a ghost variable [g] that 
+    is set to 1 whenever [x] is on the LHS of an assignment.
+    Additionally, sets [g] to [0] at the start of the instrumented code, 
+    and asserts that it must not be [0] at the end. Something like:
+    [x := 0; c; assert x != 0] *)
+    val track_assigns : Var.t -> t -> t
   
   (**/**)
   val prim : Active.t -> t
@@ -226,20 +238,11 @@ module GPL : sig
   (** [assign x e] constructs an assignment *)
   val assign : Var.t -> Expr.t -> t
 
+  (** [active a] injects an Active primitive [a] into [GPL] *)
+  val active : Primitives.Active.t -> t
+
   (** [of_gcl gcl] injects the [GCL] program [gcl] into [GPL]*)
   val of_gcl : GCL.t -> t
-
-  (** [assert_valids c] instruments [c] with assertions
-      that ensure that anytime a variable with the prefix "hdr." 
-      is read, its validity bit is set to 1 *)
-  val assert_valids : t -> t 
-
-  (** [track_assigns x c] instruments [c] with a ghost variable [g] that 
-      is set to 1 whenever [x] is on the LHS of an assignment.
-      Additionally, sets [g] to [0] at the start of the instrumented code, 
-      and asserts that it must not be [0] at the end. Something like:
-      [x := 0; c; assert x != 0] *)
-  val track_assigns : Var.t -> t -> t
 
   (** [wp c phi] computes the weakest precondition of [c] w.r.t [phi]*)
   val wp : t -> BExpr.t -> BExpr.t
@@ -269,6 +272,8 @@ module GPL : sig
   val choices : t list -> t
   val choices_map : 'a list -> f:('a -> t) -> t
   val choices_opt : t option list -> t option
+
+  val choice_seqs : t list list -> t
 
   val skip : t
   val pass : t

@@ -1,6 +1,6 @@
 open Core
 open Capisce
-open DependentTypeChecker
+open ASTs.GPL
 open V1ModelUtils
 
 
@@ -29,7 +29,6 @@ type metadata_t = {
 let meta : metadata_t = {meta; routing_metadata}
 
 let ndp_parser =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   sequence [
@@ -53,7 +52,6 @@ let ndp_parser =
   ]
 
 let ndp_ingress =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   let set_nhop =
@@ -72,14 +70,13 @@ let ndp_ingress =
       ]
   in
   let ipv4_lpm =
-    sequence [
-      instr_table ("ipv4_lpm", [
+    table "ipv4_lpm" 
+      [
         hdr.ipv4.dstAddr, Maskable
-        ], [
-          set_nhop; _drop; 
-          nop (*Unspecified default action, assuming noop*)
-          ])
-    ]
+      ] [
+        set_nhop; _drop; 
+        nop (*Unspecified default action, assuming noop*)
+      ]
   in
   let directpriohigh =
     [], Primitives.Action.[
@@ -89,13 +86,13 @@ let ndp_ingress =
       ]
   in
   let directtoprio =
-    instr_table ("directtoprio", 
+    table "directtoprio"
     [
       meta.meta.register_tmp, MaskableDegen
-    ], [
+    ] [
       directpriohigh;
       nop (*Unspecified default action, assuming noop*)
-    ])
+    ]
   in
   let readbuffer =
     [],
@@ -103,12 +100,13 @@ let ndp_ingress =
     register_read "buffersense_readbuffer" meta.meta.register_tmp (var standard_metadata.egress_port)
   in
   let readbuffersense =
-    instr_table ("readbuffersense", [
-      meta.meta.register_tmp, MaskableDegen
-      ], [
+    table "readbuffersense" 
+      [
+        meta.meta.register_tmp, MaskableDegen
+      ] [
         readbuffer;
         nop (*Unspecified default action, assuming noop*)
-      ])
+      ]
   in
   let setpriolow =
     [], Primitives.Action.[
@@ -129,12 +127,13 @@ let ndp_ingress =
       ]
   in
   let setprio =
-    instr_table ("setprio", [
-      meta.meta.register_tmp, MaskableDegen
-      ], [
+    table "setprio" 
+      [
+        meta.meta.register_tmp, MaskableDegen
+      ] [
         setpriolow; setpriohigh;
         nop (* unspecified default action, adding noop  *)
-        ])
+      ]
   in
   let set_dmac =
     let dmac = Var.make "dmac" 48 in
@@ -145,12 +144,12 @@ let ndp_ingress =
       register_read "buffersense_set_dmac" meta.meta.register_tmp (var standard_metadata.egress_port)
   in
   let forward =
-    instr_table ("forward", [
-      meta.routing_metadata.nhop_ipv4, Exact
-      ], [
+    table "forward" [
+        meta.routing_metadata.nhop_ipv4, Exact
+      ] [
         set_dmac; _drop;
         nop (* unspecified default action, adding noop  *)
-        ])
+      ]
   in
   ifte_seq (eq_ btrue @@ var hdr.ipv4.isValid) [
     ifte_seq (ugt_ (var hdr.ipv4.ttl) (bvi 0 8)) [
@@ -177,7 +176,6 @@ let ndp_ingress =
   ]
 
 let ndp_egress =
-  let open HoareNet in
   (* let open BExpr in *)
   let open Expr in
   let decreasereg =
@@ -191,11 +189,11 @@ let ndp_egress =
   in
   let cont = [], [] in
   let dec_counter =
-    instr_table ("dec_counter",
-                 [meta.meta.ndpflags, MaskableDegen],
-                 [decreasereg; cont;
-                  nop (* unspecified default action assuming noop *) 
-                 ])
+    table "dec_counter"
+      [ meta.meta.ndpflags, MaskableDegen]
+      [ decreasereg; cont;
+        nop (* unspecified default action assuming noop *) 
+      ]
   in
   let rewrite_mac =
     let smac = Var.make "smac" 48 in
@@ -209,11 +207,11 @@ let ndp_egress =
       ]
   in
   let send_frame =
-    instr_table ("send_frame",
-                 [standard_metadata.egress_port, Exact],
-                 [rewrite_mac; _drop;
-                 nop (* unspecified default action assuming noop *)
-                 ])
+    table "send_frame"
+      [ standard_metadata.egress_port, Exact]
+      [ rewrite_mac; _drop;
+          nop (* unspecified default action assuming noop *)
+      ]
   in
   sequence [
     dec_counter;

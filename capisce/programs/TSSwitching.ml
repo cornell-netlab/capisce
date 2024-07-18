@@ -1,10 +1,9 @@
 open Core
 open Capisce
-open DependentTypeChecker
+open ASTs.GPL
 open V1ModelUtils
 
 let ts_switching_parser =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   let parse_rtp =
@@ -49,7 +48,6 @@ let ts_switching_parser =
   start
 
 let ts_switching_ingress fixed =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   let _drop_0 = [], Primitives.Action.[
@@ -66,14 +64,14 @@ let ts_switching_ingress fixed =
       ]
   in
   let schedule_table =
-    instr_table ("schedule_table",
-          [ 
-            hdr.ipv4.dstAddr, Exact;
-            hdr.rtp.timestamp, Maskable
-          ], [
-            take_video_0; _drop_0;
-            nop   (* Unspecified default action, assuming nop *)
-          ])
+    table "schedule_table"
+      [ 
+        hdr.ipv4.dstAddr, Exact;
+        hdr.rtp.timestamp, Maskable
+      ] [
+        take_video_0; _drop_0;
+        nop   (* Unspecified default action, assuming nop *)
+      ]
   in
   sequence [
     if fixed then assume @@ ands_ [
@@ -85,9 +83,6 @@ let ts_switching_ingress fixed =
 
 
 let ts_switching_egress =
-  (* HoareNet.skip *)
-  let open HoareNet in
-  (* let open BExpr in *)
   skip
 
 let ts_switching fixed =

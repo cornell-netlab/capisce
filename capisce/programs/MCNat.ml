@@ -1,6 +1,6 @@
 open Core
 open Capisce
-open DependentTypeChecker
+open ASTs.GPL
 open V1ModelUtils
 
 type intrinsic_metadata_t = {
@@ -20,7 +20,6 @@ type meta_t =  {
 let meta : meta_t = {intrinsic_metadata}
 
 let mc_nat_parser =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   let parse_udp =
@@ -58,7 +57,6 @@ let mc_nat_parser =
   start
 
 let mc_nat_ingress fixed =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   let _drop = [], Primitives.Action.[
@@ -72,11 +70,11 @@ let mc_nat_ingress fixed =
       ]
   in
   let set_mcg =
-    instr_table("set_mcg",
-         [hdr.ipv4.dstAddr, Exact ],
+    table "set_mcg"
+         [ hdr.ipv4.dstAddr, Exact ]
          [set_output_mcg; _drop;
           nop (*Unspecified default action, assuming nop*)
-         ])
+         ]
   in
   sequence [
     if fixed then assume @@ eq_ btrue @@ var hdr.ipv4.isValid else skip;
@@ -85,8 +83,6 @@ let mc_nat_ingress fixed =
 
 
 let mc_nat_egress =
-  (* HoareNet.skip *)
-  let open HoareNet in
   (* let open BExpr in *)
   let open Expr in
   let _drop = [], Primitives.Action.[
@@ -101,14 +97,13 @@ let mc_nat_egress =
       ]
   in
   let nat_table =
-    instr_table ( "nat_table",
-                  [meta.intrinsic_metadata.egress_rid, Exact;
-                   hdr.ipv4.dstAddr, Exact],
-                  [
-                    do_nat; _drop;
-                    nop (*Unspecified default action, assuming nop*)
-                  ]
-    )
+    table "nat_table"
+      [ meta.intrinsic_metadata.egress_rid, Exact;
+        hdr.ipv4.dstAddr, Exact
+      ] [
+        do_nat; _drop;
+        nop (*Unspecified default action, assuming nop*)
+      ]
   in
   sequence [
     nat_table

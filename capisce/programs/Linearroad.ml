@@ -1,6 +1,6 @@
 open Core
 open Capisce
-open DependentTypeChecker
+open ASTs.GPL
 open V1ModelUtils
 
 type egress_metadata_t = {
@@ -462,7 +462,6 @@ let seconds = List.filter_map ~f:(function
   )
 
 let linearroad_parser =
-  let open HoareNet in
   let open Expr in
   let parse_pos_report =
     sequence [
@@ -580,7 +579,6 @@ let linearroad_parser =
   start
 
 let linearroad_ingress annot =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   let open Primitives in
@@ -614,20 +612,21 @@ let linearroad_ingress annot =
       ] |> List.concat
   in
   let update_pos_state = 
-    instr_table ("update_pos_state", [], [
+    table "update_pos_state" [] [
     do_update_pos_state;
     nop (* Unspecified default action, assuming nop *)
-    ]) in
+    ]
+  in
   let set_new_seg =
     [], Action.[
         assign meta.v_state.new_seg @@ bvi 1 1
       ]
   in
   let update_new_seg =
-    instr_table ("update_new_seg", [], [
+    table "update_new_seg" [] [
       set_new_seg;
       nop (* Unspecified default action, assuming nop *)
-    ])
+    ]
   in
   let load_vol =
     [], Action.[
@@ -652,15 +651,15 @@ let linearroad_ingress annot =
       ]
   in
   let update_vol_state =
-    instr_table ("update_vol_state",
-                 [meta.v_state.new_, Exact;
-                  meta.v_state.new_seg, Exact
-                 ], [
-                   load_vol;
-                   load_and_inc_vol;
-                   load_and_inc_and_dec_vol;
-                   nop (* Unspecified default action, assuming nop *)
-                 ])
+    table "update_vol_state"
+      [ meta.v_state.new_, Exact;
+        meta.v_state.new_seg, Exact
+      ] [
+        load_vol;
+        load_and_inc_vol;
+        load_and_inc_and_dec_vol;
+        nop (* Unspecified default action, assuming nop *)
+      ]
   in
   let set_spd =
     [], Action.[
@@ -696,10 +695,10 @@ let linearroad_ingress annot =
       ]
   in
   let loc_not_changed =
-    instr_table ("loc_not_changed", [], [
+    table "loc_not_changed" [] [
       do_loc_not_changed;
       nop (* Unspecified default action, assuming nop *)
-    ])
+    ]
   in
   let do_loc_changed =
     [], Action.[
@@ -710,17 +709,17 @@ let linearroad_ingress annot =
       ]
   in
   let loc_changed =
-    instr_table ("loc_changed", [], [
+    table "loc_changed" [] [
       do_loc_changed;
       nop (* Unspecified default action, assuming nop *)
-    ])
+    ]
   in
   let update_ewma_spd =
-    instr_table ("update_ewma_spd",
-                firsts [
-                  (meta.seg_meta.vol, Table.Exact) |> if annot then Either.second else Either.first
-                ],
-                [set_spd; calc_ewma_spd (* default *)])
+    table "update_ewma_spd"
+      (firsts [
+        (meta.seg_meta.vol, Table.Exact) |> if annot then Either.second else Either.first
+      ])
+      [set_spd; calc_ewma_spd (* default *)]
   in
   let do_dec_prev_stopped =
     [], [
@@ -729,10 +728,10 @@ let linearroad_ingress annot =
       ]
   in
   let dec_prev_stopped =
-    instr_table ("dec_prev_stopped", [], [
+    table "dec_prev_stopped" [] [
       do_dec_prev_stopped;
       nop (* Unspecified default action, assuming nop *)
-    ])
+    ]
   in
   let do_inc_stopped =
     [], Action.[
@@ -743,7 +742,7 @@ let linearroad_ingress annot =
     ]
   in
   let inc_stopped =
-    instr_table ("inc_stopped", [], [do_inc_stopped])
+    table "inc_stopped" [] [do_inc_stopped]
   in
   let do_load_stopped_ahead =
     [], Action.[
@@ -785,10 +784,10 @@ let linearroad_ingress annot =
     ]
   in
   let load_stopped_ahead =
-    instr_table ("load_stopped_ahead", [], [
+    table "load_stopped_ahead" [] [
       do_load_stopped_ahead; 
       nop (* Unspecified default action, assuming nop *)
-      ])
+    ]
   in
   let issue_toll =
     let base_toll = Var.make "base_toll" 16 in
@@ -807,17 +806,17 @@ let linearroad_ingress annot =
   in
   let check_toll =
     let open Table in 
-    instr_table ("check_toll",
-                 firsts
-                 [(meta.v_state.new_seg, Exact) |> Either.first;
-                  (meta.seg_meta.ewma_spd, MaskableDegen) |> if annot then Either.second else Either.first;
-                  (meta.seg_meta.vol, MaskableDegen) |> if annot then Either.second else Either.first;
-                  (meta.accident_meta.has_accident_ahead, MaskableDegen) |> Either.first
-                ],
-                [
-                  issue_toll;
-                  nop (* Unspecified default action, assuming nop *)
-                ])
+    table "check_toll"
+      (firsts
+        [ (meta.v_state.new_seg, Exact) |> Either.first;
+          (meta.seg_meta.ewma_spd, MaskableDegen) |> if annot then Either.second else Either.first;
+          (meta.seg_meta.vol, MaskableDegen) |> if annot then Either.second else Either.first;
+          (meta.accident_meta.has_accident_ahead, MaskableDegen) |> Either.first
+      ])
+      [
+        issue_toll;
+        nop (* Unspecified default action, assuming nop *)
+      ]
   in
   let do_load_accnt_bal = [], Action.[
       assert_ @@ eq_ btrue @@ var hdr.accnt_bal_req.isValid;
@@ -825,10 +824,9 @@ let linearroad_ingress annot =
     ]
   in
   let load_accnt_bal =
-    instr_table ("load_accnt_bal",
-                 [],
-                 [do_load_accnt_bal]
-                )
+    table "load_accnt_bal"
+      []
+      [do_load_accnt_bal]
   in
   let set_nhop =
     let nhop_ipv4 = Var.make "nhop_ipv4" 32 in
@@ -844,12 +842,12 @@ let linearroad_ingress annot =
       ]
   in
   let ipv4_lpm =
-    instr_table ("ipv4_lpm",
-                [hdr.ipv4.dstAddr, Maskable],
-                [
-                  set_nhop; _drop;
-                  nop (* Unspecified default action, assuming nop *)
-                ])
+    table "ipv4_lpm"
+      [hdr.ipv4.dstAddr, Maskable]
+      [
+        set_nhop; _drop;
+        nop (* Unspecified default action, assuming nop *)
+      ]
   in
   let set_dmac =
     let dmac = Var.make "dmac" 48 in
@@ -858,13 +856,12 @@ let linearroad_ingress annot =
     ]
   in
   let forward =
-    instr_table ("forward",
-                 [hdr.ipv4.dstAddr, Exact],
-                 [
-                  set_dmac; _drop;
-                  nop (* Unspecified default action, assuming nop *)
-                 ]
-                )
+    table "forward"
+      [hdr.ipv4.dstAddr, Exact]
+      [
+        set_dmac; _drop;
+        nop (* Unspecified default action, assuming nop *)
+      ]
   in
   ifte_seq (eq_ btrue @@ var hdr.ipv4.isValid) [
     ifte_seq (eq_ btrue @@ var hdr.pos_report.isValid) [
@@ -910,7 +907,6 @@ let linearroad_ingress annot =
   ]
 
 let linearroad_egress =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   let open Primitives in
@@ -934,14 +930,14 @@ let linearroad_egress =
       ]
   in
   let send_accident_alert =
-    instr_table ("send_accident_alert",
-                [meta.accident_meta.has_accident_ahead, Exact;
-                 meta.accident_egress_meta.recirculate, Exact ],
-                [ 
-                  accident_alert_e2e; 
-                  make_accident_alert;
-                  nop (* Unspecified default action, assuming nop *)
-                ])
+    table "send_accident_alert"
+      [ meta.accident_meta.has_accident_ahead, Exact;
+        meta.accident_egress_meta.recirculate, Exact ]
+      [ 
+        accident_alert_e2e; 
+        make_accident_alert;
+        nop (* Unspecified default action, assuming nop *)
+      ]
   in
   let toll_notification_e2e =
     [], Action.[
@@ -964,13 +960,13 @@ let linearroad_egress =
       ]
   in
   let send_toll_notification =
-    instr_table ("send_toll_notification",
-                [meta.toll_meta.has_toll, Exact;
-                 meta.toll_egress_meta.recirculate, Exact],
-                [
-                  toll_notification_e2e; make_toll_notification;
-                  nop (* Unspecified default action, assuming nop *)
-                ])
+    table "send_toll_notification"
+      [ meta.toll_meta.has_toll, Exact;
+        meta.toll_egress_meta.recirculate, Exact]
+      [
+        toll_notification_e2e; make_toll_notification;
+        nop (* Unspecified default action, assuming nop *)
+      ]
   in
   let accnt_bal_e2e =
     [], Action.[
@@ -993,12 +989,12 @@ let linearroad_egress =
       ]
   in
   let send_accnt_bal =
-    instr_table ("send_accnt_bal",
-                [meta.accnt_bal_egress_meta.recirculate, Exact],
-                [
-                  accnt_bal_e2e; make_accnt_bal;
-                  nop (* Unspecified default action, assuming nop *)
-                ])
+    table "send_accnt_bal"
+      [meta.accnt_bal_egress_meta.recirculate, Exact]
+      [
+        accnt_bal_e2e; make_accnt_bal;
+        nop (* Unspecified default action, assuming nop *)
+      ]
   in
   let make_expenditure_report =
     let bal = Var.make "bal" 16 in
@@ -1016,15 +1012,15 @@ let linearroad_egress =
     ]
   in
   let daily_expenditure =
-    instr_table ("daily_expenditure",
-                [hdr.expenditure_req.vid, Exact;
-                 hdr.expenditure_req.day, Exact;
-                 hdr.expenditure_req.xway, Exact
-                ],
-                [
-                  make_expenditure_report;
-                  nop (* Unspecified default action, assuming nop *)
-                ])
+    table "daily_expenditure"
+      [ hdr.expenditure_req.vid, Exact;
+        hdr.expenditure_req.day, Exact;
+        hdr.expenditure_req.xway, Exact
+      ]
+      [
+        make_expenditure_report;
+        nop (* Unspecified default action, assuming nop *)
+      ]
   in
   let do_travel_estimate_init =
     [],
@@ -1035,9 +1031,9 @@ let linearroad_egress =
     ]
   in
   let travel_estimate_init =
-    instr_table ("travel_estimate_init",
-                [],
-                [do_travel_estimate_init (*default*)])
+    table "travel_estimate_init"
+      []
+      [do_travel_estimate_init (*default*)]
   in
   let do_travel_estimate_init_rev =
     [], Action.[
@@ -1047,10 +1043,9 @@ let linearroad_egress =
     ]
   in
   let travel_estimate_init_rev =
-    instr_table ("travel_estimate_init_rev",
-                 [],
-                 [do_travel_estimate_init_rev (* default *)]
-                )
+    table "travel_estimate_init_rev"
+      []
+      [do_travel_estimate_init_rev (* default *)]
   in
   let update_travel_estimate =
     let time = Var.make "time" 16 in
@@ -1061,16 +1056,16 @@ let linearroad_egress =
       ]
   in
   let travel_estimate_history =
-    instr_table ("travel_estimate_history",
-                [hdr.travel_estimate_req.dow, Exact;
-                 hdr.travel_estimate_req.tod, Exact;
-                 hdr.travel_estimate_req.xway, Exact;
-                 meta.te_md.dir, Exact;
-                 meta.te_md.seg_cur, Exact;
-                ], [
-                  update_travel_estimate;
-                  nop (* Unspecified default action, assuming nop *)
-                ])
+    table "travel_estimate_history"
+      [ hdr.travel_estimate_req.dow, Exact;
+        hdr.travel_estimate_req.tod, Exact;
+        hdr.travel_estimate_req.xway, Exact;
+        meta.te_md.dir, Exact;
+        meta.te_md.seg_cur, Exact;
+      ] [
+        update_travel_estimate;
+        nop (* Unspecified default action, assuming nop *)
+      ]
   in
   let do_travel_estimate_send = [], Action.[
       assign hdr.lr_msg_type.msg_type @@ bvi 14 8;
@@ -1085,9 +1080,9 @@ let linearroad_egress =
     ]
   in
   let travel_estimate_send =
-    instr_table("travel_estimate_send",
-               [],
-               [do_travel_estimate_send])
+    table "travel_estimate_send"
+      []
+      [do_travel_estimate_send]
   in
   let travel_estimate_e2e =
     let mir_ses = Var.make "mir_ses" 32 in
@@ -1099,12 +1094,12 @@ let linearroad_egress =
       ]
   in
   let travel_estimate_recirc =
-    instr_table("travel_estimate_recirc",
-                [],
-                [
-                  travel_estimate_e2e;
-                  nop (*  unspecified default action, assuming nop *)
-                ])
+    table "travel_estimate_recirc"
+      []
+      [
+        travel_estimate_e2e;
+        nop (*  unspecified default action, assuming nop *)
+      ]
   in
   let rewrite_mac =
     let smac = Var.make "smac" 48 in
@@ -1118,13 +1113,12 @@ let linearroad_egress =
       ]
   in
   let send_frame =
-    instr_table("send_frame",
-                [standard_metadata.egress_port, Exact],
-                [
-                  rewrite_mac; _drop;
-                  nop (*  unspecified default action, assuming nop *)
-                ]
-               )
+    table "send_frame"
+      [standard_metadata.egress_port, Exact]
+      [
+        rewrite_mac; _drop;
+        nop (*  unspecified default action, assuming nop *)
+      ]
   in
   ifte_seq (eq_ btrue @@ var hdr.ipv4.isValid) [
     ifte_seq (eq_ btrue @@ var hdr.pos_report.isValid) [

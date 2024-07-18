@@ -1,6 +1,6 @@
 open Core
 open Capisce
-open DependentTypeChecker
+open ASTs.GPL
 open V1ModelUtils
 
 
@@ -46,7 +46,6 @@ let meta : metadata_t = {
 
 
 let simple_nat_parser =
-  let open HoareNet in
   let open Expr in
   let parse_tcp =
     sequence [
@@ -87,7 +86,6 @@ let simple_nat_parser =
   start
 
 let simple_nat_ingress =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   let open Primitives in
@@ -103,12 +101,15 @@ let simple_nat_ingress =
       assign meta.meta.is_ext_if @@ var is_ext
     ]
   in
-  let if_info = instr_table ("if_info", [
-      meta.meta.if_index, Exact
-    ], [
-      set_if_info; _drop;
-      nop (* Unspecified default action, assuming nop *)
-    ]) in
+  let if_info = 
+    table "if_info" 
+      [
+        meta.meta.if_index, Exact
+      ] [
+        set_if_info; _drop;
+        nop (* Unspecified default action, assuming nop *)
+      ]
+  in
   let nat_miss_int_to_ext = [], [
         (* clone3(CloneType.I2E, (bit<32>)32w250, { standard_metadata }); *)
     ]
@@ -137,23 +138,23 @@ let simple_nat_ingress =
     ]
   in
   let nat =
-    instr_table ("nat",
-                 [ meta.meta.is_ext_if, Exact;
-                   hdr.ipv4.isValid, Exact;
-                   hdr.tcp.isValid, Exact;
-                   hdr.ipv4.srcAddr, Maskable;
-                   hdr.ipv4.dstAddr, Maskable;
-                   hdr.tcp.srcPort, Maskable;
-                   hdr.tcp.dstPort, Maskable
-                 ],
-                 [_drop;
-                  nat_miss_int_to_ext;
-                  nat_miss_ext_to_int;
-                  nat_hit_int_to_ext;
-                  nat_hit_ext_to_int;
-                  nat_no_nat;
-                  nop; (*Unspeecified default action assuming nop*)
-                 ])
+    table "nat"
+      [ meta.meta.is_ext_if, Exact;
+        hdr.ipv4.isValid, Exact;
+        hdr.tcp.isValid, Exact;
+        hdr.ipv4.srcAddr, Maskable;
+        hdr.ipv4.dstAddr, Maskable;
+        hdr.tcp.srcPort, Maskable;
+        hdr.tcp.dstPort, Maskable
+      ]
+      [ _drop;
+        nat_miss_int_to_ext;
+        nat_miss_ext_to_int;
+        nat_hit_int_to_ext;
+        nat_hit_ext_to_int;
+        nat_no_nat;
+        nop; (*Unspeecified default action assuming nop*)
+      ]
   in
   let set_nhop =
     let nhop_ipv4 = Var.make "nhop_ipv4" 32 in
@@ -165,24 +166,29 @@ let simple_nat_ingress =
       assign hdr.ipv4.ttl @@ bsub (var hdr.ipv4.ttl) (bvi 1 8);
     ]
   in
-  let ipv4_lpm = instr_table ("ipv4_lpm", [
-    meta.meta.ipv4_da, MaskableDegen
-    ], [
+  let ipv4_lpm = 
+    table "ipv4_lpm" 
+    [
+      meta.meta.ipv4_da, MaskableDegen
+    ] [
       set_nhop; _drop;
       nop (*Unspecified default action, assuming nop*)
-    ]) in
+    ]
+  in
   let set_dmac =
     let dmac = Var.make "dmac" 48 in
     [dmac], Action.[
         assign hdr.ethernet.dstAddr @@ var dmac
     ]
   in
-  let forward = instr_table ("forward", [
-    meta.meta.nhop_ipv4, Exact
-    ], [
+  let forward = 
+    table "forward" [
+      meta.meta.nhop_ipv4, Exact
+    ] [
       set_dmac; _drop;
       nop (*Unspecified default action, assuming nop*)
-    ]) in
+    ]
+  in
   sequence [
     if_info;
     nat;
@@ -196,7 +202,6 @@ let simple_nat_ingress =
 
 
 let simple_nat_egress =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   let open Primitives in
@@ -217,13 +222,12 @@ let simple_nat_egress =
     ]
   in
   let send_frame =
-    instr_table("send_frame",
-                [standard_metadata.egress_port, Exact],
-                [
-                  do_rewrites; _drop;
-                  nop (*Unspecified default action, assuming nop*)
-                ]
-               )
+    table "send_frame"
+      [standard_metadata.egress_port, Exact]
+      [
+        do_rewrites; _drop;
+        nop (*Unspecified default action, assuming nop*)
+      ]
   in
   let do_cpu_encap = [], Action.[
       assign hdr.cpu_header.isValid btrue;
@@ -234,10 +238,10 @@ let simple_nat_egress =
     ]
   in
   let send_to_cpu =
-    instr_table("send_to_cpu", [], [
+    table "send_to_cpu" [] [
       do_cpu_encap;
       nop (*Unspecified default action, assuming nop*)
-    ])
+    ]
   in
   ifte_seq (eq_ (var standard_metadata.instance_type) (bvi 0 32)) [
     send_frame

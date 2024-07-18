@@ -1,6 +1,6 @@
 open Core
 open Capisce
-open DependentTypeChecker
+open ASTs.GPL
 open V1ModelUtils
 open Primitives
 
@@ -307,7 +307,6 @@ let hdr : hdr_t = {
   packet_in
 }
 let fabric_parser =
-  let open HoareNet in
   let open Expr in
   let look_eth = Var.make "look_eth" 16 in
   let look_mpls = Var.make "look_mpls" 4 in
@@ -483,7 +482,6 @@ let fabric_parser =
   start
 
 let lkp_md_init =  
-  let open HoareNet in
   let open Expr in
   let open BExpr in
   sequence [
@@ -539,7 +537,6 @@ let lkp_md_init =
   ]
 
 let slice_tc_classifier =
-  let open HoareNet in
   let open Expr in
   let open Primitives in  
   let set_slice_id_tc =
@@ -565,7 +562,7 @@ let slice_tc_classifier =
     ] 
   in
   let classifier =
-    instr_table ("classifier",  
+    table "classifier" 
       [ 
         standard_metadata.ingress_port, Exact
       ; fabric_metadata.lkp.ipv4_src, Exact
@@ -573,17 +570,15 @@ let slice_tc_classifier =
       ; fabric_metadata.lkp.ip_proto, Exact
       ; fabric_metadata.lkp.l4_sport, Exact
       ; fabric_metadata.lkp.l4_dport, Exact
-      ],
+      ]
       [set_slice_id_tc; trust_dscp;
       (* default *)
       set_slice_id_tc_default
       ]
-     )
   in
   classifier
 
 let filtering = 
-  let open HoareNet in
   let open Expr in
   let open BExpr in
   let deny = [], Action.[
@@ -607,16 +602,15 @@ let filtering =
       assign fabric_metadata.port_type @@ var port_type;
     ] in
   let ingress_port_vlan = 
-    instr_table ("ingress_port_vlan",
+    table "ingress_port_vlan"
       [
         standard_metadata.ingress_port, Exact;
         hdr.vlan_tag.isValid, Exact ;
         hdr.vlan_tag.vlan_id, Maskable;
-      ], [
+      ] [
         deny; (* default *)
         permit; permit_with_internal_vlan;
       ]
-    )
   in
   let set_forwarding_type = 
     let fwd_type = Var.make "fwd_type" 3 in
@@ -632,17 +626,17 @@ let filtering =
     ]
   in
   let fwd_classifier = 
-    instr_table ("fwd_classifier", [
-      standard_metadata.ingress_port, Exact;
-      hdr.ethernet.dstAddr, Exact;
-      hdr.eth_type.value, Exact;
-      fabric_metadata.ip_eth_type, Exact;  
-      ],[
+    table "fwd_classifier"
+      [
+        standard_metadata.ingress_port, Exact;
+        hdr.ethernet.dstAddr, Exact;
+        hdr.eth_type.value, Exact;
+        fabric_metadata.ip_eth_type, Exact;  
+      ] [
         set_forwarding_type; 
         set_forwarding_type_bridging (*default*)
       ]
-    )
-    in
+  in
   sequence [
     ifte_seq (eq_ btrue @@ var hdr.vlan_tag.isValid) [
       assign fabric_metadata.vlan_id @@ var hdr.vlan_tag.vlan_id;
@@ -657,7 +651,6 @@ let filtering =
   ]
 
 let forwarding = 
-  let open HoareNet in
   let open Expr in
   let open BExpr in
   let set_next_id_bridging = 
@@ -669,15 +662,14 @@ let forwarding =
     ] in
   let nop = [],[] in
   let bridging = 
-    instr_table ("bridging",
+    table "bridging"
       [
         fabric_metadata.vlan_id, Exact;
         hdr.ethernet.dstAddr, Exact;
-      ] , [
+      ] [
         set_next_id_bridging; 
         nop (*defaultonly*)
       ]
-    )
   in
   let pop_mpls_and_next =
     let next_id = Var.make "next_id" 32 in
@@ -688,14 +680,13 @@ let forwarding =
       (* mpls_counter.count() *)
     ] in
   let mpls = 
-    instr_table ("mpls",
+    table "mpls"
       [
         fabric_metadata.mpls_label, Exact; 
-      ], [
+      ] [
         pop_mpls_and_next; 
         nop (* nop *)
       ]
-    )
   in
   let set_next_id_routing_v4 = 
     let next_id = Var.make "next_id" 32 in
@@ -704,14 +695,13 @@ let forwarding =
     ] in
   let nop_routing_v4 = [],[] in
   let routing_v4 = 
-      instr_table ("routing_v4",
-        [
-          fabric_metadata.ipv4_dst_addr, Exact;
-        ],[
-          set_next_id_routing_v4; nop_routing_v4; 
-          nop (*defaultonly*)
-        ]
-      )
+    table "routing_v4"
+      [
+        fabric_metadata.ipv4_dst_addr, Exact;
+      ] [
+        set_next_id_routing_v4; nop_routing_v4; 
+        nop (*defaultonly*)
+      ]
   in
   ifte (eq_ (bvi 0 3) @@ var fabric_metadata.fwd_type) bridging @@
   ifte (eq_ (bvi 1 3) @@ var fabric_metadata.fwd_type) mpls @@
@@ -719,7 +709,6 @@ let forwarding =
   skip
 
 let pre_next =
-  let open HoareNet in
   let open Expr in
   let nop = [],[] in
   let set_mpls_label =
@@ -730,13 +719,12 @@ let pre_next =
     ]
   in
   let next_mpls = 
-    instr_table ("next_mpls",
+    table "next_mpls"
       [
         fabric_metadata.next_id, Exact; 
-      ], [
+      ] [
         set_mpls_label; nop
       ]
-    )
   in
   let set_vlan = 
     let vlan_id = Var.make "vlan_id" 12 in
@@ -745,21 +733,20 @@ let pre_next =
       (* next_vlan_counter.count() *)
     ] in
   let next_vlan = 
-    instr_table ( "next_vlan", 
+    table "next_vlan"
       [
         fabric_metadata.next_id, Exact; 
-      ], [
+      ] [
         set_vlan; 
         nop (* defaultonly *)
       ]
-    ) in  
+  in  
   sequence [
     next_mpls;
     next_vlan
   ]
 
 let acl fixed = 
-  let open HoareNet in
   let open Expr in
   let set_next_id_acl =
     let next_id = Var.make "next_id" 32 in
@@ -788,7 +775,7 @@ let acl fixed =
   ] in
   let nop_acl = [], [ (* acl_counter.count(); *) ] in
   let acl =
-    instr_table  ("acl",
+    table "acl"
       [ 
         standard_metadata.ingress_port, MaskableDegen;
         hdr.ethernet.dstAddr, MaskableDegen;     
@@ -807,19 +794,17 @@ let acl fixed =
         fabric_metadata.lkp.l4_sport, MaskableDegen;
         fabric_metadata.lkp.l4_dport, MaskableDegen;
         fabric_metadata.port_type, MaskableDegen;
-      ], [
+      ] [
         set_next_id_acl;
         punt_to_cpu;
         set_clone_session_id;
         drop;
         nop_acl; (*default*)
       ]
-    ) 
   in
   acl
 
 let next =
-  let open HoareNet in
   let open Expr in
   let output x = Action.(assign standard_metadata.egress_spec x) in
   let output_xconnect = 
@@ -838,15 +823,14 @@ let next =
   in
   let nop = [],[] in
   let xconnect =
-    instr_table ("xconnect",
+    table "xconnect"
       [
         standard_metadata.ingress_port, Exact;
         fabric_metadata.next_id, Exact;
-      ], [
+      ] [
         output_xconnect; set_next_id_xconnect; 
         nop; (* default*)
       ]
-    )
   in
   let output_hashed =
     let port_num = Var.make "port_num" 9 in
@@ -867,7 +851,7 @@ let next =
     ]
   in
   let hashed =
-    instr_table ("hashed",
+    table "hashed"
       [
         fabric_metadata.next_id, Exact;
         (* `Exact fabric_metadata.ipv4_src_addr; (* selector *)
@@ -875,11 +859,10 @@ let next =
         `Exact fabric_metadata.ip_proto; (* selector *)
         `Exact fabric_metadata.l4_sport; (* selector *)
         `Exact fabric_metadata.l4_dport; selector *)
-      ], [
+      ] [
         output_hashed; routing_hashed; 
         nop (*defaultonly*)
       ]
-    )
   in
   let set_mcast_group_id =
     let group_id = Var.make "group_id" 32 in
@@ -890,13 +873,13 @@ let next =
     ]
   in
   let multicast = 
-    instr_table ("multicast",
+    table "multicast"
     [
       fabric_metadata.next_id, Exact;
-    ], [
+    ] [
       set_mcast_group_id; 
       nop (* multicast *)
-    ])
+    ]
   in
   sequence [
     xconnect;
@@ -904,8 +887,7 @@ let next =
     multicast;
   ]
 
-let qos =  
-  let open HoareNet in
+let qos =
   let open Expr in
   let slice_tc = Var.make "slice_tc" 6 in
   let meter_havoc = Var.make "meter_havoc" 2 in
@@ -925,15 +907,15 @@ let qos =
       ]
   in
   let queues =
-    instr_table ("queues",
+    table "queues"
     [
       fabric_metadata.slice_id, Exact;
       fabric_metadata.tc, Exact;
       fabric_metadata.packet_color, Exact;
-    ], [
+    ] [
       set_queue; meter_drop;
       set_queue_default
-    ])
+    ]
   in
   sequence [
     assign slice_tc @@ bconcat (var fabric_metadata.slice_id) (var fabric_metadata.tc);
@@ -944,7 +926,6 @@ let qos =
   ]
 
 let pkt_io_ingress =
-  let open HoareNet in
   let open Expr in
   let open BExpr in
   sequence [
@@ -957,7 +938,6 @@ let pkt_io_ingress =
   ]
 
 let fabric_ingress fixed =
-  let open HoareNet in
   let open Expr in
   let open BExpr in
   sequence [
@@ -982,8 +962,7 @@ let fabric_ingress fixed =
     ]
   ]
 
-let pkt_io_egress =  
-  let open HoareNet in
+let pkt_io_egress =
   let open Expr in
   let open BExpr in
   sequence [
@@ -999,7 +978,6 @@ let pkt_io_egress =
   ]
 
 let egress_next =
-  let open HoareNet in
   let open Expr in
   let open BExpr in
   let push_vlan = [], Action.[
@@ -1023,22 +1001,21 @@ let egress_next =
     (* egress_vlan_counter.count() *)
   ] in
   let egress_vlan =
-    instr_table("egress_vlan", 
+    table "egress_vlan"
       [
         fabric_metadata.vlan_id, Exact;
         standard_metadata.egress_port, Exact;
-      ], [
+      ] [
         push_vlan; pop_vlan; 
         drop (*defaultonly*)
       ]
-    )
   in
   sequence [
     ifte_seq (and_
         (eq_ btrue @@ var fabric_metadata.is_multicast) 
         (var standard_metadata.ingress_port |> eq_ @@ var standard_metadata.egress_port)
       ) [
-        of_action mark_to_drop
+        assign standard_metadata.egress_spec @@ bvi 511 9;
       ] [];
     ifte_seq (var fabric_metadata.mpls_label |> eq_ @@ bvi 0 20) [
       ifte_seq (eq_ btrue @@ var hdr.mpls.isValid) 
@@ -1049,10 +1026,10 @@ let egress_next =
         [];
     ] [
       assign hdr.mpls.isValid btrue;
-      havoc hdr.mpls.label "egress_havoc_label" |> of_action;
-      havoc hdr.mpls.tc "egress_havoc_tc" |> of_action;
-      havoc hdr.mpls.bos "egress_havoc_bos" |> of_action;
-      havoc hdr.mpls.ttl "egress_havoc_ttl" |> of_action;
+      havoc hdr.mpls.label "egress_havoc_label" |> active;
+      havoc hdr.mpls.tc "egress_havoc_tc" |> active;
+      havoc hdr.mpls.bos "egress_havoc_bos" |> active;
+      havoc hdr.mpls.ttl "egress_havoc_ttl" |> active;
       assign hdr.mpls.label @@ var fabric_metadata.mpls_label;
       assign hdr.mpls.tc @@ bvi 0 3;
       assign hdr.mpls.bos @@ bvi  1 1;
@@ -1063,7 +1040,7 @@ let egress_next =
     ifte_seq (eq_ btrue @@ var hdr.mpls.isValid) [
       assign hdr.mpls.ttl @@ bsub (var hdr.mpls.ttl) (bvi 1 8);
       ifte_seq (var hdr.mpls.ttl |> eq_ @@ bvi 0 8) [
-        of_action mark_to_drop
+        active mark_to_drop
       ] []
     ] [
       ifte_seq (and_ 
@@ -1072,14 +1049,13 @@ let egress_next =
       ) [
         assign hdr.ipv4.ttl @@ bsub (var hdr.ipv4.ttl) (bvi 1 8);
         ifte_seq (var hdr.ipv4.ttl |> eq_ @@ bvi 0 8) [
-          of_action mark_to_drop
+          active mark_to_drop
         ] []
       ] []
     ]
   ]
 
 let dscp_rewriter =
-  let open HoareNet in
   let open Expr in
   let open BExpr in
   let tmp_dscp = Var.make "tmp_dscp" 6 in
@@ -1092,12 +1068,13 @@ let dscp_rewriter =
   ] in
   let nop = [], [action 2] in
   let rewriter = 
-    instr_table ("rewriter",[
+    table "rewriter"
+    [
       standard_metadata.egress_port, Exact;
-    ],[
+    ] [
      rewrite; clear; 
      nop (*defaultonly*)
-    ])
+    ]
   in
   let rewrite_or_clear =
     ifte (eq_ btrue @@ var hdr.ipv4.isValid) 
@@ -1115,7 +1092,6 @@ let dscp_rewriter =
   ]
 
 let fabric_egress =
-  let open HoareNet in
   let open Expr in
   let open BExpr in
   sequence [

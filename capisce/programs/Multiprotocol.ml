@@ -1,6 +1,6 @@
 open Core
 open Capisce
-open DependentTypeChecker
+open ASTs.GPL
 open V1ModelUtils
 
 type ingress_metadata_t = {
@@ -21,7 +21,6 @@ type my_metadata_t = {ing_metadata : ingress_metadata_t}
 let meta : my_metadata_t = {ing_metadata}
 
 let multiproto_parser =
-  let open HoareNet in
   let open Expr in
   (* start *)
   let parse_icmp =
@@ -107,7 +106,6 @@ let multiproto_parser =
   start
 
 let multiproto_ingress =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   let open Primitives in
@@ -122,14 +120,13 @@ let multiproto_ingress =
   let mpls_packet = packet_type 3 in
   let mim_packet  = packet_type 4 in
   let ethertype_match =
-    instr_table ("ethertype_match",
-                 [hdr.ethernet.etherType, Exact],
-                 [l2_packet;
-                  ipv4_packet; ipv6_packet;
-                  mpls_packet; mim_packet; 
-                  nop (* Unspecified default action, assuming  noop *)
-                 ]
-                )
+    table "ethertype_match"
+      [hdr.ethernet.etherType, Exact]
+      [ l2_packet;
+        ipv4_packet; ipv6_packet;
+        mpls_packet; mim_packet; 
+        nop (* Unspecified default action, assuming  noop *)
+      ]
   in
   let _drop = [], Action.[
       assign meta.ing_metadata.drop btrue
@@ -142,13 +139,13 @@ let multiproto_ingress =
       ]
   in
   let _match name key =
-    instr_table (name, [key, Exact], [nop; set_egress_port])
+    table name [key, Exact] [nop; set_egress_port]
   in
   let ipv4_match = _match "ipv4_match" hdr.ipv4.dstAddr in
   let ipv6_match = _match "ipv6_match" hdr.ipv6.dstAddr in
   let l2_match   = _match "l2_match"   hdr.ethernet.dstAddr in
   let _check name key =
-    instr_table (name, [key, Exact], [nop; _drop])
+    table name [key, Exact] [nop; _drop]
     (*  none of the check tables have specified default actions, assuming noop *)
     (*  no change made since they already have   noop *)
   in
@@ -166,13 +163,12 @@ let multiproto_ingress =
     ]
   in
   let set_egress =
-    instr_table ("set_egress",
-                  [meta.ing_metadata.drop, Exact],
-                  [
-                    discard; send_packet;
-                    nop; (*  unspecified default action, assuming noop *)
-                  ]
-                )
+    table "set_egress"
+      [meta.ing_metadata.drop, Exact]
+      [
+        discard; send_packet;
+        nop; (*  unspecified default action, assuming noop *)
+      ]
   in
   sequence [
     ethertype_match;
@@ -196,9 +192,7 @@ let multiproto_ingress =
     assert_ @@ eq_ btrue @@ var meta.ing_metadata.fwded; 
   ]
 
-let multiproto_egress =
-  let open HoareNet in
-  skip
+let multiproto_egress = skip
 
 let multiprotocol =
   pipeline multiproto_parser multiproto_ingress multiproto_egress

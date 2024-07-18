@@ -1,6 +1,6 @@
 open Core
 open Capisce
-open DependentTypeChecker
+open ASTs.GPL
 open V1ModelUtils
 
 type my_metadata_t = {
@@ -20,7 +20,6 @@ let meta : my_metadata_t = {
 }
 
 let arp_parser =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   (* start *)
@@ -65,7 +64,6 @@ let arp_parser =
   ]
 
 let arp_ingress =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   let open Primitives in
@@ -88,11 +86,11 @@ let arp_ingress =
     ]
   in
   let ipv4_lpm =
-    instr_table ("ipv4_lpm", [
+    table "ipv4_lpm" [
       meta.dst_ipv4, MaskableDegen
-      ], [
-        set_dst_info; drop (*default*)
-        ])
+    ] [
+      set_dst_info; drop (*default*)
+    ]
   in
   let forward_ipv4 = [], Action.[
       (* assert_ (eq_ btrue (var hdr.ethernet.isValid)); *)
@@ -135,17 +133,17 @@ let arp_ingress =
     ]
   in
   let forward =
-    instr_table ("forward",
-                 [hdr.arp.isValid, Exact;
-                  hdr.arp.oper, MaskableDegen;
-                  hdr.arp_ipv4.isValid, Exact;
-                  hdr.ipv4.isValid, Exact;
-                  hdr.icmp.isValid, Exact;
-                  hdr.icmp.type_, Maskable
-                  ],[
-                  forward_ipv4; send_arp_reply; send_icmp_reply;
-                  drop (* default *)
-                ])
+    table "forward"
+      [hdr.arp.isValid, Exact;
+      hdr.arp.oper, MaskableDegen;
+      hdr.arp_ipv4.isValid, Exact;
+      hdr.ipv4.isValid, Exact;
+      hdr.icmp.isValid, Exact;
+      hdr.icmp.type_, Maskable
+      ]
+      [ forward_ipv4; send_arp_reply; send_icmp_reply;
+        drop (* default *)
+      ]
   in
   sequence [
     assign meta.my_mac @@ bvi 000102030405 48;
@@ -159,9 +157,6 @@ let arp_ingress =
   ]
 
 let arp_egress =
-  let open HoareNet in
-  (* let open BExpr in *)
-  (* let open Expr in *)
   skip
 
 

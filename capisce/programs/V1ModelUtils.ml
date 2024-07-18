@@ -1,6 +1,6 @@
 open Core
 open Capisce
-open DependentTypeChecker
+open ASTs.GPL
 
 
 let access obj field width =
@@ -293,7 +293,6 @@ let standard_metadata = {
 }
 
 let ifte guard tru fls =
-  let open HoareNet in
   let open BExpr in
   choice_seqs [
     [assume guard; tru];
@@ -301,7 +300,6 @@ let ifte guard tru fls =
   ]
 
 let ifte_seq guard true_seqs false_seqs =
-  let open HoareNet in
   let open BExpr in
   choice_seqs [
     assume guard::true_seqs;
@@ -312,19 +310,18 @@ let ifte_seq guard true_seqs false_seqs =
   let bfalse = Expr.bvi 0 1
 
 let exited = Var.make "exit" 1
-let exit_ = HoareNet.assign exited btrue
-let unexit = HoareNet.assign exited bfalse
+let exit_ = assign exited btrue
+let unexit = assign exited bfalse
 let check_exit k = 
-  HoareNet.sequence [
-    ifte (BExpr.eq_ btrue @@ Expr.var exited) HoareNet.skip k;
+  sequence [
+    ifte (BExpr.eq_ btrue @@ Expr.var exited) skip k;
     unexit;
   ]
 
 let transition_accept =
-  let open HoareNet in
   assign zombie.parse_result btrue
 
-let select discriminee cases default : HoareNet.t =
+let select discriminee cases default : t =
   List.fold_right cases ~init:default
     ~f:(fun (value, state) cont ->
         ifte (BExpr.eq_ value discriminee) state cont
@@ -378,22 +375,18 @@ let hash_ result algo base inputs max havoc_name =
   ]
 
 let pipeline prsr ingr egr =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
-  let pipe =
-    sequence [
-      assign zombie.parse_result bfalse;
-      prsr;
-      ifte_seq (eq_ (var zombie.parse_result) (bvi 1 1)) [
-        ingr;
-        ifte_seq (eq_ (var standard_metadata.egress_spec) (bvi 511 9)) [] [
-          assign standard_metadata.egress_port (var standard_metadata.egress_spec);
-          egr
-        ]
-      ] [
-        assign standard_metadata.egress_spec @@ bvi 511 9;
+  sequence [
+    assign zombie.parse_result bfalse;
+    prsr;
+    ifte_seq (eq_ (var zombie.parse_result) (bvi 1 1)) [
+      ingr;
+      ifte_seq (eq_ (var standard_metadata.egress_spec) (bvi 511 9)) [] [
+        assign standard_metadata.egress_port (var standard_metadata.egress_spec);
+        egr
       ]
+    ] [
+      assign standard_metadata.egress_spec @@ bvi 511 9;
     ]
-  in
-  triple true_ pipe true_
+  ]

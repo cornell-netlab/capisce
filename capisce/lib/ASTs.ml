@@ -166,6 +166,61 @@ module GCL = struct
     Log.irs "After constant propagation: %s\n%!" @@ lazy (to_string gcl');
     let _ , gcl'' = dead_code_elim_inner Var.Set.empty gcl' in
     gcl''
+
+    let from_vars (xs : Var.t list) : Active.t list =
+      let open BExpr in 
+      let open Expr in 
+      List.bind xs ~f:(fun x ->
+          match Var.header x with
+          | Some (hdr, _) ->
+            [Active.assert_ @@ eq_ (bvi 1 1) @@ var @@ Var.isValid hdr ]
+          | None -> []
+        )
+    let rec assert_valids cmd =
+      match cmd with
+      | Seq cs ->
+        List.map cs ~f:assert_valids |> sequence
+      | Choice cxs ->
+        List.map cxs ~f:assert_valids |> choices
+      | Prim p ->
+        let asserts =
+          from_vars @@ Active.reads p
+          |> sequence_map ~f:prim
+        in
+        seq asserts cmd
+
+    let track_assigns x (cmd : t) : t =
+      let did_assign = Var.make (Printf.sprintf "%s$set" (Var.str x)) 1 in 
+      let track_assigns_active = 
+        let open Active in function
+        | Passive p -> 
+          [passive p]
+        | Assign (y,e) ->
+          if Var.equal y x then 
+            [ 
+              assign y e;
+              assign did_assign @@ Expr.bvi 1 1;
+            ]
+          else 
+            [assign y e]
+      in
+      let rec loop cmd = 
+        match cmd with 
+        | Seq cs ->
+          sequence_map cs ~f:loop
+        | Choice cxs ->
+          choices_map cxs ~f:loop
+        | Prim a ->
+          track_assigns_active a.data
+          |> sequence_map ~f:prim
+      in
+      let open BExpr in 
+      let open Expr in 
+      sequence [
+        assign did_assign @@ Expr.bvi 0 1;
+        loop cmd;
+        assert_ @@ eq_ (var did_assign) @@ bvi 1 1;
+      ]
   end
 
   module CP = Transform.ConstProp (struct
@@ -305,6 +360,7 @@ end
   module Pack = struct
     include Cmd.Make (Pipeline)
     let assign x e = prim (Active (Active.assign x e))
+    let active a = prim (Active a)
     
     let raw_table name keys actions =
       prim (Table {name; keys; actions})
@@ -377,102 +433,6 @@ end
         | Table {name;keys;actions} ->
           GCL.table (name, keys, actions)
         | Active a -> GCL.prim a
-
-    module type CanAssert = sig
-      type t
-      val assert_ : BExpr.t -> t
-    end
-
-    module Asserter(Prim : CanAssert) = struct
-      open BExpr
-      open Expr
-      let from_vars (xs : Var.t list) : Prim.t list =
-        List.bind xs ~f:(fun x ->
-            match Var.header x with
-            | Some (hdr, _) ->
-              [Prim.assert_ @@ eq_ (bvi 1 1) @@ var @@ Var.isValid hdr ]
-            | None -> []
-          )
-    end
-
-    let assert_valids_action (data, act_cmds) : (Var.t list * Action.t list) =
-      let module AAsserter = Asserter(Action) in
-      let asserts a = Action.reads a
-                      |> List.filter ~f:(fun x -> not (List.exists data ~f:(Var.equal x)))
-                      |> AAsserter.from_vars in
-      (data, List.bind act_cmds ~f:(fun a -> asserts a @ [a]))
-
-    let rec assert_valids (cmd:t) : t =
-      let module PAsserter = Asserter(Pipeline) in
-      match cmd with
-      | Seq cs ->
-        List.map cs ~f:assert_valids |> sequence
-      | Choice cxs ->
-        List.map cxs ~f:assert_valids |> choices
-      | Prim p ->
-        match p with
-        | Table table ->
-          let key_asserts =
-            table.keys
-            |> List.map ~f:fst
-            |> PAsserter.from_vars
-            |> List.map ~f:prim
-            |> sequence
-          in
-          let actions = List.map ~f:assert_valids_action table.actions in
-          seq key_asserts (prim (Table {table with actions}))
-        | Active a ->
-          let asserts =
-            PAsserter.from_vars @@ Active.reads a
-            |> List.map ~f:prim
-            |> sequence
-          in
-          seq asserts cmd
-
-    let track_assigns x (cmd : t) : t =
-      let did_assign = Var.make (Printf.sprintf "%s$set" (Var.str x)) 1 in 
-      let track_assigns_active = 
-        let open Active in function
-        | Passive p -> 
-          [passive p]
-        | Assign (y,e) ->
-          if Var.equal y x then 
-            [ 
-              assign y e;
-              assign did_assign @@ Expr.bvi 1 1;
-            ]
-          else 
-            [assign y e]
-      in
-      let rec loop cmd = 
-        match cmd with 
-        | Seq cs ->
-          sequence_map cs ~f:loop
-        | Choice cxs ->
-          choices_map cxs ~f:loop
-        | Prim p -> 
-          match p with 
-          | Table {name;keys; actions} -> 
-            let actions = 
-              List.map actions ~f:(fun (keys,actions) -> 
-                keys, 
-                List.bind actions ~f:(fun act_prim -> 
-                  track_assigns_active act_prim.data
-                )
-              )
-            in
-            prim (Table {name; keys; actions})
-          | Active a -> 
-            track_assigns_active a.data
-            |> sequence_map ~f:(fun x -> prim (Active x))
-      in
-      let open BExpr in 
-      let open Expr in 
-      sequence [
-        assign did_assign @@ Expr.bvi 0 1;
-        loop cmd;
-        assert_ @@ eq_ (var did_assign) @@ bvi 1 1;
-      ]
 
     let wp cmd phi =
       let cmd = encode_tables cmd in
