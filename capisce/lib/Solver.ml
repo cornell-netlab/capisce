@@ -3,7 +3,7 @@ open Core
 module Info = P4Info
 
 let z3_path = ref "../solvers/z3.4.8.13"
-let princess_path = ref "../solvers/princess"
+let princess_path = ref "../solvers/princess/princess"
 
 let princess_exe () = Printf.sprintf "%s -inputFormat=smtlib +mostGeneralConstraint +incremental +stdin " (!princess_path)
 
