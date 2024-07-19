@@ -19,15 +19,13 @@ let example (name : string) (program : ASTs.GPL.t) : Command.t =
       Log.smt "Running princess via %s" @@ lazy (Solver.princess_exe ());
       Printf.printf "%s\n" name;
       let open ASTs in
-      let instrument p = 
+      let instrument gcl = 
         assert (not (hv && df));
-        let p = if hv then GCL.assert_valids p else p in 
-        let p = if df then GCL.track_assigns Programs.V1ModelUtils.standard_metadata.egress_spec p else p in 
-        p
+        let gcl = if hv then GCL.assert_valids gcl else gcl in 
+        let gcl = if df then GCL.track_assigns Programs.V1ModelUtils.standard_metadata.egress_spec gcl else gcl in 
+        gcl
       in
-      let algorithm p = 
-        Qe.cegqe p
-      in
+      let algorithm = Qe.cegqe in
       let paths p =
         ASTs.GPL.count_paths p
         |> Bigint.to_string
@@ -36,6 +34,7 @@ let example (name : string) (program : ASTs.GPL.t) : Command.t =
       let phi = 
         try 
           program |> 
+          (if not hv then GPL.exactify else Fn.id ) |>
           GPL.encode_tables |> 
           instrument |>
           algorithm

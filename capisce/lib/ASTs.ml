@@ -394,6 +394,17 @@ end
     let table name (keys : (Var.t * Table.kind) list) actions =
       prim (Table {name; keys; actions})
 
+    let rec exactify (gpl : t) : t =
+      match gpl with 
+      | Prim (Active a) -> active a
+      | Prim (Table t) -> 
+        let exactify_key (key, _) = (key, Table.Exact) in 
+        let keys = List.map t.keys ~f:exactify_key in 
+        let t = {t with keys} in
+        prim (Table t)
+      | Seq cs -> sequence_map cs ~f:exactify
+      | Choice cxs -> choices_map cxs ~f:exactify
+
     let rec of_gcl (gcl : GCL.t) : t =
       match gcl with
       | GCL.Prim p -> prim (Active p)

@@ -61,14 +61,14 @@ module GCL : sig
   (** [assert_valids c] instruments [c] with assertions
     that ensure that anytime a variable with the prefix "hdr." 
     is read, its validity bit is set to 1 *)
-    val assert_valids : t -> t 
+  val assert_valids : t -> t 
 
   (** [track_assigns x c] instruments [c] with a ghost variable [g] that 
     is set to 1 whenever [x] is on the LHS of an assignment.
     Additionally, sets [g] to [0] at the start of the instrumented code, 
     and asserts that it must not be [0] at the end. Something like:
     [x := 0; c; assert x != 0] *)
-    val track_assigns : Var.t -> t -> t
+  val track_assigns : Var.t -> t -> t
   
   (**/**)
   val prim : Active.t -> t
@@ -256,6 +256,10 @@ module GPL : sig
 
   (** [count_paths c] returns the number of paths through the program [c]*)
   val count_paths : t -> Bigint.t
+
+  (** [exactify c] collapses all match kinds to [Exact]. Useful when your
+      analysis is match-kind independent, such as determined forwarding *)
+  val exactify : t -> t
    
   (**/**)
 
