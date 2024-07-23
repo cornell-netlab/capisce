@@ -224,10 +224,10 @@ module Parser = struct
       | [] -> 
         inline_next_state default
       | queries -> 
-        List.fold cases 
+        List.fold_right cases 
         ~init:(inline_next_state default)
-        ~f:(fun else_ (tests, next_state) -> 
-          let cond = BExpr.ands_ @@ List.map2_exn queries tests ~f:(BExpr.eq_) in
+        ~f:(fun (tests, next_state) else_ -> 
+          let cond = BExpr.ands_ @@ List.map2_exn tests queries ~f:(BExpr.eq_) in
           let then_ = inline_next_state next_state in 
           GCL.ite cond then_ else_
         )
@@ -335,9 +335,9 @@ let emit_p4_control control_name (gpl : GPL.t) : string =
     | Prim (Active ({data=Assign (x,e);alt=_})) when Header.is x && Header.is_valid x -> 
       let hdr = String.chop_suffix_exn (Var.str x) ~suffix:".isValid" in
       if Expr.is_one e then 
-        Printf.sprintf "%s%s.setValid()" (indent offset) hdr
+        Printf.sprintf "%s%s.setValid();" (indent offset) hdr
       else if Expr.is_zero e then 
-        Printf.sprintf "%s%s.setInvalid()" (indent offset) hdr
+        Printf.sprintf "%s%s.setInvalid();" (indent offset) hdr
       else 
         failwith "Don't know what to do when assigning a header to a funky value"
     | Prim (Active ({data=Assign (x,e);alt=_})) ->

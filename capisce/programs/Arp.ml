@@ -24,9 +24,12 @@ let arp_parser =
   let open Expr in
   (* start *)
   sequence [
+    assign zombie.parse_result bfalse;
     assign hdr.ethernet.isValid bfalse;
     assign hdr.ipv4.isValid bfalse;
-    assign hdr.tcp.isValid bfalse;
+    assign hdr.icmp.isValid bfalse;
+    assign hdr.arp.isValid bfalse;
+    assign hdr.arp_ipv4.isValid bfalse;
     (*parse ethenet*)
     assign hdr.ethernet.isValid btrue;
     (* assert_ @@ eq_ btrue @@ var hdr.ethernet.isValid; *)
@@ -57,6 +60,7 @@ let arp_parser =
             assign hdr.arp_ipv4.isValid btrue;
             (* assert_ @@ eq_ btrue @@ var hdr.arp_ipv4.isValid; *)
             assign meta.dst_ipv4 @@ var hdr.arp_ipv4.tpa;
+            transition_accept
           ] [transition_accept]
         ]
         [transition_accept]
@@ -84,7 +88,7 @@ let arp_psm =
           List.map ~f:Expr.var
           [hdr.arp.htype; hdr.arp.ptype; hdr.arp.hlen; hdr.arp.plen];
         cases = [
-          [bvi 1 16; bvi 2048 16; bvi 6 16; bvi 4 16], "parse_arp_ipv4"
+          [bvi 1 16; bvi 2048 16; bvi 6 8; bvi 4 8], "parse_arp_ipv4"
         ];
         default = "accept"
 
@@ -99,7 +103,7 @@ let arp_psm =
     };
     { name = "parse_ipv4" ;
       body = sequence [
-        assign hdr.ethernet.isValid btrue;
+        assign hdr.ipv4.isValid btrue;
         assign meta.dst_ipv4 @@ var hdr.ipv4.dstAddr
       ];
       transition = 
@@ -201,10 +205,7 @@ let arp_ingress =
     ]
   ]
 
-let arp_egress =
-  sequence [
-    assign hdr.ethernet.isValid bfalse;
-  ]
+let arp_egress = skip
 
 
 let arp =

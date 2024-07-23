@@ -378,6 +378,8 @@ let pipeline prsr ingr egr : t * t * t =
   (prsr, ingr, egr)
 
 let pipeline_psm psm ingr egr =
+  EmitP4.Parser.emit_p4 "start" psm
+  |> Printf.printf "%s\n%!";
   ( EmitP4.Parser.to_gcl 2 psm |> ASTs.GPL.of_gcl,
     ingr,
     egr)

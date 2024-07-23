@@ -185,7 +185,7 @@ let op_emit_p4 op args =
 
 let comp_emit_p4 comp arg1 arg2 = 
   let symbol = match comp with
-    | Eq -> "="
+    | Eq -> "=="
     | Ult | Slt -> "<"
     | Ule | Sle -> "<="
     | Uge | Sge -> ">="
