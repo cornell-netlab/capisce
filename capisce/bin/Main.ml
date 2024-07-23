@@ -120,7 +120,7 @@ let serialize (name : string) (prsr, ingr, egr) : Command.t =
     let p4 = flag "-p4" no_arg ~doc:"set output format to p4"
     in fun () ->
     let serialized = if p4 then
-      EmitP4.emit String.Map.empty ingr egr
+      EmitP4.emit Programs.Arp.arp_psm ingr egr
     else 
       ASTs.GPL.to_string (Programs.V1ModelUtils.linearize (prsr, ingr, egr))
     in

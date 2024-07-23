@@ -84,8 +84,7 @@ type t =
 let rec to_smtlib = function
   | BV (n,w) ->
     Printf.sprintf "(_ bv%s %d)" (Bigint.to_string n) w
-  | Var v ->
-    Var.str v
+  | Var x -> Var.str x
   | BinOp (op, e1, e2) ->
     Printf.sprintf "(%s %s %s)"
       (bop_to_smtlib op)
@@ -96,7 +95,12 @@ let rec to_smtlib = function
 
 let rec emit_p4 = function
   | BV (n,w) -> Printf.sprintf "%dw%s" w (Bigint.to_string n)
-  | Var v -> Var.str v
+  | Var x ->     
+    let x = Var.str x in 
+    if String.is_prefix x ~prefix:"hdr." && String.is_suffix x ~suffix:"isValid" then
+      x ^ "()"
+    else 
+      x
   | BinOp (op, e1, e2) -> 
     (bop_emit_p4 op)
       (emit_p4 e1)

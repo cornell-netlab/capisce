@@ -63,6 +63,56 @@ let arp_parser =
       ]
   ]
 
+let arp_psm =
+  let open EmitP4 in 
+  let open Parser in 
+  let open ASTs.GCL in
+  let open Expr in 
+  of_state_list
+  [ {name = "start";
+     body = assign hdr.ethernet.isValid btrue;
+     transition = 
+      select (hdr.ethernet.etherType) [
+        bvi 2048 16, "parse_ipv4";
+        bvi 2054 16, "parse_arp";
+      ] "accept";
+    };
+    { name = "parse_arp";
+      body = assign hdr.arp.isValid btrue;
+      transition = {
+        discriminee = 
+          List.map ~f:Expr.var
+          [hdr.arp.htype; hdr.arp.ptype; hdr.arp.hlen; hdr.arp.plen];
+        cases = [
+          [bvi 1 16; bvi 2048 16; bvi 6 16; bvi 4 16], "parse_arp_ipv4"
+        ];
+        default = "accept"
+
+      }
+    };
+    { name = "parse_arp_ipv4";
+      body = sequence [
+        assign hdr.arp_ipv4.isValid btrue;
+        assign meta.dst_ipv4 @@ var hdr.arp_ipv4.tpa;
+      ];
+      transition = default "accept"
+    };
+    { name = "parse_ipv4" ;
+      body = sequence [
+        assign hdr.ethernet.isValid btrue;
+        assign meta.dst_ipv4 @@ var hdr.ipv4.dstAddr
+      ];
+      transition = 
+        select (hdr.ipv4.protocol) [
+          bvi 1 8, "parse_icmp"
+        ] "accept"; 
+    };
+    { name = "parse_icmp";
+      body = assign hdr.icmp.isValid btrue;
+      transition = default "accept"
+    }
+  ]
+
 let arp_ingress =
   let open BExpr in
   let open Expr in
@@ -93,11 +143,8 @@ let arp_ingress =
     ]
   in
   let forward_ipv4 = [], Action.[
-      (* assert_ (eq_ btrue (var hdr.ethernet.isValid)); *)
       assign hdr.ethernet.dstAddr @@ var meta.mac_da;
-      (* assert_ (eq_ btrue (var hdr.ethernet.isValid)); *)
       assign hdr.ethernet.srcAddr @@ var meta.mac_sa;
-      (* assert_ (eq_ btrue (var hdr.ipv4.isValid)); *)
       assign hdr.ipv4.ttl @@ bsub (var hdr.ipv4.ttl) (bvi 1 8);
       assign standard_metadata.egress_spec @@ var meta.egress_port;
     ] in
@@ -148,8 +195,6 @@ let arp_ingress =
   sequence [
     assign meta.my_mac @@ bvi 000102030405 48;
     ifte_seq (eq_ btrue @@ var zombie.exited) [
-      (** FIX--ADDED*)
-      assign standard_metadata.egress_spec @@ bvi 511 9
     ] [
       ipv4_lpm;
       forward
@@ -157,8 +202,10 @@ let arp_ingress =
   ]
 
 let arp_egress =
-  skip
+  sequence [
+    assign hdr.ethernet.isValid bfalse;
+  ]
 
 
 let arp =
-  pipeline arp_parser arp_ingress arp_egress
+  pipeline_psm arp_psm arp_ingress arp_egress
