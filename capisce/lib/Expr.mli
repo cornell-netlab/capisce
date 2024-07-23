@@ -42,6 +42,7 @@ val neq_contra : (t * t) -> (t * t) -> bool
 val subst : Var.t -> t -> t -> t
 val vars : t -> Var.t list * Var.t list
 val to_smtlib : t -> string
+val emit_p4 : t -> string
 val coerce_types : TypeContext.t -> t -> t  
 
 val normalize_names : t -> t  

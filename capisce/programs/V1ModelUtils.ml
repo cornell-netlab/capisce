@@ -374,11 +374,15 @@ let hash_ result algo base inputs max havoc_name =
     havoc result hash_name
   ]
 
-let pipeline prsr ingr egr =
+let pipeline prsr ingr egr : t * t * t =
+  (prsr, ingr, egr)
+
+let linearize (prsr, ingr, egr) =
   let open BExpr in
   let open Expr in
   sequence [
     assign zombie.parse_result bfalse;
+    (* EmitP4.Parser.to_gcl 2 prsr |> ASTs.GPL.of_gcl; *)
     prsr;
     ifte_seq (eq_ (var zombie.parse_result) (bvi 1 1)) [
       ingr;

@@ -26,6 +26,29 @@ let bop_to_smtlib = function
   | BAshr -> "bvashr"
   | BLshr -> "bvlshr"
 
+let bop_emit_p4 bop arg1 arg2 =
+  let open Printf in 
+  match bop with 
+  | BAnd -> 
+    sprintf "(%s & %s)" arg1 arg2
+  | BOr ->
+    sprintf "(%s | %s)" arg1 arg2
+  | BXor -> 
+    sprintf "(%s ^ %s)" arg1 arg2
+  | BAdd -> 
+    sprintf "(%s + %s)" arg1 arg2
+  | BMul -> 
+    sprintf "(%s * %s)" arg1 arg2
+  | BSub -> 
+    sprintf "(%s - %s)" arg1 arg2
+  | BConcat -> 
+    sprintf "(%s ++ %s)" arg1 arg2
+  | BShl -> 
+    sprintf "(%s << %s)" arg1 arg2
+  | BAshr | BLshr -> 
+    sprintf "(%s >> %s)" arg1 arg2
+
+
 type uop =
   | UNot
   | UNeg
@@ -42,6 +65,15 @@ let uop_to_smtlib = function
     (* Intentionally swap the order here*)
     Printf.sprintf "(_ extract %d %d)" hi lo    
 
+let uop_emit_p4 uop arg =
+  match uop with
+  | UNot -> 
+    "~" ^ arg
+  | UNeg -> 
+    "-" ^ arg
+  | USlice (lo, hi) -> 
+    Printf.sprintf "%s[%d:%d]" arg hi lo
+    
 type t =
   | BV of Bigint.t * int
   | Var of Var.t
@@ -61,6 +93,18 @@ let rec to_smtlib = function
       (to_smtlib e2)
   | UnOp (op,e) ->
     Printf.sprintf "(%s %s)" (uop_to_smtlib op) (to_smtlib e)
+
+let rec emit_p4 = function
+  | BV (n,w) -> Printf.sprintf "%dw%s" w (Bigint.to_string n)
+  | Var v -> Var.str v
+  | BinOp (op, e1, e2) -> 
+    (bop_emit_p4 op)
+      (emit_p4 e1)
+      (emit_p4 e2)
+  | UnOp (op, e) -> 
+      (uop_emit_p4 op)
+      (emit_p4 e)
+
 
 let bv n w = BV (Bigint.(n % pow (succ one) (of_int w)), w)
 let bvi n w = bv (Bigint.of_int n) w

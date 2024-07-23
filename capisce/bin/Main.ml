@@ -2,7 +2,8 @@ open Core
 open Capisce
 module Qe = Qe
 
-let example (name : string) (program : ASTs.GPL.t) : Command.t =
+let example (name : string) (example) : Command.t =
+  let program = Programs.V1ModelUtils.linearize example in
   let open Command.Let_syntax in
   Command.basic ~summary:("runs example " ^ name)
   [%map_open
@@ -31,21 +32,24 @@ let example (name : string) (program : ASTs.GPL.t) : Command.t =
         |> Bigint.to_string
       in
       let st = Clock.start () in
+      let instrumented_and_specified_program =
+        program |> 
+        (if not hv then GPL.exactify else Fn.id ) |>
+        GPL.encode_tables |> 
+        instrument
+      in
       let phi = 
         try 
-          program |> 
-          (if not hv then GPL.exactify else Fn.id ) |>
-          GPL.encode_tables |> 
-          instrument |>
-          algorithm
+        instrumented_and_specified_program
+        |> algorithm
         with
         | Failure msg -> 
           if String.(msg = "unsolveable") then
             BExpr.false_
           else failwith msg
       in
-      let num_cexs = !Qe.num_cexs |> Bigint.to_string in
       let time = Clock.stop st  |> Float.to_string in
+      let num_cexs = !Qe.num_cexs |> Bigint.to_string in
       let filename f = Printf.sprintf "%s/%s_%s_%s" out name "cegps" f in
       Out_channel.write_all (filename "formula") ~data:(BExpr.to_smtlib phi);
       Out_channel.write_all (filename "size") ~data:(Int.to_string @@ BExpr.size phi);
@@ -53,7 +57,7 @@ let example (name : string) (program : ASTs.GPL.t) : Command.t =
       Out_channel.write_all (filename "count_paths") ~data:(num_cexs);
       Out_channel.write_all (filename "time") ~data:time;
       if replay then
-        let time_series = Qe.replay (!Qe.data) (program |> GPL.encode_tables |> instrument) in 
+        let time_series = Qe.replay (!Qe.data) instrumented_and_specified_program in 
         let time_series_str = List.map time_series ~f:(fun (t,n) -> Printf.sprintf "%f, %d\n" t n) |> String.concat ~sep:"" in 
         Out_channel.write_all (filename "completion") ~data:(time_series_str)
   ]
@@ -70,7 +74,7 @@ let smtlib : Command.t =
          Printf.printf "%s\n%!" (BExpr.to_smtlib b);
     ]
 
-let examples =
+let command_for_each_example ~f =
   let open Programs in 
   let programs = [
     "ecmp", ECMP.ecmp;
@@ -101,12 +105,40 @@ let examples =
   Command.group ~summary:"Example programs" @@
   let open List.Let_syntax in 
   let%map name, program = programs in 
-  name, example name program
+  f name program
+
+let run_examples = 
+  command_for_each_example
+  ~f:(fun name program -> 
+    name, example name program
+  )
+
+let serialize (name : string) (prsr, ingr, egr) : Command.t =
+  let open Command.Let_syntax in
+  Command.basic ~summary:("serializes example " ^ name ^ " to the specified format")
+  [%map_open
+    let p4 = flag "-p4" no_arg ~doc:"set output format to p4"
+    in fun () ->
+    let serialized = if p4 then
+      EmitP4.emit String.Map.empty ingr egr
+    else 
+      ASTs.GPL.to_string (Programs.V1ModelUtils.linearize (prsr, ingr, egr))
+    in
+    serialized |> 
+    Printf.printf "%s\n%!";
+  ]
+
+let serialize_examples =
+  command_for_each_example
+  ~f:(fun name pipeline -> 
+      name, serialize name pipeline
+    )
 
 let main =
   Command.group ~summary:"research toy for exploring verification & synthesis of p4 programs"
     [("smtlib", smtlib);
-     ("exp", examples)
+     ("exp", run_examples);
+     ("emit", serialize_examples)     
     ]
 
 let () = Command_unix.run main    
