@@ -57,6 +57,34 @@ let hh_parser =
   in
   start
 
+  let hh_psm =
+    let open EmitP4.Parser in 
+    let open ASTs.GCL in 
+    let open Expr in
+    of_state_list
+    [
+      { name = "start";
+        body = skip;
+        transition = default "parse_ethernet"
+      };
+      { name = "parse_ethernet";
+        body = assign hdr.ethernet.isValid btrue;
+        transition = select hdr.ethernet.etherType [
+          bvi 2048 16, "parse_ipv4";
+        ] "accept" 
+      };
+      { name = "parse_ipv4";
+        body = assign hdr.ipv4.isValid btrue;
+        transition = select hdr.ipv4.protocol [
+          bvi 6 8, "parse_tcp"
+        ] "accept"
+      };
+      { name = "parse_tcp";
+        body = assign hdr.tcp.isValid btrue;
+        transition = default "accept"
+      }  
+    ]
+
 let hh_ingress =
   (* let open BExpr in *)
   let open Expr in
@@ -147,4 +175,4 @@ let hh_egress =
   ]
 
 let heavy_hitter_1 =
-  pipeline hh_parser hh_ingress hh_egress
+  hh_psm, hh_ingress, hh_egress

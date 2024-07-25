@@ -18,8 +18,11 @@ module Header = struct
         match String.lsplit2 x_rst ~on:'.' with 
         | None -> 
           failwithf "Dont know how to get header of %s" (Var.str x) ()
-        | Some (_, field) when String.(field = "isValid") ->
-          hdrs
+        | Some (hdr_name, field) when String.(field = "isValid") ->
+          String.Map.update hdrs hdr_name ~f:(function 
+          | None -> {name = hdr_name; fields = []}
+          | Some hdr -> hdr
+          )
         | Some (hdr_name, field) -> 
           String.Map.update hdrs hdr_name ~f:(function
           | None -> {name= hdr_name; fields = [
@@ -77,21 +80,35 @@ module Metadata = struct
     )
 
   let rec get_metadata name xs : t =
-    List.fold xs ~init:(empty name) ~f:(fun metadata x -> 
-      match String.chop_prefix (Var.str x) ~prefix:(name ^ ".") with 
-      | None -> metadata 
-      | Some field -> 
-        if String.contains field '.' then 
-          let (submeta, _) = String.lsplit2_exn field ~on:'.' in 
-          get_metadata (name ^ "." ^ submeta) xs
-        else if has_field metadata field then
-          metadata
-        else 
-          { metadata with 
-            fields = 
-            (field, Var.size x)::metadata.fields
-          }
-    )
+    let raw_meta = 
+      List.fold xs ~init:(empty name) ~f:(fun metadata x -> 
+        match String.chop_prefix (Var.str x) ~prefix:(name ^ ".") with 
+        | None -> metadata 
+        | Some field -> 
+          Printf.printf "name: %s; field: %s\n%!" name field;
+          if String.contains field '.' then 
+            let (submeta, _) = String.lsplit2_exn field ~on:'.' in 
+            let subfields = List.filter_map xs ~f:(fun x -> 
+              if String.is_prefix (Var.str x) ~prefix:(name ^ "." ^ submeta ^ ".") then
+                Some (Var.rename x (Var.str x |> String.chop_prefix_exn ~prefix:(name ^ ".")))
+              else
+                None
+              )
+            in
+            { metadata with 
+              meta = (submeta, get_metadata submeta subfields)::metadata.meta
+            }
+          else if has_field metadata field then
+            metadata
+          else 
+            { metadata with 
+              fields = 
+              (field, Var.size x)::metadata.fields
+            }
+      )
+    in 
+    {raw_meta with meta = List.dedup_and_sort raw_meta.meta ~compare:(fun (x,_) (y,_) -> String.compare x y)}
+    
 
   let emit_metadata metadata = 
     let rec loop typename m = 
@@ -143,13 +160,33 @@ module Parser = struct
     }
 
   let default default =
+    (* [deprecated], use [direct] instead*)
     { discriminee = []; cases = []; default}
+
+  let direct default = 
+    {discriminee = []; cases = []; default}
 
   type state = {
     name : state_name;
     body : GCL.t;
     transition : transition
   }
+  
+  let state name ?(pre = GCL.skip) hdr_validity_bit ?(post = GCL.skip) transition =
+    { name;
+      body = GCL.sequence [
+        pre;
+        GCL.assign hdr_validity_bit Expr.(bvi 1 1);
+        post
+      ];
+      transition;
+    }
+
+  let noop_state name next_state =
+    { name;
+      body = GCL.skip;
+      transition = direct next_state;
+    }
 
   type t = state String.Map.t
 
@@ -202,7 +239,8 @@ module Parser = struct
     |> GCL.sequence
 
   let to_gcl unroll (parser : t) : GCL.t =
-    let parse_result = Var.make "parse_result" 1 in 
+    let parse_result = Var.make "parse_result" 1 in
+    let exited = Var.make "exited" 1 in
     let accept = Expr.bvi 1 1 in 
     let reject = Expr.bvi 0 1 in 
     let rec inline (unroll_map : int String.Map.t) (st : state)=
@@ -217,8 +255,13 @@ module Parser = struct
           GCL.assign parse_result accept
         else if String.(st = "reject") then 
           GCL.assign parse_result reject
-        else
-          inline unroll_map (String.Map.find_exn parser st)
+        else 
+          match String.Map.find unroll_map st with 
+          | Some i when i <= 0 -> 
+            GCL.assign parse_result reject
+          | None | Some _ -> 
+            String.Map.find_exn parser st
+            |> inline unroll_map
       in
       match discriminee with 
       | [] -> 
@@ -232,11 +275,13 @@ module Parser = struct
           GCL.ite cond then_ else_
         )
     in
-    GCL.sequence [
+    GCL.(sequence [
+      assign parse_result Expr.(bvi 0 1);
+      assign exited Expr.(bvi 0 1);
       invalidate_headers parser;
       String.Map.find_exn parser "start"
       |> inline String.Map.empty 
-    ]
+    ])
   let emit_parser_state {name; body; transition} : string = 
     let rec emit_parser_body gcl =
       let open GCL in 
@@ -250,7 +295,9 @@ module Parser = struct
           | None -> 
             Printf.sprintf "    %s = %s;" (Var.str x) (Expr.emit_p4 e)
           end 
-        | Passive _ -> 
+        | Passive (Assume b) | Passive (Assert b) when BExpr.(true_ = b) -> 
+          ""
+        | Passive _ ->
           failwith "unexpected parser passive"
         end
       | Seq cs -> 
@@ -290,7 +337,7 @@ module Parser = struct
 parser %s(
   packet_in packet,
   out my_headers_t hdr,
-  out my_metadata_t meta,
+  inout my_metadata_t meta,
   inout standard_metadata_t standard_metadata)
 {
 %s
@@ -338,8 +385,15 @@ let emit_p4_control control_name (gpl : GPL.t) : string =
         Printf.sprintf "%s%s.setValid();" (indent offset) hdr
       else if Expr.is_zero e then 
         Printf.sprintf "%s%s.setInvalid();" (indent offset) hdr
+      else if Expr.is_var e then 
+        let y = Expr.get_var e in 
+        if Header.is y && Header.is_valid y then 
+          let hdr' = String.chop_suffix_exn (Var.str y) ~suffix:".isValid" in 
+          Printf.sprintf "%s%s = %s;" (indent offset) hdr hdr'
+        else 
+          failwithf "trying to assign variable %s to isValid" (Var.str y) ()
       else 
-        failwith "Don't know what to do when assigning a header to a funky value"
+        failwithf "trying to assign expression %s to isValid()" (Expr.to_smtlib e) ()
     | Prim (Active ({data=Assign (x,e);alt=_})) ->
       Printf.sprintf "%s%s = %s;" (indent offset) 
         (Var.str x)

@@ -1,3 +1,4 @@
+open Core
 open Capisce
 open ASTs.GPL
 open V1ModelUtils
@@ -45,6 +46,30 @@ let npa_parser =
       [ transition_accept ]
   ]
 
+let npa_psm =
+  let open EmitP4.Parser in
+  let open Expr in 
+  of_state_list [
+    noop_state "start" "parse_ethernet"
+    ;
+    state "parse_ethernet" hdr.ethernet.isValid @@
+    select hdr.ethernet.etherType [
+      bvi 2048 16, "parse_ipv4";
+    ] "accept"
+    ;
+    state "parse_ipv4" hdr.ipv4.isValid @@
+    select hdr.ipv4.protocol [
+      bvi 17 8, "parse_udp";
+    ] "accept"
+    ;
+    state "parse_udp" hdr.udp.isValid @@
+    select hdr.udp.dstPort [
+      bvi 34952 16, "parse_paxos"
+    ] "accept"
+    ;
+    state "parse_paxos" hdr.paxos.isValid @@
+    direct "accept"
+  ]
 let npa_ingress =
   let open Expr in
   let open BExpr in
@@ -138,4 +163,4 @@ in
 let npa_egress = skip
 
 let netpaxos_acceptor =
-  pipeline npa_parser npa_ingress npa_egress
+  npa_psm, npa_ingress, npa_egress

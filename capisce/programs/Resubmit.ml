@@ -27,6 +27,14 @@ let resubmit_parser =
     transition_accept;
   ]
 
+let resubmit_psm =
+  let open EmitP4.Parser in 
+  of_state_list [
+    noop_state "start" "parse_ethernet";
+    state "parse_ethernet" hdr.ethernet.isValid @@
+    direct "accept"
+  ]
+
 let resubmit_ingress =
   let open Expr in
   let _nop = [],[] in
@@ -56,4 +64,4 @@ let resubmit_ingress =
 let resubmit_egress = skip
 
 let resubmit =
-  pipeline resubmit_parser resubmit_ingress resubmit_egress
+  resubmit_psm, resubmit_ingress, resubmit_egress

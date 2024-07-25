@@ -577,6 +577,64 @@ let linearroad_parser =
     ]
   in
   start
+let linearroad_psm =
+  let open EmitP4.Parser in 
+  let open Expr in 
+  of_state_list [
+    noop_state "start" "parse_ethernet"
+    ;
+    state "parse_ethernet" hdr.ethernet.isValid @@
+    select hdr.ethernet.etherType [
+      bvi 2048 16, "parse_ipv4"
+    ] "accept" 
+    ;
+    state "parse_ipv4" hdr.ipv4.isValid @@
+    select hdr.ipv4.protocol [
+      bvi 17 8, "parse_udp"
+    ] "accept"
+    ; 
+    state "parse_udp" hdr.udp.isValid @@
+    select hdr.udp.dstPort [
+      bvi 4660 16, "parse_lr"
+    ] "accept"
+    ;
+    state "parse_lr" hdr.lr_msg_type.isValid @@
+    select hdr.lr_msg_type.msg_type [
+      bvi  0 8, "parse_pos_report";
+      bvi  2 8, "parse_accnt_bal_req";
+      bvi 10 8, "parse_toll_notification";
+      bvi 11 8, "parse_accident_alert";
+      bvi 12 8, "parse_accnt_bal";
+      bvi  3 8, "parse_expenditure_req";
+      bvi 13 8, "parse_expenditure_report";
+      bvi  4 8, "parse_travel_estimate_req";
+      bvi 14 8, "parse_travel_estimate";
+    ] "accept"
+    ;
+    state "parse_pos_report" hdr.pos_report.isValid @@
+    direct "accept"
+    ;
+    state "parse_accnt_bal_req" hdr.accnt_bal_req.isValid @@
+    direct "accept"
+    ;
+    state "parse_toll_notification" hdr.toll_notification.isValid @@
+    direct "accept"
+    ;
+    state "parse_accident_alert" hdr.accident_alert.isValid @@
+    direct "accept"
+    ;
+    state "parse_expenditure_req" hdr.expenditure_req.isValid @@
+    direct "accept"
+    ;
+    state "parse_expenditure_report" hdr.expenditure_report.isValid @@
+    direct "accept"
+    ;
+    state "parse_travel_estimate_req" hdr.travel_estimate_req.isValid @@
+    direct "accept"
+    ;
+    state "parse_travel_estimate" hdr.travel_estimate.isValid @@
+    direct "accept"
+  ]
 
 let linearroad_ingress annot =
   let open BExpr in
@@ -1149,5 +1207,5 @@ let linearroad_egress =
   ][]
 
 let linearroad annotated =
-  pipeline linearroad_parser (linearroad_ingress annotated) linearroad_egress
+  linearroad_psm, linearroad_ingress annotated, linearroad_egress
 

@@ -49,6 +49,29 @@ let ecmp_parser : t =
     ];
   ]
 
+let ecmp_psm =
+  let open EmitP4.Parser in 
+  let open ASTs.GCL in 
+  let open Expr in 
+  of_state_list [
+    { name = "start";
+      body = assign hdr.ethernet.isValid btrue;
+      transition = select (hdr.ethernet.etherType) [
+        (bvi 2048 16), "parse_ipv4";      
+      ] "accept"
+    };
+    { name = "parse_ipv4";
+      body = assign hdr.ipv4.isValid btrue;
+      transition = select (hdr.ipv4.protocol) [
+        (bvi 6 8), "parse_tcp";
+      ] "accept"
+    };
+    { name = "parse_tcp";
+      body = assign hdr.tcp.isValid btrue;
+      transition = default "accept"
+    }
+  ]
+
 let ecmp_ingress : t =
   let open BExpr in
   let open Expr in
@@ -136,4 +159,4 @@ let ecmp_egress =
   ]
 
 let ecmp =
-  pipeline ecmp_parser ecmp_ingress ecmp_egress
+  (ecmp_psm, ecmp_ingress, ecmp_egress)

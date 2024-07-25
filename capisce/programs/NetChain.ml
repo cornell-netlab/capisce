@@ -181,6 +181,59 @@ let netchain_parser =
     start
   ]
 
+let netchain_psm =
+  let open EmitP4.Parser in 
+  let open Expr in 
+  let parse_overlay_name i = Printf.sprintf "parse_overlay_%d" i in 
+  let parse_overlay (i : Int.t) : state =
+    let post =
+      let open ASTs.GCL in 
+      if Int.(i >= 7) then
+        assign (overlay 7).swip @@ bvi 0 32
+      else 
+        skip
+    in
+    let transition = 
+      if Int.(i >= 7) then 
+        direct "accept"
+      else
+        select (overlay i).swip [
+          bvi 0 32, "parse_nc_header"
+        ] (parse_overlay_name Int.(i + 1))
+    in
+    state (parse_overlay_name i) 
+      (overlay i).isValid 
+      ~post 
+      transition
+  in
+  of_state_list @@ [
+    noop_state "start" "parse_ethernet"
+    ;
+    state "parse_ethernet" hdr.ethernet.isValid @@
+    select hdr.ethernet.etherType [
+      bvi 2048 16, "parse_ipv4";
+    ] "accept"
+    ;
+    state "parse_ipv4" hdr.ipv4.isValid @@
+    select hdr.ipv4.protocol [
+      bvi  6 8, "parse_tcp";
+      bvi 17 8, "parse_udp"
+    ] "accept"
+    ;
+    state "parse_tcp" hdr.tcp.isValid @@
+    direct "accept"
+    ;
+    state "parse_udp" hdr.udp.isValid @@
+    select hdr.udp.dstPort [
+      bvi 8888 16, parse_overlay_name 0;
+      bvi 8889 16, parse_overlay_name 0
+    ] "accept"
+    ;
+    state "parse_nc_header" hdr.nc_hdr.isValid @@
+    direct "accept"
+    ;
+  ] @ List.init 8 ~f:parse_overlay
+
 let netchain_ingress =
   let open Expr in
   let open BExpr in
@@ -395,4 +448,4 @@ let netchain_egress =
   ethernet_set_mac
 
 let netchain =
-  pipeline netchain_parser netchain_ingress netchain_egress
+  netchain_psm, netchain_ingress, netchain_egress

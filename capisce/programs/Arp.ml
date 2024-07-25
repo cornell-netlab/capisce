@@ -209,4 +209,4 @@ let arp_egress = skip
 
 
 let arp =
-  pipeline_psm arp_psm arp_ingress arp_egress
+  arp_psm, arp_ingress, arp_egress

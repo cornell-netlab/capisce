@@ -306,11 +306,21 @@ let hdr : hdr_t = {
   packet_out;
   packet_in
 }
+
+
+let look_eth = Var.make "look_eth" 16
+let look_mpls = Var.make "look_mpls" 4
+
+let look_vlan = Var.make "look_vlan" 16
+let last_ipv4_dscp = Var.make "last_ipv4_dscp" 6
+
+let gtpu_version = Var.make "gtpu_version" 3
+let gtpu_msgtype = Var.make "gtpu_msgtype" 8
+let gtpu_ext_len = Var.make "gtpu_ext_len" 8
+
+let look_packet_out = Var.make "look_packet_out" 1
 let fabric_parser =
   let open Expr in
-  let look_eth = Var.make "look_eth" 16 in
-  let look_mpls = Var.make "look_mpls" 4 in
-  let last_ipv4_dscp = Var.make "last_ipv4_dscp" 6 in
   let parse_tcp = sequence [
     assign hdr.tcp.isValid btrue;
     assign fabric_metadata.l4_sport @@ var hdr.tcp.srcPort;
@@ -338,7 +348,6 @@ let fabric_parser =
       bvi 1 8, parse_inner_icmp;
     ] transition_accept
   ] in
-  let gtpu_ext_len = Var.make "gtpu_ext_len" 8 in
   let parse_gtpu_ext_psc = sequence [
     assign hdr.gtpu_ext_psc.isValid btrue;
     assign hdr.gtpu_ext_psc.len @@ var gtpu_ext_len;
@@ -352,8 +361,6 @@ let fabric_parser =
       bconcat (bvi 133 8) (bvi 1 8), parse_gtpu_ext_psc
     ] transition_accept
   ] in
-  let gtpu_version = Var.make "gtpu_version" 3 in
-  let gtpu_msgtype = Var.make "gtpu_msgtype" 8 in
   let parse_gtpu = sequence [
     assign hdr.gtpu.isValid btrue;
     assign hdr.gtpu.version @@ var gtpu_version;
@@ -397,7 +404,6 @@ let fabric_parser =
     ] transition_accept
   ] 
   in
-  let look_vlan = Var.make "look_vlan" 16 in
   let parse_inner_vlan_tag_1 = sequence [
     assign hdr.inner_vlan_tag.isValid btrue;
     assign hdr.inner_vlan_tag.eth_type @@ var look_vlan;
@@ -456,7 +462,6 @@ let fabric_parser =
       bvi 33024 16, parse_vlan_tag;
     ] parse_eth_type
   ] in
-  let look_packet_out = Var.make "look_packet_out" 1 in
   let parse_packet_out_and_accept = sequence [
     assign hdr.packet_out.isValid btrue;
     assign hdr.packet_out.do_forwarding @@ var look_packet_out; 
@@ -480,6 +485,180 @@ let fabric_parser =
     ] parse_ethernet
   ] in
   start
+
+let fabric_psm =
+  let open EmitP4.Parser in 
+  let open ASTs.GCL in 
+  let open Expr in 
+  of_state_list [
+    { name = "start";
+      body = sequence [
+        assign fabric_metadata.is_controller_packet_out bfalse;
+        assign hdr.packet_out.isValid bfalse;
+        assign last_ipv4_dscp @@ bvi 0 6;
+      ] ;
+      transition = select standard_metadata.ingress_port [
+        bvi 510 9, "check_packet_out";
+      ] "parse_ethernet"
+    }
+    ;
+    { name = "check_packet_out";
+      body = skip;
+      transition = select look_packet_out [
+        bvi 0 1, "parse_packet_out_and_accept";
+      ] "strip_packet_out"
+    }
+    ;
+    state "parse_packet_out_and_accept" hdr.packet_out.isValid @@
+    direct "accept"
+    ;
+    noop_state "strip_packet_out" "accept"
+    ;
+    state "parse_ethernet"
+      ~pre:(assign fabric_metadata.vlan_id @@ bvi 4094 12)
+      hdr.ethernet.isValid @@
+      select (look_eth) [
+        bvi 34984 16, "parse_vlan_tag";
+        bvi 37120 16, "parse_vlan_tag";
+        bvi 33024 16, "parse_vlan_tag";
+      ] "parse_eth_type"
+    ;
+    state "parse_vlan_tag" 
+      hdr.vlan_tag.isValid
+      ~post:(assign hdr.vlan_tag.eth_type @@ var look_eth) @@
+      select look_vlan [
+        bvi 33024 16, "parse_inner_vlan_tag"
+      ] "parse_eth_type"
+    ;
+    state "parse_inner_vlan_tag" 
+      hdr.inner_vlan_tag.isValid
+      ~post:(assign hdr.inner_vlan_tag.eth_type @@ var look_vlan) @@
+      direct "parse_eth_type"
+    ;
+    state "parse_eth_type"
+      hdr.eth_type.isValid @@
+      select (hdr.eth_type.value) [
+        bvi 34887 16, "parse_mpls";
+        bvi  2048 16, "parse_ipv4";
+      ] "accept"
+    ;
+    state "parse_mpls" 
+      hdr.mpls.isValid
+      ~post:(sequence [
+        assign fabric_metadata.mpls_label @@ var hdr.mpls.label;
+        assign fabric_metadata.mpls_ttl @@ var hdr.mpls.ttl
+      ]) @@
+      select (look_mpls) [
+        bvi 4 4, "parse_ipv4";
+      ] "parse_ethernet_1"
+    ;
+    state "parse_ipv4" 
+      hdr.ipv4.isValid
+      ~post:(sequence[
+        assign fabric_metadata.ip_proto @@ var hdr.ipv4.protocol;
+        assign fabric_metadata.ip_eth_type @@ bvi 2048 16;
+        assign fabric_metadata.ipv4_src_addr @@ var hdr.ipv4.srcAddr;
+        assign fabric_metadata.ipv4_dst_addr @@ var hdr.ipv4.dstAddr;
+        assign last_ipv4_dscp @@ var hdr.ipv4.dscp;
+      ]) @@ 
+      select hdr.ipv4.protocol [
+        bvi 6 8, "parse_tcp";
+        bvi 17 8, "parse_udp";
+        bvi 1 8, "parse_icmp";
+      ] "accept"
+    ;
+    state "parse_tcp" 
+      hdr.tcp.isValid
+      ~post:(sequence [
+        assign fabric_metadata.l4_sport @@ var hdr.tcp.srcPort;
+        assign fabric_metadata.l4_dport @@ var hdr.tcp.dstPort;
+      ]) @@
+      direct "accept"
+    ;
+    state "parse_udp"
+      hdr.udp.isValid
+      ~post:(sequence [
+        assign fabric_metadata.l4_sport @@ var hdr.udp.srcPort;
+        assign fabric_metadata.l4_dport @@ var hdr.udp.dstPort;
+      ]) @@
+      { discriminee = [
+          var hdr.udp.dstPort; var gtpu_version; var gtpu_msgtype
+        ];
+        cases = [
+          [bvi 2152 16; bvi 1 3; bvi 255 8], "parse_gtpu"
+        ];
+        default = "accept";
+      }
+    ;
+    state "parse_icmp" hdr.icmp.isValid @@
+    direct "accept"
+    ;
+    state "parse_ethernet_1"
+      ~pre:(assign fabric_metadata.vlan_id @@ bvi 4094 12)
+      hdr.ethernet.isValid @@
+      select (look_eth) [
+        bvi 34984 16, "parse_vlan_tag_1";
+        bvi 37120 16, "parse_vlan_tag_1";
+        bvi 33024 16, "parse_vlan_tag_1";
+      ] "parse_eth_type_1"
+    ;
+    state "parse_vlan_tag_1" 
+      hdr.vlan_tag.isValid
+      ~post:(assign hdr.vlan_tag.eth_type @@ var look_eth) @@
+      select look_vlan [
+        bvi 33024 16, "parse_inner_vlan_tag_1"
+      ] "parse_eth_type_1"
+    ;
+    state "parse_inner_vlan_tag_1" 
+      hdr.inner_vlan_tag.isValid
+      ~post:(assign hdr.inner_vlan_tag.eth_type @@ var look_vlan) @@
+      direct "parse_eth_type_1"
+    ;
+    state "parse_eth_type_1"
+      hdr.eth_type.isValid @@
+      select (hdr.eth_type.value) [
+        bvi 34887 16, "reject";
+        bvi  2048 16, "parse_ipv4";
+      ] "accept"
+    ;
+    state "parse_gtpu" hdr.gtpu.isValid @@
+    { discriminee = 
+      [var hdr.gtpu.ex_flag; var hdr.gtpu.seq_flag; var hdr.gtpu.npdu_flag];
+      cases = [ [bvi 0 1; bvi 0 1; bvi 0 1], "parse_inner_ipv4" ];
+      default = "parse_gtpu_options";
+    }
+    ;
+    state "parse_gtpu_options" hdr.gtpu_options.isValid @@
+    { discriminee = [var hdr.gtpu_options.next_ext; var gtpu_ext_len];
+      cases = [
+        [bvi 133 8; bvi 1 8 ], "parse_gtpu_ext_psc"
+      ];
+      default = "accept";
+    }
+    ;
+    state "parse_gtpu_ext_psc" hdr.gtpu_ext_psc.isValid @@
+    select hdr.gtpu_ext_psc.next_ext [
+      bvi 0 8,  "parse_inner_ipv4"
+    ] "accept"
+    ;
+    state "parse_inner_ipv4" 
+      hdr.inner_ipv4.isValid 
+      ~post:(assign last_ipv4_dscp @@ var hdr.inner_ipv4.dscp) @@
+      select hdr.inner_ipv4.protocol [
+        bvi 6 8, "parse_inner_tcp";
+        bvi 17 8, "parse_inner_udp";
+        bvi 1 8, "parse_inner_icmp";
+      ] "accept"
+    ;
+    state "parse_inner_udp" hdr.inner_udp.isValid @@
+    direct "accept"
+    ;
+    state "parse_inner_tcp" hdr.inner_tcp.isValid @@
+    direct "accept"
+    ;
+    state "parse_inner_icmp" hdr.inner_icmp.isValid @@
+    direct "accept"
+  ]
 
 let lkp_md_init =  
   let open Expr in
@@ -1104,4 +1283,4 @@ let fabric_egress =
   ]
 
 let fabric fixed =
-  pipeline fabric_parser (fabric_ingress fixed) fabric_egress
+  (fabric_psm, fabric_ingress fixed, fabric_egress)

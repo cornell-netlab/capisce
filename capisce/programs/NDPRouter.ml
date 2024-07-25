@@ -43,7 +43,7 @@ let ndp_parser =
       (*parse_ipv4*)
       assign hdr.ipv4.isValid btrue;
       (* assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid; *)
-      ifte_seq (eq_ (var hdr.ipv4.protocol) (bvi 409 8)) [
+      ifte_seq (eq_ (var hdr.ipv4.protocol) (bvi 199 8)) [
         assign hdr.ndp.isValid btrue;
         transition_accept
       ] [transition_accept]
@@ -51,6 +51,25 @@ let ndp_parser =
     ] [transition_accept]
   ]
 
+let ndp_router_psm =
+  let open EmitP4.Parser in
+  let open Expr in 
+  of_state_list [
+    noop_state "state" "parse_ethernet"
+    ;
+    state "parse_ethernet" hdr.ethernet.isValid @@
+    select hdr.ethernet.etherType [
+      bvi 2048 16, "parse_ipv4";
+    ] "accept"
+    ;
+    state "parse_ipv4" hdr.ipv4.isValid @@
+    select hdr.ipv4.protocol [
+      bvi 199 8, "parse_ndp";
+    ] "accept"
+    ;
+    state "parse_ndp" hdr.ndp.isValid @@
+    direct "accept"
+  ]
 let ndp_ingress =
   let open BExpr in
   let open Expr in
@@ -219,5 +238,5 @@ let ndp_egress =
   ]
 
 let ndp_router =
-  pipeline ndp_parser ndp_ingress ndp_egress
+  ndp_router_psm, ndp_ingress, ndp_egress
 

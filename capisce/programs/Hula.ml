@@ -83,7 +83,6 @@ let hula_parser =
           parse_ipv4
           (parse_srcRouting Int.(i + 1))
       ]
-
   in
   let parse_hula =
     sequence [
@@ -94,7 +93,6 @@ let hula_parser =
   let parse_ethernet =
     sequence [
       assign hdr.ethernet.isValid btrue;
-      (* assert_ @@ eq_ btrue @@ var hdr.ethernet.isValid; *)
       select (var hdr.ethernet.etherType)[
         bvi 2048 16, parse_ipv4;
         bvi 9029 16, parse_hula;
@@ -120,6 +118,45 @@ let hula_parser =
     ]
   in
   start
+
+let hula_psm =
+  let open EmitP4.Parser in 
+  let open ASTs.GCL in 
+  let open Expr in
+  let parse_srcRouting = Printf.sprintf "parse_srcRouting__%d" in 
+  let srcRouting i : state =
+    let transition = 
+      if Int.(i >= 7) then
+        direct "parse_ipv4"
+      else
+        select (srcRoute i).bos [
+          btrue, "parse_ipv4"
+        ] (parse_srcRouting Int.(i + 1))
+    in 
+    let post = 
+      assign (srcRoute 7).bos btrue;
+    in
+    state (parse_srcRouting i) (srcRoute i).isValid ~post transition
+  in
+  of_state_list @@ [
+    noop_state "start" "parse_ethernet";
+    state "parse_ethernet" hdr.ethernet.isValid @@
+    select hdr.ethernet.etherType [
+      bvi 2048 16, "parse_ipv4";
+      bvi 9029 16, "parse_hula";
+    ] "accept"
+    ;
+    state "parse_ipv4" hdr.ipv4.isValid @@ 
+    select hdr.ipv4.protocol [
+      bvi 17 8, "parse_udp"
+    ] "accept" 
+    ;
+    state "parse_udp" hdr.udp.isValid @@
+    direct "accept"
+    ;
+    state "parse_hula" hula.isValid @@
+    direct (parse_srcRouting 0)
+  ] @ List.init 7 ~f:srcRouting
 
 let hula_ingress _ =
   let open BExpr in
@@ -285,4 +322,4 @@ let hula_egress =
   ]
 
 let hula fixed =
-  pipeline hula_parser (hula_ingress fixed) hula_egress
+  hula_psm, hula_ingress fixed, hula_egress

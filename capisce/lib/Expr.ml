@@ -98,7 +98,7 @@ let rec emit_p4 = function
   | Var x ->     
     let x = Var.str x in 
     if String.is_prefix x ~prefix:"hdr." && String.is_suffix x ~suffix:"isValid" then
-      x ^ "()"
+      Printf.sprintf "(%s() ? 1w1 : 1w0)" x
     else 
       x
   | BinOp (op, e1, e2) -> 

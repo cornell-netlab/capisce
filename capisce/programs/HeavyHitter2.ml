@@ -62,6 +62,26 @@ let hh2_parser =
   in
   start
 
+let hh2_psm =
+  let open EmitP4.Parser in
+  let open Expr in
+  of_state_list [
+    noop_state "start" "parse_ethernet"
+    ;
+    state "parse_ethernet" hdr.ethernet.isValid @@ 
+    select hdr.ethernet.etherType [
+      bvi 2048 16, "parse_ipv4"
+    ] "accept"
+    ;
+    state "parse_ipv4" hdr.ipv4.isValid @@
+    select hdr.ipv4.protocol [
+      bvi 6 8, "parse_tcp"
+    ] "accept"
+    ;
+    state "parse_tcp" hdr.tcp.isValid @@
+    direct "accept"
+  ]
+
 let hh2_ingress fixed =
   let open BExpr in
   let open Expr in
@@ -183,4 +203,4 @@ let hh2_egress =
   send_frame
 
 let heavy_hitter_2 fixed =
-  pipeline hh2_parser (hh2_ingress fixed) hh2_egress
+  hh2_psm, hh2_ingress fixed, hh2_egress

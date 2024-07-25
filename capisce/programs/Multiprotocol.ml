@@ -105,6 +105,52 @@ let multiproto_parser =
   in
   start
 
+let multiproto_psm =
+  let open EmitP4.Parser in
+  let open ASTs.GCL in 
+  let open Expr in 
+  of_state_list
+  [ state "start" hdr.ethernet.isValid 
+    ~pre:(assign meta.ing_metadata.fwded bfalse) @@
+    select hdr.ethernet.etherType [
+      bvi 33024 16, "parse_vlan_tag";
+      bvi 37120 16, "parse_vlan_tag";
+      bvi  2048 16, "parse_ipv4";
+      bvi 34525 16, "parse_ipv6";
+    ] "accept"
+    ; 
+    state "parse_vlan_tag" hdr.vlan_tag.isValid @@
+    select hdr.vlan_tag.etherType [
+      bvi  2048 16, "parse_ipv4";
+      bvi 34525 16, "parse_ipv6";
+    ] "accept"
+    ;
+    state "parse_ipv4" hdr.ipv4.isValid @@
+    { discriminee = [var hdr.ipv4.ihl; var hdr.ipv4.protocol];
+      cases = [
+        [bvi 5 4; bvi  1 8], "parse_icmp";
+        [bvi 5 4; bvi  6 8], "parse_tcp";
+        [bvi 5 4; bvi 17 8], "parse_udp";
+      ];
+      default = "accept"
+    };
+    state "parse_ipv6" hdr.ipv6.isValid @@
+    select hdr.ipv6.nextHdr [
+      bvi  1 8, "parse_icmp";
+      bvi  6 8, "parse_tcp";
+      bvi 17 8, "parse_udp";
+    ] "accept"
+    ;
+    state "parse_icmp" hdr.icmp.isValid @@
+    direct "accept"
+    ;
+    state "parse_tcp" hdr.tcp.isValid @@
+    direct "accept"
+    ;
+    state "parse_udp" hdr.udp.isValid @@
+    direct "accept"
+  ]
+
 let multiproto_ingress =
   let open BExpr in
   let open Expr in
@@ -195,4 +241,4 @@ let multiproto_ingress =
 let multiproto_egress = skip
 
 let multiprotocol =
-  pipeline multiproto_parser multiproto_ingress multiproto_egress
+  multiproto_psm, multiproto_ingress, multiproto_egress

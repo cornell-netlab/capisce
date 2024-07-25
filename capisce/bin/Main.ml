@@ -2,7 +2,7 @@ open Core
 open Capisce
 module Qe = Qe
 
-let example (name : string) (example) : Command.t =
+let example (name : string) (prsr, ingr, egr) : Command.t =
   let open Command.Let_syntax in
   Command.basic ~summary:("runs example " ^ name)
   [%map_open
@@ -13,7 +13,7 @@ let example (name : string) (example) : Command.t =
     and hv = flag "-hv" (no_arg) ~doc:"instrument example program to check the header validity property"
     and df = flag "-df" (no_arg) ~doc:"instrument example program to check the determined forwarding property"
     in fun () ->
-      let program = Programs.V1ModelUtils.linearize example in
+      let program = Programs.V1ModelUtils.(linearize @@ pipeline_psm prsr ingr egr) in
       Solver.z3_path := Option.value z3 ~default:(!Solver.z3_path);
       Log.smt "Running z3 via %s" @@ lazy (Solver.z3_exe ());
       Solver.princess_path := Option.value princess ~default:(!Solver.princess_path);
@@ -38,7 +38,6 @@ let example (name : string) (example) : Command.t =
         GPL.encode_tables |> 
         instrument
       in
-      Printf.printf "Program to analyze:%s\n%!" (GCL.to_string instrumented_and_specified_program);
       let phi = 
         try 
         instrumented_and_specified_program
@@ -121,9 +120,12 @@ let serialize (name : string) (prsr, ingr, egr) : Command.t =
     let p4 = flag "-p4" no_arg ~doc:"set output format to p4"
     in fun () ->
     let serialized = if p4 then
-      EmitP4.emit Programs.Arp.arp_psm ingr egr
+      EmitP4.emit prsr ingr egr
     else 
-      ASTs.GPL.to_string (Programs.V1ModelUtils.linearize (prsr, ingr, egr))
+      let open Programs.V1ModelUtils in 
+      pipeline_psm prsr ingr egr |>
+      linearize |>
+      ASTs.GPL.to_string
     in
     serialized |> 
     Printf.printf "%s\n%!";

@@ -85,6 +85,31 @@ let simple_nat_parser =
   in
   start
 
+let simple_nat_psm = 
+  let open EmitP4.Parser in 
+  let open Expr in 
+  of_state_list [
+    noop_state "start" "parse_ethernet"
+    ;
+    state "parse_ethernet" hdr.ethernet.isValid @@ 
+    select hdr.ethernet.etherType [
+      bvi 2048 16, "parse_ipv4";
+    ] "accept"
+    ;
+    state "parse_ipv4" hdr.ipv4.isValid
+      ~post:ASTs.GCL.(sequence [
+        assign meta.meta.ipv4_sa @@ var hdr.ipv4.srcAddr;
+        assign meta.meta.ipv4_da @@ var hdr.ipv4.dstAddr;
+        assign meta.meta.tcpLength @@ bsub (var hdr.ipv4.totalLen) (bvi 20 16);
+      ]) 
+    @@ select hdr.ipv4.protocol [
+      bvi 2048 16, "parse_ipv4"
+    ] "accept"
+    ;
+    state "parse_tcp" hdr.tcp.isValid @@
+    direct "accept"
+  ]
+
 let simple_nat_ingress =
   let open BExpr in
   let open Expr in
@@ -250,4 +275,4 @@ let simple_nat_egress =
   ]
 
 let simple_nat =
-  pipeline simple_nat_parser simple_nat_ingress simple_nat_egress
+  simple_nat_psm, simple_nat_ingress, simple_nat_egress
