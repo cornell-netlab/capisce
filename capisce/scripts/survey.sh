@@ -1,40 +1,41 @@
 #! /usr/bin/bash
 
-data_dir="./survey_data_oopsla"
-log_dir="./log_oopsla"
+data_dir="${1}"
+log_dir="${2}"
+flag="${3}"
 
 # rm -r $data_dir
-mkdir $data_dir
+mkdir -p $data_dir
 # rm -r $log_dir
-mkdir $log_dir
+mkdir -p $log_dir
 
 function run {
     start=$(date +%s%N | cut -b1-13)
-    ./capisce exp -name $1 -out $data_dir 2>&1 > "${log_dir}/${1}"
+    ./capisce exp $1 -${flag} -out $data_dir 2>&1 > "${log_dir}/${1}"
     finish=$(date +%s%N | cut -b1-13)
     echo $1
 }
 
-run ecmp;
-run netpaxos_acceptor;
-run resubmit;
-run ndp_router;
-run heavy_hitter_1;
-run arp;
+run "ecmp";
+run "netpaxos-acceptor";
+run "resubmit";
+run "ndp-router";
+run "heavy-hitter-1";
+run "arp";
 run "07-multiprotocol";
-run mc_nat;
-run mc_nat_fixed;
-run ts_switching;
-run ts_switching_fixed;
-run heavy_hitter_2;
-run heavy_hitter_2_fixed;
-run flowlet;
-run flowlet_fixed;
-run hula;
-run hula_fixed;
-run netchain;
-run simple_nat;
-run fabric;
-run fabric_fixed;
-run linearroad
-run linearroad_fixed;
+run "mc-nat";
+run "mc-nat-fixed";
+run "ts-switching";
+run "ts-switching-fixed";
+run "heavy-hitter-2";
+run "heavy-hitter-2-fixed";
+run "flowlet";
+run "flowlet-fixed";
+run "hula";
+run "hula-fixed";
+run "netchain";
+run "simple-nat";
+run "fabric";
+run "fabric-fixed";
+run "linearroad-fixed";
+run "linearroad";

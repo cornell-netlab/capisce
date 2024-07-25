@@ -55,7 +55,7 @@ let ndp_router_psm =
   let open EmitP4.Parser in
   let open Expr in 
   of_state_list [
-    noop_state "state" "parse_ethernet"
+    noop_state "start" "parse_ethernet"
     ;
     state "parse_ethernet" hdr.ethernet.isValid @@
     select hdr.ethernet.etherType [
