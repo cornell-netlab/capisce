@@ -156,7 +156,7 @@ let hula_psm =
     ;
     state "parse_hula" hula.isValid @@
     direct (parse_srcRouting 0)
-  ] @ List.init 7 ~f:srcRouting
+  ] @ List.init 8 ~f:srcRouting
 
 let hula_ingress _ =
   let open BExpr in

@@ -614,6 +614,9 @@ let linearroad_psm =
     state "parse_pos_report" hdr.pos_report.isValid @@
     direct "accept"
     ;
+    state "parse_accnt_bal" hdr.accnt_bal.isValid @@
+    direct "accept"
+    ;
     state "parse_accnt_bal_req" hdr.accnt_bal_req.isValid @@
     direct "accept"
     ;

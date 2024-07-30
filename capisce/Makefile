@@ -34,6 +34,10 @@ survey-tex:
 	echo "DETERMINED FORWARDING"
 	cat df.tex
 
+survey-emit:
+	./scripts/survey-emit.sh ./survey-p4
+	xdg-open ./survey-p4
+
 doc: 
 	dune build @doc;
 	cp -r _build/default/_doc/_html/ ./doc
