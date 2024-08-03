@@ -155,9 +155,13 @@ let multiproto_ingress =
   let open BExpr in
   let open Expr in
   let open Primitives in
+  let ethertype_action_run =
+    Var.make "ethertype_action_run" 3
+  in
   let packet_type i =
     [], Action.[
-        assign meta.ing_metadata.packet_type @@ bvi i 4
+        assign meta.ing_metadata.packet_type @@ bvi i 4;
+        assign ethertype_action_run @@ bvi i 3
       ]
   in
   let l2_packet   = packet_type 0 in
@@ -218,10 +222,10 @@ let multiproto_ingress =
   in
   sequence [
     ethertype_match;
-    select (var @@ Var.make "_symb$ethertype_match$action" 3) [
+    select (var ethertype_action_run) [
       bvi 1 3, ipv4_match;
-      bvi 3 3, ipv6_match;
       bvi 2 3, ipv6_match;
+      bvi 3 3, ipv6_match;
     ] l2_match;
     ifte_seq (eq_ btrue @@ var hdr.tcp.isValid) [
       tcp_check

@@ -52,7 +52,7 @@ module FLAGS = struct
   let tree = ref Off
 
   let error = ref On
-  let warn = ref On
+  let warn = ref Off
 end
 
 let parse verbosity flag char =

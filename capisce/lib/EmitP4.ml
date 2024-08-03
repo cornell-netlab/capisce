@@ -85,7 +85,6 @@ module Metadata = struct
         match String.chop_prefix (Var.str x) ~prefix:(name ^ ".") with 
         | None -> metadata 
         | Some field -> 
-          Printf.printf "name: %s; field: %s\n%!" name field;
           if String.contains field '.' then 
             let (submeta, _) = String.lsplit2_exn field ~on:'.' in 
             let subfields = List.filter_map xs ~f:(fun x -> 
@@ -142,6 +141,12 @@ struct %s {
 
 end
 
+let variable_definitions xs =
+  List.filter xs ~f:(fun x -> not (Header.is x || Metadata.is x || Metadata.is_standard x))
+  |> List.fold ~init:"" ~f:(fun acc x ->
+    Printf.sprintf "%s  bit<%d> %s;\n"acc (Var.size x) (Var.str x)
+  )
+  
 module Parser = struct
   (* Constructs a parser, starting at state "start", and
     ending at either "accept" or "reject" *)
@@ -240,7 +245,7 @@ module Parser = struct
 
   let to_gcl unroll (parser : t) : GCL.t =
     let parse_result = Var.make "parse_result" 1 in
-    let exited = Var.make "exited" 1 in
+    let exited = Var.make "exitt" 1 in
     let accept = Expr.bvi 1 1 in 
     let reject = Expr.bvi 0 1 in 
     let rec inline (unroll_map : int String.Map.t) (st : state)=
@@ -327,6 +332,7 @@ module Parser = struct
   }
     |} name (emit_parser_body body) (emit_transition transition)
 
+
   let emit_p4 parser_name parser =
     String.Map.fold parser ~init:"" 
       ~f:(fun ~key:_ ~data:state acc -> 
@@ -340,9 +346,12 @@ parser %s(
   inout my_metadata_t meta,
   inout standard_metadata_t standard_metadata)
 {
+  // Variable Definitions
+%s
+  // Parser state machine
 %s
 }
-|} parser_name
+|} parser_name (variable_definitions @@ vars parser)
 end
 
 
@@ -407,15 +416,6 @@ let emit_p4_control control_name (gpl : GPL.t) : string =
     | Prim (Table table) ->
       Printf.sprintf "%s%s.apply();" (indent offset) table.name;
   in 
-  let variable_definitions =
-    let local_vars = 
-      GPL.vars gpl
-      |> List.filter ~f:(fun x -> not (Header.is x || Metadata.is x || Metadata.is_standard x))
-    in
-    List.fold local_vars ~init:"" ~f:(fun acc x ->
-      Printf.sprintf "%s  bit<%d> %s;\n"acc (Var.size x) (Var.str x)
-    )
-  in
   let string_of_kind = 
     let open Primitives.Table in function 
     | Maskable -> "ternary"
@@ -434,12 +434,19 @@ let emit_p4_control control_name (gpl : GPL.t) : string =
       )
     ) |> String.concat ~sep:"\n"
   in
+  let emit_key k =
+    let name = Var.str k in 
+    if String.is_suffix name ~suffix:".isValid" then
+      name ^ "()"
+    else 
+      name
+  in 
   let table_definitions =
     let open List.Let_syntax in 
     let%map table = GPL.tables gpl in 
     let keys = 
       List.map table.keys ~f:(fun (key, kind) ->
-        Printf.sprintf "\n      %s : %s;" (Expr.(emit_p4 (var key))) (string_of_kind kind)
+        Printf.sprintf "\n      %s : %s;" (emit_key key) (string_of_kind kind)
       )
       |> String.concat
     in
@@ -480,7 +487,7 @@ control %s (
 }
   |}
   (control_name)
-  (variable_definitions)
+  (variable_definitions @@ GPL.vars gpl)
   (action_definitions)
   (String.concat table_definitions)
   (loop 2 gpl)

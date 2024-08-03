@@ -17,7 +17,7 @@ type lookup_metadata_t = {
 }
 
 let lkp :  lookup_metadata_t = 
-  let m = access "fabric_metadata.lkp" in
+  let m = access "meta.lkp" in
   {
     is_ipv4 = m "is_ipv4" 1;
     ipv4_src = m "ipv4_src" 32;
@@ -57,7 +57,7 @@ type fabric_metadata_t ={
 }
 
 let fabric_metadata : fabric_metadata_t =
-  let f = access "fabric_metadata" in
+  let f = access "meta" in
   {
     lkp;
     ip_eth_type = f "ip_eth_type" 16;
@@ -106,7 +106,7 @@ let gtpu : gtpu_t =
     spare = f "spare" 1;
     ex_flag = f "ex_flag" 1;
     seq_flag = f "seq_flag" 1;
-    npdu_flag = f "npdu_flag" (1);
+    npdu_flag = f "npdu_flag" 1;
     msgtype = f "msgtype" 8; 
     msglen = f "msglen" 16;
     teid = f "teid" 32;
@@ -1044,7 +1044,7 @@ let next =
       ]
   in
   let set_mcast_group_id =
-    let group_id = Var.make "group_id" 32 in
+    let group_id = Var.make "group_id" 16 in
     [group_id], Action.[
       assign standard_metadata.mcast_grp @@ var group_id;
       assign fabric_metadata.is_multicast @@ btrue;

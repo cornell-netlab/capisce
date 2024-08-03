@@ -34,7 +34,7 @@ survey-tex:
 	echo "DETERMINED FORWARDING"
 	cat df.tex
 
-survey-emit:
+survey-emit: all
 	./scripts/survey-emit.sh ./survey-p4
 	xdg-open ./survey-p4
 

@@ -103,7 +103,7 @@ let simple_nat_psm =
         assign meta.meta.tcpLength @@ bsub (var hdr.ipv4.totalLen) (bvi 20 16);
       ]) 
     @@ select hdr.ipv4.protocol [
-      bvi 2048 16, "parse_ipv4"
+      bvi 6 8, "parse_tcp"
     ] "accept"
     ;
     state "parse_tcp" hdr.tcp.isValid @@

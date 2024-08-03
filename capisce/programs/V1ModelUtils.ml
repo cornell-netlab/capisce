@@ -289,7 +289,7 @@ let standard_metadata = {
   ingress_port = Var.make "standard_metadata.ingress_port" 9;
   deq_qdepth = Var.make "standard_metadata.deq_qdepth" 19;
   instance_type = Var.make "standard_metadata.instance_type" 32;
-  mcast_grp = Var.make "standard_metadata.mcast_grp" 32;
+  mcast_grp = Var.make "standard_metadata.mcast_grp" 16;
 }
 
 let ifte guard tru fls =
@@ -309,7 +309,7 @@ let ifte_seq guard true_seqs false_seqs =
   let btrue = Expr.bvi 1 1
   let bfalse = Expr.bvi 0 1
 
-let exited = Var.make "exit" 1
+let exited = Var.make "exitt" 1
 let exit_ = assign exited btrue
 let unexit = assign exited bfalse
 let check_exit k = 
