@@ -664,14 +664,14 @@ let lkp_md_init =
   let open Expr in
   let open BExpr in
   sequence [
-    assign fabric_metadata.lkp.is_ipv4 @@ bfalse;
+    (* assign fabric_metadata.lkp.is_ipv4 @@ bfalse;
     assign fabric_metadata.lkp.ipv4_src @@ bvi 0 32;
     assign fabric_metadata.lkp.ipv4_dst @@ bvi 0 32;
     assign fabric_metadata.lkp.ip_proto @@ bvi 0 8;
     assign fabric_metadata.lkp.l4_sport @@ bvi 0 16;
     assign fabric_metadata.lkp.l4_dport @@ bvi 0 16;
     assign fabric_metadata.lkp.icmp_type @@ bvi 0 8;
-    assign fabric_metadata.lkp.icmp_code @@ bvi 0 8;
+    assign fabric_metadata.lkp.icmp_code @@ bvi 0 8; *)
     ifte_seq (eq_ btrue @@ var hdr.inner_ipv4.isValid) [
       assign fabric_metadata.lkp.is_ipv4 btrue;
       assign fabric_metadata.lkp.ipv4_src @@ var hdr.inner_ipv4.srcAddr;
@@ -1117,6 +1117,7 @@ let pkt_io_ingress =
   ]
 
 let fabric_ingress fixed =
+  if fixed then Log.qe_s "fixed" else Log.qe_s "unfixed";
   let open Expr in
   let open BExpr in
   sequence [

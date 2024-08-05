@@ -11,7 +11,7 @@ import math
 
 from IPython.display import set_matplotlib_formats
 
-onecolsize = (4, 1.5)   # Tweak based on figure's appearance in the paper
+onecolsize = (2, 0.5)   # Tweak based on figure's appearance in the paper
 # seaborn_colorblind = cycler('color', ['#0072B2', '#D55E00', '#009E73', '#CC79A7', '#F0E442', '#56B4E9'])
 # seaborn_muted = cycler('color', ['#4878CF', '#6ACC65', '#D65F5F', '#B47CC7', '#C4AD66', '#77BEDB'])
 markers = ['o','3','^','+','*','x']
@@ -130,13 +130,13 @@ def read_data(c, f):
   with open(f) as csvfile:
     reader = csv.reader(csvfile)
     for row in reader:
-      print(row)
+      # print(row)
       data.append(c(*row))
   return data
 
 def plot_bugcoverage(is_hv):
   bf4_data = read_data(BF4Data, bf4_file(is_hv))
-  fig = plt.figure(figsize=(1.5,1)) # Override fig size based on trial
+  fig = plt.figure() # Override fig size based on trial
   legal_data = [d for d in bf4_data if d.startbugs > 0]
   bf4_coverage = [100.0 * (d.startbugs - d.endbugs)/d.startbugs for d in legal_data]
   capisce_coverage = [0.0 if d.name == "linearroad" and is_hv else
@@ -147,28 +147,26 @@ def plot_bugcoverage(is_hv):
   width = 0.4
   bf4_xaxis = [i - (width/2.0) - 0.01 for i in xaxis]
   capisce_xaxis = [i + (width / 2.0) + 0.01 for i in xaxis]
-  print(bf4_xaxis)
-  print(bf4_coverage)
   plt.bar(bf4_xaxis, [100.0 for _ in bf4_coverage], 0.4, color = '#56B4E9', label = "bf4 Uncontrolled")
   plt.bar(capisce_xaxis, [100.0 for _ in capisce_coverage], 0.4, color = '#009E73', label="Capisce Uncontrolled")
   plt.bar(bf4_xaxis, bf4_coverage, 0.4, color = '#0072B2', label="bf4 Controlled")
   plt.bar(capisce_xaxis, capisce_coverage, 0.4, color = '#D55E00', label="Capisce Controlled")
-  plt.xticks(ticks = xaxis, labels = program_names, fontsize = 4, rotation = 90)
+  plt.xticks(ticks = xaxis, labels = program_names, fontsize = 4, rotation = 45, ha="right")
   # if ylim:
   #   plt.ylim(ylim)
   # if xlim:
   #   plt.xlim(xlim)
   # plt.yscale(yscale)
   # plt.xscale(xscale)
-  plt.yticks(fontsize=4)
+  plt.yticks(fontsize=3)
   # plt.xlabel("Programs", fontsize = 6)
-  plt.ylabel("Percent Coverage", fontsize = 4)
+  plt.ylabel("% Controlled", fontsize = 4)
   # if is_hv:
   #   plt.title("Header Validity", fontsize = 6)
   # else:
   #   plt.title("Determined Forwarding", fontsize = 6)
   # if len(data) > 1:
-  plt.legend(fontsize = 4, ncol=2, loc = (-0.25,1))
+  plt.legend(fontsize = 4, ncol=2, loc = (0,1))
   name = "{}_Bug_Coverage.pdf".format(("HV" if is_hv else "DF"))
   fig.savefig(name)
   print("saved to", name)
@@ -176,7 +174,7 @@ def plot_bugcoverage(is_hv):
   print("done")
 
 def plot_solvetime(is_hv):
-  ylim = 60.0 * 60.0 * 24.0 * 4
+  ylim = (60.0 * 60.0 * 24.0)
   if is_hv:
     capisce= {
       "mc-nat": 0.048,
@@ -204,45 +202,41 @@ def plot_solvetime(is_hv):
     }
   else: 
     capisce = {
-      "resubmit" : 160.0,
-      "ts-switching" : 100.0,
-      "mc-nat": 270.0,
-      "arp": 27.0,
-      "ecmp" : 4,
-      "netpaxos-acceptor" : 120,
-      "heavy-hitter-2": 88000.0,
-      "heavy-hitter-1": 1000.0,
-      "flowlet" : 79000.0,
-      "hula" : 390.0,
-      "ndp-router": 4000.0,
-      "simple-nat" : 34.0,
-      "07-multiprotocol" : 30000.0,
-      "netchain" : 27000.0,
-      "linearroad" : 54.0,
-      "fabric" : 7300.0
+      "resubmit" : 160.0 / 1000.0,
+      "ts-switching" : 100.0 / 1000.0,
+      "mc-nat": 270.0 / 1000.0,
+      "ecmp" : 320 / 1000.0,
+      "netpaxos-acceptor" : 120 / 1000.0,
+      "heavy-hitter-2": 88000.0 / 1000.0,
+      "heavy-hitter-1": 1000.0 / 1000.0,
+      "flowlet" : 79000.0 / 1000.0,
+      "hula" : 390.0 / 1000.0,
+      "ndp-router": 40000.0 / 1000.0,
+      "07-multiprotocol" : 30000.0 / 1000.0,
+      "netchain" : 27000.0 / 1000.0,
+      "fabric" : 7300.0 / 1000.0
     }
   bf4_data = read_data(BF4Data, bf4_file(is_hv))
-  bf4_data.sort(key = lambda d: capisce[d.name])
-  fig = plt.figure(figsize=(1.5,1)) # Override fig size based on trial
-  legal_data = [d for d in bf4_data if d.startbugs > 0]
+  legal_data = [d for d in bf4_data if d.startbugs > 0 and d.name in capisce]
+  legal_data.sort(key = lambda d: capisce[d.name])
+  fig = plt.figure(figsize=(2,1)) # Override fig size based on trial
   bf4_time = [d.time for d in legal_data]
   capisce_time = [capisce[d.name] for d in legal_data]
   program_names = [str(d.name) for d in legal_data]
   xaxis = [float(i) for i,_ in enumerate(legal_data)]
+  if is_hv: 
+    print("linearroad", capisce["linearroad"], "netchain", capisce["netchain"])
   width = 0.4
   bf4_xaxis = [i - (width/2.0) for i in xaxis]
   capisce_xaxis = [i + (width / 2.0) for i in xaxis]
-  print(bf4_xaxis)
-  print(bf4_time)
   plt.bar(bf4_xaxis, bf4_time, 0.4, label="bf4")
   if is_hv:
     plt.bar(capisce_xaxis[:-1], capisce_time[:-1], 0.4, label="Capisce")
-    plt.bar(capisce_xaxis[-1], capisce_time[:-1],0.4, label="Capisce Timeout")
+    plt.bar(capisce_xaxis[-1], capisce_time[-1], 0.4, label="Capisce Timeout")
   else:
     plt.bar(capisce_xaxis, capisce_time, 0.4, label="Capisce")
-  plt.xticks(ticks = xaxis, labels = program_names, fontsize = 4, rotation = 90)
+  plt.xticks(ticks = xaxis, labels = program_names, fontsize = 4, rotation = 45, ha="right")
   plt.yticks(fontsize=4)
-  # plt.ylim(ylim=ylim)
   # if xlim:
   #   plt.xlim(xlim)
   plt.yscale("log")
