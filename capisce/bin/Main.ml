@@ -82,7 +82,8 @@ let command_for_each_example ~f =
     "netpaxos-acceptor", NetpaxosAcceptor.netpaxos_acceptor;
     "resubmit", Resubmit.resubmit;
     "ndp-router",  NDPRouter.ndp_router;
-    "heavy-hitter-1", HeavyHitter1.heavy_hitter_1;
+    "heavy-hitter-1", HeavyHitter1.heavy_hitter_1 false;
+    "heavy-hitter-1-fixed", HeavyHitter1.heavy_hitter_1 true;
     "arp", Arp.arp;
     "07-multiprotocol", Multiprotocol.multiprotocol;
     "mc-nat", MCNat.mc_nat false;
