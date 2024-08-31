@@ -60,7 +60,7 @@ names = [
     "mc-nat",
     "mc-nat-fixed",
     "ts-switching",
-    "ts-switching_fixed",
+    "ts-switching-fixed",
     "heavy-hitter-2",
     "heavy-hitter-2-fixed",
     "flowlet",
