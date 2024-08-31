@@ -91,11 +91,12 @@ let mc_nat_ingress fixed =
       ]
   in
   let set_mcg =
+    let actions = [set_output_mcg; _drop] in
     table "set_mcg"
-         [ hdr.ipv4.dstAddr, Exact ]
-         [set_output_mcg; _drop;
-          (*nop*) (*Unspecified default action, assuming nop*)
-         ]
+        [ hdr.ipv4.dstAddr, Exact ]
+        (if fixed 
+         then actions 
+         else actions @ [nop])
   in
   sequence [
     if fixed then assume @@ eq_ btrue @@ var hdr.ipv4.isValid else skip;
