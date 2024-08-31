@@ -1,10 +1,11 @@
 #! /usr/bin/python3
 
 import os
+import sys
 from sigfig import round
 
-def file(name, attribute):
-    return "./survey_data_oopsla/{0}_cegps_{1}".format(name, attribute)
+def file(loc, name, attribute):
+    return "{0}/{1}_cegps_{2}".format(loc, name, attribute)
 
 def exists(filename : str) -> bool:
     return os.path.isfile(filename)
@@ -50,28 +51,28 @@ def readinto(data, field,  from_, default_):
 data = {}
 names = [
     "ecmp",
-    "netpaxos_acceptor",
+    "netpaxos-acceptor",
     "resubmit",
-    "ndp_router",
-    "heavy_hitter_1",
+    "ndp-router",
+    "heavy-hitter-1",
     "arp",
     "07-multiprotocol",
-    "mc_nat",
-    "mc_nat_fixed",
-    "ts_switching",
-    "ts_switching_fixed",
-    "heavy_hitter_2",
-    "heavy_hitter_2_fixed",
+    "mc-nat",
+    "mc-nat-fixed",
+    "ts-switching",
+    "ts-switching-fixed",
+    "heavy-hitter-2",
+    "heavy-hitter-2-fixed",
     "flowlet",
-    "flowlet_fixed",
+    "flowlet-fixed",
     "hula",
     # "hula_fixed",
     "linearroad",
-    "linearroad_fixed",
+    "linearroad-fixed",
     "netchain",
-    "simple_nat",
+    "simple-nat",
     "fabric",
-    "fabric_fixed"
+    "fabric-fixed"
 ]
 
 for n in names:
@@ -84,7 +85,7 @@ for n in names:
         ("count_paths", "0")
     ]
     for attribute, default in attributes:
-        readinto(data[n], attribute, file(n, attribute), default)
+        readinto(data[n], attribute, file(sys.argv[1], n, attribute), default)
 
 
 print("\\footnotesize")

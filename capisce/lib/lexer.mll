@@ -39,11 +39,13 @@ rule read =
   | "or" { OR }
   | "and" { AND }
   | "="  { EQ }
+  | "zero_extend" { ZEROEXTEND }
   | "_" { UNDERSCORE }
   | "BitVec" { BITVEC }
   | "#b" { BITLIT }
   | "#x" { HEXLIT }
   | "bvnot" { BVNOT }
+  | "bvneg" { BVNEG }
   | "bvand" { BVAND }
   | "bvor" { BVOR }
   | "bvxor" { BVXOR }

@@ -1,6 +1,6 @@
 open Core
 open Capisce
-open DependentTypeChecker
+open ASTs.GPL
 open V1ModelUtils
 
 type mymeta_t = {
@@ -19,7 +19,6 @@ type metadata_t = {
 let meta : metadata_t = {mymeta}
 
 let resubmit_parser =
-  let open HoareNet in
   (* start *)
   sequence [
     assign hdr.ethernet.isValid bfalse;
@@ -28,8 +27,15 @@ let resubmit_parser =
     transition_accept;
   ]
 
+let resubmit_psm =
+  let open EmitP4.Parser in 
+  of_state_list [
+    noop_state "start" "parse_ethernet";
+    state "parse_ethernet" hdr.ethernet.isValid @@
+    direct "accept"
+  ]
+
 let resubmit_ingress =
-  let open HoareNet in
   let open Expr in
   let _nop = [],[] in
   let set_port =
@@ -44,19 +50,18 @@ let resubmit_ingress =
   in
   let t_ingress_1 =
     (* No default action specified, but we already have a _nop action *)
-    instr_table ("t_ingress_1", [`Exact meta.mymeta.f1], [_nop; set_port])
+    table "t_ingress_1" [meta.mymeta.f1, Exact] [_nop; set_port]
   in
   let t_ingress_2 =
     (* No default action specified, but we already have a _nop action *)
-    instr_table ("t_ingress_2", [`Exact meta.mymeta.f2], [_nop; _resubmit])
+    table "t_ingress_2" [meta.mymeta.f2, Exact] [_nop; _resubmit]
   in
   sequence [
     t_ingress_1;
     t_ingress_2
   ]
 
-let resubmit_egress = HoareNet.skip
+let resubmit_egress = skip
 
 let resubmit =
-  pipeline resubmit_parser resubmit_ingress resubmit_egress
-  |> HoareNet.assert_valids
+  resubmit_psm, resubmit_ingress, resubmit_egress

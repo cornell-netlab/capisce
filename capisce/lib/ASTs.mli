@@ -20,6 +20,10 @@ module GCL : sig
 
   (** [GCL] adds a few additional functions, specified below *)
 
+  (** [assign x e] construct an assignment statement, which sets the
+      value of [x] to [e] *)
+  val assign : Var.t -> Expr.t -> t
+
   (** [ite b c1 c2] constructs an if statment, executing [c1] when 
      [b] evaluates to [true] and [c2] otherwise *)
   val ite : BExpr.t -> t -> t -> t
@@ -53,6 +57,18 @@ module GCL : sig
   (** [normalize_names c] reformats all of the variables in [c] so
     that they are well-defined SMTLIB variable names.*)
   val normalize_names : t -> t
+
+  (** [assert_valids c] instruments [c] with assertions
+    that ensure that anytime a variable with the prefix "hdr." 
+    is read, its validity bit is set to 1 *)
+  val assert_valids : t -> t 
+
+  (** [track_assigns x c] instruments [c] with a ghost variable [g] that 
+    is set to 1 whenever [x] is on the LHS of an assignment.
+    Additionally, sets [g] to [0] at the start of the instrumented code, 
+    and asserts that it must not be [0] at the end. Something like:
+    [x := 0; c; assert x != 0] *)
+  val track_assigns : Var.t -> t -> t
   
   (**/**)
   val prim : Active.t -> t
@@ -68,6 +84,9 @@ module GCL : sig
   val choices : t list -> t
   val choices_map : 'a list -> f:('a -> t) -> t
   val choices_opt : t option list -> t option
+
+  val choice_seq : t list -> t list -> t
+  val choice_seqs : t list list -> t
 
   val skip : t
   val pass : t
@@ -157,6 +176,8 @@ module Psv : sig
 
   val contra : t -> t -> bool
   val to_string : t -> string
+  val equal : t -> t -> bool 
+  val compare : t -> t -> int
   val size : t -> int
   val vars : t -> Var.t list
   val sexp_of_t : t -> Sexplib.Sexp.t
@@ -197,17 +218,14 @@ module GPL : sig
      an [exact] match kind as in p4, meaning that every bit must be
      read. [`Maskable] indicates the other extreme 
      ([ternary], [lpm], [optional], etc), where it is possible
-     to skip reading any and every bit. [`MaskableDegen] is semantically 
-     equivalent to [`Exact] and is used to capture the case when the
-     key is [`Maskable], AND we can detect that safety does not
+     to skip reading any and every bit. [MaskableDegen] is semantically 
+     equivalent to `Exact] and is used to capture the case when the
+     key is [Maskable], AND we can detect that safety does not
      require masking. For example, when checking header validity,
      if the key is a metadata field (metadata fields are always valid).
   *)
-  val table : string -> [<
-      `Exact of Var.t 
-    | `Maskable of Var.t 
-    | `MaskableDegen of Var.t
-  ] list 
+  val table : string 
+  -> (Var.t * Table.kind) list 
   -> (Var.t list * Primitives.Action.t list) list
   -> t
 
@@ -220,13 +238,11 @@ module GPL : sig
   (** [assign x e] constructs an assignment *)
   val assign : Var.t -> Expr.t -> t
 
+  (** [active a] injects an Active primitive [a] into [GPL] *)
+  val active : Primitives.Active.t -> t
+
   (** [of_gcl gcl] injects the [GCL] program [gcl] into [GPL]*)
   val of_gcl : GCL.t -> t
-
-  (** [assert_valids c] instruments [c] with assertions
-    * that ensure that anytime a variable with the prefix "hdr." 
-    * is read, its validity bit is set to 1 *)
-  val assert_valids : t -> t 
 
   (** [wp c phi] computes the weakest precondition of [c] w.r.t [phi]*)
   val wp : t -> BExpr.t -> BExpr.t
@@ -240,6 +256,10 @@ module GPL : sig
 
   (** [count_paths c] returns the number of paths through the program [c]*)
   val count_paths : t -> Bigint.t
+
+  (** [exactify c] collapses all match kinds to [Exact]. Useful when your
+      analysis is match-kind independent, such as determined forwarding *)
+  val exactify : t -> t
    
   (**/**)
 
@@ -256,6 +276,8 @@ module GPL : sig
   val choices : t list -> t
   val choices_map : 'a list -> f:('a -> t) -> t
   val choices_opt : t option list -> t option
+
+  val choice_seqs : t list list -> t
 
   val skip : t
   val pass : t

@@ -1,6 +1,6 @@
 open Core
 open Capisce
-open DependentTypeChecker
+open ASTs.GPL
 
 
 let access obj field width =
@@ -289,11 +289,10 @@ let standard_metadata = {
   ingress_port = Var.make "standard_metadata.ingress_port" 9;
   deq_qdepth = Var.make "standard_metadata.deq_qdepth" 19;
   instance_type = Var.make "standard_metadata.instance_type" 32;
-  mcast_grp = Var.make "standard_metadata.mcast_grp" 32;
+  mcast_grp = Var.make "standard_metadata.mcast_grp" 16;
 }
 
 let ifte guard tru fls =
-  let open HoareNet in
   let open BExpr in
   choice_seqs [
     [assume guard; tru];
@@ -301,7 +300,6 @@ let ifte guard tru fls =
   ]
 
 let ifte_seq guard true_seqs false_seqs =
-  let open HoareNet in
   let open BExpr in
   choice_seqs [
     assume guard::true_seqs;
@@ -311,15 +309,19 @@ let ifte_seq guard true_seqs false_seqs =
   let btrue = Expr.bvi 1 1
   let bfalse = Expr.bvi 0 1
 
-let exited = Var.make "exit" 1
-let exit_ = HoareNet.assign exited btrue
-let check_exit = ifte (BExpr.eq_ btrue @@ Expr.var exited) HoareNet.skip
+let exited = Var.make "exitt" 1
+let exit_ = assign exited btrue
+let unexit = assign exited bfalse
+let check_exit k = 
+  sequence [
+    ifte (BExpr.eq_ btrue @@ Expr.var exited) skip k;
+    unexit;
+  ]
 
 let transition_accept =
-  let open HoareNet in
   assign zombie.parse_result btrue
 
-let select discriminee cases default : HoareNet.t =
+let select discriminee cases default : t =
   List.fold_right cases ~init:default
     ~f:(fun (value, state) cont ->
         ifte (BExpr.eq_ value discriminee) state cont
@@ -361,7 +363,7 @@ let hash_ result algo base inputs max havoc_name =
   let open Primitives.Action in
   let open Expr in
   let open BExpr in
-  let hash_name = Printf.sprintf "%s_hash_%s_%s" havoc_name algo (Var.str result) in
+  let hash_name = Printf.sprintf "%s_hash_%s_%s" havoc_name algo (String.substr_replace_all ~pattern:"." ~with_:"__" @@Var.str result) in
   let hash_var = Var.make hash_name (Var.size result) in
   List.mapi inputs ~f:(fun idx input -> 
     input |> havoc_read @@ Printf.sprintf "%s_%i" hash_name idx
@@ -372,21 +374,27 @@ let hash_ result algo base inputs max havoc_name =
     havoc result hash_name
   ]
 
-let pipeline prsr ingr egr =
-  let open HoareNet in
+let pipeline prsr ingr egr : t * t * t =
+  (prsr, ingr, egr)
+
+let pipeline_psm psm ingr egr =
+  ( EmitP4.Parser.to_gcl 2 psm |> ASTs.GPL.of_gcl,
+    ingr,
+    egr)
+
+let linearize (prsr, ingr, egr) =
   let open BExpr in
   let open Expr in
-  let pipe =
-    sequence [
-      assign zombie.parse_result bfalse;
-      prsr;
-      ifte_seq (eq_ (var zombie.parse_result) (bvi 1 1)) [
-        ingr;
-        ifte_seq (eq_ (var standard_metadata.egress_spec) (bvi 511 9)) [] [
-          assign standard_metadata.egress_port (var standard_metadata.egress_spec);
-          egr
-        ]
-      ] [skip]
+  sequence [
+    assign zombie.parse_result bfalse;
+    prsr;
+    ifte_seq (eq_ (var zombie.parse_result) (bvi 1 1)) [
+      ingr;
+      ifte_seq (eq_ (var standard_metadata.egress_spec) (bvi 511 9)) [] [
+        assign standard_metadata.egress_port (var standard_metadata.egress_spec);
+        egr
+      ]
+    ] [
+      assign standard_metadata.egress_spec @@ bvi 511 9;
     ]
-  in
-  triple true_ pipe true_
+  ]

@@ -1,6 +1,6 @@
 open Core
 open Capisce
-open DependentTypeChecker
+open ASTs.GPL
 open V1ModelUtils
 
 type meta_t = {
@@ -51,7 +51,6 @@ let pop_front_1 f n =
   |> Fun.flip List.append [assign (f (n - 1)).isValid @@ bfalse]
 
 let hula_parser =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   let parse_udp =
@@ -84,7 +83,6 @@ let hula_parser =
           parse_ipv4
           (parse_srcRouting Int.(i + 1))
       ]
-
   in
   let parse_hula =
     sequence [
@@ -95,7 +93,6 @@ let hula_parser =
   let parse_ethernet =
     sequence [
       assign hdr.ethernet.isValid btrue;
-      (* assert_ @@ eq_ btrue @@ var hdr.ethernet.isValid; *)
       select (var hdr.ethernet.etherType)[
         bvi 2048 16, parse_ipv4;
         bvi 9029 16, parse_hula;
@@ -122,8 +119,46 @@ let hula_parser =
   in
   start
 
+let hula_psm =
+  let open EmitP4.Parser in 
+  let open ASTs.GCL in 
+  let open Expr in
+  let parse_srcRouting = Printf.sprintf "parse_srcRouting__%d" in 
+  let srcRouting i : state =
+    let transition = 
+      if Int.(i >= 7) then
+        direct "parse_ipv4"
+      else
+        select (srcRoute i).bos [
+          btrue, "parse_ipv4"
+        ] (parse_srcRouting Int.(i + 1))
+    in 
+    let post = 
+      assign (srcRoute 7).bos btrue;
+    in
+    state (parse_srcRouting i) (srcRoute i).isValid ~post transition
+  in
+  of_state_list @@ [
+    noop_state "start" "parse_ethernet";
+    state "parse_ethernet" hdr.ethernet.isValid @@
+    select hdr.ethernet.etherType [
+      bvi 2048 16, "parse_ipv4";
+      bvi 9029 16, "parse_hula";
+    ] "accept"
+    ;
+    state "parse_ipv4" hdr.ipv4.isValid @@ 
+    select hdr.ipv4.protocol [
+      bvi 17 8, "parse_udp"
+    ] "accept" 
+    ;
+    state "parse_udp" hdr.udp.isValid @@
+    direct "accept"
+    ;
+    state "parse_hula" hula.isValid @@
+    direct (parse_srcRouting 0)
+  ] @ List.init 8 ~f:srcRouting
+
 let hula_ingress _ =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   let open Primitives in
@@ -140,19 +175,18 @@ let hula_ingress _ =
     ] @ pop_front_1 srcRoute 8
   in
   let hula_fwd =
-    instr_table(
-      "hula_fwd",
-      [`Exact hdr.ipv4.dstAddr;
-       `Exact hdr.ipv4.srcAddr],
+    table
+      "hula_fwd"
+      [hdr.ipv4.dstAddr, Exact;
+       hdr.ipv4.srcAddr, Exact]
       [hula_dst; srcRoute_nhop (* default *) ]
-    )
   in
   let change_best_path_at_dst =
       (* srcindex_qdepth_reg.write(meta.index, hdr.hula.qdepth); *)
       register_read "srcindex_qdepth_reg_change_best_path_at_dst" meta.index (var hula.qdepth) @
       (* srcindex_digest_reg.write(meta.index, hdr.hula.digest); *)
       register_read "srcindex_digest_reg_change_best_path_at_dst" meta.index (var hula.digest)
-      |> sequence_map ~f:of_action
+      |> sequence_map ~f:active
   in
   let return_hula_to_src = sequence [
       assign hula.dir btrue;
@@ -172,22 +206,21 @@ let hula_ingress _ =
     register_write "dstindec_nhop_reg_hula_set_nhop" (var index) (var standard_metadata.ingress_port);
   in
   let hula_bwd =
-    instr_table ("hula_bwd",
-                [`Maskable hdr.ipv4.dstAddr],
-                [
-                  hula_set_nhop;
-                  nop; (* Unspecified default action, assuming nop *)
-                ])
+    table "hula_bwd"
+      [hdr.ipv4.dstAddr, Maskable]
+      [
+        hula_set_nhop;
+        nop; (* Unspecified default action, assuming nop *)
+      ]
   in
   let _drop = [], Action.[
       assign standard_metadata.egress_spec @@ bvi 511 9
     ]
   in
   let hula_src =
-    instr_table ("hula_src",
-                 [`Exact hdr.ipv4.srcAddr],
-                 [_drop; srcRoute_nhop; (*default*)]
-                )
+    table "hula_src"
+      [hdr.ipv4.srcAddr, Exact]
+      [_drop; srcRoute_nhop; (*default*)]
   in
   let hula_get_nhop =
     let tmp = Var.make "tmp" 16 in
@@ -199,9 +232,9 @@ let hula_ingress _ =
     ] |> List.concat
   in
   let hula_nhop =
-    instr_table ("hula_nhop",
-                [`Maskable hdr.ipv4.dstAddr],
-                [hula_get_nhop; _drop (* default *)])
+    table "hula_nhop"
+      [hdr.ipv4.dstAddr, Maskable]
+      [hula_get_nhop; _drop (* default *)]
   in
   let set_dmac =
     let dstAddr = Var.make "dstAddr" 48 in
@@ -212,10 +245,9 @@ let hula_ingress _ =
   in
   let nop = [],[] in
   let dmac =
-    instr_table ("dmac",
-                 [`Exact standard_metadata.egress_spec],
-                 [set_dmac; nop (* default *)]
-                )
+    table "dmac"
+      [standard_metadata.egress_spec, Exact]
+      [set_dmac; nop (* default *)]
   in
   let old_qdepth = Var.make "old_qdepth" 15 in
   let old_digest = Var.make "old_digest" 32 in
@@ -229,17 +261,17 @@ let hula_ingress _ =
           bvi 0 1, sequence [
             (* qdepth_t old_qdepth; *)
             (* srcindex_qdepth_reg.read(old_qdepth, meta.index); *)
-            register_read "srcindex_qdepth_reg_ingress" old_qdepth (var meta.index) |> sequence_map ~f:of_action;
+            register_read "srcindex_qdepth_reg_ingress" old_qdepth (var meta.index) |> sequence_map ~f:active;
             ifte_seq (ugt_ (var old_qdepth) (var hula.qdepth)) [
                 change_best_path_at_dst;
                 return_hula_to_src;
             ] [ 
             (* srcindex_digest_reg.read(old_digest, meta.index); *)
-            register_read "srcindex_qdepth_reg_ingress1" old_digest (var meta.index) |> sequence_map ~f:of_action;
+            register_read "srcindex_qdepth_reg_ingress1" old_digest (var meta.index) |> sequence_map ~f:active;
             ifte (eq_ (var old_digest) (var hula.digest))
               ((* srcindex_qdepth_reg.write(meta.index, hdr.hula.qdepth); *)
                 register_write "srcindex_qdepth_reg_ingress" (var meta.index) (var hula.qdepth)
-                |> sequence_map ~f:of_action
+                |> sequence_map ~f:active
               )
               skip;
             drop;
@@ -256,12 +288,12 @@ let hula_ingress _ =
         (* bit<16> flow_hash; *)
         (* hash(flow_hash, hashAlgorithm.crc16, 16w0, { hdr.ipv4.srcAddr, hdr.ipv4.dstAddr, hdr.udp.srcPort}, 32w65536);       *)
         hash_ flow_hash "crc16" (bvi 0 16) [ var hdr.ipv4.srcAddr; var hdr.ipv4.dstAddr; var hdr.udp.srcPort ] (bvi 65536 32) "flow_hash_ingress"
-        |> sequence_map ~f:of_action;
+        |> sequence_map ~f:active;
         ifte_seq (eq_ (var port) (bvi 0 16)) [
           hula_nhop;
           (* flow_port_reg.write((bit<32>)flow_hash, (bit<16>)standard_metadata.egress_spec); *)
           register_write "flow_port_reg_ingress" (var flow_hash) (var standard_metadata.egress_spec)
-          |> sequence_map ~f:of_action
+          |> sequence_map ~f:active
         ] [
           assign standard_metadata.egress_spec @@ bcast 9 @@ var port;
         ];
@@ -277,7 +309,6 @@ let hula_ingress _ =
 
 
 let hula_egress =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   sequence [
@@ -291,5 +322,4 @@ let hula_egress =
   ]
 
 let hula fixed =
-  pipeline hula_parser (hula_ingress fixed) hula_egress
-  |> HoareNet.assert_valids
+  hula_psm, hula_ingress fixed, hula_egress

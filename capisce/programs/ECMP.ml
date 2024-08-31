@@ -1,6 +1,6 @@
 open Core
 open Capisce
-open DependentTypeChecker
+open ASTs.GPL
 open V1ModelUtils
 
 type routing_metadata_t = {
@@ -19,8 +19,7 @@ type metadata_t = {
 let meta = {routing_metadata}
 
 
-let ecmp_parser : HoareNet.t =
-  let open HoareNet in
+let ecmp_parser : t =
   let open BExpr in
   let open Expr in
   sequence [
@@ -50,40 +49,61 @@ let ecmp_parser : HoareNet.t =
     ];
   ]
 
-let ecmp_ingress =
-  let open HoareNet in
+let ecmp_psm =
+  let open EmitP4.Parser in 
+  let open ASTs.GCL in 
+  let open Expr in 
+  of_state_list [
+    { name = "start";
+      body = assign hdr.ethernet.isValid btrue;
+      transition = select (hdr.ethernet.etherType) [
+        (bvi 2048 16), "parse_ipv4";      
+      ] "accept"
+    };
+    { name = "parse_ipv4";
+      body = assign hdr.ipv4.isValid btrue;
+      transition = select (hdr.ipv4.protocol) [
+        (bvi 6 8), "parse_tcp";
+      ] "accept"
+    };
+    { name = "parse_tcp";
+      body = assign hdr.tcp.isValid btrue;
+      transition = default "accept"
+    }
+  ]
+
+let ecmp_ingress fixed : t =
   let open BExpr in
   let open Expr in
   let nhop_ipv4 = Var.make "nhop_ipv4" 32 in
   let port = Var.make "port" 9 in
   let dmac = Var.make "dmac" 48 in
   let ecmp_group =
-    instr_table
-      ("ecmp_group",
-       [ `Maskable hdr.ipv4.dstAddr],
-       [ (*_drop*)
-         [],
-         Primitives.Action.[
-           assign
-             standard_metadata.egress_spec
-             (bvi 511 9)]
-         ;
-         (* set_nhop *)
-         [nhop_ipv4; port],
-         Primitives.Action.[
-           assign meta.routing_metadata.nhop_ipv4 (var nhop_ipv4);
-           assign standard_metadata.egress_spec (var port);
-           assign hdr.ipv4.ttl @@ badd (var hdr.ipv4.ttl) (bvi 255 8);
-         ]
-         ;
-         nop (* No default action specified, assuming noop *)
-       ]
-      )
+    table
+      "ecmp_group"
+      [ hdr.ipv4.dstAddr, Maskable]
+      [ (*_drop*)
+        [],
+        Primitives.Action.[
+          assign
+            standard_metadata.egress_spec
+            (bvi 511 9)]
+        ;
+        (* set_nhop *)
+        [nhop_ipv4; port],
+        Primitives.Action.[
+          assign meta.routing_metadata.nhop_ipv4 (var nhop_ipv4);
+          assign standard_metadata.egress_spec (var port);
+          assign hdr.ipv4.ttl @@ badd (var hdr.ipv4.ttl) (bvi 255 8);
+        ]
+        ;
+        nop (* No default action specified, assuming noop *)
+      ]
   in
   let forward =
-    instr_table (
-      "forward",
-      [ `MaskableDegen meta.routing_metadata.nhop_ipv4],
+    table 
+      "forward"
+      [ meta.routing_metadata.nhop_ipv4, MaskableDegen]
       [ (* set_dmac  *)
         [dmac],
         Primitives.Action.[
@@ -98,34 +118,24 @@ let ecmp_ingress =
         ];
         nop (*  no default action specified assuming noop *)
       ]
-    )
-
   in
-  choice_seqs [
-    [assume @@ eq_ (var hdr.ipv4.isValid) (bvi 1 1);
-     choice_seqs [
-       [ (* assert_ @@ eq_ (var hdr.ipv4.isValid) (bvi 1 1); *)
-         assume @@ ugt_ (var hdr.ipv4.ttl) (bvi 0 8);
-         ecmp_group;
-         forward;
-       ];
-       [assume @@ not_ @@ ugt_ (var hdr.ipv4.ttl) (Expr.bvi 0 8)]
-
-     ]
-    ];
-    [assume @@ not_ (eq_ (var hdr.ipv4.isValid) (Expr.bvi 1 1))]
+  ifte (eq_ (var hdr.ipv4.isValid) (bvi 1 1)) (sequence [
+    assume @@ ugt_ (var hdr.ipv4.ttl) (bvi 0 8);
+    ecmp_group;
+    forward;
+  ]) @@ sequence [
+    if fixed then assign standard_metadata.egress_spec @@ Expr.bvi 511 9 else skip;
   ]
 
 
 let ecmp_egress =
-  let open HoareNet in
   (* let open BExpr in *)
   let open Expr in
   let smac = Var.make "smac" 48 in
   let send_frame =
-    instr_table (
-      "send_frame",
-      [ `Exact standard_metadata.egress_port ],
+    table
+      "send_frame"
+      [ standard_metadata.egress_port, Exact ]
       [ [smac],
         Primitives.Action.[
           (* assert_ @@ eq_ (var hdr.ethernet.isValid) (bvi 1 1); *)
@@ -136,13 +146,10 @@ let ecmp_egress =
           assign standard_metadata.egress_spec (bvi 511 9)
         ]
       ]
-    )
   in
   sequence [
     send_frame
   ]
 
-let ecmp =
-  pipeline ecmp_parser ecmp_ingress ecmp_egress
-  |> HoareNet.assert_valids
-
+let ecmp fixed =
+  (ecmp_psm, ecmp_ingress fixed, ecmp_egress)

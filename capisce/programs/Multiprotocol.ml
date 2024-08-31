@@ -1,6 +1,6 @@
 open Core
 open Capisce
-open DependentTypeChecker
+open ASTs.GPL
 open V1ModelUtils
 
 type ingress_metadata_t = {
@@ -21,7 +21,6 @@ type my_metadata_t = {ing_metadata : ingress_metadata_t}
 let meta : my_metadata_t = {ing_metadata}
 
 let multiproto_parser =
-  let open HoareNet in
   let open Expr in
   (* start *)
   let parse_icmp =
@@ -106,14 +105,63 @@ let multiproto_parser =
   in
   start
 
+let multiproto_psm =
+  let open EmitP4.Parser in
+  let open ASTs.GCL in 
+  let open Expr in 
+  of_state_list
+  [ state "start" hdr.ethernet.isValid 
+    ~pre:(assign meta.ing_metadata.fwded bfalse) @@
+    select hdr.ethernet.etherType [
+      bvi 33024 16, "parse_vlan_tag";
+      bvi 37120 16, "parse_vlan_tag";
+      bvi  2048 16, "parse_ipv4";
+      bvi 34525 16, "parse_ipv6";
+    ] "accept"
+    ; 
+    state "parse_vlan_tag" hdr.vlan_tag.isValid @@
+    select hdr.vlan_tag.etherType [
+      bvi  2048 16, "parse_ipv4";
+      bvi 34525 16, "parse_ipv6";
+    ] "accept"
+    ;
+    state "parse_ipv4" hdr.ipv4.isValid @@
+    { discriminee = [var hdr.ipv4.ihl; var hdr.ipv4.protocol];
+      cases = [
+        [bvi 5 4; bvi  1 8], "parse_icmp";
+        [bvi 5 4; bvi  6 8], "parse_tcp";
+        [bvi 5 4; bvi 17 8], "parse_udp";
+      ];
+      default = "accept"
+    };
+    state "parse_ipv6" hdr.ipv6.isValid @@
+    select hdr.ipv6.nextHdr [
+      bvi  1 8, "parse_icmp";
+      bvi  6 8, "parse_tcp";
+      bvi 17 8, "parse_udp";
+    ] "accept"
+    ;
+    state "parse_icmp" hdr.icmp.isValid @@
+    direct "accept"
+    ;
+    state "parse_tcp" hdr.tcp.isValid @@
+    direct "accept"
+    ;
+    state "parse_udp" hdr.udp.isValid @@
+    direct "accept"
+  ]
+
 let multiproto_ingress =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   let open Primitives in
+  let ethertype_action_run =
+    Var.make "ethertype_action_run" 3
+  in
   let packet_type i =
     [], Action.[
-        assign meta.ing_metadata.packet_type @@ bvi i 4
+        assign meta.ing_metadata.packet_type @@ bvi i 4;
+        assign ethertype_action_run @@ bvi i 3
       ]
   in
   let l2_packet   = packet_type 0 in
@@ -122,14 +170,13 @@ let multiproto_ingress =
   let mpls_packet = packet_type 3 in
   let mim_packet  = packet_type 4 in
   let ethertype_match =
-    instr_table ("ethertype_match",
-                 [`Exact hdr.ethernet.etherType],
-                 [l2_packet;
-                  ipv4_packet; ipv6_packet;
-                  mpls_packet; mim_packet; 
-                  nop (* Unspecified default action, assuming  noop *)
-                 ]
-                )
+    table "ethertype_match"
+      [hdr.ethernet.etherType, Exact]
+      [ l2_packet;
+        ipv4_packet; ipv6_packet;
+        mpls_packet; mim_packet; 
+        nop (* Unspecified default action, assuming  noop *)
+      ]
   in
   let _drop = [], Action.[
       assign meta.ing_metadata.drop btrue
@@ -142,13 +189,13 @@ let multiproto_ingress =
       ]
   in
   let _match name key =
-    instr_table (name, [`Exact key], [nop; set_egress_port])
+    table name [key, Exact] [nop; set_egress_port]
   in
   let ipv4_match = _match "ipv4_match" hdr.ipv4.dstAddr in
   let ipv6_match = _match "ipv6_match" hdr.ipv6.dstAddr in
   let l2_match   = _match "l2_match"   hdr.ethernet.dstAddr in
   let _check name key =
-    instr_table (name, [`Exact key], [nop; _drop])
+    table name [key, Exact] [nop; _drop]
     (*  none of the check tables have specified default actions, assuming noop *)
     (*  no change made since they already have   noop *)
   in
@@ -166,20 +213,19 @@ let multiproto_ingress =
     ]
   in
   let set_egress =
-    instr_table ("set_egress",
-                  [`Exact meta.ing_metadata.drop],
-                  [
-                    discard; send_packet;
-                    nop; (*  unspecified default action, assuming noop *)
-                  ]
-                )
+    table "set_egress"
+      [meta.ing_metadata.drop, Exact]
+      [
+        discard; send_packet;
+        nop; (*  unspecified default action, assuming noop *)
+      ]
   in
   sequence [
     ethertype_match;
-    select (var @@ Var.make "_symb$ethertype_match$action" 3) [
+    select (var ethertype_action_run) [
       bvi 1 3, ipv4_match;
-      bvi 3 3, ipv6_match;
       bvi 2 3, ipv6_match;
+      bvi 3 3, ipv6_match;
     ] l2_match;
     ifte_seq (eq_ btrue @@ var hdr.tcp.isValid) [
       tcp_check
@@ -196,10 +242,7 @@ let multiproto_ingress =
     assert_ @@ eq_ btrue @@ var meta.ing_metadata.fwded; 
   ]
 
-let multiproto_egress =
-  let open HoareNet in
-  skip
+let multiproto_egress = skip
 
 let multiprotocol =
-  pipeline multiproto_parser multiproto_ingress multiproto_egress
-  |> HoareNet.assert_valids
+  multiproto_psm, multiproto_ingress, multiproto_egress

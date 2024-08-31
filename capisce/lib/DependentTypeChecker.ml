@@ -121,20 +121,7 @@ module HoareNet = struct
       prim({ precondition = pre;
              cmd = GPL.table name real_keys actions;
              postcondition = post})
-
-    let rec assert_valids cmd =
-      match cmd with
-      | Prim triple ->
-        let cmd = GPL.assert_valids triple.cmd in
-        Prim {triple with cmd}
-      | Seq cs ->
-        List.map cs ~f:assert_valids
-        |> sequence
-      | Choice cxs ->
-        List.map cxs ~f:assert_valids
-        |> choices
-
-
+             
     let of_gpl cmd =
       prim( {precondition = None;
              cmd;

@@ -1,6 +1,6 @@
 open Core
 open Capisce
-open DependentTypeChecker
+open ASTs.GPL
 open V1ModelUtils
 
 
@@ -29,7 +29,6 @@ type metadata_t = {
 let meta : metadata_t = {meta; routing_metadata}
 
 let ndp_parser =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   sequence [
@@ -44,7 +43,7 @@ let ndp_parser =
       (*parse_ipv4*)
       assign hdr.ipv4.isValid btrue;
       (* assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid; *)
-      ifte_seq (eq_ (var hdr.ipv4.protocol) (bvi 409 8)) [
+      ifte_seq (eq_ (var hdr.ipv4.protocol) (bvi 199 8)) [
         assign hdr.ndp.isValid btrue;
         transition_accept
       ] [transition_accept]
@@ -52,8 +51,26 @@ let ndp_parser =
     ] [transition_accept]
   ]
 
+let ndp_router_psm =
+  let open EmitP4.Parser in
+  let open Expr in 
+  of_state_list [
+    noop_state "start" "parse_ethernet"
+    ;
+    state "parse_ethernet" hdr.ethernet.isValid @@
+    select hdr.ethernet.etherType [
+      bvi 2048 16, "parse_ipv4";
+    ] "accept"
+    ;
+    state "parse_ipv4" hdr.ipv4.isValid @@
+    select hdr.ipv4.protocol [
+      bvi 199 8, "parse_ndp";
+    ] "accept"
+    ;
+    state "parse_ndp" hdr.ndp.isValid @@
+    direct "accept"
+  ]
 let ndp_ingress =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   let set_nhop =
@@ -72,14 +89,13 @@ let ndp_ingress =
       ]
   in
   let ipv4_lpm =
-    sequence [
-      instr_table ("ipv4_lpm", [
-        `Maskable hdr.ipv4.dstAddr
-        ], [
-          set_nhop; _drop; 
-          nop (*Unspecified default action, assuming noop*)
-          ])
-    ]
+    table "ipv4_lpm" 
+      [
+        hdr.ipv4.dstAddr, Maskable
+      ] [
+        set_nhop; _drop; 
+        nop (*Unspecified default action, assuming noop*)
+      ]
   in
   let directpriohigh =
     [], Primitives.Action.[
@@ -89,13 +105,13 @@ let ndp_ingress =
       ]
   in
   let directtoprio =
-    instr_table ("directtoprio", 
+    table "directtoprio"
     [
-      `MaskableDegen meta.meta.register_tmp
-    ], [
+      meta.meta.register_tmp, MaskableDegen
+    ] [
       directpriohigh;
       nop (*Unspecified default action, assuming noop*)
-    ])
+    ]
   in
   let readbuffer =
     [],
@@ -103,12 +119,13 @@ let ndp_ingress =
     register_read "buffersense_readbuffer" meta.meta.register_tmp (var standard_metadata.egress_port)
   in
   let readbuffersense =
-    instr_table ("readbuffersense", [
-      `MaskableDegen meta.meta.register_tmp
-      ], [
+    table "readbuffersense" 
+      [
+        meta.meta.register_tmp, MaskableDegen
+      ] [
         readbuffer;
         nop (*Unspecified default action, assuming noop*)
-      ])
+      ]
   in
   let setpriolow =
     [], Primitives.Action.[
@@ -129,12 +146,13 @@ let ndp_ingress =
       ]
   in
   let setprio =
-    instr_table ("setprio", [
-      `MaskableDegen meta.meta.register_tmp
-      ], [
+    table "setprio" 
+      [
+        meta.meta.register_tmp, MaskableDegen
+      ] [
         setpriolow; setpriohigh;
         nop (* unspecified default action, adding noop  *)
-        ])
+      ]
   in
   let set_dmac =
     let dmac = Var.make "dmac" 48 in
@@ -145,12 +163,12 @@ let ndp_ingress =
       register_read "buffersense_set_dmac" meta.meta.register_tmp (var standard_metadata.egress_port)
   in
   let forward =
-    instr_table ("forward", [
-      `Exact meta.routing_metadata.nhop_ipv4
-      ], [
+    table "forward" [
+        meta.routing_metadata.nhop_ipv4, Exact
+      ] [
         set_dmac; _drop;
         nop (* unspecified default action, adding noop  *)
-        ])
+      ]
   in
   ifte_seq (eq_ btrue @@ var hdr.ipv4.isValid) [
     ifte_seq (ugt_ (var hdr.ipv4.ttl) (bvi 0 8)) [
@@ -168,11 +186,15 @@ let ndp_ingress =
       ];
       forward
     ] [
+      (* FIX-- set egress spec*)
+      assign standard_metadata.egress_spec @@ bvi 511 9;
     ]
-  ] []
+  ] [
+    (* FIX-- set egress spec*)
+    assign standard_metadata.egress_spec @@ bvi 511 9;
+  ]
 
 let ndp_egress =
-  let open HoareNet in
   (* let open BExpr in *)
   let open Expr in
   let decreasereg =
@@ -186,11 +208,11 @@ let ndp_egress =
   in
   let cont = [], [] in
   let dec_counter =
-    instr_table ("dec_counter",
-                 [`MaskableDegen meta.meta.ndpflags],
-                 [decreasereg; cont;
-                  nop (* unspecified default action assuming noop *) 
-                 ])
+    table "dec_counter"
+      [ meta.meta.ndpflags, MaskableDegen]
+      [ decreasereg; cont;
+        nop (* unspecified default action assuming noop *) 
+      ]
   in
   let rewrite_mac =
     let smac = Var.make "smac" 48 in
@@ -204,11 +226,11 @@ let ndp_egress =
       ]
   in
   let send_frame =
-    instr_table ("send_frame",
-                 [`Exact standard_metadata.egress_port],
-                 [rewrite_mac; _drop;
-                 nop (* unspecified default action assuming noop *)
-                 ])
+    table "send_frame"
+      [ standard_metadata.egress_port, Exact]
+      [ rewrite_mac; _drop;
+          nop (* unspecified default action assuming noop *)
+      ]
   in
   sequence [
     dec_counter;
@@ -216,6 +238,5 @@ let ndp_egress =
   ]
 
 let ndp_router =
-  pipeline ndp_parser ndp_ingress ndp_egress
-  |> HoareNet.assert_valids
+  ndp_router_psm, ndp_ingress, ndp_egress
 

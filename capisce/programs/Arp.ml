@@ -1,6 +1,6 @@
 open Core
 open Capisce
-open DependentTypeChecker
+open ASTs.GPL
 open V1ModelUtils
 
 type my_metadata_t = {
@@ -20,14 +20,16 @@ let meta : my_metadata_t = {
 }
 
 let arp_parser =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   (* start *)
   sequence [
+    assign zombie.parse_result bfalse;
     assign hdr.ethernet.isValid bfalse;
     assign hdr.ipv4.isValid bfalse;
-    assign hdr.tcp.isValid bfalse;
+    assign hdr.icmp.isValid bfalse;
+    assign hdr.arp.isValid bfalse;
+    assign hdr.arp_ipv4.isValid bfalse;
     (*parse ethenet*)
     assign hdr.ethernet.isValid btrue;
     (* assert_ @@ eq_ btrue @@ var hdr.ethernet.isValid; *)
@@ -58,14 +60,64 @@ let arp_parser =
             assign hdr.arp_ipv4.isValid btrue;
             (* assert_ @@ eq_ btrue @@ var hdr.arp_ipv4.isValid; *)
             assign meta.dst_ipv4 @@ var hdr.arp_ipv4.tpa;
+            transition_accept
           ] [transition_accept]
         ]
         [transition_accept]
       ]
   ]
 
+let arp_psm =
+  let open EmitP4 in 
+  let open Parser in 
+  let open ASTs.GCL in
+  let open Expr in 
+  of_state_list
+  [ {name = "start";
+     body = assign hdr.ethernet.isValid btrue;
+     transition = 
+      select (hdr.ethernet.etherType) [
+        bvi 2048 16, "parse_ipv4";
+        bvi 2054 16, "parse_arp";
+      ] "accept";
+    };
+    { name = "parse_arp";
+      body = assign hdr.arp.isValid btrue;
+      transition = {
+        discriminee = 
+          List.map ~f:Expr.var
+          [hdr.arp.htype; hdr.arp.ptype; hdr.arp.hlen; hdr.arp.plen];
+        cases = [
+          [bvi 1 16; bvi 2048 16; bvi 6 8; bvi 4 8], "parse_arp_ipv4"
+        ];
+        default = "accept"
+
+      }
+    };
+    { name = "parse_arp_ipv4";
+      body = sequence [
+        assign hdr.arp_ipv4.isValid btrue;
+        assign meta.dst_ipv4 @@ var hdr.arp_ipv4.tpa;
+      ];
+      transition = default "accept"
+    };
+    { name = "parse_ipv4" ;
+      body = sequence [
+        assign hdr.ipv4.isValid btrue;
+        assign meta.dst_ipv4 @@ var hdr.ipv4.dstAddr
+      ];
+      transition = 
+        select (hdr.ipv4.protocol) [
+          bvi 1 8, "parse_icmp"
+        ] "accept"; 
+    };
+    { name = "parse_icmp";
+      body = assign hdr.icmp.isValid btrue;
+      transition = default "accept"
+    }
+  ]
+
 let arp_ingress =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   let open Primitives in
@@ -88,18 +140,15 @@ let arp_ingress =
     ]
   in
   let ipv4_lpm =
-    instr_table ("ipv4_lpm", [
-      `MaskableDegen meta.dst_ipv4
-      ], [
-        set_dst_info; drop (*default*)
-        ])
+    table "ipv4_lpm" [
+      meta.dst_ipv4, MaskableDegen
+    ] [
+      set_dst_info; drop (*default*)
+    ]
   in
   let forward_ipv4 = [], Action.[
-      (* assert_ (eq_ btrue (var hdr.ethernet.isValid)); *)
       assign hdr.ethernet.dstAddr @@ var meta.mac_da;
-      (* assert_ (eq_ btrue (var hdr.ethernet.isValid)); *)
       assign hdr.ethernet.srcAddr @@ var meta.mac_sa;
-      (* assert_ (eq_ btrue (var hdr.ipv4.isValid)); *)
       assign hdr.ipv4.ttl @@ bsub (var hdr.ipv4.ttl) (bvi 1 8);
       assign standard_metadata.egress_spec @@ var meta.egress_port;
     ] in
@@ -135,33 +184,29 @@ let arp_ingress =
     ]
   in
   let forward =
-    instr_table ("forward",
-                 [`Exact hdr.arp.isValid;
-                  `MaskableDegen hdr.arp.oper;
-                  `Exact hdr.arp_ipv4.isValid;
-                  `Exact hdr.ipv4.isValid;
-                  `Exact hdr.icmp.isValid;
-                  `Maskable hdr.icmp.type_
-                  ],[
-                  forward_ipv4; send_arp_reply; send_icmp_reply;
-                  drop (* default *)
-                ])
+    table "forward"
+      [hdr.arp.isValid, Exact;
+      hdr.arp.oper, MaskableDegen;
+      hdr.arp_ipv4.isValid, Exact;
+      hdr.ipv4.isValid, Exact;
+      hdr.icmp.isValid, Exact;
+      hdr.icmp.type_, Maskable
+      ]
+      [ forward_ipv4; send_arp_reply; send_icmp_reply;
+        drop (* default *)
+      ]
   in
   sequence [
     assign meta.my_mac @@ bvi 000102030405 48;
-    ifte_seq (eq_ btrue @@ var zombie.exited) [] [
+    ifte_seq (eq_ btrue @@ var zombie.exited) [
+    ] [
       ipv4_lpm;
       forward
     ]
   ]
 
-let arp_egress =
-  let open HoareNet in
-  (* let open BExpr in *)
-  (* let open Expr in *)
-  skip
+let arp_egress = skip
 
 
 let arp =
-  pipeline arp_parser arp_ingress arp_egress
-  |> HoareNet.assert_valids
+  arp_psm, arp_ingress, arp_egress

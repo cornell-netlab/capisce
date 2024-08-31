@@ -1,6 +1,6 @@
 open Core
 open Capisce
-open DependentTypeChecker
+open ASTs.GPL
 open V1ModelUtils
 open Primitives
 
@@ -17,7 +17,7 @@ type lookup_metadata_t = {
 }
 
 let lkp :  lookup_metadata_t = 
-  let m = access "fabric_metadata.lkp" in
+  let m = access "meta.lkp" in
   {
     is_ipv4 = m "is_ipv4" 1;
     ipv4_src = m "ipv4_src" 32;
@@ -57,7 +57,7 @@ type fabric_metadata_t ={
 }
 
 let fabric_metadata : fabric_metadata_t =
-  let f = access "fabric_metadata" in
+  let f = access "meta" in
   {
     lkp;
     ip_eth_type = f "ip_eth_type" 16;
@@ -106,7 +106,7 @@ let gtpu : gtpu_t =
     spare = f "spare" 1;
     ex_flag = f "ex_flag" 1;
     seq_flag = f "seq_flag" 1;
-    npdu_flag = f "npdu_flag" (1);
+    npdu_flag = f "npdu_flag" 1;
     msgtype = f "msgtype" 8; 
     msglen = f "msglen" 16;
     teid = f "teid" 32;
@@ -306,12 +306,21 @@ let hdr : hdr_t = {
   packet_out;
   packet_in
 }
+
+
+let look_eth = Var.make "look_eth" 16
+let look_mpls = Var.make "look_mpls" 4
+
+let look_vlan = Var.make "look_vlan" 16
+let last_ipv4_dscp = Var.make "last_ipv4_dscp" 6
+
+let gtpu_version = Var.make "gtpu_version" 3
+let gtpu_msgtype = Var.make "gtpu_msgtype" 8
+let gtpu_ext_len = Var.make "gtpu_ext_len" 8
+
+let look_packet_out = Var.make "look_packet_out" 1
 let fabric_parser =
-  let open HoareNet in
   let open Expr in
-  let look_eth = Var.make "look_eth" 16 in
-  let look_mpls = Var.make "look_mpls" 4 in
-  let last_ipv4_dscp = Var.make "last_ipv4_dscp" 6 in
   let parse_tcp = sequence [
     assign hdr.tcp.isValid btrue;
     assign fabric_metadata.l4_sport @@ var hdr.tcp.srcPort;
@@ -339,7 +348,6 @@ let fabric_parser =
       bvi 1 8, parse_inner_icmp;
     ] transition_accept
   ] in
-  let gtpu_ext_len = Var.make "gtpu_ext_len" 8 in
   let parse_gtpu_ext_psc = sequence [
     assign hdr.gtpu_ext_psc.isValid btrue;
     assign hdr.gtpu_ext_psc.len @@ var gtpu_ext_len;
@@ -353,8 +361,6 @@ let fabric_parser =
       bconcat (bvi 133 8) (bvi 1 8), parse_gtpu_ext_psc
     ] transition_accept
   ] in
-  let gtpu_version = Var.make "gtpu_version" 3 in
-  let gtpu_msgtype = Var.make "gtpu_msgtype" 8 in
   let parse_gtpu = sequence [
     assign hdr.gtpu.isValid btrue;
     assign hdr.gtpu.version @@ var gtpu_version;
@@ -398,7 +404,6 @@ let fabric_parser =
     ] transition_accept
   ] 
   in
-  let look_vlan = Var.make "look_vlan" 16 in
   let parse_inner_vlan_tag_1 = sequence [
     assign hdr.inner_vlan_tag.isValid btrue;
     assign hdr.inner_vlan_tag.eth_type @@ var look_vlan;
@@ -457,7 +462,6 @@ let fabric_parser =
       bvi 33024 16, parse_vlan_tag;
     ] parse_eth_type
   ] in
-  let look_packet_out = Var.make "look_packet_out" 1 in
   let parse_packet_out_and_accept = sequence [
     assign hdr.packet_out.isValid btrue;
     assign hdr.packet_out.do_forwarding @@ var look_packet_out; 
@@ -470,26 +474,204 @@ let fabric_parser =
     ] strip_packet_out
   ] in
   let start = sequence [
-    assign last_ipv4_dscp @@ bvi 0 6;   
+    (* added annotations *)
+    unexit;
+    assign fabric_metadata.is_controller_packet_out bfalse;
+    assign hdr.packet_out.isValid bfalse;
+    (* end added annotations*)
+    assign last_ipv4_dscp @@ bvi 0 6;
     select (var standard_metadata.ingress_port) [
       bvi 510 9, check_packet_out;
     ] parse_ethernet
   ] in
   start
 
+let fabric_psm =
+  let open EmitP4.Parser in 
+  let open ASTs.GCL in 
+  let open Expr in 
+  of_state_list [
+    { name = "start";
+      body = sequence [
+        assign fabric_metadata.is_controller_packet_out bfalse;
+        assign hdr.packet_out.isValid bfalse;
+        assign last_ipv4_dscp @@ bvi 0 6;
+      ] ;
+      transition = select standard_metadata.ingress_port [
+        bvi 510 9, "check_packet_out";
+      ] "parse_ethernet"
+    }
+    ;
+    { name = "check_packet_out";
+      body = skip;
+      transition = select look_packet_out [
+        bvi 0 1, "parse_packet_out_and_accept";
+      ] "strip_packet_out"
+    }
+    ;
+    state "parse_packet_out_and_accept" hdr.packet_out.isValid @@
+    direct "accept"
+    ;
+    noop_state "strip_packet_out" "accept"
+    ;
+    state "parse_ethernet"
+      ~pre:(assign fabric_metadata.vlan_id @@ bvi 4094 12)
+      hdr.ethernet.isValid @@
+      select (look_eth) [
+        bvi 34984 16, "parse_vlan_tag";
+        bvi 37120 16, "parse_vlan_tag";
+        bvi 33024 16, "parse_vlan_tag";
+      ] "parse_eth_type"
+    ;
+    state "parse_vlan_tag" 
+      hdr.vlan_tag.isValid
+      ~post:(assign hdr.vlan_tag.eth_type @@ var look_eth) @@
+      select look_vlan [
+        bvi 33024 16, "parse_inner_vlan_tag"
+      ] "parse_eth_type"
+    ;
+    state "parse_inner_vlan_tag" 
+      hdr.inner_vlan_tag.isValid
+      ~post:(assign hdr.inner_vlan_tag.eth_type @@ var look_vlan) @@
+      direct "parse_eth_type"
+    ;
+    state "parse_eth_type"
+      hdr.eth_type.isValid @@
+      select (hdr.eth_type.value) [
+        bvi 34887 16, "parse_mpls";
+        bvi  2048 16, "parse_ipv4";
+      ] "accept"
+    ;
+    state "parse_mpls" 
+      hdr.mpls.isValid
+      ~post:(sequence [
+        assign fabric_metadata.mpls_label @@ var hdr.mpls.label;
+        assign fabric_metadata.mpls_ttl @@ var hdr.mpls.ttl
+      ]) @@
+      select (look_mpls) [
+        bvi 4 4, "parse_ipv4";
+      ] "parse_ethernet_1"
+    ;
+    state "parse_ipv4" 
+      hdr.ipv4.isValid
+      ~post:(sequence[
+        assign fabric_metadata.ip_proto @@ var hdr.ipv4.protocol;
+        assign fabric_metadata.ip_eth_type @@ bvi 2048 16;
+        assign fabric_metadata.ipv4_src_addr @@ var hdr.ipv4.srcAddr;
+        assign fabric_metadata.ipv4_dst_addr @@ var hdr.ipv4.dstAddr;
+        assign last_ipv4_dscp @@ var hdr.ipv4.dscp;
+      ]) @@ 
+      select hdr.ipv4.protocol [
+        bvi 6 8, "parse_tcp";
+        bvi 17 8, "parse_udp";
+        bvi 1 8, "parse_icmp";
+      ] "accept"
+    ;
+    state "parse_tcp" 
+      hdr.tcp.isValid
+      ~post:(sequence [
+        assign fabric_metadata.l4_sport @@ var hdr.tcp.srcPort;
+        assign fabric_metadata.l4_dport @@ var hdr.tcp.dstPort;
+      ]) @@
+      direct "accept"
+    ;
+    state "parse_udp"
+      hdr.udp.isValid
+      ~post:(sequence [
+        assign fabric_metadata.l4_sport @@ var hdr.udp.srcPort;
+        assign fabric_metadata.l4_dport @@ var hdr.udp.dstPort;
+      ]) @@
+      { discriminee = [
+          var hdr.udp.dstPort; var gtpu_version; var gtpu_msgtype
+        ];
+        cases = [
+          [bvi 2152 16; bvi 1 3; bvi 255 8], "parse_gtpu"
+        ];
+        default = "accept";
+      }
+    ;
+    state "parse_icmp" hdr.icmp.isValid @@
+    direct "accept"
+    ;
+    state "parse_ethernet_1"
+      ~pre:(assign fabric_metadata.vlan_id @@ bvi 4094 12)
+      hdr.ethernet.isValid @@
+      select (look_eth) [
+        bvi 34984 16, "parse_vlan_tag_1";
+        bvi 37120 16, "parse_vlan_tag_1";
+        bvi 33024 16, "parse_vlan_tag_1";
+      ] "parse_eth_type_1"
+    ;
+    state "parse_vlan_tag_1" 
+      hdr.vlan_tag.isValid
+      ~post:(assign hdr.vlan_tag.eth_type @@ var look_eth) @@
+      select look_vlan [
+        bvi 33024 16, "parse_inner_vlan_tag_1"
+      ] "parse_eth_type_1"
+    ;
+    state "parse_inner_vlan_tag_1" 
+      hdr.inner_vlan_tag.isValid
+      ~post:(assign hdr.inner_vlan_tag.eth_type @@ var look_vlan) @@
+      direct "parse_eth_type_1"
+    ;
+    state "parse_eth_type_1"
+      hdr.eth_type.isValid @@
+      select (hdr.eth_type.value) [
+        bvi 34887 16, "reject";
+        bvi  2048 16, "parse_ipv4";
+      ] "accept"
+    ;
+    state "parse_gtpu" hdr.gtpu.isValid @@
+    { discriminee = 
+      [var hdr.gtpu.ex_flag; var hdr.gtpu.seq_flag; var hdr.gtpu.npdu_flag];
+      cases = [ [bvi 0 1; bvi 0 1; bvi 0 1], "parse_inner_ipv4" ];
+      default = "parse_gtpu_options";
+    }
+    ;
+    state "parse_gtpu_options" hdr.gtpu_options.isValid @@
+    { discriminee = [var hdr.gtpu_options.next_ext; var gtpu_ext_len];
+      cases = [
+        [bvi 133 8; bvi 1 8 ], "parse_gtpu_ext_psc"
+      ];
+      default = "accept";
+    }
+    ;
+    state "parse_gtpu_ext_psc" hdr.gtpu_ext_psc.isValid @@
+    select hdr.gtpu_ext_psc.next_ext [
+      bvi 0 8,  "parse_inner_ipv4"
+    ] "accept"
+    ;
+    state "parse_inner_ipv4" 
+      hdr.inner_ipv4.isValid 
+      ~post:(assign last_ipv4_dscp @@ var hdr.inner_ipv4.dscp) @@
+      select hdr.inner_ipv4.protocol [
+        bvi 6 8, "parse_inner_tcp";
+        bvi 17 8, "parse_inner_udp";
+        bvi 1 8, "parse_inner_icmp";
+      ] "accept"
+    ;
+    state "parse_inner_udp" hdr.inner_udp.isValid @@
+    direct "accept"
+    ;
+    state "parse_inner_tcp" hdr.inner_tcp.isValid @@
+    direct "accept"
+    ;
+    state "parse_inner_icmp" hdr.inner_icmp.isValid @@
+    direct "accept"
+  ]
+
 let lkp_md_init =  
-  let open HoareNet in
   let open Expr in
   let open BExpr in
   sequence [
-    assign fabric_metadata.lkp.is_ipv4 @@ bfalse;
+    (* assign fabric_metadata.lkp.is_ipv4 @@ bfalse;
     assign fabric_metadata.lkp.ipv4_src @@ bvi 0 32;
     assign fabric_metadata.lkp.ipv4_dst @@ bvi 0 32;
     assign fabric_metadata.lkp.ip_proto @@ bvi 0 8;
     assign fabric_metadata.lkp.l4_sport @@ bvi 0 16;
     assign fabric_metadata.lkp.l4_dport @@ bvi 0 16;
     assign fabric_metadata.lkp.icmp_type @@ bvi 0 8;
-    assign fabric_metadata.lkp.icmp_code @@ bvi 0 8;
+    assign fabric_metadata.lkp.icmp_code @@ bvi 0 8; *)
     ifte_seq (eq_ btrue @@ var hdr.inner_ipv4.isValid) [
       assign fabric_metadata.lkp.is_ipv4 btrue;
       assign fabric_metadata.lkp.ipv4_src @@ var hdr.inner_ipv4.srcAddr;
@@ -534,7 +716,6 @@ let lkp_md_init =
   ]
 
 let slice_tc_classifier =
-  let open HoareNet in
   let open Expr in
   let open Primitives in  
   let set_slice_id_tc =
@@ -560,25 +741,23 @@ let slice_tc_classifier =
     ] 
   in
   let classifier =
-    instr_table ("classifier",  
+    table "classifier" 
       [ 
-        `Exact standard_metadata.ingress_port
-      ; `Exact fabric_metadata.lkp.ipv4_src
-      ; `Exact fabric_metadata.lkp.ipv4_dst
-      ; `Exact fabric_metadata.lkp.ip_proto
-      ; `Exact fabric_metadata.lkp.l4_sport
-      ; `Exact fabric_metadata.lkp.l4_dport
-      ],
+        standard_metadata.ingress_port, Exact
+      ; fabric_metadata.lkp.ipv4_src, Exact
+      ; fabric_metadata.lkp.ipv4_dst, Exact
+      ; fabric_metadata.lkp.ip_proto, Exact
+      ; fabric_metadata.lkp.l4_sport, Exact
+      ; fabric_metadata.lkp.l4_dport, Exact
+      ]
       [set_slice_id_tc; trust_dscp;
       (* default *)
       set_slice_id_tc_default
       ]
-     )
   in
   classifier
 
 let filtering = 
-  let open HoareNet in
   let open Expr in
   let open BExpr in
   let deny = [], Action.[
@@ -602,16 +781,15 @@ let filtering =
       assign fabric_metadata.port_type @@ var port_type;
     ] in
   let ingress_port_vlan = 
-    instr_table ("ingress_port_vlan",
+    table "ingress_port_vlan"
       [
-        `Exact standard_metadata.ingress_port;
-        `Exact hdr.vlan_tag.isValid ;
-        `Maskable hdr.vlan_tag.vlan_id;
-      ], [
+        standard_metadata.ingress_port, Exact;
+        hdr.vlan_tag.isValid, Exact ;
+        hdr.vlan_tag.vlan_id, Maskable;
+      ] [
         deny; (* default *)
         permit; permit_with_internal_vlan;
       ]
-    )
   in
   let set_forwarding_type = 
     let fwd_type = Var.make "fwd_type" 3 in
@@ -627,17 +805,17 @@ let filtering =
     ]
   in
   let fwd_classifier = 
-    instr_table ("fwd_classifier", [
-      `Exact standard_metadata.ingress_port;
-      `Exact hdr.ethernet.dstAddr;
-      `Exact hdr.eth_type.value;
-      `Exact fabric_metadata.ip_eth_type;  
-      ],[
+    table "fwd_classifier"
+      [
+        standard_metadata.ingress_port, Exact;
+        hdr.ethernet.dstAddr, Exact;
+        hdr.eth_type.value, Exact;
+        fabric_metadata.ip_eth_type, Exact;  
+      ] [
         set_forwarding_type; 
         set_forwarding_type_bridging (*default*)
       ]
-    )
-    in
+  in
   sequence [
     ifte_seq (eq_ btrue @@ var hdr.vlan_tag.isValid) [
       assign fabric_metadata.vlan_id @@ var hdr.vlan_tag.vlan_id;
@@ -652,7 +830,6 @@ let filtering =
   ]
 
 let forwarding = 
-  let open HoareNet in
   let open Expr in
   let open BExpr in
   let set_next_id_bridging = 
@@ -664,15 +841,14 @@ let forwarding =
     ] in
   let nop = [],[] in
   let bridging = 
-    instr_table ("bridging",
+    table "bridging"
       [
-        `Exact fabric_metadata.vlan_id;
-        `Exact hdr.ethernet.dstAddr;
-      ] , [
+        fabric_metadata.vlan_id, Exact;
+        hdr.ethernet.dstAddr, Exact;
+      ] [
         set_next_id_bridging; 
         nop (*defaultonly*)
       ]
-    )
   in
   let pop_mpls_and_next =
     let next_id = Var.make "next_id" 32 in
@@ -683,14 +859,13 @@ let forwarding =
       (* mpls_counter.count() *)
     ] in
   let mpls = 
-    instr_table ("mpls",
+    table "mpls"
       [
-        `Exact fabric_metadata.mpls_label; 
-      ], [
+        fabric_metadata.mpls_label, Exact; 
+      ] [
         pop_mpls_and_next; 
         nop (* nop *)
       ]
-    )
   in
   let set_next_id_routing_v4 = 
     let next_id = Var.make "next_id" 32 in
@@ -699,14 +874,13 @@ let forwarding =
     ] in
   let nop_routing_v4 = [],[] in
   let routing_v4 = 
-      instr_table ("routing_v4",
-        [
-          `Exact fabric_metadata.ipv4_dst_addr;
-        ],[
-          set_next_id_routing_v4; nop_routing_v4; 
-          nop (*defaultonly*)
-        ]
-      )
+    table "routing_v4"
+      [
+        fabric_metadata.ipv4_dst_addr, Exact;
+      ] [
+        set_next_id_routing_v4; nop_routing_v4; 
+        nop (*defaultonly*)
+      ]
   in
   ifte (eq_ (bvi 0 3) @@ var fabric_metadata.fwd_type) bridging @@
   ifte (eq_ (bvi 1 3) @@ var fabric_metadata.fwd_type) mpls @@
@@ -714,7 +888,6 @@ let forwarding =
   skip
 
 let pre_next =
-  let open HoareNet in
   let open Expr in
   let nop = [],[] in
   let set_mpls_label =
@@ -725,13 +898,12 @@ let pre_next =
     ]
   in
   let next_mpls = 
-    instr_table ("next_mpls",
+    table "next_mpls"
       [
-        `Exact fabric_metadata.next_id; 
-      ], [
+        fabric_metadata.next_id, Exact; 
+      ] [
         set_mpls_label; nop
       ]
-    )
   in
   let set_vlan = 
     let vlan_id = Var.make "vlan_id" 12 in
@@ -740,21 +912,20 @@ let pre_next =
       (* next_vlan_counter.count() *)
     ] in
   let next_vlan = 
-    instr_table ( "next_vlan", 
+    table "next_vlan"
       [
-        `Exact fabric_metadata.next_id; 
-      ], [
+        fabric_metadata.next_id, Exact; 
+      ] [
         set_vlan; 
         nop (* defaultonly *)
       ]
-    ) in  
+  in  
   sequence [
     next_mpls;
     next_vlan
   ]
 
 let acl fixed = 
-  let open HoareNet in
   let open Expr in
   let set_next_id_acl =
     let next_id = Var.make "next_id" 32 in
@@ -783,38 +954,36 @@ let acl fixed =
   ] in
   let nop_acl = [], [ (* acl_counter.count(); *) ] in
   let acl =
-    instr_table  ("acl",
+    table "acl"
       [ 
-        `MaskableDegen standard_metadata.ingress_port;
-        `MaskableDegen hdr.ethernet.dstAddr;     
-        `MaskableDegen hdr.ethernet.srcAddr;         
-        `Maskable      hdr.vlan_tag.vlan_id;          
-        `MaskableDegen hdr.eth_type.value;            
-        `MaskableDegen fabric_metadata.lkp.ipv4_src;        
-        `MaskableDegen fabric_metadata.lkp.ipv4_dst;
-        `MaskableDegen fabric_metadata.lkp.ip_proto;
+        standard_metadata.ingress_port, MaskableDegen;
+        hdr.ethernet.dstAddr, MaskableDegen;     
+        hdr.ethernet.srcAddr, MaskableDegen;         
+        hdr.vlan_tag.vlan_id, Maskable;          
+        hdr.eth_type.value, MaskableDegen;            
+        fabric_metadata.lkp.ipv4_src, MaskableDegen;        
+        fabric_metadata.lkp.ipv4_dst, MaskableDegen;
+        fabric_metadata.lkp.ip_proto, MaskableDegen;
         if fixed 
-        then `MaskableDegen fabric_metadata.lkp.icmp_type
-        else `Maskable      hdr.icmp.type_;
+        then fabric_metadata.lkp.icmp_type, MaskableDegen
+        else hdr.icmp.type_, Maskable;
         if fixed
-        then `MaskableDegen fabric_metadata.lkp.icmp_code
-        else `Maskable      hdr.icmp.code;
-        `MaskableDegen fabric_metadata.lkp.l4_sport;
-        `MaskableDegen fabric_metadata.lkp.l4_dport;
-        `MaskableDegen fabric_metadata.port_type;
-      ], [
+        then fabric_metadata.lkp.icmp_code, MaskableDegen
+        else hdr.icmp.code, Maskable;
+        fabric_metadata.lkp.l4_sport, MaskableDegen;
+        fabric_metadata.lkp.l4_dport, MaskableDegen;
+        fabric_metadata.port_type, MaskableDegen;
+      ] [
         set_next_id_acl;
         punt_to_cpu;
         set_clone_session_id;
         drop;
         nop_acl; (*default*)
       ]
-    ) 
   in
   acl
 
 let next =
-  let open HoareNet in
   let open Expr in
   let output x = Action.(assign standard_metadata.egress_spec x) in
   let output_xconnect = 
@@ -833,15 +1002,14 @@ let next =
   in
   let nop = [],[] in
   let xconnect =
-    instr_table ("xconnect",
+    table "xconnect"
       [
-        `Exact standard_metadata.ingress_port;
-        `Exact fabric_metadata.next_id;
-      ], [
+        standard_metadata.ingress_port, Exact;
+        fabric_metadata.next_id, Exact;
+      ] [
         output_xconnect; set_next_id_xconnect; 
         nop; (* default*)
       ]
-    )
   in
   let output_hashed =
     let port_num = Var.make "port_num" 9 in
@@ -862,22 +1030,21 @@ let next =
     ]
   in
   let hashed =
-    instr_table ("hashed",
+    table "hashed"
       [
-        `Exact fabric_metadata.next_id;
+        fabric_metadata.next_id, Exact;
         (* `Exact fabric_metadata.ipv4_src_addr; (* selector *)
         `Exact fabric_metadata.ipv4_dst_addr; (* selector *)
         `Exact fabric_metadata.ip_proto; (* selector *)
         `Exact fabric_metadata.l4_sport; (* selector *)
         `Exact fabric_metadata.l4_dport; selector *)
-      ], [
+      ] [
         output_hashed; routing_hashed; 
         nop (*defaultonly*)
       ]
-    )
   in
   let set_mcast_group_id =
-    let group_id = Var.make "group_id" 32 in
+    let group_id = Var.make "group_id" 16 in
     [group_id], Action.[
       assign standard_metadata.mcast_grp @@ var group_id;
       assign fabric_metadata.is_multicast @@ btrue;
@@ -885,13 +1052,13 @@ let next =
     ]
   in
   let multicast = 
-    instr_table ("multicast",
+    table "multicast"
     [
-      `Exact fabric_metadata.next_id;
-    ], [
+      fabric_metadata.next_id, Exact;
+    ] [
       set_mcast_group_id; 
       nop (* multicast *)
-    ])
+    ]
   in
   sequence [
     xconnect;
@@ -899,8 +1066,7 @@ let next =
     multicast;
   ]
 
-let qos =  
-  let open HoareNet in
+let qos =
   let open Expr in
   let slice_tc = Var.make "slice_tc" 6 in
   let meter_havoc = Var.make "meter_havoc" 2 in
@@ -920,15 +1086,15 @@ let qos =
       ]
   in
   let queues =
-    instr_table ("queues",
+    table "queues"
     [
-      `Exact fabric_metadata.slice_id;
-      `Exact fabric_metadata.tc;
-      `Exact fabric_metadata.packet_color;
-    ], [
+      fabric_metadata.slice_id, Exact;
+      fabric_metadata.tc, Exact;
+      fabric_metadata.packet_color, Exact;
+    ] [
       set_queue; meter_drop;
       set_queue_default
-    ])
+    ]
   in
   sequence [
     assign slice_tc @@ bconcat (var fabric_metadata.slice_id) (var fabric_metadata.tc);
@@ -939,39 +1105,44 @@ let qos =
   ]
 
 let pkt_io_ingress =
-  let open HoareNet in
   let open Expr in
   let open BExpr in
-  ifte_seq (eq_ btrue @@ var hdr.packet_out.isValid) [
-    assign standard_metadata.egress_spec @@ var hdr.packet_out.egress_port;
-    assign hdr.packet_out.isValid bfalse;
-    assign fabric_metadata.is_controller_packet_out btrue;
-    exit_; 
-  ] []
+  sequence [
+    ifte_seq (eq_ btrue @@ var hdr.packet_out.isValid) [
+      assign standard_metadata.egress_spec @@ var hdr.packet_out.egress_port;
+      assign hdr.packet_out.isValid bfalse;
+      assign fabric_metadata.is_controller_packet_out btrue;
+      exit_; 
+    ] []
+  ]
 
 let fabric_ingress fixed =
-  let open HoareNet in
+  if fixed then Log.qe_s "fixed" else Log.qe_s "unfixed";
   let open Expr in
   let open BExpr in
   sequence [
     lkp_md_init;
-    pkt_io_ingress; check_exit @@
-    slice_tc_classifier;
-    ifte_seq (eq_ bfalse (var fabric_metadata.is_controller_packet_out)) [
-      filtering;
-      ifte (eq_ bfalse (var fabric_metadata.skip_forwarding))
-        forwarding skip;
-      ifte (eq_ bfalse (var fabric_metadata.skip_next))
-        pre_next skip;
-      acl fixed;
-      ifte (eq_ bfalse (var fabric_metadata.skip_next))
-        next skip;
-      qos;
-    ] []
+    pkt_io_ingress; 
+    (* check_exit @@ sequence [
+      assign standard_metadata.egress_spec @@ bvi 511 9;
+    ] *)
+    check_exit @@ sequence [
+      slice_tc_classifier;
+      ifte_seq (eq_ bfalse (var fabric_metadata.is_controller_packet_out)) [
+        filtering;
+        ifte (eq_ bfalse (var fabric_metadata.skip_forwarding))
+          forwarding skip;
+        ifte (eq_ bfalse (var fabric_metadata.skip_next))
+          pre_next skip;
+        acl fixed;
+        ifte (eq_ bfalse (var fabric_metadata.skip_next))
+         next skip;
+        qos;
+      ] [] 
+    ]
   ]
 
-let pkt_io_egress =  
-  let open HoareNet in
+let pkt_io_egress =
   let open Expr in
   let open BExpr in
   sequence [
@@ -987,7 +1158,6 @@ let pkt_io_egress =
   ]
 
 let egress_next =
-  let open HoareNet in
   let open Expr in
   let open BExpr in
   let push_vlan = [], Action.[
@@ -1011,22 +1181,21 @@ let egress_next =
     (* egress_vlan_counter.count() *)
   ] in
   let egress_vlan =
-    instr_table("egress_vlan", 
+    table "egress_vlan"
       [
-        `Exact fabric_metadata.vlan_id;
-        `Exact standard_metadata.egress_port;
-      ], [
+        fabric_metadata.vlan_id, Exact;
+        standard_metadata.egress_port, Exact;
+      ] [
         push_vlan; pop_vlan; 
         drop (*defaultonly*)
       ]
-    )
   in
   sequence [
     ifte_seq (and_
         (eq_ btrue @@ var fabric_metadata.is_multicast) 
         (var standard_metadata.ingress_port |> eq_ @@ var standard_metadata.egress_port)
       ) [
-        of_action mark_to_drop
+        assign standard_metadata.egress_spec @@ bvi 511 9;
       ] [];
     ifte_seq (var fabric_metadata.mpls_label |> eq_ @@ bvi 0 20) [
       ifte_seq (eq_ btrue @@ var hdr.mpls.isValid) 
@@ -1037,10 +1206,10 @@ let egress_next =
         [];
     ] [
       assign hdr.mpls.isValid btrue;
-      havoc hdr.mpls.label "egress_havoc_label" |> of_action;
-      havoc hdr.mpls.tc "egress_havoc_tc" |> of_action;
-      havoc hdr.mpls.bos "egress_havoc_bos" |> of_action;
-      havoc hdr.mpls.ttl "egress_havoc_ttl" |> of_action;
+      havoc hdr.mpls.label "egress_havoc_label" |> active;
+      havoc hdr.mpls.tc "egress_havoc_tc" |> active;
+      havoc hdr.mpls.bos "egress_havoc_bos" |> active;
+      havoc hdr.mpls.ttl "egress_havoc_ttl" |> active;
       assign hdr.mpls.label @@ var fabric_metadata.mpls_label;
       assign hdr.mpls.tc @@ bvi 0 3;
       assign hdr.mpls.bos @@ bvi  1 1;
@@ -1051,7 +1220,7 @@ let egress_next =
     ifte_seq (eq_ btrue @@ var hdr.mpls.isValid) [
       assign hdr.mpls.ttl @@ bsub (var hdr.mpls.ttl) (bvi 1 8);
       ifte_seq (var hdr.mpls.ttl |> eq_ @@ bvi 0 8) [
-        of_action mark_to_drop
+        active mark_to_drop
       ] []
     ] [
       ifte_seq (and_ 
@@ -1060,14 +1229,13 @@ let egress_next =
       ) [
         assign hdr.ipv4.ttl @@ bsub (var hdr.ipv4.ttl) (bvi 1 8);
         ifte_seq (var hdr.ipv4.ttl |> eq_ @@ bvi 0 8) [
-          of_action mark_to_drop
+          active mark_to_drop
         ] []
       ] []
     ]
   ]
 
 let dscp_rewriter =
-  let open HoareNet in
   let open Expr in
   let open BExpr in
   let tmp_dscp = Var.make "tmp_dscp" 6 in
@@ -1080,12 +1248,13 @@ let dscp_rewriter =
   ] in
   let nop = [], [action 2] in
   let rewriter = 
-    instr_table ("rewriter",[
-      `Exact standard_metadata.egress_port;
-    ],[
+    table "rewriter"
+    [
+      standard_metadata.egress_port, Exact;
+    ] [
      rewrite; clear; 
      nop (*defaultonly*)
-    ])
+    ]
   in
   let rewrite_or_clear =
     ifte (eq_ btrue @@ var hdr.ipv4.isValid) 
@@ -1103,7 +1272,6 @@ let dscp_rewriter =
   ]
 
 let fabric_egress =
-  let open HoareNet in
   let open Expr in
   let open BExpr in
   sequence [
@@ -1116,5 +1284,4 @@ let fabric_egress =
   ]
 
 let fabric fixed =
-  pipeline fabric_parser (fabric_ingress fixed) fabric_egress
-  |> HoareNet.assert_valids
+  (fabric_psm, fabric_ingress fixed, fabric_egress)

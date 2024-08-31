@@ -157,10 +157,58 @@ let occurs_in x b =
    * |> Util.uncurry (@)  *)
   |> List.exists ~f:(Var.(=) x)
 
-let to_smtlib c =
+let to_smtlib phi =
   let b = Buffer.create 8000 in
-  to_smtlib_buffer 0 b c;
+  to_smtlib_buffer 0 b phi;
   Buffer.contents b
+
+let op_emit_p4 op args = 
+  let binop = match op with 
+    | LAnd -> 
+      Printf.sprintf "(%s && %s)"
+    | LOr -> 
+      Printf.sprintf "(%s || %s)" 
+    | LArr ->
+      failwith "=> unsupported"
+    | LIff ->
+      failwith "<=> unsupported"
+  in 
+  List.fold args ~init:None ~f:(fun acc_opt arg -> 
+    match acc_opt with 
+    | None -> Some arg
+    | Some acc -> 
+      Some (binop acc arg)
+  )
+  |> (Option.value_exn 
+    ~message:"length of arglist is 0"
+  )
+
+let comp_emit_p4 comp arg1 arg2 = 
+  let symbol = match comp with
+    | Eq -> "=="
+    | Ult | Slt -> "<"
+    | Ule | Sle -> "<="
+    | Uge | Sge -> ">="
+    | Ugt | Sgt -> ">"
+  in 
+  Printf.sprintf "(%s %s %s)" arg1 symbol arg2
+
+let rec emit_p4 phi = 
+  match phi with 
+  | TFalse -> "false"
+  | TTrue -> "true"
+  | LVar _ -> failwith "unknown"
+  | TNot phi -> 
+    Printf.sprintf "!%s" (emit_p4 phi)
+  | TNary (op, phis) -> 
+    List.map phis ~f:emit_p4
+    |> op_emit_p4 op
+  | TComp (c, e1, e2) -> 
+    (comp_emit_p4 c)
+      (Expr.emit_p4 e1)
+      (Expr.emit_p4 e2)
+  | Exists _ | Forall _ ->
+    failwith "Quantifiers are unsupported"
     
 let ctor1 ~default ~smart a =
   match !enable_smart_constructors with

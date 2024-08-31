@@ -34,8 +34,7 @@ type t =
   [@@deriving eq, sexp, hash, compare, quickcheck]
 
 val to_smtlib : t -> string
-(* val of_smtlib : ?cvs:Var.t list -> string -> t
- * val of_smtast : ?cvs:Var.t list -> SmtAst.t list -> t   *)
+val emit_p4 : t -> string
 
 val enable_smart_constructors : [`On | `Off] ref
 val q_count : Bigint.t ref

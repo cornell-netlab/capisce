@@ -136,6 +136,37 @@ let roundtrip_gen_4 () =
 
 
 
+let zero_extend () =
+  Solver.of_smtlib ~cvs:[Var.make "x" 8; Var.make "y" 16] ~dvs:[]  {|
+    (= ((_ zero_extend 8) x) y)
+  |}
+  |> Alcotest.(check bexpr) "equiv" BExpr.(Expr.(
+    eq_ (bconcat (bvi 0 8) (var @@ Var.make "x" 8)) (var @@ Var.make "y" 16)
+  ))
+
+let parse_tricksy_princess_output () = 
+  {|
+    (or 
+      (or 
+        (or 
+          (or 
+            (not (= _symb$flowlet$action$_$0 (_ bv1 1))) 
+            (not (= _symb$ecmp_nhop$action$_$0 (_ bv0 2)))) 
+          (not (= _symb$ecmp_group$match_0$DONT_CARE$_$0 (_ bv0 1)))) 
+        (not (= _symb$ecmp_group$action$_$0 (_ bv1 2)))) 
+        
+      (or 
+        (or 
+          (or 
+            (bvule _symb$forward$action$_$0 (_ bv1 2)) 
+            (bvsle (_ bv0 16) 
+                   (bvadd ((_ zero_extend 2) _symb$ecmp_nhop$match_0$_$0) (bvadd (bvneg ((_ zero_extend 8) _symb$ecmp_group$1$ecmp_count$_$0)) (bvneg ((_ zero_extend 8) _symb$ecmp_group$1$ecmp_base$_$0)))))) 
+        (bvsle (_ bv1 16) (bvadd (bvneg ((_ zero_extend 2) _symb$ecmp_nhop$match_0$_$0)) ((_ zero_extend 8) _symb$ecmp_group$1$ecmp_base$_$0)))) 
+      (bvsle (_ bv256 10) (bvadd ((_ zero_extend 2) _symb$ecmp_group$1$ecmp_count$_$0) ((_ zero_extend 2) _symb$ecmp_group$1$ecmp_base$_$0)))))
+  |}
+  |> Solver.of_smtlib ~cvs:[] ~dvs:[]
+  |> Alcotest.(check (neg bexpr)) "parses" BExpr.true_
+
   
 let tests =
   [ Alcotest.test_case "QC smt parser roundtrips" `Slow smtlib_roundtrip;
@@ -144,5 +175,7 @@ let tests =
     Alcotest.test_case "debugging generated example_1" `Quick roundtrip_gen_1;
     Alcotest.test_case "debugging generated example_2" `Quick roundtrip_gen_2;
     Alcotest.test_case "debugging generated example_3" `Quick roundtrip_gen_3;    
-    Alcotest.test_case "debugging generated example_4" `Quick roundtrip_gen_4;        
+    Alcotest.test_case "debugging generated example_4" `Quick roundtrip_gen_4;   
+    Alcotest.test_case "zero_extend" `Quick zero_extend;
+    Alcotest.test_case "tricksy princess" `Quick parse_tricksy_princess_output;
   ]

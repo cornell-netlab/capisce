@@ -1,6 +1,6 @@
 open Core
 open Capisce
-open DependentTypeChecker
+open ASTs.GPL
 open V1ModelUtils
 
 
@@ -19,7 +19,6 @@ let meta : metadata_t = {custom_metadata}
 
 
 let hh_parser =
-  let open HoareNet in
   let open BExpr in
   let open Expr in
   let parse_tcp =
@@ -58,8 +57,35 @@ let hh_parser =
   in
   start
 
+  let hh_psm =
+    let open EmitP4.Parser in 
+    let open ASTs.GCL in 
+    let open Expr in
+    of_state_list
+    [
+      { name = "start";
+        body = skip;
+        transition = default "parse_ethernet"
+      };
+      { name = "parse_ethernet";
+        body = assign hdr.ethernet.isValid btrue;
+        transition = select hdr.ethernet.etherType [
+          bvi 2048 16, "parse_ipv4";
+        ] "accept" 
+      };
+      { name = "parse_ipv4";
+        body = assign hdr.ipv4.isValid btrue;
+        transition = select hdr.ipv4.protocol [
+          bvi 6 8, "parse_tcp"
+        ] "accept"
+      };
+      { name = "parse_tcp";
+        body = assign hdr.tcp.isValid btrue;
+        transition = default "accept"
+      }  
+    ]
+
 let hh_ingress =
-  let open HoareNet in
   (* let open BExpr in *)
   let open Expr in
   let count_action =
@@ -74,12 +100,12 @@ let hh_ingress =
       ]
   in
   let count_table =
-    instr_table ("count_table", [
-      `Maskable hdr.ipv4.srcAddr
-      ], [
+    table "count_table" [
+      hdr.ipv4.srcAddr, Maskable
+    ] [
       count_action; _drop;
       nop (* Unspecified default action, assuming noop *)
-      ])
+    ]
   in
   let set_nhop =
     let nhop_ipv4 = Var.make "set_nhop" 32 in
@@ -93,12 +119,12 @@ let hh_ingress =
       ]
   in
   let ipv4_lpm =
-    instr_table ("ipv4_lpm", [
-      `Maskable hdr.ipv4.dstAddr
-      ], [
-        set_nhop; _drop;
-        nop (* Unspecified default action, assuming noop *)
-        ])
+    table "ipv4_lpm" [
+      hdr.ipv4.dstAddr, Maskable
+    ] [
+      set_nhop; _drop;
+      nop (* Unspecified default action, assuming noop *)
+    ]
   in
   let set_dmac =
     let dmac = Var.make "dmac" 48 in
@@ -108,12 +134,12 @@ let hh_ingress =
       ]
   in
   let forward =
-    instr_table ("forward", [
-      `Exact meta.custom_metadata.nhop_ipv4
-      ], [
-        set_dmac; _drop;
-        nop (* Unspecified default action, assuming noop *)
-        ])
+    table "forward" [
+      meta.custom_metadata.nhop_ipv4, Exact
+    ] [
+      set_dmac; _drop;
+      nop (* Unspecified default action, assuming noop *)
+    ]
   in
   sequence [
     count_table;
@@ -122,37 +148,31 @@ let hh_ingress =
   ]
 
 let hh_egress =
-  (* HoareNet.skip *)
-  let open HoareNet in
   (* let open BExpr in *)
   let open Expr in
   let rewrite_mac =
     let smac = Var.make "smac" 48 in
     [smac], Primitives.Action.[
-        (* assert_ @@ eq_ btrue @@ var hdr.ethernet.isValid; *)
-        assign hdr.ethernet.srcAddr @@ var smac
-      ]
+      assign hdr.ethernet.srcAddr @@ var smac
+    ]
   in
   let _drop =
     [], Primitives.Action.[
-        assign standard_metadata.egress_spec @@ bvi 511 9
-      ]
+      assign standard_metadata.egress_spec @@ bvi 511 9
+    ]
   in
   let send_frame =
-    instr_table (
-      "send_frame", [
-        `Exact standard_metadata.egress_port
-        ], [
-          rewrite_mac; _drop;
-          nop (* Unspecified default action, assuming noop *)
-          ]
-          )
+    table "send_frame" 
+      [
+        standard_metadata.egress_port, Exact
+      ] [
+        rewrite_mac; _drop;
+        nop (* Unspecified default action, assuming noop *)
+      ]
   in
   sequence [
     send_frame
   ]
 
-
 let heavy_hitter_1 =
-  pipeline hh_parser hh_ingress hh_egress
-  |> HoareNet.assert_valids
+  hh_psm, hh_ingress, hh_egress

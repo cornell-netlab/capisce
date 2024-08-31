@@ -41,7 +41,7 @@ let run_proc_file p str =
 (*   String.concat lines ~sep:"\n" *)
 
   
-let run_princess = run_proc_file (princess_exe ())
+let run_princess str = run_proc_file (princess_exe ()) str
 let run_z3 str =
   (* let table = String.Table.create () in *)
   (* fun str ->

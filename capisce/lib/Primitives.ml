@@ -361,8 +361,15 @@ module Action = struct
 end
 
 module Table = struct
+  type kind = 
+  | Exact
+  | Maskable
+  | MaskableDegen
+  [@@deriving quickcheck, hash, eq, sexp, compare]
+
+
   type t = {name : string;
-            keys : Var.t list;
+            keys : (Var.t * kind) list;
             actions : (Var.t list * Action.t list) list;
            }
   [@@deriving quickcheck, hash, eq, sexp, compare]
@@ -386,7 +393,7 @@ module Table = struct
         List.sum (module Int) prims ~f:(Action.size))
 
   let subst x e (tbl : t) =
-    if List.exists tbl.keys ~f:(Var.equal x) then
+    if List.exists tbl.keys ~f:(fun (key, _) -> Var.equal x key) then
       failwithf "Cannot substitute variable %s, its a key in table %s" (Var.str x) tbl.name ()
     else
       let open List.Let_syntax in
@@ -402,7 +409,7 @@ module Table = struct
 
   let normalize_names (tbl : t) =
     let open List.Let_syntax in
-    let keys = List.map tbl.keys ~f:(Var.normalize_name) in
+    let keys = List.map tbl.keys ~f:(Tuple2.map_fst ~f:Var.normalize_name) in
     let actions =
       let%map (args, body) = tbl.actions in
       (List.map ~f:Var.normalize_name args,
@@ -472,14 +479,20 @@ module Table = struct
   let explode _ = failwith "Ironically tables themselves cannot be exploded"
 
   let vars t =
-    t.keys @
+    List.map ~f:fst t.keys @
     List.bind t.actions ~f:(fun (params, commands) ->
         params @ List.bind commands ~f:(Action.vars))
     |> Var.dedup
 
   let symbolic_interface tbl : Var.t list =
     Action.cp_action tbl.name (act_size tbl)
-    :: List.bind tbl.keys ~f:(fun k -> [k; Var.make (Var.str k ^ "$DONT_CARE") 1])
+    :: List.bind tbl.keys ~f:(fun (k, kind) -> 
+      match kind with 
+      | Exact | MaskableDegen -> 
+        [k]
+      | Maskable -> 
+        [k; Var.make (Var.str k ^ "$DONT_CARE") 1]
+    )
     @ List.bind ~f:fst tbl.actions
 
 end

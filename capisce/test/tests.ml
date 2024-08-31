@@ -11,6 +11,7 @@ let test_suites : unit Alcotest.test list = [
   "Traversals", Traversals.tests;
   "Util", UtilTest.tests;
   "Concolic Helpers", ConcolicTest.tests;
+  "Analysis", Analysis.tests;
 ]
 
 let () =

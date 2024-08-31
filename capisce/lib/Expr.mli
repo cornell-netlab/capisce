@@ -30,6 +30,7 @@ val nary : (t -> t -> t) -> t list -> t
   
 (* Unary-ish Operators *)
 val bnot : t -> t
+val bneg : t -> t
 val bcast : int -> t -> t
 val bslice : int -> int -> t -> t
 
@@ -41,6 +42,7 @@ val neq_contra : (t * t) -> (t * t) -> bool
 val subst : Var.t -> t -> t -> t
 val vars : t -> Var.t list * Var.t list
 val to_smtlib : t -> string
+val emit_p4 : t -> string
 val coerce_types : TypeContext.t -> t -> t  
 
 val normalize_names : t -> t  
