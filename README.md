@@ -71,6 +71,10 @@ Now to build Capisce, run `make`.
 
 Verify your build by running `./capisce exp -help`
 
+##### Known Issue
+
+On M1 Macs there may be an issue regarding the a missing `/lib64/ld-linux-x86-64.so.2` file.  If you get such an error try building with the flag `--platform linux/amd64`
+
 ### Installing from source
 
 Capiscelib is an ocaml library, so we first need to install `opam`.
@@ -443,13 +447,15 @@ Conversely, `assert_` is demonic---if it can ba falsified the program assumes it
 
 #### Building the Documentation
 
-The full documentation can be viewed using the following commands
+The full documentation can be viewed using the following command. It may prompt you to
+install `odoc`. Please do so using `opam install odoc`.
 ```
 make doc -B
 ```
-
 This will open the documentation in your systems default web
-browser. In the docker container this will be w3m (press enter to follow links and q to quit).
+browser. If you do not have a web browser installed the terminal `xdg-open` command will fail.
+Feel free to browse the documenation some other way.
+In the docker container the docs will be opened in `w3m` (press `enter` to follow links and `q` to quit).
 
 The documentation for the core modules can be found by clicking on
 `capisce` and then navigating to modules `Cmd`, `ASTs`, and `Qe`.

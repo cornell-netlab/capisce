@@ -40,7 +40,8 @@ survey-emit: all
 
 doc: 
 	dune build @doc;
-	cp -r _build/default/_doc/_html/ ./doc
+	rm -rf _build/default/_doc/_html;
+	cp -r _build/default/_doc/_html/ ./doc;
 	xdg-open ./doc/capisce/index.html
 
 coverage:

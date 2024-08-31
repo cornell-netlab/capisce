@@ -5,6 +5,8 @@ RUN mkdir ./capisce
 COPY . ./capisce
 USER root
 RUN chown -R opam:opam .
+
+RUN apt update
 RUN apt install libgmp-dev -y
 
 RUN apt install python3 -y
