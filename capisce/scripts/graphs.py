@@ -66,8 +66,8 @@ def setrcparams():
 
   plt.rcParams['figure.figsize'] = onecolsize
 
-  # plt.rcParams['pdf.fonttype'] = 42
-  # plt.rcParams['ps.fonttype'] = 42
+  plt.rcParams['pdf.fonttype'] = 42
+  plt.rcParams['ps.fonttype'] = 42
   # plt.rcParams['pdf.compression'] = 9
   # plt.rcParams['text.usetex'] = True
   # plt.rcParams['pgf.texsystem']= "pdflatex"

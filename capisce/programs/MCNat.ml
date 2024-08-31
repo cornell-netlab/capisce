@@ -86,22 +86,21 @@ let mc_nat_ingress fixed =
   let set_output_mcg =
     let mcast_group = Var.make "mcast_group" 16 in
     [mcast_group], Primitives.Action.[
-        assign meta.intrinsic_metadata.mcast_grp @@ var mcast_group
+        assign meta.intrinsic_metadata.mcast_grp @@ var mcast_group;
+        assign standard_metadata.egress_spec @@ var (Var.make "DUMMY" 9);
       ]
   in
   let set_mcg =
     table "set_mcg"
          [ hdr.ipv4.dstAddr, Exact ]
          [set_output_mcg; _drop;
-          nop (*Unspecified default action, assuming nop*)
+          (*nop*) (*Unspecified default action, assuming nop*)
          ]
   in
   sequence [
     if fixed then assume @@ eq_ btrue @@ var hdr.ipv4.isValid else skip;
     set_mcg
   ]
-
-
 let mc_nat_egress =
   (* let open BExpr in *)
   let open Expr in

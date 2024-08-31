@@ -42,4 +42,7 @@ doc:
 	dune build @doc;
 	cp -r _build/default/_doc/_html/ ./doc
 	xdg-open ./doc/capisce/index.html
+
+coverage:
+	sh ./coverage.sh
 # end

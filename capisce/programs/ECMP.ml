@@ -72,7 +72,7 @@ let ecmp_psm =
     }
   ]
 
-let ecmp_ingress : t =
+let ecmp_ingress fixed : t =
   let open BExpr in
   let open Expr in
   let nhop_ipv4 = Var.make "nhop_ipv4" 32 in
@@ -119,19 +119,12 @@ let ecmp_ingress : t =
         nop (*  no default action specified assuming noop *)
       ]
   in
-  choice_seqs [
-    [assume @@ eq_ (var hdr.ipv4.isValid) (bvi 1 1);
-     choice_seqs [
-       [ (* assert_ @@ eq_ (var hdr.ipv4.isValid) (bvi 1 1); *)
-         assume @@ ugt_ (var hdr.ipv4.ttl) (bvi 0 8);
-         ecmp_group;
-         forward;
-       ];
-       [assume @@ not_ @@ ugt_ (var hdr.ipv4.ttl) (Expr.bvi 0 8)]
-
-     ]
-    ];
-    [assume @@ not_ (eq_ (var hdr.ipv4.isValid) (Expr.bvi 1 1))]
+  ifte (eq_ (var hdr.ipv4.isValid) (bvi 1 1)) (sequence [
+    assume @@ ugt_ (var hdr.ipv4.ttl) (bvi 0 8);
+    ecmp_group;
+    forward;
+  ]) @@ sequence [
+    if fixed then assign standard_metadata.egress_spec @@ Expr.bvi 511 9 else skip;
   ]
 
 
@@ -158,5 +151,5 @@ let ecmp_egress =
     send_frame
   ]
 
-let ecmp =
-  (ecmp_psm, ecmp_ingress, ecmp_egress)
+let ecmp fixed =
+  (ecmp_psm, ecmp_ingress fixed, ecmp_egress)

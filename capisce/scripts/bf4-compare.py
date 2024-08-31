@@ -40,6 +40,9 @@ def setrcparams():
   # plt.rcParams['axes.grid'] = True
   plt.rcParams['axes.linewidth'] = 0.5
 
+  plt.rcParams['pdf.fonttype'] = 42
+  plt.rcParams['ps.fonttype'] = 42
+
 
   plt.rcParams['grid.alpha'] = 0.4
   plt.rcParams['grid.color'] = 'gray'

@@ -77,7 +77,8 @@ let smtlib : Command.t =
 let command_for_each_example ~f =
   let open Programs in 
   let programs = [
-    "ecmp", ECMP.ecmp;
+    "ecmp", ECMP.ecmp false;
+    "ecmp-fixed", ECMP.ecmp true;
     "netpaxos-acceptor", NetpaxosAcceptor.netpaxos_acceptor;
     "resubmit", Resubmit.resubmit;
     "ndp-router",  NDPRouter.ndp_router;
