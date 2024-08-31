@@ -119,14 +119,15 @@ let ecmp_ingress fixed : t =
         nop (*  no default action specified assuming noop *)
       ]
   in
-  ifte (eq_ (var hdr.ipv4.isValid) (bvi 1 1)) (sequence [
-    assume @@ ugt_ (var hdr.ipv4.ttl) (bvi 0 8);
-    ecmp_group;
-    forward;
-  ]) @@ sequence [
-    if fixed then assign standard_metadata.egress_spec @@ Expr.bvi 511 9 else skip;
-  ]
-
+  let mark_to_drop =
+    assign standard_metadata.egress_spec @@ Expr.bvi 511 9
+  in
+  ifte (eq_ (var hdr.ipv4.isValid) (bvi 1 1)) (
+    ifte (ugt_ (var hdr.ipv4.ttl) (bvi 0 8)) (sequence [
+      ecmp_group;
+      forward])
+      (if fixed then mark_to_drop else skip))
+    (if fixed then mark_to_drop else skip)
 
 let ecmp_egress =
   (* let open BExpr in *)
