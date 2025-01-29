@@ -1,0 +1,271 @@
+(and
+  (not(and
+  (= _symb$classifier$match_0$_$0 (_ bv510 9))
+  (= _symb$classifier$match_1$_$0 (_ bv0 32))
+  (= _symb$classifier$match_2$_$0 (_ bv0 32))
+  (= _symb$classifier$match_3$_$0 (_ bv0 8))
+  (= _symb$classifier$match_4$_$0 (_ bv0 16))
+  (= _symb$classifier$match_5$_$0 (_ bv0 16))
+  (= _symb$classifier$action$_$0 (_ bv0 2))
+  (= _symb$ingress_port_vlan$match_0$_$0 (_ bv510 9))
+  (= _symb$ingress_port_vlan$match_1$_$0 (_ bv0 1))
+  (= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1))
+  (bvule (_ bv2 2) _symb$ingress_port_vlan$action$_$0)
+  (= _symb$fwd_classifier$match_0$_$0 (_ bv510 9))))
+  (and
+    (not(and
+  (= _symb$classifier$match_0$_$0 (_ bv510 9))
+  (= _symb$classifier$match_1$_$0 (_ bv0 32))
+  (= _symb$classifier$match_2$_$0 (_ bv0 32))
+  (= _symb$classifier$match_3$_$0 (_ bv0 8))
+  (= _symb$classifier$match_4$_$0 (_ bv0 16))
+  (= _symb$classifier$match_5$_$0 (_ bv0 16))
+  (bvule (_ bv2 2) _symb$classifier$action$_$0)
+  (= _symb$ingress_port_vlan$match_0$_$0 (_ bv510 9))
+  (= _symb$ingress_port_vlan$match_1$_$0 (_ bv0 1))
+  (= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1))
+  (bvule (_ bv2 2) _symb$ingress_port_vlan$action$_$0)
+  (= _symb$fwd_classifier$match_0$_$0 (_ bv510 9))))
+    (and
+      (not(and
+  (and
+    (not(= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1)))
+    (= _symb$classifier$match_3$_$0 (_ bv1 8))
+    (= _symb$classifier$match_4$_$0 (_ bv0 16))
+    (= _symb$classifier$match_5$_$0 (_ bv0 16))
+    (= _symb$classifier$action$_$0 (_ bv0 2))
+    (= _symb$ingress_port_vlan$match_1$_$0 (_ bv0 1)))
+  (not(= _symb$classifier$match_0$_$0 (_ bv510 9)))
+  (= _symb$ingress_port_vlan$match_0$_$0 _symb$classifier$match_0$_$0)))
+      (and
+        (not(and
+  (and
+    (not(= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1)))
+    (= _symb$classifier$match_3$_$0 (_ bv1 8))
+    (= _symb$classifier$match_4$_$0 (_ bv0 16))
+    (= _symb$classifier$match_5$_$0 (_ bv0 16))
+    (bvule (_ bv2 2) _symb$classifier$action$_$0)
+    (= _symb$ingress_port_vlan$match_1$_$0 (_ bv0 1)))
+  (not(= _symb$classifier$match_0$_$0 (_ bv510 9)))
+  (= _symb$ingress_port_vlan$match_0$_$0 _symb$classifier$match_0$_$0)))
+        (and
+          (not(and
+  (and
+    (and
+      (and
+        (not(= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1)))
+        (not(= _symb$classifier$match_3$_$0 (_ bv17 8))))
+      (not(= _symb$classifier$match_3$_$0 (_ bv6 8)))
+      (= _symb$classifier$match_4$_$0 (_ bv0 16))
+      (= _symb$classifier$match_5$_$0 (_ bv0 16))
+      (= _symb$classifier$action$_$0 (_ bv0 2))
+      (= _symb$ingress_port_vlan$match_1$_$0 (_ bv0 1)))
+    (not(= _symb$classifier$match_0$_$0 (_ bv510 9)))
+    (= _symb$ingress_port_vlan$match_0$_$0 _symb$classifier$match_0$_$0))
+  (not(= _symb$classifier$match_3$_$0 (_ bv1 8)))))
+          (and
+            (not(and
+  (= _symb$classifier$match_0$_$0 (_ bv510 9))
+  (= _symb$classifier$match_1$_$0 (_ bv0 32))
+  (= _symb$classifier$match_2$_$0 (_ bv0 32))
+  (= _symb$classifier$match_3$_$0 (_ bv0 8))
+  (= _symb$classifier$match_4$_$0 (_ bv0 16))
+  (= _symb$classifier$match_5$_$0 (_ bv0 16))
+  (= _symb$classifier$action$_$0 (_ bv0 2))
+  (= _symb$ingress_port_vlan$match_0$_$0 (_ bv510 9))
+  (= _symb$ingress_port_vlan$match_1$_$0 (_ bv0 1))
+  (= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$ingress_port_vlan$action$_$0 (_ bv0 2))
+  (= _symb$fwd_classifier$match_0$_$0 (_ bv510 9))))
+            (and
+              (not(and
+  (and
+    (not(= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1)))
+    (= _symb$classifier$match_3$_$0 (_ bv17 8))
+    (= _symb$classifier$action$_$0 (_ bv0 2))
+    (= _symb$ingress_port_vlan$match_1$_$0 (_ bv0 1)))
+  (not(= _symb$classifier$match_0$_$0 (_ bv510 9)))
+  (= _symb$ingress_port_vlan$match_0$_$0 _symb$classifier$match_0$_$0)))
+              (and
+                (not(and
+  (and
+    (not(= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1)))
+    (= _symb$classifier$match_3$_$0 (_ bv6 8))
+    (= _symb$classifier$action$_$0 (_ bv0 2))
+    (= _symb$ingress_port_vlan$match_1$_$0 (_ bv0 1)))
+  (not(= _symb$classifier$match_0$_$0 (_ bv510 9)))
+  (= _symb$ingress_port_vlan$match_0$_$0 _symb$classifier$match_0$_$0)))
+                (and
+                  (not(and
+  (and
+    (and
+      (and
+        (not(= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1)))
+        (not(= _symb$classifier$match_3$_$0 (_ bv6 8)))
+        (= _symb$classifier$match_4$_$0 (_ bv0 16))
+        (= _symb$classifier$match_5$_$0 (_ bv0 16))
+        (bvule (_ bv2 2) _symb$classifier$action$_$0)
+        (= _symb$ingress_port_vlan$match_1$_$0 (_ bv0 1)))
+      (not(= _symb$classifier$match_3$_$0 (_ bv1 8))))
+    (not(= _symb$classifier$match_0$_$0 (_ bv510 9)))
+    (= _symb$ingress_port_vlan$match_0$_$0 _symb$classifier$match_0$_$0))
+  (not(= _symb$classifier$match_3$_$0 (_ bv17 8)))))
+                  (and
+                    (not(and
+  (and
+    (not(= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1)))
+    (= _symb$classifier$match_3$_$0 (_ bv1 8))
+    (= _symb$classifier$match_4$_$0 (_ bv0 16))
+    (= _symb$classifier$match_5$_$0 (_ bv0 16))
+    (= _symb$classifier$action$_$0 (_ bv1 2))
+    (= _symb$ingress_port_vlan$match_1$_$0 (_ bv0 1)))
+  (not(= _symb$classifier$match_0$_$0 (_ bv510 9)))
+  (= _symb$ingress_port_vlan$match_0$_$0 _symb$classifier$match_0$_$0)))
+                    (and
+                      (not(and
+  (and
+    (not(= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1)))
+    (= _symb$classifier$match_3$_$0 (_ bv17 8))
+    (= _symb$classifier$action$_$0 (_ bv1 2))
+    (= _symb$ingress_port_vlan$match_1$_$0 (_ bv0 1)))
+  (not(= _symb$classifier$match_0$_$0 (_ bv510 9)))
+  (= _symb$ingress_port_vlan$match_0$_$0 _symb$classifier$match_0$_$0)))
+                      (and
+                        (not(and
+  (and
+    (= _symb$ingress_port_vlan$match_0$_$0 _symb$classifier$match_0$_$0)
+    (not(= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1)))
+    (= _symb$classifier$match_3$_$0 (_ bv6 8))
+    (bvule (_ bv2 2) _symb$classifier$action$_$0)
+    (= _symb$ingress_port_vlan$match_1$_$0 (_ bv0 1)))
+  (not(= _symb$classifier$match_0$_$0 (_ bv510 9)))))
+                        (and
+                          (not(and
+  (and
+    (not(= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1)))
+    (= _symb$classifier$match_3$_$0 (_ bv6 8))
+    (= _symb$classifier$action$_$0 (_ bv1 2))
+    (= _symb$ingress_port_vlan$match_1$_$0 (_ bv0 1)))
+  (not(= _symb$classifier$match_0$_$0 (_ bv510 9)))
+  (= _symb$ingress_port_vlan$match_0$_$0 _symb$classifier$match_0$_$0)))
+                          (and
+                            (not(and
+  (= _symb$classifier$match_0$_$0 (_ bv510 9))
+  (= _symb$classifier$match_1$_$0 (_ bv0 32))
+  (= _symb$classifier$match_2$_$0 (_ bv0 32))
+  (= _symb$classifier$match_3$_$0 (_ bv0 8))
+  (= _symb$classifier$match_4$_$0 (_ bv0 16))
+  (= _symb$classifier$match_5$_$0 (_ bv0 16))
+  (= _symb$classifier$action$_$0 (_ bv0 2))
+  (= _symb$ingress_port_vlan$match_0$_$0 (_ bv510 9))
+  (= _symb$ingress_port_vlan$match_1$_$0 (_ bv0 1))
+  (= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$ingress_port_vlan$action$_$0 (_ bv1 2))
+  (= _symb$fwd_classifier$match_0$_$0 (_ bv510 9))))
+                            (and
+                              (not(and
+  (= _symb$classifier$match_0$_$0 (_ bv510 9))
+  (= _symb$classifier$match_1$_$0 (_ bv0 32))
+  (= _symb$classifier$match_2$_$0 (_ bv0 32))
+  (= _symb$classifier$match_3$_$0 (_ bv0 8))
+  (= _symb$classifier$match_4$_$0 (_ bv0 16))
+  (= _symb$classifier$match_5$_$0 (_ bv0 16))
+  (bvule (_ bv2 2) _symb$classifier$action$_$0)
+  (= _symb$ingress_port_vlan$match_0$_$0 (_ bv510 9))
+  (= _symb$ingress_port_vlan$match_1$_$0 (_ bv0 1))
+  (= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$ingress_port_vlan$action$_$0 (_ bv0 2))
+  (= _symb$fwd_classifier$match_0$_$0 (_ bv510 9))))
+                              (and
+                                (not(and
+  (= _symb$classifier$match_0$_$0 (_ bv510 9))
+  (= _symb$classifier$match_1$_$0 (_ bv0 32))
+  (= _symb$classifier$match_2$_$0 (_ bv0 32))
+  (= _symb$classifier$match_3$_$0 (_ bv0 8))
+  (= _symb$classifier$match_4$_$0 (_ bv0 16))
+  (= _symb$classifier$match_5$_$0 (_ bv0 16))
+  (= _symb$classifier$action$_$0 (_ bv1 2))))
+                                (and
+                                  (not(and
+  (and
+    (and
+      (and
+        (not(= _symb$classifier$match_3$_$0 (_ bv17 8)))
+        (not(= _symb$classifier$match_3$_$0 (_ bv1 8))))
+      (not(= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1))))
+    (not(= _symb$classifier$match_3$_$0 (_ bv6 8)))
+    (= _symb$classifier$match_4$_$0 (_ bv0 16))
+    (= _symb$classifier$match_5$_$0 (_ bv0 16))
+    (= _symb$classifier$action$_$0 (_ bv1 2))
+    (= _symb$ingress_port_vlan$match_1$_$0 (_ bv0 1)))
+  (not(= _symb$classifier$match_0$_$0 (_ bv510 9)))
+  (= _symb$ingress_port_vlan$match_0$_$0 _symb$classifier$match_0$_$0)))
+                                  (and
+                                    (not(and
+  (not(= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1)))
+  (= _symb$classifier$match_0$_$0 (_ bv510 9))
+  (= _symb$classifier$match_1$_$0 (_ bv0 32))
+  (= _symb$classifier$match_2$_$0 (_ bv0 32))
+  (= _symb$classifier$match_3$_$0 (_ bv0 8))
+  (= _symb$classifier$match_4$_$0 (_ bv0 16))
+  (= _symb$classifier$match_5$_$0 (_ bv0 16))
+  (= _symb$classifier$action$_$0 (_ bv0 2))
+  (= _symb$ingress_port_vlan$match_0$_$0 (_ bv510 9))
+  (= _symb$ingress_port_vlan$match_1$_$0 (_ bv0 1))))
+                                    (and
+                                      (not(and
+  (not(= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1)))
+  (= _symb$classifier$match_0$_$0 (_ bv510 9))
+  (= _symb$classifier$match_1$_$0 (_ bv0 32))
+  (= _symb$classifier$match_2$_$0 (_ bv0 32))
+  (= _symb$classifier$match_3$_$0 (_ bv0 8))
+  (= _symb$classifier$match_4$_$0 (_ bv0 16))
+  (= _symb$classifier$match_5$_$0 (_ bv0 16))
+  (bvule (_ bv2 2) _symb$classifier$action$_$0)
+  (= _symb$ingress_port_vlan$match_0$_$0 (_ bv510 9))
+  (= _symb$ingress_port_vlan$match_1$_$0 (_ bv0 1))))
+                                      (and
+                                        (not(and
+  (and
+    (not(= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1)))
+    (= _symb$classifier$match_1$_$0 (_ bv0 32))
+    (= _symb$classifier$match_2$_$0 (_ bv0 32))
+    (= _symb$classifier$match_3$_$0 (_ bv0 8))
+    (= _symb$classifier$match_4$_$0 (_ bv0 16))
+    (= _symb$classifier$match_5$_$0 (_ bv0 16))
+    (= _symb$classifier$action$_$0 (_ bv0 2))
+    (= _symb$ingress_port_vlan$match_1$_$0 (_ bv0 1)))
+  (not(= _symb$classifier$match_0$_$0 (_ bv510 9)))
+  (= _symb$ingress_port_vlan$match_0$_$0 _symb$classifier$match_0$_$0)))
+                                        (and
+                                          (not(and
+  (= _symb$classifier$match_0$_$0 (_ bv510 9))
+  (= _symb$classifier$match_1$_$0 (_ bv0 32))
+  (= _symb$classifier$match_2$_$0 (_ bv0 32))
+  (= _symb$classifier$match_3$_$0 (_ bv0 8))
+  (= _symb$classifier$match_4$_$0 (_ bv0 16))
+  (= _symb$classifier$match_5$_$0 (_ bv0 16))
+  (bvule (_ bv2 2) _symb$classifier$action$_$0)
+  (= _symb$ingress_port_vlan$match_0$_$0 (_ bv510 9))
+  (= _symb$ingress_port_vlan$match_1$_$0 (_ bv0 1))
+  (= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$ingress_port_vlan$action$_$0 (_ bv1 2))
+  (= _symb$fwd_classifier$match_0$_$0 (_ bv510 9))))
+                                          (and
+                                            (not(and
+  (and
+    (not(= _symb$ingress_port_vlan$match_2$DONT_CARE$_$0 (_ bv1 1)))
+    (= _symb$classifier$match_3$_$0 (_ bv17 8))
+    (bvule (_ bv2 2) _symb$classifier$action$_$0)
+    (= _symb$ingress_port_vlan$match_1$_$0 (_ bv0 1)))
+  (not(= _symb$classifier$match_0$_$0 (_ bv510 9)))
+  (= _symb$ingress_port_vlan$match_0$_$0 _symb$classifier$match_0$_$0)))
+                                            (not(and
+  (and
+    (= _symb$classifier$match_1$_$0 (_ bv0 32))
+    (= _symb$classifier$match_2$_$0 (_ bv0 32))
+    (= _symb$classifier$match_3$_$0 (_ bv0 8))
+    (= _symb$classifier$match_4$_$0 (_ bv0 16))
+    (= _symb$classifier$match_5$_$0 (_ bv0 16))
+    (= _symb$classifier$action$_$0 (_ bv1 2)))
+  (not(= _symb$classifier$match_0$_$0 (_ bv510 9)))))))))))))))))))))))))))

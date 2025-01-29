@@ -1,0 +1,10 @@
+(and
+  (not(and
+  (= _symb$set_heavy_hitter_count_table$action$_$0 (_ bv0 1))
+  (= _symb$ipv4_lpm$match_0$DONT_CARE$_$0 (_ bv1 1))
+  (bvule (_ bv2 2) _symb$ipv4_lpm$action$_$0)))
+  (and
+    (not(and
+  (not(= _symb$ipv4_lpm$match_0$DONT_CARE$_$0 (_ bv1 1)))
+  (= _symb$set_heavy_hitter_count_table$action$_$0 (_ bv0 1))))
+    (not(= _symb$set_heavy_hitter_count_table$action$_$0 (_ bv1 1)))))

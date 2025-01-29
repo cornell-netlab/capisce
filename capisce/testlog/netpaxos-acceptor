@@ -1,0 +1,5 @@
+netpaxos-acceptor
+
+(declare-const _symb$fwd_tbl$action$_$0 (_ BitVec 2))
+
+(not(= _symb$fwd_tbl$action$_$0 (_ bv0 2)))

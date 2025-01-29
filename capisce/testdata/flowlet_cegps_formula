@@ -1,0 +1,50 @@
+(and
+  (not(and
+  (= _symb$flowlet$action$_$0 (_ bv0 1))
+  (= _symb$ecmp_group$match_0$DONT_CARE$_$0 (_ bv1 1))
+  (bvule (_ bv2 2) _symb$ecmp_group$action$_$0)
+  (= _symb$ecmp_nhop$action$_$0 (_ bv1 2))))
+  (and
+    (not(and
+  (= _symb$flowlet$action$_$0 (_ bv0 1))
+  (= _symb$new_flowlet$action$_$0 (_ bv0 1))
+  (= _symb$ecmp_group$match_0$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$ecmp_group$action$_$0 (_ bv0 2))
+  (= _symb$ecmp_nhop$action$_$0 (_ bv1 2))))
+    (and
+      (not(and
+  (= _symb$flowlet$action$_$0 (_ bv0 1))
+  (not(= _symb$ecmp_group$match_0$DONT_CARE$_$0 (_ bv1 1)))))
+      (and
+        (not(and
+  (= _symb$flowlet$action$_$0 (_ bv0 1))
+  (= _symb$new_flowlet$action$_$0 (_ bv0 1))
+  (= _symb$ecmp_group$match_0$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$ecmp_group$action$_$0 (_ bv1 2))))
+        (and
+          (not(and
+  (and
+    (= _symb$flowlet$action$_$0 (_ bv0 1))
+    (= _symb$new_flowlet$action$_$0 (_ bv1 1)))
+  (not(= _symb$ecmp_group$match_0$DONT_CARE$_$0 (_ bv1 1)))))
+          (and
+            (not(and
+  (= _symb$flowlet$action$_$0 (_ bv0 1))
+  (= _symb$new_flowlet$action$_$0 (_ bv1 1))
+  (= _symb$ecmp_group$match_0$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$ecmp_group$action$_$0 (_ bv1 2))))
+            (and
+              (not(and
+  (= _symb$flowlet$action$_$0 (_ bv0 1))
+  (= _symb$new_flowlet$action$_$0 (_ bv1 1))
+  (= _symb$ecmp_group$match_0$DONT_CARE$_$0 (_ bv1 1))
+  (bvule (_ bv2 2) _symb$ecmp_group$action$_$0)
+  (= _symb$ecmp_nhop$action$_$0 (_ bv1 2))))
+              (and
+                (not(and
+  (= _symb$flowlet$action$_$0 (_ bv0 1))
+  (= _symb$new_flowlet$action$_$0 (_ bv1 1))
+  (= _symb$ecmp_group$match_0$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$ecmp_group$action$_$0 (_ bv0 2))
+  (= _symb$ecmp_nhop$action$_$0 (_ bv1 2))))
+                (not(= _symb$flowlet$action$_$0 (_ bv1 1)))))))))))

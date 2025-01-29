@@ -1,0 +1,249 @@
+arp
+
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ipv4_lpm$action$_$0 (_ bv1 1))
+  (= _symb$forward$match_0$_$0 (_ bv0 1))))
+
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ipv4_lpm$action$_$0 (_ bv0 1))
+  (= _symb$forward$match_0$_$0 (_ bv0 1))))
+
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_2$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_3$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_4$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_5$DONT_CARE$_$0 (_ BitVec 1))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 1))
+
+(not(and
+  (and
+    (= _symb$ipv4_lpm$action$_$0 (_ bv1 1))
+    (= _symb$forward$match_0$_$0 (_ bv1 1))
+    (= _symb$forward$match_2$_$0 (_ bv1 1))
+    (= _symb$forward$match_3$_$0 (_ bv0 1))
+    (= _symb$forward$match_4$_$0 (_ bv0 1)))
+  (not(= _symb$forward$match_5$DONT_CARE$_$0 (_ bv1 1)))))
+
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_2$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_3$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_4$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_5$DONT_CARE$_$0 (_ BitVec 1))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 1))
+
+(not(and
+  (and
+    (= _symb$forward$match_3$_$0 (_ bv0 1))
+    (= _symb$forward$match_4$_$0 (_ bv0 1)))
+  (not(= _symb$forward$match_5$DONT_CARE$_$0 (_ bv1 1)))
+  (= _symb$ipv4_lpm$action$_$0 (_ bv1 1))
+  (= _symb$forward$match_0$_$0 (_ bv1 1))
+  (= _symb$forward$match_2$_$0 (_ bv0 1))))
+
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_2$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_3$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_4$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_5$DONT_CARE$_$0 (_ BitVec 1))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ipv4_lpm$action$_$0 (_ bv1 1))
+  (= _symb$forward$match_0$_$0 (_ bv1 1))
+  (= _symb$forward$match_2$_$0 (_ bv1 1))
+  (= _symb$forward$match_3$_$0 (_ bv0 1))
+  (= _symb$forward$match_4$_$0 (_ bv0 1))
+  (= _symb$forward$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$forward$action$_$0 (_ bv3 2))))
+
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_2$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_3$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_4$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_5$DONT_CARE$_$0 (_ BitVec 1))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 1))
+
+(not(and
+  (and
+    (= _symb$forward$match_3$_$0 (_ bv0 1))
+    (= _symb$forward$match_4$_$0 (_ bv0 1)))
+  (not(= _symb$forward$match_5$DONT_CARE$_$0 (_ bv1 1)))
+  (= _symb$ipv4_lpm$action$_$0 (_ bv0 1))
+  (= _symb$forward$match_0$_$0 (_ bv1 1))
+  (= _symb$forward$match_2$_$0 (_ bv0 1))))
+
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_2$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_3$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_4$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_5$DONT_CARE$_$0 (_ BitVec 1))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$forward$match_4$_$0 (_ bv0 1))
+  (= _symb$forward$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$forward$action$_$0 (_ bv3 2))
+  (= _symb$ipv4_lpm$action$_$0 (_ bv1 1))
+  (= _symb$forward$match_0$_$0 (_ bv1 1))
+  (= _symb$forward$match_2$_$0 (_ bv0 1))
+  (= _symb$forward$match_3$_$0 (_ bv0 1))))
+
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_2$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_3$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_4$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_5$DONT_CARE$_$0 (_ BitVec 1))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 1))
+
+(not(and
+  (and
+    (= _symb$ipv4_lpm$action$_$0 (_ bv0 1))
+    (= _symb$forward$match_0$_$0 (_ bv1 1))
+    (= _symb$forward$match_2$_$0 (_ bv1 1))
+    (= _symb$forward$match_3$_$0 (_ bv0 1))
+    (= _symb$forward$match_4$_$0 (_ bv0 1)))
+  (not(= _symb$forward$match_5$DONT_CARE$_$0 (_ bv1 1)))))
+
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_2$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_3$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_4$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_5$DONT_CARE$_$0 (_ BitVec 1))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ipv4_lpm$action$_$0 (_ bv0 1))
+  (= _symb$forward$match_0$_$0 (_ bv1 1))
+  (= _symb$forward$match_2$_$0 (_ bv1 1))
+  (= _symb$forward$match_3$_$0 (_ bv0 1))
+  (= _symb$forward$match_4$_$0 (_ bv0 1))
+  (= _symb$forward$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$forward$action$_$0 (_ bv3 2))))
+
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_2$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_3$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_4$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_5$DONT_CARE$_$0 (_ BitVec 1))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$forward$match_4$_$0 (_ bv0 1))
+  (= _symb$forward$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$forward$action$_$0 (_ bv2 2))
+  (= _symb$ipv4_lpm$action$_$0 (_ bv1 1))
+  (= _symb$forward$match_0$_$0 (_ bv1 1))
+  (= _symb$forward$match_2$_$0 (_ bv0 1))
+  (= _symb$forward$match_3$_$0 (_ bv0 1))))
+
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_2$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_3$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_4$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_5$DONT_CARE$_$0 (_ BitVec 1))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ipv4_lpm$action$_$0 (_ bv0 1))
+  (= _symb$forward$match_0$_$0 (_ bv1 1))
+  (= _symb$forward$match_2$_$0 (_ bv1 1))
+  (= _symb$forward$match_3$_$0 (_ bv0 1))
+  (= _symb$forward$match_4$_$0 (_ bv0 1))
+  (= _symb$forward$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$forward$action$_$0 (_ bv1 2))))
+
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_2$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_3$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_4$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_5$DONT_CARE$_$0 (_ BitVec 1))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$forward$match_4$_$0 (_ bv0 1))
+  (= _symb$forward$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$forward$action$_$0 (_ bv3 2))
+  (= _symb$ipv4_lpm$action$_$0 (_ bv0 1))
+  (= _symb$forward$match_0$_$0 (_ bv1 1))
+  (= _symb$forward$match_2$_$0 (_ bv0 1))
+  (= _symb$forward$match_3$_$0 (_ bv0 1))))
+
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_2$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_3$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_4$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_5$DONT_CARE$_$0 (_ BitVec 1))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$forward$match_4$_$0 (_ bv0 1))
+  (= _symb$forward$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$forward$action$_$0 (_ bv1 2))
+  (= _symb$ipv4_lpm$action$_$0 (_ bv0 1))
+  (= _symb$forward$match_0$_$0 (_ bv1 1))
+  (= _symb$forward$match_2$_$0 (_ bv0 1))
+  (= _symb$forward$match_3$_$0 (_ bv0 1))))
+
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_2$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_3$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_4$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_5$DONT_CARE$_$0 (_ BitVec 1))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ipv4_lpm$action$_$0 (_ bv1 1))
+  (= _symb$forward$match_0$_$0 (_ bv1 1))
+  (= _symb$forward$match_2$_$0 (_ bv1 1))
+  (= _symb$forward$match_3$_$0 (_ bv0 1))
+  (= _symb$forward$match_4$_$0 (_ bv0 1))
+  (= _symb$forward$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$forward$action$_$0 (_ bv1 2))))
+
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_2$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_3$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_4$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_5$DONT_CARE$_$0 (_ BitVec 1))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$forward$match_4$_$0 (_ bv0 1))
+  (= _symb$forward$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$forward$action$_$0 (_ bv1 2))
+  (= _symb$ipv4_lpm$action$_$0 (_ bv1 1))
+  (= _symb$forward$match_0$_$0 (_ bv1 1))
+  (= _symb$forward$match_2$_$0 (_ bv0 1))
+  (= _symb$forward$match_3$_$0 (_ bv0 1))))
+
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_2$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_3$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_4$_$0 (_ BitVec 1))
+(declare-const _symb$forward$match_5$DONT_CARE$_$0 (_ BitVec 1))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$forward$match_4$_$0 (_ bv0 1))
+  (= _symb$forward$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$forward$action$_$0 (_ bv2 2))
+  (= _symb$ipv4_lpm$action$_$0 (_ bv0 1))
+  (= _symb$forward$match_0$_$0 (_ bv1 1))
+  (= _symb$forward$match_2$_$0 (_ bv0 1))
+  (= _symb$forward$match_3$_$0 (_ bv0 1))))

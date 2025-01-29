@@ -1,0 +1,38 @@
+ecmp
+
+(declare-const _symb$ecmp_group$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ecmp_group$action$_$0 (_ bv0 2))
+  (= _symb$forward$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ecmp_group$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ecmp_group$action$_$0 (_ bv0 2))
+  (bvule (_ bv2 2) _symb$forward$action$_$0)))
+
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 1))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+
+(not(and
+  (= _symb$send_frame$action$_$0 (_ bv1 1))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+
+false
+Uncontrollable path: standard_metadata.egress_spec$set:=(_ bv0 1);
+ parse_result:=(_ bv0 1);
+ exited:=(_ bv0 1);
+ hdr.ethernet.isValid:=(_ bv0 1);
+ hdr.ipv4.isValid:=(_ bv0 1);
+ hdr.tcp.isValid:=(_ bv0 1);
+ hdr.ethernet.isValid:=(_ bv1 1);
+ assume (not(= (_ bv2048 16) hdr.ethernet.etherType));
+ parse_result:=(_ bv1 1);
+ assume (= parse_result (_ bv1 1));
+ assume (not(= hdr.ipv4.isValid (_ bv1 1)));
+ assume (= standard_metadata.egress_spec (_ bv511 9));
+ assert (= standard_metadata.egress_spec$set (_ bv1 1))

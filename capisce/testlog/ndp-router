@@ -1,0 +1,601 @@
+ndp-router
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$readbuffersense$action$_$0 (_ BitVec 1))
+(declare-const _symb$readbuffersense$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+(declare-const _symb$setprio$action$_$0 (_ BitVec 2))
+(declare-const _symb$setprio$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (and
+    (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+    (= _symb$readbuffersense$action$_$0 (_ bv0 1))
+    (= _symb$setprio$action$_$0 (_ bv0 2))
+    (= _symb$forward$action$_$0 (_ bv0 2))
+    (= _symb$dec_counter$action$_$0 (_ bv1 2))
+    (= _symb$send_frame$action$_$0 (_ bv0 2))
+    (= _symb$readbuffersense$match_0$_$0 _symb$setprio$match_0$_$0))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$readbuffersense$action$_$0 (_ BitVec 1))
+(declare-const _symb$setprio$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+  (= _symb$readbuffersense$action$_$0 (_ bv1 1))
+  (= _symb$setprio$action$_$0 (_ bv0 2))
+  (bvule (_ bv2 2) _symb$forward$action$_$0)))
+
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$readbuffersense$action$_$0 (_ BitVec 1))
+(declare-const _symb$readbuffersense$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$setprio$action$_$0 (_ BitVec 2))
+(declare-const _symb$setprio$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+  (= _symb$readbuffersense$action$_$0 (_ bv0 1))
+  (= _symb$setprio$action$_$0 (_ bv0 2))
+  (bvule (_ bv2 2) _symb$forward$action$_$0)
+  (= _symb$readbuffersense$match_0$_$0 _symb$setprio$match_0$_$0)))
+
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 32))
+(declare-const _symb$ipv4_lpm$2$nhop_ipv4$_$0 (_ BitVec 32))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$readbuffersense$action$_$0 (_ BitVec 1))
+(declare-const _symb$setprio$action$_$0 (_ BitVec 2))
+
+(not(and
+  (bvule (_ bv2 2) _symb$ipv4_lpm$action$_$0)
+  (= _symb$readbuffersense$action$_$0 (_ bv1 1))
+  (= _symb$setprio$action$_$0 (_ bv0 2))
+  (bvule (_ bv2 2) _symb$forward$action$_$0)
+  (= _symb$forward$match_0$_$0 _symb$ipv4_lpm$2$nhop_ipv4$_$0)))
+
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 32))
+(declare-const _symb$ipv4_lpm$2$nhop_ipv4$_$0 (_ BitVec 32))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$readbuffersense$action$_$0 (_ BitVec 1))
+(declare-const _symb$readbuffersense$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$setprio$action$_$0 (_ BitVec 2))
+(declare-const _symb$setprio$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (bvule (_ bv2 2) _symb$ipv4_lpm$action$_$0)
+  (= _symb$readbuffersense$action$_$0 (_ bv0 1))
+  (= _symb$setprio$action$_$0 (_ bv0 2))
+  (bvule (_ bv2 2) _symb$forward$action$_$0)
+  (= _symb$readbuffersense$match_0$_$0 _symb$setprio$match_0$_$0)
+  (= _symb$forward$match_0$_$0 _symb$ipv4_lpm$2$nhop_ipv4$_$0)))
+
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 32))
+(declare-const _symb$ipv4_lpm$2$nhop_ipv4$_$0 (_ BitVec 32))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$readbuffersense$action$_$0 (_ BitVec 1))
+(declare-const _symb$setprio$action$_$0 (_ BitVec 2))
+
+(not(and
+  (bvule (_ bv2 2) _symb$ipv4_lpm$action$_$0)
+  (= _symb$readbuffersense$action$_$0 (_ bv1 1))
+  (= _symb$setprio$action$_$0 (_ bv0 2))
+  (= _symb$forward$action$_$0 (_ bv0 2))
+  (= _symb$forward$match_0$_$0 _symb$ipv4_lpm$2$nhop_ipv4$_$0)))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$readbuffersense$action$_$0 (_ BitVec 1))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+(declare-const _symb$setprio$action$_$0 (_ BitVec 2))
+
+(not(and
+  (and
+    (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+    (= _symb$readbuffersense$action$_$0 (_ bv1 1))
+    (= _symb$setprio$action$_$0 (_ bv0 2))
+    (= _symb$forward$action$_$0 (_ bv0 2))
+    (bvule (_ bv2 2) _symb$dec_counter$action$_$0)
+    (bvule (_ bv2 2) _symb$send_frame$action$_$0))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$directtoprio$action$_$0 (_ BitVec 1))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+
+(not(and
+  (and
+    (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+    (= _symb$directtoprio$action$_$0 (_ bv0 1))
+    (bvule (_ bv2 2) _symb$forward$action$_$0)
+    (= _symb$dec_counter$action$_$0 (_ bv1 2))
+    (= _symb$send_frame$action$_$0 (_ bv0 2)))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$readbuffersense$action$_$0 (_ BitVec 1))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+(declare-const _symb$setprio$action$_$0 (_ BitVec 2))
+
+(not(and
+  (and
+    (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+    (= _symb$readbuffersense$action$_$0 (_ bv1 1))
+    (= _symb$setprio$action$_$0 (_ bv0 2))
+    (= _symb$forward$action$_$0 (_ bv0 2))
+    (= _symb$dec_counter$action$_$0 (_ bv1 2))
+    (bvule (_ bv2 2) _symb$send_frame$action$_$0))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 32))
+(declare-const _symb$ipv4_lpm$2$nhop_ipv4$_$0 (_ BitVec 32))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$readbuffersense$action$_$0 (_ BitVec 1))
+(declare-const _symb$readbuffersense$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+(declare-const _symb$setprio$action$_$0 (_ BitVec 2))
+(declare-const _symb$setprio$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (and
+    (bvule (_ bv2 2) _symb$ipv4_lpm$action$_$0)
+    (= _symb$readbuffersense$action$_$0 (_ bv0 1))
+    (= _symb$setprio$action$_$0 (_ bv0 2))
+    (= _symb$forward$action$_$0 (_ bv0 2))
+    (bvule (_ bv2 2) _symb$dec_counter$action$_$0)
+    (= _symb$send_frame$action$_$0 (_ bv0 2))
+    (= _symb$readbuffersense$match_0$_$0 _symb$setprio$match_0$_$0)
+    (= _symb$forward$match_0$_$0 _symb$ipv4_lpm$2$nhop_ipv4$_$0))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$readbuffersense$action$_$0 (_ BitVec 1))
+(declare-const _symb$readbuffersense$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+(declare-const _symb$setprio$action$_$0 (_ BitVec 2))
+(declare-const _symb$setprio$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (and
+    (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+    (= _symb$readbuffersense$action$_$0 (_ bv0 1))
+    (= _symb$setprio$action$_$0 (_ bv0 2))
+    (= _symb$forward$action$_$0 (_ bv0 2))
+    (= _symb$dec_counter$action$_$0 (_ bv0 2))
+    (= _symb$send_frame$action$_$0 (_ bv0 2))
+    (= _symb$readbuffersense$match_0$_$0 _symb$setprio$match_0$_$0))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$readbuffersense$action$_$0 (_ BitVec 1))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+(declare-const _symb$setprio$action$_$0 (_ BitVec 2))
+
+(not(and
+  (and
+    (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+    (= _symb$readbuffersense$action$_$0 (_ bv1 1))
+    (= _symb$setprio$action$_$0 (_ bv0 2))
+    (= _symb$forward$action$_$0 (_ bv0 2))
+    (bvule (_ bv2 2) _symb$dec_counter$action$_$0)
+    (= _symb$send_frame$action$_$0 (_ bv0 2)))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$readbuffersense$action$_$0 (_ BitVec 1))
+(declare-const _symb$readbuffersense$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+(declare-const _symb$setprio$action$_$0 (_ BitVec 2))
+(declare-const _symb$setprio$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (and
+    (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+    (= _symb$readbuffersense$action$_$0 (_ bv0 1))
+    (= _symb$setprio$action$_$0 (_ bv0 2))
+    (= _symb$forward$action$_$0 (_ bv0 2))
+    (= _symb$dec_counter$action$_$0 (_ bv1 2))
+    (bvule (_ bv2 2) _symb$send_frame$action$_$0)
+    (= _symb$readbuffersense$match_0$_$0 _symb$setprio$match_0$_$0))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$readbuffersense$action$_$0 (_ BitVec 1))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+(declare-const _symb$setprio$action$_$0 (_ BitVec 2))
+
+(not(and
+  (and
+    (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+    (= _symb$readbuffersense$action$_$0 (_ bv1 1))
+    (= _symb$setprio$action$_$0 (_ bv0 2))
+    (= _symb$forward$action$_$0 (_ bv0 2))
+    (= _symb$dec_counter$action$_$0 (_ bv1 2))
+    (= _symb$send_frame$action$_$0 (_ bv0 2)))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$readbuffersense$action$_$0 (_ BitVec 1))
+(declare-const _symb$readbuffersense$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+(declare-const _symb$setprio$action$_$0 (_ BitVec 2))
+(declare-const _symb$setprio$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (and
+    (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+    (= _symb$readbuffersense$action$_$0 (_ bv0 1))
+    (= _symb$setprio$action$_$0 (_ bv0 2))
+    (= _symb$forward$action$_$0 (_ bv0 2))
+    (= _symb$dec_counter$action$_$0 (_ bv0 2))
+    (bvule (_ bv2 2) _symb$send_frame$action$_$0)
+    (= _symb$readbuffersense$match_0$_$0 _symb$setprio$match_0$_$0))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$readbuffersense$action$_$0 (_ BitVec 1))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+(declare-const _symb$setprio$action$_$0 (_ BitVec 2))
+
+(not(and
+  (and
+    (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+    (= _symb$readbuffersense$action$_$0 (_ bv1 1))
+    (= _symb$setprio$action$_$0 (_ bv0 2))
+    (= _symb$forward$action$_$0 (_ bv0 2))
+    (= _symb$dec_counter$action$_$0 (_ bv0 2))
+    (= _symb$send_frame$action$_$0 (_ bv0 2)))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$readbuffersense$action$_$0 (_ BitVec 1))
+(declare-const _symb$readbuffersense$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+(declare-const _symb$setprio$action$_$0 (_ BitVec 2))
+(declare-const _symb$setprio$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (and
+    (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+    (= _symb$readbuffersense$action$_$0 (_ bv0 1))
+    (= _symb$setprio$action$_$0 (_ bv0 2))
+    (= _symb$forward$action$_$0 (_ bv0 2))
+    (bvule (_ bv2 2) _symb$dec_counter$action$_$0)
+    (= _symb$send_frame$action$_$0 (_ bv0 2))
+    (= _symb$readbuffersense$match_0$_$0 _symb$setprio$match_0$_$0))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$readbuffersense$action$_$0 (_ BitVec 1))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+(declare-const _symb$setprio$action$_$0 (_ BitVec 2))
+
+(not(and
+  (and
+    (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+    (= _symb$readbuffersense$action$_$0 (_ bv1 1))
+    (= _symb$setprio$action$_$0 (_ bv0 2))
+    (= _symb$forward$action$_$0 (_ bv0 2))
+    (= _symb$dec_counter$action$_$0 (_ bv0 2))
+    (bvule (_ bv2 2) _symb$send_frame$action$_$0))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$readbuffersense$action$_$0 (_ BitVec 1))
+(declare-const _symb$readbuffersense$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+(declare-const _symb$setprio$action$_$0 (_ BitVec 2))
+(declare-const _symb$setprio$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (and
+    (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+    (= _symb$readbuffersense$action$_$0 (_ bv0 1))
+    (= _symb$setprio$action$_$0 (_ bv0 2))
+    (= _symb$forward$action$_$0 (_ bv0 2))
+    (bvule (_ bv2 2) _symb$dec_counter$action$_$0)
+    (bvule (_ bv2 2) _symb$send_frame$action$_$0)
+    (= _symb$readbuffersense$match_0$_$0 _symb$setprio$match_0$_$0))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$readbuffersense$action$_$0 (_ BitVec 1))
+(declare-const _symb$readbuffersense$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$setprio$action$_$0 (_ BitVec 2))
+(declare-const _symb$setprio$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+  (= _symb$readbuffersense$action$_$0 (_ bv0 1))
+  (= _symb$setprio$action$_$0 (_ bv0 2))
+  (= _symb$forward$action$_$0 (_ bv0 2))
+  (= _symb$readbuffersense$match_0$_$0 _symb$setprio$match_0$_$0)))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$directtoprio$action$_$0 (_ BitVec 1))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+
+(not(and
+  (and
+    (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+    (= _symb$directtoprio$action$_$0 (_ bv0 1))
+    (= _symb$forward$action$_$0 (_ bv0 2))
+    (= _symb$dec_counter$action$_$0 (_ bv0 2))
+    (= _symb$send_frame$action$_$0 (_ bv0 2)))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$readbuffersense$action$_$0 (_ BitVec 1))
+(declare-const _symb$setprio$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+  (= _symb$readbuffersense$action$_$0 (_ bv1 1))
+  (= _symb$setprio$action$_$0 (_ bv0 2))
+  (= _symb$forward$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$directtoprio$action$_$0 (_ BitVec 1))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+
+(not(and
+  (and
+    (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+    (= _symb$directtoprio$action$_$0 (_ bv0 1))
+    (= _symb$forward$action$_$0 (_ bv0 2))
+    (= _symb$dec_counter$action$_$0 (_ bv1 2))
+    (= _symb$send_frame$action$_$0 (_ bv0 2)))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 32))
+(declare-const _symb$ipv4_lpm$2$nhop_ipv4$_$0 (_ BitVec 32))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$readbuffersense$action$_$0 (_ BitVec 1))
+(declare-const _symb$readbuffersense$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$setprio$action$_$0 (_ BitVec 2))
+(declare-const _symb$setprio$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (bvule (_ bv2 2) _symb$ipv4_lpm$action$_$0)
+  (= _symb$readbuffersense$action$_$0 (_ bv0 1))
+  (= _symb$setprio$action$_$0 (_ bv0 2))
+  (= _symb$forward$action$_$0 (_ bv0 2))
+  (= _symb$readbuffersense$match_0$_$0 _symb$setprio$match_0$_$0)
+  (= _symb$forward$match_0$_$0 _symb$ipv4_lpm$2$nhop_ipv4$_$0)))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$directtoprio$action$_$0 (_ BitVec 1))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+
+(not(and
+  (and
+    (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+    (= _symb$directtoprio$action$_$0 (_ bv0 1))
+    (= _symb$forward$action$_$0 (_ bv0 2))
+    (bvule (_ bv2 2) _symb$dec_counter$action$_$0)
+    (= _symb$send_frame$action$_$0 (_ bv0 2)))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$directtoprio$action$_$0 (_ BitVec 1))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 32))
+(declare-const _symb$ipv4_lpm$2$nhop_ipv4$_$0 (_ BitVec 32))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+
+(not(and
+  (bvule (_ bv2 2) _symb$ipv4_lpm$action$_$0)
+  (= _symb$directtoprio$action$_$0 (_ bv0 1))
+  (= _symb$forward$action$_$0 (_ bv0 2))
+  (= _symb$forward$match_0$_$0 _symb$ipv4_lpm$2$nhop_ipv4$_$0)))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$directtoprio$action$_$0 (_ BitVec 1))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+
+(not(and
+  (and
+    (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+    (= _symb$directtoprio$action$_$0 (_ bv0 1))
+    (= _symb$forward$action$_$0 (_ bv0 2))
+    (bvule (_ bv2 2) _symb$dec_counter$action$_$0)
+    (bvule (_ bv2 2) _symb$send_frame$action$_$0))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$directtoprio$action$_$0 (_ BitVec 1))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+
+(not(and
+  (and
+    (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+    (= _symb$directtoprio$action$_$0 (_ bv0 1))
+    (= _symb$forward$action$_$0 (_ bv0 2))
+    (= _symb$dec_counter$action$_$0 (_ bv0 2))
+    (bvule (_ bv2 2) _symb$send_frame$action$_$0))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$directtoprio$action$_$0 (_ BitVec 1))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+
+(not(and
+  (and
+    (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+    (= _symb$directtoprio$action$_$0 (_ bv0 1))
+    (= _symb$forward$action$_$0 (_ bv0 2))
+    (= _symb$dec_counter$action$_$0 (_ bv1 2))
+    (bvule (_ bv2 2) _symb$send_frame$action$_$0))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$directtoprio$action$_$0 (_ BitVec 1))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+  (= _symb$directtoprio$action$_$0 (_ bv0 1))
+  (= _symb$forward$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$directtoprio$action$_$0 (_ BitVec 1))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+  (= _symb$directtoprio$action$_$0 (_ bv0 1))
+  (bvule (_ bv2 2) _symb$forward$action$_$0)))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$directtoprio$action$_$0 (_ BitVec 1))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 32))
+(declare-const _symb$ipv4_lpm$2$nhop_ipv4$_$0 (_ BitVec 32))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+
+(not(and
+  (and
+    (bvule (_ bv2 2) _symb$ipv4_lpm$action$_$0)
+    (= _symb$directtoprio$action$_$0 (_ bv0 1))
+    (bvule (_ bv2 2) _symb$forward$action$_$0)
+    (= _symb$dec_counter$action$_$0 (_ bv1 2))
+    (= _symb$send_frame$action$_$0 (_ bv0 2))
+    (= _symb$forward$match_0$_$0 _symb$ipv4_lpm$2$nhop_ipv4$_$0))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$directtoprio$action$_$0 (_ BitVec 1))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 32))
+(declare-const _symb$ipv4_lpm$2$nhop_ipv4$_$0 (_ BitVec 32))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+
+(not(and
+  (and
+    (bvule (_ bv2 2) _symb$ipv4_lpm$action$_$0)
+    (= _symb$directtoprio$action$_$0 (_ bv0 1))
+    (bvule (_ bv2 2) _symb$forward$action$_$0)
+    (bvule (_ bv2 2) _symb$dec_counter$action$_$0)
+    (= _symb$send_frame$action$_$0 (_ bv0 2))
+    (= _symb$forward$match_0$_$0 _symb$ipv4_lpm$2$nhop_ipv4$_$0))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$directtoprio$action$_$0 (_ BitVec 1))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 32))
+(declare-const _symb$ipv4_lpm$2$nhop_ipv4$_$0 (_ BitVec 32))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+
+(not(and
+  (and
+    (bvule (_ bv2 2) _symb$ipv4_lpm$action$_$0)
+    (= _symb$directtoprio$action$_$0 (_ bv0 1))
+    (bvule (_ bv2 2) _symb$forward$action$_$0)
+    (= _symb$dec_counter$action$_$0 (_ bv1 2))
+    (bvule (_ bv2 2) _symb$send_frame$action$_$0)
+    (= _symb$forward$match_0$_$0 _symb$ipv4_lpm$2$nhop_ipv4$_$0))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$dec_counter$action$_$0 (_ BitVec 2))
+(declare-const _symb$directtoprio$action$_$0 (_ BitVec 1))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 32))
+(declare-const _symb$ipv4_lpm$2$nhop_ipv4$_$0 (_ BitVec 32))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$action$_$0 (_ BitVec 2))
+(declare-const _symb$send_frame$match_0$_$0 (_ BitVec 9))
+
+(not(and
+  (and
+    (bvule (_ bv2 2) _symb$ipv4_lpm$action$_$0)
+    (= _symb$directtoprio$action$_$0 (_ bv0 1))
+    (bvule (_ bv2 2) _symb$forward$action$_$0)
+    (= _symb$dec_counter$action$_$0 (_ bv0 2))
+    (bvule (_ bv2 2) _symb$send_frame$action$_$0)
+    (= _symb$forward$match_0$_$0 _symb$ipv4_lpm$2$nhop_ipv4$_$0))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+
+(declare-const _symb$directtoprio$action$_$0 (_ BitVec 1))
+(declare-const _symb$forward$action$_$0 (_ BitVec 2))
+(declare-const _symb$forward$match_0$_$0 (_ BitVec 32))
+(declare-const _symb$ipv4_lpm$2$nhop_ipv4$_$0 (_ BitVec 32))
+(declare-const _symb$ipv4_lpm$action$_$0 (_ BitVec 2))
+
+(not(and
+  (bvule (_ bv2 2) _symb$ipv4_lpm$action$_$0)
+  (= _symb$directtoprio$action$_$0 (_ bv0 1))
+  (bvule (_ bv2 2) _symb$forward$action$_$0)
+  (= _symb$forward$match_0$_$0 _symb$ipv4_lpm$2$nhop_ipv4$_$0)))

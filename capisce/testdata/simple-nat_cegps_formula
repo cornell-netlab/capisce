@@ -1,0 +1,545 @@
+(and
+  (not(and
+  (not(= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))
+  (bvule (_ bv2 2) _symb$if_info$action$_$0)
+  (= _symb$nat$match_1$_$0 (_ bv1 1))
+  (= _symb$nat$match_2$_$0 (_ bv0 1))
+  (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_0$_$0 _symb$if_info$2$is_ext$_$0)))
+  (and
+    (not(and
+  (and
+    (and
+      (bvule (_ bv2 2) _symb$if_info$action$_$0)
+      (= _symb$nat$match_1$_$0 (_ bv1 1))
+      (= _symb$nat$match_2$_$0 (_ bv0 1))
+      (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1)))
+    (not(= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))))
+  (not(= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))
+  (= _symb$nat$match_0$_$0 _symb$if_info$2$is_ext$_$0)))
+    (and
+      (not(and
+  (and
+    (and
+      (= _symb$if_info$action$_$0 (_ bv1 2))
+      (= _symb$nat$match_1$_$0 (_ bv1 1))
+      (= _symb$nat$match_2$_$0 (_ bv0 1))
+      (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1)))
+    (not(= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))))
+  (not(= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))))
+      (and
+        (not(and
+  (and
+    (and
+      (= _symb$if_info$action$_$0 (_ bv0 2))
+      (= _symb$nat$match_1$_$0 (_ bv1 1))
+      (= _symb$nat$match_2$_$0 (_ bv0 1))
+      (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1)))
+    (not(= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))))
+  (not(= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))))
+        (and
+          (not(and
+  (not(= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1)))
+  (= _symb$if_info$action$_$0 (_ bv1 2))
+  (= _symb$nat$match_1$_$0 (_ bv1 1))
+  (= _symb$nat$match_2$_$0 (_ bv0 1))
+  (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1))))
+          (and
+            (not(and
+  (and
+    (= _symb$if_info$action$_$0 (_ bv1 2))
+    (= _symb$nat$match_1$_$0 (_ bv1 1))
+    (= _symb$nat$match_2$_$0 (_ bv0 1))
+    (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+    (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1)))
+  (not(= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))))
+            (and
+              (not(and
+  (and
+    (= _symb$if_info$action$_$0 (_ bv0 2))
+    (= _symb$nat$match_1$_$0 (_ bv1 1))
+    (= _symb$nat$match_2$_$0 (_ bv0 1))
+    (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+    (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1)))
+  (not(= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))))
+              (and
+                (not(and
+  (= _symb$if_info$action$_$0 (_ bv0 2))
+  (= _symb$nat$match_1$_$0 (_ bv0 1))
+  (= _symb$nat$match_2$_$0 (_ bv0 1))
+  (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1))
+  (bvule (_ bv6 3) _symb$nat$action$_$0)))
+                (and
+                  (not(and
+  (= _symb$if_info$action$_$0 (_ bv1 2))
+  (= _symb$nat$match_1$_$0 (_ bv0 1))
+  (= _symb$nat$match_2$_$0 (_ bv0 1))
+  (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$action$_$0 (_ bv0 3))))
+                  (and
+                    (not(and
+  (and
+    (and
+      (= _symb$if_info$action$_$0 (_ bv0 2))
+      (= _symb$nat$match_1$_$0 (_ bv1 1))
+      (= _symb$nat$match_2$_$0 (_ bv0 1))
+      (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1)))
+    (not(= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1)))
+    (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))
+  (not(= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1)))))
+                    (and
+                      (not(and
+  (= _symb$if_info$action$_$0 (_ bv1 2))
+  (= _symb$nat$match_1$_$0 (_ bv0 1))
+  (= _symb$nat$match_2$_$0 (_ bv0 1))
+  (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$action$_$0 (_ bv1 3))))
+                      (and
+                        (not(and
+  (= _symb$if_info$action$_$0 (_ bv0 2))
+  (= _symb$nat$match_1$_$0 (_ bv0 1))
+  (= _symb$nat$match_2$_$0 (_ bv0 1))
+  (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$action$_$0 (_ bv2 3))))
+                        (and
+                          (not(and
+  (= _symb$if_info$action$_$0 (_ bv0 2))
+  (= _symb$nat$match_1$_$0 (_ bv0 1))
+  (= _symb$nat$match_2$_$0 (_ bv0 1))
+  (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$action$_$0 (_ bv1 3))))
+                          (and
+                            (not(and
+  (= _symb$if_info$action$_$0 (_ bv0 2))
+  (= _symb$nat$match_1$_$0 (_ bv0 1))
+  (= _symb$nat$match_2$_$0 (_ bv0 1))
+  (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$action$_$0 (_ bv0 3))))
+                            (and
+                              (not(and
+  (and
+    (and
+      (and
+        (= _symb$if_info$action$_$0 (_ bv0 2))
+        (= _symb$nat$match_1$_$0 (_ bv1 1))
+        (= _symb$nat$match_2$_$0 (_ bv0 1)))
+      (not(= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))))
+    (not(= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1)))
+    (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))
+  (not(= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1)))))
+                              (and
+                                (not(and
+  (= _symb$if_info$action$_$0 (_ bv1 2))
+  (= _symb$nat$match_1$_$0 (_ bv0 1))
+  (= _symb$nat$match_2$_$0 (_ bv0 1))
+  (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$action$_$0 (_ bv5 3))))
+                                (and
+                                  (not(and
+  (= _symb$if_info$action$_$0 (_ bv1 2))
+  (= _symb$nat$match_1$_$0 (_ bv0 1))
+  (= _symb$nat$match_2$_$0 (_ bv0 1))
+  (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1))
+  (bvule (_ bv6 3) _symb$nat$action$_$0)))
+                                  (and
+                                    (not(and
+  (= _symb$if_info$action$_$0 (_ bv0 2))
+  (= _symb$nat$match_1$_$0 (_ bv0 1))
+  (= _symb$nat$match_2$_$0 (_ bv0 1))
+  (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$action$_$0 (_ bv5 3))))
+                                    (and
+                                      (not(and
+  (bvule (_ bv2 2) _symb$if_info$action$_$0)
+  (= _symb$nat$match_1$_$0 (_ bv0 1))
+  (= _symb$nat$match_2$_$0 (_ bv0 1))
+  (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$action$_$0 (_ bv5 3))
+  (= _symb$nat$match_0$_$0 _symb$if_info$2$is_ext$_$0)))
+                                      (and
+                                        (not(and
+  (= _symb$if_info$action$_$0 (_ bv1 2))
+  (= _symb$nat$match_1$_$0 (_ bv0 1))
+  (= _symb$nat$match_2$_$0 (_ bv0 1))
+  (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$action$_$0 (_ bv2 3))))
+                                        (and
+                                          (not(and
+  (bvule (_ bv2 2) _symb$if_info$action$_$0)
+  (= _symb$nat$match_1$_$0 (_ bv0 1))
+  (= _symb$nat$match_2$_$0 (_ bv0 1))
+  (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$action$_$0 (_ bv2 3))
+  (= _symb$nat$match_0$_$0 _symb$if_info$2$is_ext$_$0)))
+                                          (and
+                                            (not(and
+  (bvule (_ bv2 2) _symb$if_info$action$_$0)
+  (= _symb$nat$match_1$_$0 (_ bv0 1))
+  (= _symb$nat$match_2$_$0 (_ bv0 1))
+  (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$action$_$0 (_ bv0 3))
+  (= _symb$nat$match_0$_$0 _symb$if_info$2$is_ext$_$0)))
+                                            (and
+                                              (not(and
+  (bvule (_ bv2 2) _symb$if_info$action$_$0)
+  (= _symb$nat$match_1$_$0 (_ bv0 1))
+  (= _symb$nat$match_2$_$0 (_ bv0 1))
+  (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1))
+  (bvule (_ bv6 3) _symb$nat$action$_$0)
+  (= _symb$nat$match_0$_$0 _symb$if_info$2$is_ext$_$0)))
+                                              (and
+                                                (not(and
+  (and
+    (and
+      (and
+        (bvule (_ bv2 2) _symb$if_info$action$_$0)
+        (= _symb$nat$match_1$_$0 (_ bv1 1))
+        (= _symb$nat$match_2$_$0 (_ bv0 1)))
+      (not(= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))))
+    (not(= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1)))
+    (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))
+  (not(= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1)))
+  (= _symb$nat$match_0$_$0 _symb$if_info$2$is_ext$_$0)))
+                                                (and
+                                                  (not(and
+  (bvule (_ bv2 2) _symb$if_info$action$_$0)
+  (= _symb$nat$match_1$_$0 (_ bv0 1))
+  (= _symb$nat$match_2$_$0 (_ bv0 1))
+  (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$action$_$0 (_ bv1 3))
+  (= _symb$nat$match_0$_$0 _symb$if_info$2$is_ext$_$0)))
+                                                  (and
+                                                    (not(and
+  (and
+    (= _symb$if_info$action$_$0 (_ bv0 2))
+    (= _symb$nat$match_1$_$0 (_ bv0 1))
+    (= _symb$nat$match_2$_$0 (_ bv0 1))
+    (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+    (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+    (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))
+  (not(= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1)))))
+                                                    (and
+                                                      (not(and
+  (and
+    (and
+      (and
+        (= _symb$if_info$action$_$0 (_ bv0 2))
+        (= _symb$nat$match_1$_$0 (_ bv1 1))
+        (= _symb$nat$match_2$_$0 (_ bv0 1)))
+      (not(= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))))
+    (not(= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))))
+  (not(= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))))
+                                                      (and
+                                                        (not(and
+  (and
+    (= _symb$if_info$action$_$0 (_ bv1 2))
+    (= _symb$nat$match_1$_$0 (_ bv0 1))
+    (= _symb$nat$match_2$_$0 (_ bv0 1))
+    (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+    (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1)))
+  (not(= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))))
+                                                        (and
+                                                          (not(and
+  (and
+    (and
+      (bvule (_ bv2 2) _symb$if_info$action$_$0)
+      (= _symb$nat$match_1$_$0 (_ bv1 1))
+      (= _symb$nat$match_2$_$0 (_ bv0 1))
+      (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1)))
+    (not(= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1)))
+    (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))
+  (not(= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1)))
+  (= _symb$nat$match_0$_$0 _symb$if_info$2$is_ext$_$0)))
+                                                          (and
+                                                            (not(and
+  (and
+    (and
+      (= _symb$if_info$action$_$0 (_ bv0 2))
+      (= _symb$nat$match_1$_$0 (_ bv1 1))
+      (= _symb$nat$match_2$_$0 (_ bv0 1)))
+    (not(= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1)))
+    (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1)))
+  (not(= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))))
+                                                            (and
+                                                              (not(and
+  (and
+    (and
+      (= _symb$if_info$action$_$0 (_ bv0 2))
+      (= _symb$nat$match_1$_$0 (_ bv1 1))
+      (= _symb$nat$match_2$_$0 (_ bv0 1)))
+    (not(= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1)))
+    (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+    (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))
+  (not(= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1)))))
+                                                              (and
+                                                                (not(and
+  (and
+    (and
+      (and
+        (= _symb$if_info$action$_$0 (_ bv1 2))
+        (= _symb$nat$match_1$_$0 (_ bv1 1))
+        (= _symb$nat$match_2$_$0 (_ bv0 1)))
+      (not(= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))))
+    (not(= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))))
+  (not(= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))))
+                                                                (and
+                                                                  (not(and
+  (and
+    (not(= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))
+    (= _symb$if_info$action$_$0 (_ bv1 2))
+    (= _symb$nat$match_1$_$0 (_ bv1 1))
+    (= _symb$nat$match_2$_$0 (_ bv0 1)))
+  (not(= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1)))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))))
+                                                                  (and
+                                                                    (not(and
+  (and
+    (and
+      (and
+        (bvule (_ bv2 2) _symb$if_info$action$_$0)
+        (= _symb$nat$match_1$_$0 (_ bv1 1))
+        (= _symb$nat$match_2$_$0 (_ bv0 1)))
+      (not(= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))))
+    (not(= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))))
+  (not(= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))
+  (= _symb$nat$match_0$_$0 _symb$if_info$2$is_ext$_$0)))
+                                                                    (and
+                                                                      (not(and
+  (and
+    (and
+      (and
+        (= _symb$if_info$action$_$0 (_ bv1 2))
+        (= _symb$nat$match_1$_$0 (_ bv1 1))
+        (= _symb$nat$match_2$_$0 (_ bv0 1)))
+      (not(= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))))
+    (not(= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1)))
+    (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))
+  (not(= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1)))))
+                                                                      (and
+                                                                        (not(and
+  (and
+    (not(= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))
+    (bvule (_ bv2 2) _symb$if_info$action$_$0)
+    (= _symb$nat$match_1$_$0 (_ bv1 1))
+    (= _symb$nat$match_2$_$0 (_ bv0 1)))
+  (not(= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1)))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_0$_$0 _symb$if_info$2$is_ext$_$0)))
+                                                                        (and
+                                                                          (not(and
+  (and
+    (bvule (_ bv2 2) _symb$if_info$action$_$0)
+    (= _symb$nat$match_1$_$0 (_ bv0 1))
+    (= _symb$nat$match_2$_$0 (_ bv0 1))
+    (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+    (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+    (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))
+  (not(= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1)))
+  (= _symb$nat$match_0$_$0 _symb$if_info$2$is_ext$_$0)))
+                                                                          (and
+                                                                            (not(and
+  (and
+    (= _symb$if_info$action$_$0 (_ bv1 2))
+    (= _symb$nat$match_1$_$0 (_ bv0 1))
+    (= _symb$nat$match_2$_$0 (_ bv0 1))
+    (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+    (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+    (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))
+  (not(= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1)))))
+                                                                            (and
+                                                                              (not(and
+  (and
+    (bvule (_ bv2 2) _symb$if_info$action$_$0)
+    (= _symb$nat$match_1$_$0 (_ bv1 1))
+    (= _symb$nat$match_2$_$0 (_ bv0 1))
+    (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+    (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+    (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))
+  (not(= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1)))
+  (= _symb$nat$match_0$_$0 _symb$if_info$2$is_ext$_$0)))
+                                                                              (and
+                                                                                (not(and
+  (and
+    (bvule (_ bv2 2) _symb$if_info$action$_$0)
+    (= _symb$nat$match_1$_$0 (_ bv0 1))
+    (= _symb$nat$match_2$_$0 (_ bv0 1))
+    (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+    (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1)))
+  (not(= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))
+  (= _symb$nat$match_0$_$0 _symb$if_info$2$is_ext$_$0)))
+                                                                                (and
+                                                                                  (not(and
+  (and
+    (and
+      (= _symb$if_info$action$_$0 (_ bv1 2))
+      (= _symb$nat$match_1$_$0 (_ bv1 1))
+      (= _symb$nat$match_2$_$0 (_ bv0 1))
+      (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1)))
+    (not(= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1)))
+    (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))
+  (not(= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1)))))
+                                                                                  (and
+                                                                                    (not(and
+  (and
+    (not(= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1)))
+    (= _symb$if_info$action$_$0 (_ bv1 2))
+    (= _symb$nat$match_1$_$0 (_ bv1 1))
+    (= _symb$nat$match_2$_$0 (_ bv0 1)))
+  (not(= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1)))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1))))
+                                                                                    (and
+                                                                                      (not(and
+  (not(= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1)))
+  (= _symb$if_info$action$_$0 (_ bv0 2))
+  (= _symb$nat$match_1$_$0 (_ bv1 1))
+  (= _symb$nat$match_2$_$0 (_ bv0 1))
+  (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1))))
+                                                                                      (and
+                                                                                        (not(and
+  (and
+    (= _symb$if_info$action$_$0 (_ bv0 2))
+    (= _symb$nat$match_1$_$0 (_ bv0 1))
+    (= _symb$nat$match_2$_$0 (_ bv0 1))
+    (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+    (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1)))
+  (not(= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))))
+                                                                                        (and
+                                                                                          (not(and
+  (bvule (_ bv2 2) _symb$if_info$action$_$0)
+  (= _symb$nat$match_1$_$0 (_ bv0 1))
+  (= _symb$nat$match_2$_$0 (_ bv0 1))
+  (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$action$_$0 (_ bv3 3))
+  (= _symb$nat$match_0$_$0 _symb$if_info$2$is_ext$_$0)))
+                                                                                          (and
+                                                                                            (not(and
+  (= _symb$if_info$action$_$0 (_ bv1 2))
+  (= _symb$nat$match_1$_$0 (_ bv0 1))
+  (= _symb$nat$match_2$_$0 (_ bv0 1))
+  (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$action$_$0 (_ bv3 3))))
+                                                                                            (and
+                                                                                              (not(and
+  (= _symb$if_info$action$_$0 (_ bv0 2))
+  (= _symb$nat$match_1$_$0 (_ bv0 1))
+  (= _symb$nat$match_2$_$0 (_ bv0 1))
+  (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1))
+  (= _symb$nat$action$_$0 (_ bv3 3))))
+                                                                                              (and
+                                                                                                (not(and
+  (and
+    (and
+      (bvule (_ bv2 2) _symb$if_info$action$_$0)
+      (= _symb$nat$match_1$_$0 (_ bv1 1))
+      (= _symb$nat$match_2$_$0 (_ bv0 1)))
+    (not(= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1)))
+    (= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1))
+    (= _symb$nat$match_5$DONT_CARE$_$0 (_ bv1 1)))
+  (not(= _symb$nat$match_6$DONT_CARE$_$0 (_ bv1 1)))
+  (= _symb$nat$match_0$_$0 _symb$if_info$2$is_ext$_$0)))
+                                                                                                (and
+                                                                                                  (not(and
+  (and
+    (bvule (_ bv2 2) _symb$if_info$action$_$0)
+    (= _symb$nat$match_1$_$0 (_ bv0 1))
+    (= _symb$nat$match_2$_$0 (_ bv0 1))
+    (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1)))
+  (not(= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1)))
+  (= _symb$nat$match_0$_$0 _symb$if_info$2$is_ext$_$0)))
+                                                                                                  (and
+                                                                                                    (not(and
+  (and
+    (= _symb$if_info$action$_$0 (_ bv1 2))
+    (= _symb$nat$match_1$_$0 (_ bv0 1))
+    (= _symb$nat$match_2$_$0 (_ bv0 1))
+    (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1)))
+  (not(= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1)))))
+                                                                                                    (and
+                                                                                                      (not(and
+  (and
+    (= _symb$if_info$action$_$0 (_ bv1 2))
+    (= _symb$nat$match_1$_$0 (_ bv0 1))
+    (= _symb$nat$match_2$_$0 (_ bv0 1)))
+  (not(= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1)))))
+                                                                                                      (and
+                                                                                                        (not(and
+  (and
+    (bvule (_ bv2 2) _symb$if_info$action$_$0)
+    (= _symb$nat$match_1$_$0 (_ bv0 1))
+    (= _symb$nat$match_2$_$0 (_ bv0 1)))
+  (not(= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1)))
+  (= _symb$nat$match_0$_$0 _symb$if_info$2$is_ext$_$0)))
+                                                                                                        (and
+                                                                                                          (not(and
+  (and
+    (= _symb$if_info$action$_$0 (_ bv0 2))
+    (= _symb$nat$match_1$_$0 (_ bv0 1))
+    (= _symb$nat$match_2$_$0 (_ bv0 1))
+    (= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1)))
+  (not(= _symb$nat$match_4$DONT_CARE$_$0 (_ bv1 1)))))
+                                                                                                          (not(and
+  (and
+    (= _symb$if_info$action$_$0 (_ bv0 2))
+    (= _symb$nat$match_1$_$0 (_ bv0 1))
+    (= _symb$nat$match_2$_$0 (_ bv0 1)))
+  (not(= _symb$nat$match_3$DONT_CARE$_$0 (_ bv1 1))))))))))))))))))))))))))))))))))))))))))))))))))))))))))

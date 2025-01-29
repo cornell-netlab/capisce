@@ -1,0 +1,14 @@
+mc-nat,0.564,1,1
+ts-switching,0.54,1,1
+resubmit,0.478,0,0
+ecmp,0.586,1,1
+netpaxos-acceptor,0.655,1,1
+ndp-router,0.772,1,1
+arp,0.831,1,1
+07-multiprotocol,0.605,1,0
+heavy-hitter-2,0.627,1,1
+heavy-hitter-1,0.58,1,1
+flowlet,0.647,1,1
+simple-nat,1.021,1,1
+netchain,1.395,1,1
+linearroad,2.24,1,1

@@ -1,0 +1,1238 @@
+07-multiprotocol
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv2 3))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$ipv6_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv2 3))
+  (= _symb$ipv6_match$action$_$0 (_ bv0 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv0 3))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv0 3))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$ipv6_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv2 3))
+  (= _symb$ipv6_match$action$_$0 (_ bv1 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$ipv6_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv0 3))
+  (= _symb$ipv6_match$action$_$0 (_ bv0 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv2 3))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$ipv6_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv0 3))
+  (= _symb$ipv6_match$action$_$0 (_ bv1 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$ipv4_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$tcp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv4 3))
+  (= _symb$ipv4_match$action$_$0 (_ bv0 1))
+  (= _symb$tcp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (and
+    (and
+      (and
+        (= _symb$ethertype_match$action$_$0 (_ bv0 3))
+        (not(= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))))
+      (not(= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))))
+    (not(= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))))
+  (not(= _symb$ethertype_match$match_0$_$0 (_ bv34525 16)))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (and
+    (and
+      (and
+        (= _symb$ethertype_match$action$_$0 (_ bv2 3))
+        (not(= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))))
+      (not(= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))))
+    (not(= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))))
+  (not(= _symb$ethertype_match$match_0$_$0 (_ bv34525 16)))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv0 3))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv2 3))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (and
+    (and
+      (and
+        (= _symb$ethertype_match$action$_$0 (_ bv4 3))
+        (not(= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))))
+      (not(= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))))
+    (not(= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))))
+  (not(= _symb$ethertype_match$match_0$_$0 (_ bv34525 16)))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (and
+    (and
+      (and
+        (and
+          (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+          (= _symb$l2_match$action$_$0 (_ bv0 1))
+          (= _symb$set_egress$action$_$0 (_ bv0 2)))
+        (not(= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))))
+      (not(= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))))
+    (not(= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))))
+  (not(= _symb$ethertype_match$match_0$_$0 (_ bv34525 16)))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$ipv6_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv2 3))
+  (= _symb$ipv6_match$action$_$0 (_ bv1 1))
+  (= _symb$udp_check$action$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$set_egress$action$_$0 (_ bv0 2))
+  (= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv1 1))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (and
+    (and
+      (and
+        (and
+          (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+          (= _symb$l2_match$action$_$0 (_ bv1 1))
+          (= _symb$set_egress$action$_$0 (_ bv0 2)))
+        (not(= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))))
+      (not(= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))))
+    (not(= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))))
+  (not(= _symb$ethertype_match$match_0$_$0 (_ bv34525 16)))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (and
+    (and
+      (and
+        (and
+          (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+          (= _symb$l2_match$action$_$0 (_ bv0 1))
+          (= _symb$set_egress$action$_$0 (_ bv0 2)))
+        (not(= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))))
+      (not(= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))))
+    (not(= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))))
+  (not(= _symb$ethertype_match$match_0$_$0 (_ bv34525 16)))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$ipv6_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$tcp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv2 3))
+  (= _symb$ipv6_match$action$_$0 (_ bv1 1))
+  (= _symb$tcp_check$action$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (and
+    (and
+      (and
+        (and
+          (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+          (= _symb$l2_match$action$_$0 (_ bv1 1))
+          (= _symb$set_egress$action$_$0 (_ bv0 2)))
+        (not(= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))))
+      (not(= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))))
+    (not(= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))))
+  (not(= _symb$ethertype_match$match_0$_$0 (_ bv34525 16)))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv0 3))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv3 3))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (and
+    (and
+      (and
+        (= _symb$ethertype_match$action$_$0 (_ bv3 3))
+        (not(= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))))
+      (not(= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))))
+    (not(= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))))
+  (not(= _symb$ethertype_match$match_0$_$0 (_ bv34525 16)))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$icmp_check$action$_$0 (_ BitVec 1))
+(declare-const _symb$ipv4_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv4 3))
+  (= _symb$ipv4_match$action$_$0 (_ bv0 1))
+  (= _symb$icmp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$tcp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$tcp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv3 3))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$ipv4_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv4 3))
+  (= _symb$ipv4_match$action$_$0 (_ bv1 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$ipv4_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv4 3))
+  (= _symb$ipv4_match$action$_$0 (_ bv0 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$ipv4_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$tcp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv4 3))
+  (= _symb$ipv4_match$action$_$0 (_ bv1 1))
+  (= _symb$tcp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv3 3))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$ipv6_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$tcp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv3 3))
+  (= _symb$ipv6_match$action$_$0 (_ bv0 1))
+  (= _symb$tcp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$ipv6_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv2 3))
+  (= _symb$ipv6_match$action$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv4 3))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$ipv6_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv2 3))
+  (= _symb$ipv6_match$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$ipv4_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv4 3))
+  (= _symb$ipv4_match$action$_$0 (_ bv0 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv4 3))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$tcp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$tcp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv4 3))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$udp_check$action$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$icmp_check$action$_$0 (_ BitVec 1))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$icmp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$ipv4_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv4 3))
+  (= _symb$ipv4_match$action$_$0 (_ bv0 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$tcp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$tcp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$icmp_check$action$_$0 (_ BitVec 1))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$icmp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$ipv6_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv3 3))
+  (= _symb$ipv6_match$action$_$0 (_ bv1 1))
+  (= _symb$udp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$icmp_check$action$_$0 (_ BitVec 1))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$icmp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$icmp_check$action$_$0 (_ BitVec 1))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$icmp_check$action$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$icmp_check$action$_$0 (_ BitVec 1))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$icmp_check$action$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$udp_check$action$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$set_egress$action$_$0 (_ bv0 2))
+  (= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv0 1))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$ipv4_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$set_egress$action$_$0 (_ bv0 2))
+  (= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv4 3))
+  (= _symb$ipv4_match$action$_$0 (_ bv1 1))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$set_egress$action$_$0 (_ bv0 2))
+  (= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv0 1))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$icmp_check$action$_$0 (_ BitVec 1))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$icmp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$icmp_check$action$_$0 (_ BitVec 1))
+(declare-const _symb$ipv4_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv4 3))
+  (= _symb$ipv4_match$action$_$0 (_ bv0 1))
+  (= _symb$icmp_check$action$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$ipv4_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$set_egress$action$_$0 (_ bv0 2))
+  (= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv4 3))
+  (= _symb$ipv4_match$action$_$0 (_ bv0 1))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$ipv6_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv3 3))
+  (= _symb$ipv6_match$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$tcp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$tcp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$ipv6_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$tcp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv3 3))
+  (= _symb$ipv6_match$action$_$0 (_ bv1 1))
+  (= _symb$tcp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$tcp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$tcp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$set_egress$action$_$0 (_ bv0 2))
+  (= _symb$ethertype_match$match_0$_$0 (_ bv2048 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv1 1))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$udp_check$action$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$udp_check$action$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$ipv6_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv34525 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv3 3))
+  (= _symb$ipv6_match$action$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$set_egress$match_0$_$0 (_ BitVec 1))
+(declare-const _symb$tcp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$tcp_check$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$match_0$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$udp_check$action$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$icmp_check$action$_$0 (_ BitVec 1))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$icmp_check$action$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$tcp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$tcp_check$action$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$tcp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$tcp_check$action$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$set_egress$action$_$0 (_ bv0 2))
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv1 1))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$udp_check$action$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (bvule (_ bv5 3) _symb$ethertype_match$action$_$0)
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$set_egress$action$_$0 (_ bv0 2))
+  (= _symb$ethertype_match$match_0$_$0 (_ bv33024 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv0 1))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+(declare-const _symb$udp_check$action$_$0 (_ BitVec 1))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$udp_check$action$_$0 (_ bv1 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
+
+(declare-const _symb$ethertype_match$action$_$0 (_ BitVec 3))
+(declare-const _symb$ethertype_match$match_0$_$0 (_ BitVec 16))
+(declare-const _symb$l2_match$action$_$0 (_ BitVec 1))
+(declare-const _symb$set_egress$action$_$0 (_ BitVec 2))
+
+(not(and
+  (= _symb$ethertype_match$match_0$_$0 (_ bv37120 16))
+  (= _symb$ethertype_match$action$_$0 (_ bv1 3))
+  (= _symb$l2_match$action$_$0 (_ bv0 1))
+  (= _symb$set_egress$action$_$0 (_ bv0 2))))
