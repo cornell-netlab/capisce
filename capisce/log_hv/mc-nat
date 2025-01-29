@@ -1,0 +1,28 @@
+mc-nat
+
+
+false
+Uncontrollable path: parse_result:=(_ bv0 1);
+ exitt:=(_ bv0 1);
+ hdr.ethernet.isValid:=(_ bv0 1);
+ hdr.ipv4.isValid:=(_ bv0 1);
+ hdr.udp.isValid:=(_ bv0 1);
+ hdr.ethernet.isValid:=(_ bv1 1);
+ assert (= (_ bv1 1) hdr.ethernet.isValid);
+ assume (not(= (_ bv2048 16) hdr.ethernet.etherType));
+ parse_result:=(_ bv1 1);
+ assume (= parse_result (_ bv1 1));
+ assert (= (_ bv1 1) hdr.ipv4.isValid);
+ assume (= _symb$set_mcg$match_0 hdr.ipv4.dstAddr);
+ assume (bvuge _symb$set_mcg$action (_ bv1 1));
+ meta.intrinsic_metadata.mcast_grp:=_symb$set_mcg$1$mcast_group;
+ standard_metadata.egress_spec:=DUMMY;
+ assume (not(= standard_metadata.egress_spec (_ bv511 9)));
+ standard_metadata.egress_port:=standard_metadata.egress_spec;
+ assume (= _symb$nat_table$match_0 meta.intrinsic_metadata.egress_rid);
+ assert (= (_ bv1 1) hdr.ipv4.isValid);
+ assume (= _symb$nat_table$match_1 hdr.ipv4.dstAddr);
+ assume (bvuge _symb$nat_table$action (_ bv2 2));
+ hdr.ipv4.dstAddr:=_symb$nat_table$2$dst_ip;
+ assert (= (_ bv1 1) hdr.ipv4.isValid);
+ hdr.ipv4.ttl:=(bvadd hdr.ipv4.ttl (_ bv255 8))

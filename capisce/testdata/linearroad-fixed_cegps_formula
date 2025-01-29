@@ -1,0 +1,25 @@
+(and
+  (not(and
+  (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+  (= _symb$forward$action$_$0 (_ bv0 2))
+  (= _symb$ipv4_lpm$match_0$_$0 _symb$forward$match_0$_$0)))
+  (and
+    (not(and
+  (or
+    (= _symb$update_vol_state$match_0$_$0 (_ bv0 1))
+    (= _symb$update_vol_state$match_0$_$0 (_ bv1 1)))
+  (= _symb$update_vol_state$match_1$_$0 _symb$check_toll$match_0$_$0)
+  (= _symb$ipv4_lpm$match_0$_$0 _symb$forward$match_0$_$0)
+  (= _symb$update_pos_state$action$_$0 (_ bv1 1))
+  (= _symb$update_new_seg$action$_$0 (_ bv0 1))
+  (= _symb$update_vol_state$action$_$0 (_ bv1 2))
+  (= _symb$update_ewma_spd$action$_$0 (_ bv0 1))
+  (= _symb$loc_changed$action$_$0 (_ bv0 1))
+  (= _symb$load_stopped_ahead$action$_$0 (_ bv1 1))
+  (= _symb$check_toll$action$_$0 (_ bv0 1))
+  (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+  (= _symb$forward$action$_$0 (_ bv0 2))))
+    (not(and
+  (= _symb$ipv4_lpm$action$_$0 (_ bv0 2))
+  (bvule (_ bv2 2) _symb$forward$action$_$0)
+  (= _symb$ipv4_lpm$match_0$_$0 _symb$forward$match_0$_$0)))))

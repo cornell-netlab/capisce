@@ -1,0 +1,3 @@
+(and
+  (not(bvule (_ bv2 2) _symb$set_mcg$action$_$0))
+  (not(= _symb$set_mcg$action$_$0 (_ bv0 2))))

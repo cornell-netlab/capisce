@@ -30,7 +30,6 @@ let hh_parser =
   let parse_ipv4 =
     sequence [
         assign hdr.ipv4.isValid btrue;
-        (* assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid; *)
         ifte_seq (eq_ (var hdr.ipv4.protocol) (bvi 6 8))
           [ parse_tcp ]
           [ transition_accept ];
@@ -40,7 +39,6 @@ let hh_parser =
   let parse_ethernet =
     sequence [
       assign hdr.ethernet.isValid btrue;
-      (* assert_ @@ eq_ btrue @@ var hdr.ethernet.isValid; *)
       ifte_seq (eq_ (var hdr.ethernet.etherType) (bvi 2048 16))
         [parse_ipv4]
         [transition_accept]
@@ -85,8 +83,8 @@ let hh_parser =
       }  
     ]
 
-let hh_ingress =
-  (* let open BExpr in *)
+let hh_ingress fixed =
+  let open BExpr in
   let open Expr in
   let count_action =
     let idx = Var.make "idx" 32 in
@@ -114,7 +112,6 @@ let hh_ingress =
       Primitives.Action.[
         assign meta.custom_metadata.nhop_ipv4 @@ var nhop_ipv4;
         assign standard_metadata.egress_spec @@ var port;
-        (* assert_ @@ eq_ btrue @@ var hdr.ipv4.isValid; *)
         assign hdr.ipv4.ttl @@ badd (var hdr.ipv4.ttl) (bvi 255 8)
       ]
   in
@@ -142,6 +139,7 @@ let hh_ingress =
     ]
   in
   sequence [
+    if fixed then assume (eq_ (var hdr.ipv4.isValid) (Expr.bvi 1 1)) else skip;
     count_table;
     ipv4_lpm;
     forward
@@ -174,5 +172,5 @@ let hh_egress =
     send_frame
   ]
 
-let heavy_hitter_1 =
-  hh_psm, hh_ingress, hh_egress
+let heavy_hitter_1 fixed =
+  hh_psm, hh_ingress fixed, hh_egress

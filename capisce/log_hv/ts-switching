@@ -1,0 +1,27 @@
+ts-switching
+
+(declare-const _symb$schedule_table$match_1$DONT_CARE$_$0 (_ BitVec 1))
+
+(= _symb$schedule_table$match_1$DONT_CARE$_$0 (_ bv1 1))
+
+
+false
+Uncontrollable path: parse_result:=(_ bv0 1);
+ exitt:=(_ bv0 1);
+ hdr.ethernet.isValid:=(_ bv0 1);
+ hdr.ipv4.isValid:=(_ bv0 1);
+ hdr.rtp.isValid:=(_ bv0 1);
+ hdr.udp.isValid:=(_ bv0 1);
+ hdr.ethernet.isValid:=(_ bv1 1);
+ assert (= (_ bv1 1) hdr.ethernet.isValid);
+ assume (not(= (_ bv2048 16) hdr.ethernet.etherType));
+ parse_result:=(_ bv1 1);
+ assume (= parse_result (_ bv1 1));
+ assert (= (_ bv1 1) hdr.ipv4.isValid);
+ assume (= _symb$schedule_table$match_0 hdr.ipv4.dstAddr);
+ assume (= (_ bv1 1) _symb$schedule_table$match_1$DONT_CARE);
+ assume (bvuge _symb$schedule_table$action (_ bv2 2));
+ standard_metadata.egress_spec:=(_ bv1 9);
+ hdr.ipv4.dstAddr:=dst_ip;
+ assume (not(= standard_metadata.egress_spec (_ bv511 9)));
+ standard_metadata.egress_port:=standard_metadata.egress_spec

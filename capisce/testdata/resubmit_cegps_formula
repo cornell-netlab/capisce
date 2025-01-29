@@ -1,0 +1,7 @@
+(and
+  (not(and
+  (= _symb$t_ingress_1$action$_$0 (_ bv1 1))
+  (= _symb$t_ingress_2$action$_$0 (_ bv0 1))))
+  (not(and
+  (= _symb$t_ingress_1$action$_$0 (_ bv1 1))
+  (= _symb$t_ingress_2$action$_$0 (_ bv1 1)))))

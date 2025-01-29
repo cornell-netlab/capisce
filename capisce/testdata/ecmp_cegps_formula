@@ -1,0 +1,21 @@
+(and
+  (not(and
+  (= _symb$ecmp_group$action$_$0 (_ bv0 2))
+  (bvule (_ bv2 2) _symb$forward$action$_$0)))
+  (and
+    (not(and
+  (and
+    (= _symb$ecmp_group$action$_$0 (_ bv0 2))
+    (bvule (_ bv2 2) _symb$forward$action$_$0)
+    (= _symb$send_frame$action$_$0 (_ bv1 1)))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9)))))
+    (and
+      (not(and
+  (= _symb$ecmp_group$action$_$0 (_ bv0 2))
+  (= _symb$forward$action$_$0 (_ bv0 2))))
+      (not(and
+  (and
+    (= _symb$ecmp_group$action$_$0 (_ bv0 2))
+    (= _symb$forward$action$_$0 (_ bv0 2))
+    (= _symb$send_frame$action$_$0 (_ bv1 1)))
+  (not(= _symb$send_frame$match_0$_$0 (_ bv511 9))))))))

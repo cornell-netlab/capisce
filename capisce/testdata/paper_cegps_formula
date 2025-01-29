@@ -1,0 +1,12 @@
+(and
+  (not(and
+  (and
+    (= _symb$t1$action$_$0 (_ bv0 1))
+    (= _symb$t2$action$_$0 (_ bv1 1)))
+  (not(= _symb$t1$match_0$_$0 (_ bv2048 16)))))
+  (not(and
+  (and
+    (= _symb$t1$action$_$0 (_ bv1 1))
+    (= _symb$t2$action$_$0 (_ bv1 1)))
+  (not(= _symb$t1$match_0$_$0 (_ bv2048 16)))
+  (= _symb$t2$match_0$_$0 _symb$t1$1$s$_$0))))
